@@ -111,6 +111,7 @@ data class CuplixItem(
 
 data class ContinueWatchingItem(
     val id: String,
+    val idMovie: String,
     val title: String,
     val episodeText: String,
     val imageUrl: String,
