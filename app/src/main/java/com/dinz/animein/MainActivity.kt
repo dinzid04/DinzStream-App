@@ -13,8 +13,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.dinz.animein.ui.components.NavTab
 import com.dinz.animein.ui.detail.AnimeDetailScreen
 import com.dinz.animein.ui.home.HomeScreen
+import com.dinz.animein.ui.jadwal.JadwalScreen
+import com.dinz.animein.ui.search.SearchScreen
 import com.dinz.animein.ui.streaming.StreamingScreen
 import com.dinz.animein.ui.theme.AnimeInTheme
 import com.dinz.animein.ui.theme.ColorBackgroundPrimary
@@ -34,6 +37,7 @@ class MainActivity : ComponentActivity() {
                     var selectedAnimeId by remember { mutableStateOf<String?>(null) }
                     var selectedStreamingEpisodeId by remember { mutableStateOf<String?>(null) }
                     var selectedStreamingMovieId by remember { mutableStateOf<String?>(null) }
+                    var currentTab by remember { mutableStateOf(NavTab.HOME) }
 
                     when {
                         selectedStreamingEpisodeId != null -> {
@@ -64,14 +68,71 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         else -> {
-                            HomeScreen(
-                                onAnimeClick = { animeId ->
-                                    selectedAnimeId = animeId
-                                },
-                                onCuplixClick = { cuplixId ->
-                                    Toast.makeText(this, "Putar Cuplix #$cuplixId", Toast.LENGTH_SHORT).show()
+                            when (currentTab) {
+                                NavTab.HOME -> {
+                                    HomeScreen(
+                                        selectedTab = currentTab,
+                                        onTabSelected = { tab ->
+                                            if (tab == NavTab.CHAT || tab == NavTab.PROFILE) {
+                                                Toast.makeText(this, "Fitur ${tab.title} segera hadir", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                currentTab = tab
+                                            }
+                                        },
+                                        onAnimeClick = { animeId ->
+                                            selectedAnimeId = animeId
+                                        },
+                                        onCuplixClick = { cuplixId ->
+                                            Toast.makeText(this, "Putar Cuplix #$cuplixId", Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
                                 }
-                            )
+                                NavTab.JADWAL -> {
+                                    BackHandler {
+                                        currentTab = NavTab.HOME
+                                    }
+                                    JadwalScreen(
+                                        selectedTab = currentTab,
+                                        onTabSelected = { tab ->
+                                            if (tab == NavTab.CHAT || tab == NavTab.PROFILE) {
+                                                Toast.makeText(this, "Fitur ${tab.title} segera hadir", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                currentTab = tab
+                                            }
+                                        },
+                                        onAnimeClick = { animeId ->
+                                            selectedAnimeId = animeId
+                                        },
+                                        onCuplixClick = { cuplixId ->
+                                            Toast.makeText(this, "Putar Cuplix #$cuplixId", Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
+                                }
+                                NavTab.CARI -> {
+                                    BackHandler {
+                                        currentTab = NavTab.HOME
+                                    }
+                                    SearchScreen(
+                                        selectedTab = currentTab,
+                                        onTabSelected = { tab ->
+                                            if (tab == NavTab.CHAT || tab == NavTab.PROFILE) {
+                                                Toast.makeText(this, "Fitur ${tab.title} segera hadir", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                currentTab = tab
+                                            }
+                                        },
+                                        onAnimeClick = { animeId ->
+                                            selectedAnimeId = animeId
+                                        },
+                                        onCuplixClick = { cuplixId ->
+                                            Toast.makeText(this, "Putar Cuplix #$cuplixId", Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
+                                }
+                                else -> {
+                                    currentTab = NavTab.HOME
+                                }
+                            }
                         }
                     }
                 }
@@ -79,4 +140,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-

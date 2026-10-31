@@ -11,6 +11,9 @@ import com.dinz.animein.data.model.CuplixItem
 import com.dinz.animein.data.model.DiscussionItem
 import com.dinz.animein.data.model.EpisodeCommentItem
 import com.dinz.animein.data.model.EpisodeItem
+import com.dinz.animein.data.model.ExploreCharacterItem
+import com.dinz.animein.data.model.ExploreGenreItem
+import com.dinz.animein.data.model.ExploreYearItem
 import com.dinz.animein.data.model.MovieDetailData
 import com.dinz.animein.data.model.StreamData
 import kotlinx.coroutines.Dispatchers
@@ -227,5 +230,74 @@ class AnimeRepository(
                 views = "1.424"
             )
         )
+    }
+
+    // ==================== JADWAL REPOSITORY ====================
+
+    suspend fun getSchedule(day: String): Result<List<AnimeItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getSchedule(day = day.uppercase(Locale.ROOT))
+            val movies = response.data?.movies ?: emptyList()
+            Result.success(movies)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // ==================== EXPLORE / SEARCH REPOSITORY ====================
+
+    suspend fun getExploreGenres(): Result<List<ExploreGenreItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getExploreGenres()
+            val genres = response.data?.genres ?: emptyList()
+            Result.success(genres)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getExploreYears(): Result<List<ExploreYearItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getExploreYears()
+            val years = response.data?.years ?: emptyList()
+            Result.success(years)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getExploreCharacters(): Result<List<ExploreCharacterItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getExploreCharacters()
+            val chars = response.data?.characters ?: emptyList()
+            Result.success(chars)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun searchMovies(
+        keyword: String? = null,
+        genreIn: String? = null,
+        type: String? = null,
+        sort: String = "views",
+        page: Int = 0
+    ): Result<List<AnimeItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.searchMovies(
+                keyword = keyword?.ifBlank { null },
+                genreIn = genreIn?.ifBlank { null },
+                type = type?.ifBlank { null },
+                sort = sort,
+                page = page
+            )
+            val movies = response.data?.movies
+                ?: response.data?.hotAnime
+                ?: response.data?.newEpisodes
+                ?: emptyList()
+            Result.success(movies)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

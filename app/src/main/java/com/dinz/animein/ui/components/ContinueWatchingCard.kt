@@ -1,15 +1,20 @@
 package com.dinz.animein.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,25 +32,27 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.dinz.animein.data.model.ContinueWatchingItem
 import com.dinz.animein.ui.theme.ColorAccentPrimary
+import com.dinz.animein.ui.theme.ColorMetricFavorites
 import com.dinz.animein.ui.theme.ColorMetricViews
 import com.dinz.animein.ui.theme.ColorTextPrimary
-import com.dinz.animein.ui.theme.ColorTextSecondary
 
 @Composable
 fun ContinueWatchingCard(
     item: ContinueWatchingItem,
     modifier: Modifier = Modifier,
+    views: String = "94.550 views",
+    favorites: String = "8.664 favorites",
     onClick: () -> Unit = {}
 ) {
     Column(
         modifier = modifier
-            .width(180.dp)
+            .width(115.dp)
             .clickable(onClick = onClick)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(16f / 9f)
+                .aspectRatio(2f / 3f)
                 .clip(RoundedCornerShape(8.dp))
         ) {
             AsyncImage(
@@ -76,7 +83,9 @@ fun ContinueWatchingCard(
             text = item.episodeText,
             color = ColorAccentPrimary,
             fontSize = 10.5.sp,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
 
         Spacer(modifier = Modifier.height(2.dp))
@@ -86,8 +95,59 @@ fun ContinueWatchingCard(
             color = ColorTextPrimary,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            maxLines = 2,
+            minLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            lineHeight = 15.sp
         )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Views row (Red #EF4444)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Visibility,
+                contentDescription = null,
+                tint = ColorMetricViews,
+                modifier = Modifier.size(11.dp)
+            )
+            Spacer(modifier = Modifier.width(3.dp))
+            Text(
+                text = views,
+                color = ColorMetricViews,
+                fontSize = 9.5.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Spacer(modifier = Modifier.height(1.dp))
+
+        // Favorites row (Yellow #FACC15)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = null,
+                tint = ColorMetricFavorites,
+                modifier = Modifier.size(11.dp)
+            )
+            Spacer(modifier = Modifier.width(3.dp))
+            Text(
+                text = favorites,
+                color = ColorMetricFavorites,
+                fontSize = 9.5.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
+

@@ -354,3 +354,74 @@ data class CommentReplyData(
     @SerializedName("comment_replay") val replies: List<EpisodeCommentItem>? = null
 )
 
+// ==================== SCHEDULE MODELS ====================
+
+data class ScheduleResponse(
+    @SerializedName("status") val status: Int? = null,
+    @SerializedName("error") val error: Boolean? = null,
+    @SerializedName("data") val data: ScheduleData? = null
+)
+
+data class ScheduleData(
+    @SerializedName("movie") val movies: List<AnimeItem>? = null
+)
+
+// ==================== EXPLORE / SEARCH MODELS ====================
+
+data class ExploreGenreResponse(
+    @SerializedName("status") val status: Int? = null,
+    @SerializedName("error") val error: Boolean? = null,
+    @SerializedName("data") val data: ExploreGenreData? = null
+)
+
+data class ExploreGenreData(
+    @SerializedName("genre") val genres: List<ExploreGenreItem>? = null
+)
+
+data class ExploreGenreItem(
+    @SerializedName("id") val id: String? = null,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("image") val image: String? = null,
+    @SerializedName("group") val group: String? = null
+) {
+    fun getEffectiveImage(): String = normalizeImageUrl(image)
+}
+
+data class ExploreYearResponse(
+    @SerializedName("status") val status: Int? = null,
+    @SerializedName("error") val error: Boolean? = null,
+    @SerializedName("data") val data: ExploreYearData? = null
+)
+
+data class ExploreYearData(
+    @SerializedName("year") val years: List<ExploreYearItem>? = null
+)
+
+data class ExploreYearItem(
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("image") val image: String? = null
+) {
+    fun getEffectiveImage(): String = normalizeImageUrl(image)
+}
+
+data class ExploreCharacterResponse(
+    @SerializedName("status") val status: Int? = null,
+    @SerializedName("error") val error: Boolean? = null,
+    @SerializedName("data") val data: ExploreCharacterData? = null
+)
+
+data class ExploreCharacterData(
+    @SerializedName("character") val characters: List<ExploreCharacterItem>? = null
+)
+
+data class ExploreCharacterItem(
+    @SerializedName("id") val id: String? = null,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("name_full") val nameFull: String? = null,
+    @SerializedName("description") val description: String? = null,
+    @SerializedName("image") val image: String? = null
+) {
+    fun getEffectiveImage(): String = normalizeImageUrl(image)
+}
+
+

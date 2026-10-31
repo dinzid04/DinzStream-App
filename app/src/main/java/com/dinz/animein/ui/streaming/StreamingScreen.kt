@@ -40,10 +40,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MoreVert
@@ -119,6 +123,7 @@ import com.dinz.animein.ui.theme.ColorTextSecondary
 import kotlinx.coroutines.delay
 
 private val ColorTosca = Color(0xFF26A69A)
+private val ColorEmerald = Color(0xFF00C853)
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -246,68 +251,44 @@ fun StreamingScreen(
                                     modifier = Modifier.fillMaxSize(),
                                     contentPadding = PaddingValues(bottom = 32.dp)
                                 ) {
-                                    // Episode Title & Metadata
+                                    // Episode Title, Anime Title & Synopsis (Matching IMG-20261031-WA0049)
                                     item(key = "episode_header") {
                                         Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                                                .padding(horizontal = 16.dp, vertical = 10.dp)
                                         ) {
                                             Text(
-                                                text = uiState.episode?.title?.ifBlank { "Episode ${uiState.episode?.index ?: ""}" }
-                                                    ?: "Episode ${uiState.episode?.index ?: ""}",
+                                                text = "Episode ${uiState.episode?.index ?: "1"}",
+                                                color = ColorTextSecondary,
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            val animeTitle = uiState.episode?.anime
+                                                ?: uiState.episode?.title?.substringBefore(" Episode")
+                                                ?: "Anime Streaming"
+                                            Text(
+                                                text = animeTitle,
                                                 color = ColorTextPrimary,
-                                                fontSize = 18.sp,
+                                                fontSize = 20.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                            ) {
-                                                // Date in Tosca
-                                                Text(
-                                                    text = uiState.episode?.keyTime?.ifBlank { "Terbaru" } ?: "Terbaru",
-                                                    color = ColorTosca,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.SemiBold
-                                                )
-                                                // Views in Red
-                                                Text(
-                                                    text = "${uiState.episode?.views ?: "0"} views",
-                                                    color = ColorMetricViews,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.SemiBold
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    // 2 Action Buttons Row: SERVER & LOVE IT
-                                    item(key = "action_buttons") {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 16.dp, vertical = 6.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                        ) {
-                                            // SERVER Button
-                                            ActionButtonItem(
-                                                icon = Icons.Default.Dns,
-                                                label = "SERVER",
-                                                modifier = Modifier.weight(1f),
-                                                onClick = { viewModel.toggleServerPicker() }
-                                            )
-
-                                            // LOVE IT Button
-                                            ActionButtonItem(
-                                                icon = Icons.Default.StarOutline,
-                                                label = "LOVE IT",
-                                                modifier = Modifier.weight(1f),
-                                                onClick = { viewModel.toggleLoveItDialog() }
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            val syn = uiState.episode?.synopsis
+                                                ?: "Streaming anime episode terlengkap dengan kualitas jernih dan subtitle Indonesia resmi di platform AnimeIn."
+                                            Text(
+                                                text = syn,
+                                                color = ColorTextSecondary,
+                                                fontSize = 12.sp,
+                                                maxLines = 3,
+                                                overflow = TextOverflow.Ellipsis,
+                                                lineHeight = 16.sp
                                             )
                                         }
                                     }
+
+
 
                                     // Section: COVER & POSTER (Side by Side Preview)
                                     item(key = "cover_poster_section") {
@@ -346,29 +327,36 @@ fun StreamingScreen(
                                                 .padding(horizontal = 16.dp),
                                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                                         ) {
-                                            // Poster Card
+                                            // Poster Card with upvote points
                                             val posterImg = uiState.posters.firstOrNull()?.getEffectiveImage() ?: ""
-                                            Box(
-                                                modifier = Modifier
-                                                    .width(110.dp)
-                                                    .aspectRatio(2f / 3f)
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(Color(0xFF181A22))
-                                                    .clickable {
-                                                        if (posterImg.isNotBlank()) viewModel.openFullScreenImage(posterImg)
-                                                        else viewModel.toggleGallerySheet(0)
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .width(105.dp)
+                                                        .aspectRatio(2f / 3f)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(Color(0xFF181A22))
+                                                        .clickable {
+                                                            if (posterImg.isNotBlank()) viewModel.openFullScreenImage(posterImg)
+                                                            else viewModel.toggleGallerySheet(0)
+                                                        }
+                                                ) {
+                                                    if (posterImg.isNotBlank()) {
+                                                        AsyncImage(
+                                                            model = ImageRequest.Builder(LocalContext.current)
+                                                                .data(posterImg)
+                                                                .crossfade(true)
+                                                                .build(),
+                                                            contentDescription = "Poster",
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            contentScale = ContentScale.Crop
+                                                        )
                                                     }
-                                            ) {
-                                                if (posterImg.isNotBlank()) {
-                                                    AsyncImage(
-                                                        model = ImageRequest.Builder(LocalContext.current)
-                                                            .data(posterImg)
-                                                            .crossfade(true)
-                                                            .build(),
-                                                        contentDescription = "Poster",
-                                                        modifier = Modifier.fillMaxSize(),
-                                                        contentScale = ContentScale.Crop
-                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Text(text = "▲", color = ColorAccentPrimary, fontSize = 11.sp)
+                                                    Text(text = "44 P", color = ColorTextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                                 }
                                             }
 
@@ -670,40 +658,85 @@ private fun CustomExoPlayerView(
                         )
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Settings Gear
-                        IconButton(onClick = { viewModel.toggleSettings() }, modifier = Modifier.size(40.dp)) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
+                    // Menu with dropdown arrow (Matching IMG-20261031-WA0049)
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0x40000000))
+                            .clickable { viewModel.toggleServerPicker() }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Menu",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Menu Server",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
 
-                // Center Play / Pause Big Button
-                IconButton(
-                    onClick = {
-                        if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
-                    },
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(64.dp)
+                // Center Rewind, Emerald Play/Pause, Forward (Matching IMG-20261031-WA0049)
+                Row(
+                    modifier = Modifier.align(Alignment.Center),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(28.dp)
                 ) {
+                    // Rewind 10s
+                    IconButton(
+                        onClick = {
+                            val newPos = (exoPlayer.currentPosition - 10000).coerceAtLeast(0)
+                            exoPlayer.seekTo(newPos)
+                        },
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FastRewind,
+                            contentDescription = "Mundur 10 detik",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+
+                    // Center Play / Pause Big Button in Emerald Green (#00C853)
                     Box(
                         modifier = Modifier
                             .size(56.dp)
                             .clip(CircleShape)
-                            .background(Color(0x80000000)),
+                            .background(ColorEmerald)
+                            .clickable {
+                                if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = "Play/Pause",
                             tint = Color.White,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
+
+                    // Forward 10s
+                    IconButton(
+                        onClick = {
+                            val newPos = (exoPlayer.currentPosition + 10000).coerceAtMost(exoPlayer.duration.coerceAtLeast(0))
+                            exoPlayer.seekTo(newPos)
+                        },
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FastForward,
+                            contentDescription = "Maju 10 detik",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                 }
@@ -720,21 +753,6 @@ private fun CustomExoPlayerView(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Play/Pause icon button
-                        IconButton(
-                            onClick = {
-                                if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
-                            },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-
                         // Current Time
                         Text(
                             text = formatTime(if (isSeeking) sliderPosition else uiState.currentPositionMs),
@@ -745,7 +763,7 @@ private fun CustomExoPlayerView(
 
                         Spacer(modifier = Modifier.width(6.dp))
 
-                        // Custom Progress Slider (Tosca #26A69A)
+                        // Custom Progress Slider (Emerald Green #00C853)
                         val totalDuration = if (uiState.durationMs > 0) uiState.durationMs else 1L
                         val currentPos = if (isSeeking) sliderPosition else uiState.currentPositionMs
                         val sliderFraction = (currentPos.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
@@ -761,8 +779,8 @@ private fun CustomExoPlayerView(
                                 isSeeking = false
                             },
                             colors = SliderDefaults.colors(
-                                thumbColor = ColorTosca,
-                                activeTrackColor = ColorTosca,
+                                thumbColor = ColorEmerald,
+                                activeTrackColor = ColorEmerald,
                                 inactiveTrackColor = Color(0x66FFFFFF)
                             ),
                             modifier = Modifier.weight(1f)
@@ -790,6 +808,11 @@ private fun CustomExoPlayerView(
                         ) {
                             Text(
                                 text = "${uiState.playbackSpeed}x",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                                 color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold

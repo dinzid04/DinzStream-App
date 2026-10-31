@@ -342,4 +342,147 @@ Halaman streaming dibangun presisi berdasarkan referensi visual `reff_uistreamin
 | **Poster Komunitas** | `GET /3/2/movie_poster/data?id_movie={id}` | `data.poster` (`id`, `image`) |
 | **Cover Komunitas** | `GET /3/2/movie_cover/data?id_movie={id}` | `data.cover` (`id`, `image`) |
 
+---
+
+## 10. Perombakan Presisi Halaman Streaming (Berdasarkan `IMG-20261031-WA0049` & `WA0055`)
+
+Berdasarkan komparasi antara kegagalan pada `reff_uistreaminggagal` vs gambar referensi final `reff_uistreaming/IMG-20261031-WA0049.jpg`:
+
+1. **Player Controls & Palet Warna Hijau Emerald:**
+   * Tombol Play/Pause tengah: Lingkaran **Hijau Emerald Menyala** (`#00C853` / `#10B981`) berukuran besar dengan ikon pause/play putih di dalamnya, diapit oleh ikon putih *Skip Backward 10s* (`<<`) dan *Skip Forward 10s* (`>>`).
+   * Top bar player: Tombol panah kembali `<` di kiri, dan teks `Menu v` (dengan ikon dropdown) di kanan atas player untuk memicu bottom sheet / modal pemilihan server dan resolusi video.
+   * Bottom bar seekbar: Track dan thumb seekbar berwarna hijau emerald (`#00C853`), durasi saat ini di kiri (`01:44`), total durasi di kanan (`23:49`), serta ikon fullscreen di ujung kanan.
+2. **Metadata Header di Bawah Player (Menghapus Tombol Kotak Raksasa SERVER/LOVE IT):**
+   * Teks abu-abu/putih: `Episode [Nomor]` (contoh: `Episode 4`).
+   * Judul Anime putih tebal besar: (contoh: `Black Clover`).
+   * Teks sinopsis singkat (maksimal 3 baris teks abu-abu sekunder, contoh: `Asta dan Yuno adalah dua anak yatim piatu yang menginginkan hal yang sama...`).
+   * **Menghilangkan dua kotak tombol besar SERVER & LOVE IT** yang menutupi konten; fungsi pemilihan server dipindahkan ke tombol `Menu v` di pojok kanan atas player.
+3. **Bagian `COVER & POSTER`:**
+   * Header teks putih `COVER & POSTER` dengan menu tiga titik vertikal (`⋮`) di kanan.
+   * Poster kiri berbingkai vertikal disertai penanda segitiga oranye `▲` dan jumlah poin (contoh: `44 P`) di sisi kanan poster.
+4. **Bagian `COMMENTS` & Floating Action Chat Button:**
+   * Header `COMMENTS ([Jumlah])` dengan ikon sort/filter baris di kanan.
+   * Tampilan komentar dengan avatar Pokémon GIF animasi di sebelah kiri, username, durasi waktu, isi teks komentar, tombol jempol Like + jumlah, Dislike + jumlah, dan tombol biru/cyan `💬 [N] Balasan`.
+   * Floating Action Button (FAB) lingkaran tosca/teal di pojok kanan bawah dengan ikon bubble chat `💬` untuk membuka bar ketik komentar.
+   * Input bar komentar mengambang: Bentuk pil rounded dengan ikon chat di kiri, placeholder `Tulis komentar..`, dan tombol panah oranye `>` di kanan.
+5. **Layar Penuh Balasan (`Balasan Screen`):**
+   * Top bar: Tombol back `<` di kiri, judul tengah `Balasan` dengan garis aksen oranye di bawahnya, dan tombol sort di kanan.
+   * Pinned parent comment di bagian teratas.
+   * Input bar pil `Tulis Balasan..`.
+   * Daftar balasan komentar dengan avatar Pokémon animasi, like, dan dislike.
+
+---
+
+## 11. Perombakan Presisi Halaman Home (Koreksi `reff_uihomegagal` vs `Screenshot_ANIMEIN`)
+
+Berdasarkan komparasi presisi antara `reff_uihome/Screenshot_20261031_131918_ANIMEIN.jpg` vs kegagalan di `reff_uihomegagal`:
+
+1. **Seksi `Lanjut Nonton`:**
+   * Wajib menggunakan **kartu vertikal (2:3)** seperti poster anime standar, BUKAN kartu landscape 16:9 yang melebar kaku!
+   * Di bawah poster vertikal:
+     * Teks oranye: `Episode [Nomor]` (contoh: `Episode 1`).
+     * Judul anime: Teks putih tebal (maksimal 2 baris, ellipsis).
+     * Baris Views (merah) dan Baris Favorites (kuning emas).
+2. **Seksi `Cuplix`:**
+   * Item cuplikan pendek berbentuk **Squircle / Rounded Rectangle** (`rounded-2xl` / `rounded-xl`), BUKAN lingkaran bulat ber-border oranye tebal.
+3. **Seksi `Episode Baru`:**
+   * Teks oranye wajib menampilkan nomor episode dinamis dari data API (`Episode [Index]`, contoh: `Episode 7`, `Episode 5`, `Episode 177`), **BUKAN** teks statis generik "Episode Baru"!
+   * Di bawah nomor episode: Judul anime putih tebal + baris Views (merah) & Favorites (kuning).
+4. **Seksi `Sedang Hangat` & `Jas Por Yu`:**
+   * Menggunakan kartu landscape lebar (16:9) dengan banner anime.
+   * Di bawah banner lebar: Poster vertikal kecil di sisi kiri, mendampingi genre teks oranye, judul anime putih tebal, serta baris metrik Views (merah) + Favorites (kuning) secara horizontal.
+   * Seksi `Jas Por Yu` memiliki arsitektur tata letak yang identik dengan `Sedang Hangat`.
+5. **Seksi `Judul Baru`, `Jadwal Hari Ini`, & `Paling Populer`:**
+   * Menggunakan poster vertikal (2:3).
+   * Teks genre tunggal oranye (contoh: `Action`, `Comedy`) agar ringkas dan tidak meluber.
+   * Judul putih tebal, Views (merah), Favorites (kuning).
+   * Pada `Jadwal Hari Ini`: Disertai jam tayang / indikator rilis baru dengan ikon jam ungu (contoh: `🕒 new !!`).
+6. **Seksi `Paling Dinanti`:**
+   * Menampilkan tanggal rilis dengan ikon kalender biru (contoh: `📅 2026-10-??` / `📅 2025-10-02`) dan ikon bintang kuning dengan jumlah favorites (`⭐ 12.880 favorites`).
+   * **DILARANG menampilkan baris Views (`0 views`)** karena anime ini belum tayang di platform!
+7. **Seksi `Baca Manra`:**
+   * Header section bernama `Baca Manra`.
+   * Placeholder kartu gelap membulat dengan genre oranye, judul putih tebal, serta metrik pembaca berikon buku/play merah (contoh: `347 plays`, `19.433 plays`).
+8. **Bottom Navigation Bar (5 Tab):**
+   * 5 Tab: `HOME`, `JADWAL`, `CARI`, `CHAT`, `PROFILE`.
+   * Ikon vektor outline bersih tanpa background kotak berlebih; tab aktif memiliki ikon dan teks berwarna oranye `#FF5722`.
+
+---
+
+## 12. Arsitektur & Spesifikasi UI Halaman Jadwal (`JadwalScreen.kt`)
+
+Sesuai referensi visual `reff_uijadwal/Screenshot_20261031_133246_ANIMEIN.jpg`:
+
+1. **Top Days Tab Row (Horizontal Scrollable):**
+   * Pilihan tab hari: `SEN`, `SEL`, `RAB`, `KAM`, `JUM`, `SAB`, `MIN`.
+   * Tab aktif ditandai teks oranye tebal `#FF5722` dengan garis bawah oranye (*underline indicator*).
+2. **Baris Cuplix Squircle Horizontal:**
+   * Baris item cuplikan pendek (bentuk squircle membulat) tepat di bawah tab baris hari.
+3. **Daftar Kartu Anime Jadwal Tayang (LazyColumn):**
+   * Kartu vertikal mendatar:
+     * **Sisi Kiri:** Poster anime vertikal (2:3) dengan sudut membulat halus (`rounded-xl`).
+     * **Sisi Kanan:**
+       * Teks Genre Oranye: (contoh: `Action, Adventure, Shounen`).
+       * Judul Anime Putih Tebal: (contoh: `Bleach: Sennen Kessen-hen - Kashin-tan`).
+       * Sinopsis Singkat Teks Abu-abu: (contoh: `Bagian terakhir dari Bleach: Sennen Kessen-hen`).
+       * Baris Metrik:
+         * Views Merah: Ikon play/mata merah + teks (contoh: `183.357 views`).
+         * Favorites Kuning: Ikon bintang kuning + teks (contoh: `6.342 favorites`).
+       * Countdown Jam Tayang Ungu: Ikon jam ungu + teks countdown waktu rilis dari API (contoh: `🕒 2h 11j 8m`).
+4. **Integrasi Data API:**
+   * Mengambil data dari endpoint `GET /3/2/schedule/data?day={HARI}` (dimana `{HARI}` bernilai `SENIN`, `SELASA`, `RABU`, `KAMIS`, `JUMAT`, `SABTU`, `MINGGU`).
+   * Cuplix feed diambil dari `GET /data/fyp2/list_scroll`.
+
+---
+
+## 13. Arsitektur & Spesifikasi UI Halaman Search / Explore (`SearchScreen.kt`)
+
+Sesuai referensi visual `reff_uisearch/Screenshot_20261031_133332_ANIMEIN.jpg` (Mode Kategori) & `Screenshot_20261031_133429_ANIMEIN.jpg` (Mode Hasil Pencarian):
+
+1. **Top Search Bar (Kotak Pencarian):**
+   * Baris pil rounded abu-abu gelap dengan ikon search `🔍`, placeholder `Cari Anime..`, tombol hapus query, serta tombol kirim oranye `>` di sisi kanan.
+2. **Mode Default: Kategori, Studio, Tahun, Tipe & Karakter:**
+   * **Seksi `KATEGORI` (Header + `>`):**
+     * Kartu putih membulat (`rounded-xl`, teks hitam kontras):
+       * Kiri: Subtitle `Theme` / `Genre` + Judul Kategori tebal (contoh: `Demons`, `Sci-Fi`, `Comedy`).
+       * Kanan: Ilustrasi karakter anime cantik dari field `image`.
+     * Mengambil data dari endpoint `GET /3/2/explore/genre`. Mengetuk kartu langsung menyaring anime berdasarkan genre tersebut.
+   * **Seksi `STUDIO`:**
+     * Baris horizontal pill gelap: `MAPPA`, `Ufotable`, `Kyoto Animation`, `Bones`, `A-1 Pictures`, `Toei Animation`, `Madhouse`, `Wit Studio`.
+   * **Seksi `TAHUN` (Header + `>`):**
+     * Kartu putih membulat:
+       * Kiri: Ilustrasi karakter anime dari `image`.
+       * Kanan: Teks tahun tebal (contoh: `2026`, `2025`, `2017`, `2000an`, `1900an`).
+     * Mengambil data dari endpoint `GET /3/2/explore/year`.
+   * **Seksi `TIPE`:**
+     * Baris horizontal pill gelap: `MOVIE`, `ONA`, `OVA`, `LIVE ACTION`, `SPECIAL`, `TV`.
+   * **Seksi `KARAKTER` (Header + `>`):**
+     * Kartu abu-abu gelap kebiruan (`#1E293B`):
+       * Kiri: Nama karakter (contoh: `Hinata`, `Reanette`, `Kurisu`, `Aika`, `C.C.`).
+       * Kanan: Avatar gambar karakter dari endpoint `GET /3/2/explore/manra_npc`.
+3. **Mode Hasil Pencarian (Active Query / Filter Mode):**
+   * **Baris Filter Genre Chips:** Pil horizontal dengan outline border oranye tipis (`Action`, `Adventure`, `Comedy`, dll).
+   * **Baris Cuplix Squircle:** Menampilkan reel pendek anime terkait.
+   * **List Hasil Anime:**
+     * Poster vertikal (2:3) di kiri.
+     * Kanan: Genre oranye, Judul putih tebal, Sinopsis ringkas abu-abu (2 baris ellipsis), Views merah & Favorites kuning.
+   * **Floating Action Buttons (Kanan Bawah):**
+     * Tombol Sortir (`1->9` / `A->Z`).
+     * Tombol Toggle Tampilan (Grid `▦` vs List `≡`).
+4. **Integrasi Data API:**
+   * Mengambil hasil pencarian dari `GET /3/2/explore/movie?keyword={QUERY}&genre_in={GENRE}&type={TYPE}&sort={SORT}&page={PAGE}`.
+
+---
+
+## 14. Pemetaan Lengkap Endpoint API Jadwal & Search
+
+| Fitur / Layar | Endpoint API Sumber | Parameter Kunci | Response Payload |
+| :--- | :--- | :--- | :--- |
+| **Daftar Jadwal Tayang** | `GET /3/2/schedule/data` | `day=SENIN` (dll) | `data.movie` (`id`, `title`, `synopsis`, `image_poster`, `genre`, `views`, `favorites`, `time`) |
+| **Kategori / Genre Search** | `GET /3/2/explore/genre` | - | `data.genre` (`id`, `name`, `group`, `image`) |
+| **Tahun Search** | `GET /3/2/explore/year` | - | `data.year` (`name`, `image`) |
+| **Karakter Search** | `GET /3/2/explore/manra_npc` | - | `data.character` (`id`, `name`, `image`) |
+| **Cari / Filter Anime** | `GET /3/2/explore/movie` | `keyword`, `genre_in`, `type`, `sort`, `page` | `data.movie` (`id`, `title`, `synopsis`, `image_poster`, `genre`, `views`, `favorites`) |
+
+
 

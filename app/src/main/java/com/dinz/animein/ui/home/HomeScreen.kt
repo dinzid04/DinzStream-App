@@ -38,11 +38,12 @@ import com.dinz.animein.ui.theme.ColorBackgroundPrimary
 fun HomeScreen(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(),
+    selectedTab: NavTab = NavTab.HOME,
+    onTabSelected: (NavTab) -> Unit = {},
     onAnimeClick: (id: String) -> Unit = {},
     onCuplixClick: (id: String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var selectedTab by remember { mutableStateOf(NavTab.HOME) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -50,7 +51,7 @@ fun HomeScreen(
         bottomBar = {
             BottomNavBar(
                 selectedTab = selectedTab,
-                onTabSelected = { selectedTab = it }
+                onTabSelected = onTabSelected
             )
         }
     ) { innerPadding ->
@@ -157,7 +158,7 @@ fun HomeScreen(
                                     ) { anime ->
                                         AnimeVerticalCard(
                                             anime = anime,
-                                            overrideSubtitle = anime.index?.let { "Episode $it" } ?: "Episode Baru",
+                                            overrideSubtitle = anime.index?.let { "Episode $it" } ?: "Episode 1",
                                             onClick = { anime.id?.let { onAnimeClick(it) } }
                                         )
                                     }
@@ -206,9 +207,10 @@ fun HomeScreen(
                                         items = uiState.newTitlesList,
                                         key = { "new_title_" + (it.id ?: it.hashCode().toString()) }
                                     ) { anime ->
+                                        val singleGenre = anime.getDisplayGenre().split(",").firstOrNull()?.trim() ?: "Action"
                                         AnimeVerticalCard(
                                             anime = anime,
-                                            overrideSubtitle = anime.getDisplayGenre(),
+                                            overrideSubtitle = singleGenre,
                                             onClick = { anime.id?.let { onAnimeClick(it) } }
                                         )
                                     }
@@ -232,9 +234,10 @@ fun HomeScreen(
                                         items = uiState.todayScheduleList,
                                         key = { "today_" + (it.id ?: it.hashCode().toString()) }
                                     ) { anime ->
+                                        val singleGenre = anime.getDisplayGenre().split(",").firstOrNull()?.trim() ?: "Action"
                                         AnimeVerticalCard(
                                             anime = anime,
-                                            overrideSubtitle = anime.getDisplayGenre(),
+                                            overrideSubtitle = singleGenre,
                                             showAiringTime = true,
                                             onClick = { anime.id?.let { onAnimeClick(it) } }
                                         )
@@ -243,13 +246,13 @@ fun HomeScreen(
                             }
                         }
 
-                        // 8. Section "Jat For Yu" (16:9 Landscape Wide Cards)
+                        // 8. Section "Jas Por Yu" (16:9 Landscape Wide Cards)
                         if (uiState.jatForYuList.isNotEmpty()) {
-                            item(key = "section_jat_for_yu") {
+                            item(key = "section_jas_por_yu") {
                                 Spacer(modifier = Modifier.height(18.dp))
                                 SectionHeader(
-                                    title = "Jat For Yu",
-                                    onChevronClick = { /* See All Jat For Yu */ }
+                                    title = "Jas Por Yu",
+                                    onChevronClick = { /* See All Jas Por Yu */ }
                                 )
                                 LazyRow(
                                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -257,7 +260,7 @@ fun HomeScreen(
                                 ) {
                                     items(
                                         items = uiState.jatForYuList,
-                                        key = { "jat_for_yu_" + (it.id ?: it.hashCode().toString()) }
+                                        key = { "jas_por_yu_" + (it.id ?: it.hashCode().toString()) }
                                     ) { anime ->
                                         AnimeWideCard(
                                             anime = anime,
@@ -284,9 +287,10 @@ fun HomeScreen(
                                         items = uiState.waitingAnimeList,
                                         key = { "waiting_" + (it.id ?: it.hashCode().toString()) }
                                     ) { anime ->
+                                        val singleGenre = anime.getDisplayGenre().split(",").firstOrNull()?.trim() ?: "Action"
                                         AnimeVerticalCard(
                                             anime = anime,
-                                            overrideSubtitle = anime.getDisplayGenre(),
+                                            overrideSubtitle = singleGenre,
                                             showReleaseDate = true,
                                             onClick = { anime.id?.let { onAnimeClick(it) } }
                                         )
@@ -311,9 +315,10 @@ fun HomeScreen(
                                         items = uiState.popularAnimeList,
                                         key = { "popular_" + (it.id ?: it.hashCode().toString()) }
                                     ) { anime ->
+                                        val singleGenre = anime.getDisplayGenre().split(",").firstOrNull()?.trim() ?: "Action"
                                         AnimeVerticalCard(
                                             anime = anime,
-                                            overrideSubtitle = anime.getDisplayGenre(),
+                                            overrideSubtitle = singleGenre,
                                             onClick = { anime.id?.let { onAnimeClick(it) } }
                                         )
                                     }
@@ -321,13 +326,13 @@ fun HomeScreen(
                             }
                         }
 
-                        // 11. Section "Baca Manre" (2:3 Vertical Cards)
+                        // 11. Section "Baca Manra" (2:3 Vertical Cards)
                         if (uiState.manreList.isNotEmpty()) {
-                            item(key = "section_baca_manre") {
+                            item(key = "section_baca_manra") {
                                 Spacer(modifier = Modifier.height(18.dp))
                                 SectionHeader(
-                                    title = "Baca Manre",
-                                    onChevronClick = { /* See All Manre */ }
+                                    title = "Baca Manra",
+                                    onChevronClick = { /* See All Manra */ }
                                 )
                                 LazyRow(
                                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -335,11 +340,12 @@ fun HomeScreen(
                                 ) {
                                     items(
                                         items = uiState.manreList,
-                                        key = { "manre_" + (it.id ?: it.hashCode().toString()) }
+                                        key = { "manra_" + (it.id ?: it.hashCode().toString()) }
                                     ) { anime ->
+                                        val singleGenre = anime.getDisplayGenre().split(",").firstOrNull()?.trim() ?: "Comedy"
                                         AnimeVerticalCard(
                                             anime = anime,
-                                            overrideSubtitle = anime.getDisplayGenre(),
+                                            overrideSubtitle = singleGenre,
                                             onClick = { anime.id?.let { onAnimeClick(it) } }
                                         )
                                     }

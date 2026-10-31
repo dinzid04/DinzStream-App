@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
@@ -33,11 +33,11 @@ import com.dinz.animein.ui.theme.ColorBorderSubtle
 import com.dinz.animein.ui.theme.ColorTextSecondary
 
 enum class NavTab(val title: String, val icon: ImageVector) {
-    HOME("Home", Icons.Filled.Home),
-    JADWAL("Jadwal", Icons.Filled.CalendarMonth),
-    CARI("Cari", Icons.Filled.Search),
-    CHAT("Chat", Icons.Filled.ChatBubbleOutline),
-    PROFIL("Profil", Icons.Filled.Person)
+    HOME("HOME", Icons.Filled.Home),
+    JADWAL("JADWAL", Icons.Filled.CalendarMonth),
+    CARI("CARI", Icons.Filled.Search),
+    CHAT("CHAT", Icons.AutoMirrored.Filled.Send),
+    PROFILE("PROFILE", Icons.Filled.Person)
 }
 
 @Composable

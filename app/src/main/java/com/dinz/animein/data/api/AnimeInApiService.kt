@@ -9,7 +9,11 @@ import com.dinz.animein.data.model.CuplixResponse
 import com.dinz.animein.data.model.DiscussionResponse
 import com.dinz.animein.data.model.EpisodeCommentResponse
 import com.dinz.animein.data.model.EpisodeListResponse
+import com.dinz.animein.data.model.ExploreCharacterResponse
+import com.dinz.animein.data.model.ExploreGenreResponse
+import com.dinz.animein.data.model.ExploreYearResponse
 import com.dinz.animein.data.model.MovieDetailResponse
+import com.dinz.animein.data.model.ScheduleResponse
 import com.dinz.animein.data.model.StreamResponse
 import retrofit2.http.GET
 import retrofit2.http.Path
@@ -97,4 +101,31 @@ interface AnimeInApiService {
         @Query("id_comment") idComment: String,
         @Query("page") page: Int = 1
     ): CommentReplyResponse
+
+    // ==================== SCHEDULE ====================
+
+    @GET("/3/2/schedule/data")
+    suspend fun getSchedule(
+        @Query("day") day: String
+    ): ScheduleResponse
+
+    // ==================== EXPLORE / SEARCH ====================
+
+    @GET("/3/2/explore/genre")
+    suspend fun getExploreGenres(): ExploreGenreResponse
+
+    @GET("/3/2/explore/year")
+    suspend fun getExploreYears(): ExploreYearResponse
+
+    @GET("/3/2/explore/manra_npc")
+    suspend fun getExploreCharacters(): ExploreCharacterResponse
+
+    @GET("/3/2/explore/movie")
+    suspend fun searchMovies(
+        @Query("keyword") keyword: String? = null,
+        @Query("genre_in") genreIn: String? = null,
+        @Query("type") type: String? = null,
+        @Query("sort") sort: String = "views",
+        @Query("page") page: Int = 0
+    ): AnimeHomeResponse
 }

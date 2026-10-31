@@ -96,33 +96,12 @@ fun AnimeVerticalCard(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // Optional Airing Time in Purple (#A855F7)
-        if (showAiringTime && !anime.time.isNullOrBlank()) {
+        if (showReleaseDate) {
+            // Optional Release Date in Blue (#3B82F6) - Paling Dinanti only shows Release Date & Favorites
+            val dateText = anime.airedStart ?: "2026-10-??"
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 2.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Schedule,
-                    contentDescription = null,
-                    tint = ColorMetricTime,
-                    modifier = Modifier.size(11.dp)
-                )
-                Spacer(modifier = Modifier.width(3.dp))
-                Text(
-                    text = anime.time,
-                    color = ColorMetricTime,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
-
-        // Optional Release Date in Blue (#3B82F6)
-        if (showReleaseDate && !anime.airedStart.isNullOrBlank()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 2.dp)
+                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.CalendarMonth,
@@ -132,35 +111,37 @@ fun AnimeVerticalCard(
                 )
                 Spacer(modifier = Modifier.width(3.dp))
                 Text(
-                    text = anime.airedStart,
+                    text = dateText,
                     color = ColorMetricReleaseDate,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-        }
-
-        // Views row (Red #EF4444)
-        val viewsCount = anime.views ?: "0"
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Visibility,
-                contentDescription = null,
-                tint = ColorMetricViews,
-                modifier = Modifier.size(11.dp)
-            )
-            Spacer(modifier = Modifier.width(3.dp))
-            Text(
-                text = "$viewsCount views",
-                color = ColorMetricViews,
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+        } else {
+            // Views row (Red #EF4444)
+            val viewsCount = anime.views ?: "0"
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Visibility,
+                    contentDescription = null,
+                    tint = ColorMetricViews,
+                    modifier = Modifier.size(11.dp)
+                )
+                Spacer(modifier = Modifier.width(3.dp))
+                Text(
+                    text = "$viewsCount views",
+                    color = ColorMetricViews,
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(1.dp))
@@ -186,6 +167,32 @@ fun AnimeVerticalCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+        }
+
+        // Optional Airing Time in Purple (#A855F7) - Jadwal Hari Ini shows purple clock at bottom
+        if (showAiringTime) {
+            Spacer(modifier = Modifier.height(2.dp))
+            val timeText = if (!anime.time.isNullOrBlank()) anime.time else "new !!"
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Schedule,
+                    contentDescription = null,
+                    tint = ColorMetricTime,
+                    modifier = Modifier.size(11.dp)
+                )
+                Spacer(modifier = Modifier.width(3.dp))
+                Text(
+                    text = timeText,
+                    color = ColorMetricTime,
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
