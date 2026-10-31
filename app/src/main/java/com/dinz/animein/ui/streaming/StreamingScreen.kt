@@ -276,8 +276,7 @@ fun StreamingScreen(
                                                 fontWeight = FontWeight.Medium
                                             )
                                             Spacer(modifier = Modifier.height(2.dp))
-                                            val animeTitle = uiState.episode?.anime
-                                                ?: uiState.episode?.title?.substringBefore(" Episode")
+                                            val animeTitle = uiState.episode?.title?.substringBefore(" Episode")
                                                 ?: "Anime Streaming"
                                             Text(
                                                 text = animeTitle,
@@ -286,8 +285,7 @@ fun StreamingScreen(
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Spacer(modifier = Modifier.height(6.dp))
-                                            val syn = uiState.episode?.synopsis
-                                                ?: "Streaming anime episode terlengkap dengan kualitas jernih dan subtitle Indonesia resmi di platform AnimeIn."
+                                            val syn = "Streaming anime episode terlengkap dengan kualitas jernih dan subtitle Indonesia resmi di platform AnimeIn."
                                             Text(
                                                 text = syn,
                                                 color = ColorTextSecondary,
@@ -874,11 +872,6 @@ private fun CustomExoPlayerView(
                         ) {
                             Text(
                                 text = "${uiState.playbackSpeed}x",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
                                 color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
