@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.dinz.animein.ui.detail.AnimeDetailScreen
 import com.dinz.animein.ui.home.HomeScreen
+import com.dinz.animein.ui.streaming.StreamingScreen
 import com.dinz.animein.ui.theme.AnimeInTheme
 import com.dinz.animein.ui.theme.ColorBackgroundPrimary
 
@@ -31,32 +32,51 @@ class MainActivity : ComponentActivity() {
                     color = ColorBackgroundPrimary
                 ) {
                     var selectedAnimeId by remember { mutableStateOf<String?>(null) }
+                    var selectedStreamingEpisodeId by remember { mutableStateOf<String?>(null) }
+                    var selectedStreamingMovieId by remember { mutableStateOf<String?>(null) }
 
-                    if (selectedAnimeId != null) {
-                        BackHandler {
-                            selectedAnimeId = null
+                    when {
+                        selectedStreamingEpisodeId != null -> {
+                            StreamingScreen(
+                                episodeId = selectedStreamingEpisodeId!!,
+                                movieId = selectedStreamingMovieId ?: selectedAnimeId ?: "",
+                                onBackClick = {
+                                    selectedStreamingEpisodeId = null
+                                }
+                            )
                         }
-                        AnimeDetailScreen(
-                            movieId = selectedAnimeId!!,
-                            onBackClick = {
+                        selectedAnimeId != null -> {
+                            BackHandler {
                                 selectedAnimeId = null
-                            },
-                            onAnimeClick = { newId ->
-                                selectedAnimeId = newId
                             }
-                        )
-                    } else {
-                        HomeScreen(
-                            onAnimeClick = { animeId ->
-                                selectedAnimeId = animeId
-                            },
-                            onCuplixClick = { cuplixId ->
-                                Toast.makeText(this, "Putar Cuplix #$cuplixId", Toast.LENGTH_SHORT).show()
-                            }
-                        )
+                            AnimeDetailScreen(
+                                movieId = selectedAnimeId!!,
+                                onBackClick = {
+                                    selectedAnimeId = null
+                                },
+                                onAnimeClick = { newId ->
+                                    selectedAnimeId = newId
+                                },
+                                onEpisodeClick = { epId ->
+                                    selectedStreamingMovieId = selectedAnimeId
+                                    selectedStreamingEpisodeId = epId
+                                }
+                            )
+                        }
+                        else -> {
+                            HomeScreen(
+                                onAnimeClick = { animeId ->
+                                    selectedAnimeId = animeId
+                                },
+                                onCuplixClick = { cuplixId ->
+                                    Toast.makeText(this, "Putar Cuplix #$cuplixId", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
+

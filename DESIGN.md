@@ -205,32 +205,34 @@ Seluruh data komponen dihubungkan langsung ke scraper dan API yang tersedia di w
 
 ## 7. Arsitektur & Spesifikasi UI Halaman Detail Anime (Anime Detail Screen)
 
-Sesuai analisa mendalam pada referensi desain `reff_ui/reff_uidetail/` (`WA0007` s/d `WA0012`), halaman detail anime memiliki arsitektur modular dengan struktur berikut:
+Sesuai analisa mendalam membandingkan referensi desain asli (`reff_ui/reff_uidetail/`: `WA0022`, `WA0024`, `WA0027`, `WA0029`) terhadap hasil evaluasi sebelumnya (`reff_uidetailgagal/`), halaman detail anime disempurnakan dengan arsitektur 100% presisi:
 
-### 1. Header / Hero Cover (Cover Landscape dengan Gradasi Hitam)
-* **Visual:**
-  * Gambar cover landscape (`image_cover`) di bagian atas dengan rasio fleksibel (tinggi ~230dp).
-  * Lapisan gradasi hitam halus (`Brush.verticalGradient`) di bagian bawah cover agar teks judul dan metrik terbaca jelas (WCAG AA).
-* **Kontrol Atas (Top Overlay Bar):**
-  * Sisi Kiri: Tombol Back (ikon panah kiri `<` dengan padding touch target minimal 48dp).
+### 1. Full Screen / Edge-to-Edge Status Bar Transparan
+* **Tampilan Penuh (Edge-to-Edge):** Menggunakan `enableEdgeToEdge()` dengan status bar transparan penuh sehingga gambar backdrop cover atas menyatu langsung hingga ujung atas layar perangkat (tanpa bilah hitam notifikasi yang memotong gambar).
+* **Insets Padding:** Baris kontrol atas diberikan `statusBarsPadding()` agar tombol `Back`, pill status `ONGOING`, pill tipe `SERIES`, tombol bintang, dan tombol `Share` berada tepat di bawah jam dan indikator sinyal baterai tanpa terpotong.
+
+### 2. Header / Hero Cover (Cover Landscape dengan Kontrol Bersih)
+* **Visual Cover:** Gambar cover landscape (`image_cover`) diperbesar tingginya (~260dp) dengan gradasi hitam halus pekat di bagian bawahnya.
+* **Top Control Bar (Melayang Bersih Tanpa Lingkaran Hitam):**
+  * Sisi Kiri: Ikon panah kembali `Back` transparan bersih tanpa kotak lingkaran hitam (`ic_arrow_back`).
   * Sisi Kanan:
-    * Status Pill: `ONGOING` (background abu-abu transparan `rgba(255,255,255,0.18)`, teks putih 11sp semi-bold).
+    * Status Pill: `ONGOING` (background abu-abu transparan `rgba(255, 255, 255, 0.18)`, teks putih 11sp semi-bold).
     * Type Pill: `SERIES` / `MOVIE` (background hijau tosca / teal `#0D9488`, teks putih 11sp semi-bold).
-    * Action Favorite: Ikon bintang outline (warna putih/kuning saat aktif, touch target >= 48dp).
-    * Action Share: Ikon share (warna putih, touch target >= 48dp).
-* **Informasi Bawah Cover (Bottom Info Overlay):**
+    * Action Favorite: Ikon bintang outline putih `Icons.Outlined.Star` transparan (kuning emas saat aktif).
+    * Action Share: Ikon share putih transparan `Icons.Default.Share`.
+* **Informasi Bawah Cover:**
   * Sisi Kiri:
     * Judul Anime: Teks putih tebal (18sp - 20sp Bold), maksimal 2 baris terpotong rapi.
-    * Baris Statistik: Ikon mata + teks merah (`#EF4444`, contoh: `145.892 views`) dan Ikon bintang + teks kuning emas (`#FACC15`, contoh: `12.480 favorites`).
+    * Baris Statistik: Menggunakan vektor ikon bersih (bukan emoji), teks merah `[jumlah] views` (`#EF4444`) dan teks kuning emas `[jumlah] favorites` (`#FACC15`).
   * Sisi Kanan:
-    * Tombol Play Putar: Tombol melingkar dengan border dan ikon Play oranye (`#FF5722`), di bawah lingkaran terdapat teks putih/abu-abu `ep 1` (atau episode terbaru).
+    * Tombol Play Putar: Lingkaran transparan dengan **border putih tipis dan ikon segitiga play outline putih** (diameter 44dp, tanpa background oranye tebal), dengan teks putih `ep 1` di bawahnya.
 
 ---
 
-### 2. Scrollable TabBar (8 Tab Navigasi)
-* **Daftar Tab:** `INFO`, `EPISODE`, `SEASON`, `DISCUSSION`, `CUPLIX`, `POSTER`, `COVER`, `CONTRIBUTOR`.
+### 3. Scrollable TabBar (6 Tab Navigasi Bersih)
+* **Daftar Tab:** `INFO`, `EPISODE`, `SEASON`, `CUPLIX`, `POSTER`, `COVER` (Tab `DISCUSSION` dan `CONTRIBUTOR` dihapus sepenuhnya dari halaman detail).
 * **Karakter Tab:**
-  * Horizontal scrollable bar dengan background menyatu kanvas (`#0B0B0B`).
+  * Horizontal scrollable bar dengan background kanvas solid pekat (`#0B0B0B`).
   * Indikator garis bawah oranye aktif (`#FF5722`, tebal 2.5dp).
   * Warna teks tab aktif: Oranye `#FF5722` (13sp Bold).
   * Warna teks tab non-aktif: Abu-abu `#9CA3AF` (13sp Medium).
@@ -238,81 +240,106 @@ Sesuai analisa mendalam pada referensi desain `reff_ui/reff_uidetail/` (`WA0007`
 
 ---
 
-### 3. Spesifikasi Setiap Tab Halaman Detail
+### 4. Spesifikasi Setiap Tab Halaman Detail
 
 #### A. Tab `INFO`
-* **Bagian Atas (Header Poster & Judul):**
-  * Sisi Kiri: Poster vertikal rasio `2:3` (lebar ~100dp, tinggi ~150dp) dengan sudut membulat 8dp.
+* **Bagian Atas (Poster Besar & Judul):**
+  * Sisi Kiri: Poster vertikal rasio `2:3` diperbesar ukurannya (~42%–45% lebar layar, sudut membulat 8dp).
   * Sisi Kanan:
-    * Label `Judul` (abu-abu `#9CA3AF`, 11sp) diikuti Teks Judul Utama (putih tebal, 14sp).
-    * Label `Judul Alternatif` (abu-abu `#9CA3AF`, 11sp) diikuti Teks Sinonim (putih, 12sp).
-* **Bagian Sinopsis:**
-  * Paragraf teks sinopsis lengkap (warna `#D1D5DB`, 12sp, line-height 18sp).
-* **Bagian Metadata (Key-Value Grid):**
-  * Format baris rapi dengan label abu-abu di kiri dan nilai putih di kanan:
-    * `Tipe`: Value putih (contoh: `SERIES` / `TV`).
-    * `Aired Start`: Value putih (contoh: `2026-10-03`).
-    * `Aired End`: Value putih (contoh: `?`).
-    * `Studios`: Value putih (contoh: `OLM, TOHO Animation STUDIO`).
-    * `Kategori`: Deretan badge pill genre/kategori dengan background gelap tipis dan teks abu-abu/oranye.
-* **Aksi Tambahan:**
-  * Floating Action Button (FAB) edit di pojok kanan bawah (background lingkaran gelap `#1E1E1E` dengan ikon pensil/edit).
+    * Label `Judul` (abu-abu kebiruan, 11sp) dan di bawahnya Judul Utama (putih tebal, 14sp).
+    * Label `Judul Alternatif` (abu-abu kebiruan, 11sp) dan di bawahnya Judul Sinonim (putih, 12sp).
+* **Bagian Sinopsis & Metadata (Vertikal Rata Kiri / Left-Aligned):**
+  * Seluruh baris disusun vertikal rata kiri (tanpa pemisah *space-between* kosong):
+    * Label `Sinopsis`: Teks sinopsis lengkap warna `#D1D5DB` (12.5sp, line-height 18sp).
+    * Label `Tipe`: Teks putih tebal `SERIES` / `MOVIE`.
+    * Label `Aired Start`: Teks putih tebal tanggal rilis (contoh: `2026-10-02`).
+    * Label `Aired End`: Teks putih tebal (contoh: `-` atau `2024-03-24`).
+    * Label `Studios`: Teks putih tebal studio produksi (contoh: `Studio Pierrot`, `OLM`).
+    * Label `Kategori`: Teks putih tebal biasa yang dipisahkan koma (contoh: `Action, Adventure, Comedy, Demons...`), **tanpa kotak chip/card**.
+* **Floating Action Button (FAB):** Tombol lingkaran gelap di kanan bawah dengan ikon pensil/edit oranye.
 
 #### B. Tab `EPISODE`
-* **Layout:** Grid 3 kolom berisi kartu thumbnail episode.
-* **Thumbnail Kartu:**
-  * Rasio aspek 1:1 atau 16:10 dengan sudut membulat 6dp.
-  * Jika gambar episode tersedia dari API, tampilkan thumbnail gambar.
-  * Jika gambar episode kosong dari API (`image.isBlank()`), tampilkan placeholder ikon siluet serigala (wolf logo AnimeIn) di tengah kotak abu-abu gelap (`#181920`).
-* **Indikator Badge:**
-  * Badge `NEW`: Pita merah tajam di pojok kiri atas thumbnail episode (khusus episode terbaru).
-  * Nomor Episode: Badge teks putih di pojok kanan bawah thumbnail (contoh: `1`, `2`, `3`, `4`, `5`).
+* **Pencarian & Urutan Episode:** Bar pencarian episode (`Cari nomor episode...`) dan pemilih urutan (`Terbaru / Terlama`) di bagian atas tab.
+* **Pagination / Infinite Scroll:** Pemanggilan API otomatis memuat batch episode selanjutnya saat discroll ke bawah untuk anime ber-episode banyak (*One Piece*, *Conan*, dll.) hingga episode 1 tuntas.
+* **Layout Grid 3 Kolom:**
+  * Kartu thumbnail rasio 1:1 dengan sudut membulat halus (~12dp radius).
+  * Badge nomor episode putih tebal di kanan bawah.
+  * Pita merah `NEW` di kiri atas untuk episode terbaru.
+  * Placeholder siluet serigala AnimeIn jika gambar episode belum tersedia.
 
 #### C. Tab `SEASON`
-* **Layout:** Daftar kartu vertikal dengan susunan memanjang ke bawah.
-* **Kartu Season (Landscape 16:9):**
-  * Menampilkan cover landscape masing-masing season/spin-off/OVA/collab.
-  * Di atas gambar / di bawah gambar: Teks judul season (contoh: `Season 1`, `Mini Anime`, `Season 2`, `Collab Kusuriya`, `Season 3`).
-  * Metrik: Views (ikon mata + teks merah `#EF4444`) dan Favorites (ikon bintang + teks kuning emas `#FACC15`).
-  * Interaksi: Mengetuk kartu season akan berpindah membuka detail season tersebut.
+* **Layout Kartu Landscape (16:9):**
+  * Sudut membulat modern (12dp radius).
+  * Judul musim di pojok kiri bawah dengan **font SANGAT BESAR dan TEBAL (Bold 22sp–24sp)** (contoh: `Season 1`, `Mini Anime`, `Season 2`, `Collab`).
+  * Tepat di sebelah kanan judul besar tersebut, terdapat 2 baris bertumpuk vertikal:
+    * Baris atas: `▶ [views] views` (merah).
+    * Baris bawah: `★ [favorites] favorites` (kuning emas).
 
 #### D. Tab `CUPLIX`
-* **Layout:** Grid 3 kolom vertikal kartu cuplikan pendek (reels) khusus anime tersebut.
-* **Kartu Cuplix:**
-  * Thumbnail video tegak (rasio 9:16 atau 3:4).
-  * Indikator Like: Ikon hati putih/merah dan jumlah suka (contoh: `33 ♡`, `17 ♡`) di pojok kiri bawah.
-  * Keterangan caption pendek di bagian bawah.
+* Grid 3 kolom vertikal kartu cuplikan bersih murni gambar **tanpa ikon dan angka suka (`♡`)**.
 
-#### E. Tab `POSTER` & `COVER`
-* **Layout Galeri Komunitas:**
-  * Tab `POSTER`: Grid 2 kolom kartu poster vertikal (`2:3`).
-  * Tab `COVER`: Daftar 1 atau 2 kolom kartu cover landscape (`16:9`).
-* **Informasi Kontributor Pengunggah:**
-  * Chip/Pill info pengunggah di bagian atas atau bawah kartu: Avatar pengguna (ikon pokemon/avatar), nama user, dan role badge (contoh: badge `DONATUR` / `PRO` warna ungu/oranye).
-  * Indikator Poin: Teks kuning/putih jumlah poin upvote (contoh: `145 P`, `79 P`).
-  * Tombol Upvote: Ikon panah ke atas `▲` untuk memberikan dukungan komunitas.
-* **Tombol Aksi (FAB):**
-  * Tombol Filter/Urutkan (kategori: Populer, Terbaru) dan Tombol Upload/Tambah di pojok kanan bawah.
-
-#### F. Tab `DISCUSSION` & `CONTRIBUTOR`
-* **Tab `DISCUSSION`:**
-  * Daftar komentar dan tanggapan komunitas terhadap anime.
-  * Setiap item memuat avatar pokemon pengguna, username, teks komentar, dan waktu kirim (contoh: `15 hours ago`).
-* **Tab `CONTRIBUTOR`:**
-  * Daftar kontributor yang mengunggah subtitle, poster, cover, atau sinopsis dengan metrik poin masing-masing.
+#### E. Tab `POSTER` & `COVER` + Full Screen Preview
+* **Tampilan Gambar Murni (Pure Images):** Menghilangkan seluruh teks uploader, badge donatur, angka poin (`145 P`), tombol upvote (`▲`), dan tombol floating tambah/filter.
+* **Full Screen Image Preview:** Mengklik poster atau cover mana pun akan membuka mode layar penuh (*Full Screen Preview*). Mengklik kembali gambar di layar penuh akan menutup preview.
 
 ---
 
-## 8. Pemetaan Endpoint Detail Anime ke Komponen
+## 8. Arsitektur & Spesifikasi UI Halaman Streaming (Custom Video Player)
 
-| Komponen Detail | Endpoint Sumber Data | Field Response Utama |
+Halaman streaming dibangun presisi berdasarkan referensi visual `reff_uistreaming/` (`WA0035`, `WA0036`, `WA0037`, `Screenshot_083533`, `Screenshot_083616`):
+
+### 1. Custom Video Player (Media3 / ExoPlayer 16:9)
+* **Permukaan Video:** Player responsif rasio aspek `16:9` menggunakan Jetpack Compose `AndroidView` dan Media3 ExoPlayer.
+* **Custom Video Controls:**
+  * Tombol Play/Pause di kiri bawah.
+  * Waktu berjalan (`01:00`) dan total durasi (`24:02`).
+  * *Seekbar* / slider kemajuan video dengan warna aktif tosca / teal (`#26A69A`).
+  * Pengatur kecepatan pemutaran (`1.0x`, `1.25x`, `1.5x`, `2.0x`).
+  * Tombol Ikon Gerigi (Settings):
+    * **Auto Next Episode:** Switch On/Off otomatis memutar episode selanjutnya.
+    * **Lock Screen:** Opsi kunci layar sentuh (hanya aktif saat mode **Full Screen**).
+  * Tombol Full Screen (mode landscape / layar penuh).
+
+### 2. Info Episode & 2 Tombol Aksi
+* **Info Header Episode:**
+  * Judul Episode: `Episode [Nomor]` (teks putih tebal, 18sp).
+  * Baris Metrik: Tanggal rilis warna tosca (contoh: `30 Oct 2026`) dan jumlah penayangan warna merah (contoh: `4874 views`).
+* **Hanya 2 Tombol Aksi:**
+  1. **`SERVER`:** Kotak gelap rounded dengan ikon chip/gear oranye `#FF5722` untuk memilih resolusi/server.
+  2. **`LOVE IT`:** Kotak gelap rounded dengan ikon bintang outline oranye `#FF5722` untuk memberi rating episode (1–5 bintang).
+
+### 3. Panel Pilih Server & Sinkronisasi Durasi
+* **Tampilan Panel `Pilih Server`:**
+  * Muncul di area atas player saat tombol `SERVER` ditekan (dengan tombol `X` di kanan atas).
+  * Kolom vertikal berdampingan menampilkan: Nama uploader (`Shizukana`), ikon Play, nama server (`RAPSODI`), serta pilihan resolusi (`360p direct`, `480p direct`, `720p direct`, `1080p direct`).
+  * Server aktif ditandai ikon play oranye.
+* **Sinkronisasi Durasi Otomatis:** Saat resolusi atau server berganti, player membaca `currentPosition` dan melanjutkan pemutaran di detik yang sama tanpa mengulang dari detik ke-0.
+
+### 4. Bagian `COVER & POSTER`
+* Header `COVER & POSTER` dengan tombol menu titik tiga (`⋮`) di sisi kanan.
+* Kartu Poster vertikal (kiri) dan Cover landscape (kanan) murni gambar.
+* Mengklik langsung membuka *Full Screen Preview*.
+* Mengklik titik tiga (`⋮`) atau menahan area membuka tampilan galeri lengkap (`POSTER` / `COVER`) dengan tombol kembali `<-`.
+
+### 5. Bagian Komentar (`COMMENTS`) & Sub-View Balasan
+* Header `COMMENTS ([Jumlah])` dengan ikon filter/sort di kanan.
+* **Avatar Animasi:** Menggunakan Coil `GifDecoder` / `ImageDecoderDecoder` sehingga avatar Pokemon/profil pengguna bergerak (*animated GIF / WebP*).
+* Komponen komentar: Avatar profil bergerak, username, waktu (`8 hours ago`), isi komentar, tombol jempol like (👍) beserta jumlah, tombol dislike (👎), dan tombol `[Jumlah] Balasan`.
+* **Sub-View Balasan:** Mengetuk tombol `[Jumlah] Balasan` membuka tampilan percakapan balasan komentar dengan input teks `Tulis Balasan..`.
+
+---
+
+## 9. Pemetaan Endpoint Data API Detail & Streaming
+
+| Fitur / Komponen | Endpoint Sumber Data | Field Response Utama |
 | :--- | :--- | :--- |
-| **Info Utama Anime** | `GET /3/2/movie/detail/{id}` | `data.movie` (`title`, `synonyms`, `synopsis`, `image_poster`, `image_cover`, `type`, `studio`, `aired_start`, `aired_end`, `views`, `favorites`, `status`) |
-| **Daftar Episode** | `GET /3/2/movie/episode/{id}?page=0` | `data.episode` (`id`, `index`, `title`, `views`, `is_new`, `image`) |
-| **Daftar Season** | `GET /3/2/movie/detail/{id}` | `data.season` (`id`, `title`, `season`, `views`, `favorites`, `image_cover`, `image_poster`) |
-| **Cuplix Anime** | `GET /data/movie/fyp/list_new?id_movie={id}&page=1` | `data.fyp` (`id`, `caption`, `url_thumbnail`, `count_likes`, `count_views`) |
-| **Poster Komunitas** | `GET /3/2/movie_poster/data?id_movie={id}` | `data.poster` (`id`, `image`, `point`, `username`, `pokemon`, `is_pro`) |
-| **Cover Komunitas** | `GET /3/2/movie_cover/data?id_movie={id}` | `data.cover` (`id`, `image`, `point`, `username`, `pokemon`, `is_pro`) |
-| **Diskusi Anime** | `GET /data/movie/discussion/list?id_movie={id}&page=1` | `data.discussion` (`id`, `user_name`, `user_pokemon`, `text`, `time`) |
-| **Kontributor Anime** | `GET /data/movie/contributor/list?id_movie={id}` | `data` (`username`, `point`, `type`, `pokemon`) |
+| **Info Detail Anime** | `GET /3/2/movie/detail/{id}` | `data.movie`, `data.season` |
+| **Daftar Episode (Pagination)** | `GET /3/2/movie/episode/{id}?page={page}` | `data.episode` (`id`, `index`, `title`, `views`, `image`, `is_new`) |
+| **Stream Video & Server** | `GET /3/2/episode/streamnew/{idEpisode}` | `data.episode`, `data.server` (`link`, `quality`, `name`, `type`, `username`) |
+| **Komentar Episode** | `GET /3/2/comment/data?id_episode={id}&page=0&sort=new` | `data.comment` (`id`, `user_name`, `user_pokemon`, `text`, `time`, `like`, `dislike`, `replay`) |
+| **Balasan Komentar** | `GET /data/comment_replay/data?id_comment={id}&page=1` | `data.comment_replay` (`id`, `user_name`, `user_pokemon`, `text`, `time`, `like`) |
+| **Cuplix per Anime** | `GET /data/movie/fyp/list_new?id_movie={id}&page=1` | `data.fyp` (`id`, `caption`, `url_thumbnail`) |
+| **Poster Komunitas** | `GET /3/2/movie_poster/data?id_movie={id}` | `data.poster` (`id`, `image`) |
+| **Cover Komunitas** | `GET /3/2/movie_cover/data?id_movie={id}` | `data.cover` (`id`, `image`) |
+
 

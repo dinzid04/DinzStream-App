@@ -1,13 +1,16 @@
 package com.dinz.animein.data.api
 
 import com.dinz.animein.data.model.AnimeHomeResponse
+import com.dinz.animein.data.model.CommentReplyResponse
 import com.dinz.animein.data.model.CommunityCoverResponse
 import com.dinz.animein.data.model.CommunityPosterResponse
 import com.dinz.animein.data.model.ContributorResponse
 import com.dinz.animein.data.model.CuplixResponse
 import com.dinz.animein.data.model.DiscussionResponse
+import com.dinz.animein.data.model.EpisodeCommentResponse
 import com.dinz.animein.data.model.EpisodeListResponse
 import com.dinz.animein.data.model.MovieDetailResponse
+import com.dinz.animein.data.model.StreamResponse
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -74,4 +77,24 @@ interface AnimeInApiService {
         @Query("id_movie") idMovie: String,
         @Query("page") page: Int = 1
     ): ContributorResponse
+
+    // ==================== STREAMING & COMMENTS ====================
+
+    @GET("/3/2/episode/streamnew/{id}")
+    suspend fun getEpisodeStream(
+        @Path("id") idEpisode: String
+    ): StreamResponse
+
+    @GET("/3/2/comment/data")
+    suspend fun getEpisodeComments(
+        @Query("id_episode") idEpisode: String,
+        @Query("page") page: Int = 0,
+        @Query("sort") sort: String = "new"
+    ): EpisodeCommentResponse
+
+    @GET("/data/comment_replay/data")
+    suspend fun getCommentReplies(
+        @Query("id_comment") idComment: String,
+        @Query("page") page: Int = 1
+    ): CommentReplyResponse
 }

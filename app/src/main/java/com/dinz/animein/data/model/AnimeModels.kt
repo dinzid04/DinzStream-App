@@ -289,3 +289,68 @@ data class ContributorItem(
     @SerializedName("rank") val rank: String? = null,
     @SerializedName("point") val point: String? = null
 )
+
+// ==================== STREAMING & COMMENTS ====================
+
+data class StreamResponse(
+    @SerializedName("status") val status: Int? = null,
+    @SerializedName("error") val error: Boolean? = null,
+    @SerializedName("data") val data: StreamData? = null
+)
+
+data class StreamData(
+    @SerializedName("episode") val episode: EpisodeItem? = null,
+    @SerializedName("episode_next") val episodeNext: EpisodeItem? = null,
+    @SerializedName("server") val servers: List<ServerItem>? = null
+)
+
+data class ServerItem(
+    @SerializedName("id") val id: String? = null,
+    @SerializedName("link") val link: String? = null,
+    @SerializedName("quality") val quality: String? = null,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("type") val type: String? = null,
+    @SerializedName("username") val username: String? = null,
+    @SerializedName("server_id") val serverId: String? = null
+)
+
+data class EpisodeCommentResponse(
+    @SerializedName("status") val status: Int? = null,
+    @SerializedName("error") val error: Boolean? = null,
+    @SerializedName("data") val data: EpisodeCommentData? = null
+)
+
+data class EpisodeCommentData(
+    @SerializedName("comment") val comments: List<EpisodeCommentItem>? = null
+)
+
+data class EpisodeCommentItem(
+    @SerializedName("id") val id: String? = null,
+    @SerializedName("user_id") val userId: String? = null,
+    @SerializedName("user_name") val userName: String? = null,
+    @SerializedName("user_pokemon") val userPokemon: String? = null,
+    @SerializedName("text") val text: String? = null,
+    @SerializedName("time") val time: String? = null,
+    @SerializedName("like") val like: String? = null,
+    @SerializedName("dislike") val dislike: String? = null,
+    @SerializedName("score") val score: String? = null,
+    @SerializedName("replay") val replay: String? = null,
+    @SerializedName("pro") val pro: String? = null,
+    @SerializedName("rank") val rank: String? = null
+) {
+    fun getPokemonAvatarUrl(): String {
+        val p = userPokemon?.toIntOrNull() ?: 1
+        return "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/$p.gif"
+    }
+}
+
+data class CommentReplyResponse(
+    @SerializedName("status") val status: Int? = null,
+    @SerializedName("error") val error: Boolean? = null,
+    @SerializedName("data") val data: CommentReplyData? = null
+)
+
+data class CommentReplyData(
+    @SerializedName("comment_replay") val replies: List<EpisodeCommentItem>? = null
+)
+

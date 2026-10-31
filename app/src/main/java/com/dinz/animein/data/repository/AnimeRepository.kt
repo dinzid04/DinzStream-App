@@ -9,8 +9,10 @@ import com.dinz.animein.data.model.ContinueWatchingItem
 import com.dinz.animein.data.model.ContributorItem
 import com.dinz.animein.data.model.CuplixItem
 import com.dinz.animein.data.model.DiscussionItem
+import com.dinz.animein.data.model.EpisodeCommentItem
 import com.dinz.animein.data.model.EpisodeItem
 import com.dinz.animein.data.model.MovieDetailData
+import com.dinz.animein.data.model.StreamData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -135,6 +137,43 @@ class AnimeRepository(
             Result.failure(e)
         }
     }
+
+    // ==================== STREAMING & COMMENTS ====================
+
+    suspend fun getEpisodeStream(idEpisode: String): Result<StreamData> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getEpisodeStream(idEpisode)
+            val data = response.data
+            if (data != null) {
+                Result.success(data)
+            } else {
+                Result.failure(Exception("Data stream kosong"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getEpisodeComments(idEpisode: String, page: Int = 0, sort: String = "new"): Result<List<EpisodeCommentItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getEpisodeComments(idEpisode = idEpisode, page = page, sort = sort)
+            val comments = response.data?.comments ?: emptyList()
+            Result.success(comments)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getCommentReplies(idComment: String, page: Int = 1): Result<List<EpisodeCommentItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getCommentReplies(idComment = idComment, page = page)
+            val replies = response.data?.replies ?: emptyList()
+            Result.success(replies)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
 
     fun getContinueWatchingList(): List<ContinueWatchingItem> {
         return listOf(

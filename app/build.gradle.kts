@@ -79,6 +79,11 @@ dependencies {
 
     // Image loading with Coil
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("io.coil-kt:coil-gif:2.7.0")
+
+    // Video Player (Media3 / ExoPlayer)
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-ui:1.4.1")
 
     // Networking
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
