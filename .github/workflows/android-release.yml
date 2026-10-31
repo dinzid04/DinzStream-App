@@ -37,48 +37,58 @@ jobs:
         run: |
           mkdir -p build-output
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk build-output/AnimeIn-v1.5.0.apk
+            cp app/build/outputs/apk/release/app-release.apk build-output/Yuranime-v1.6.0.apk
           elif [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
-            cp app/build/outputs/apk/debug/app-debug.apk build-output/AnimeIn-v1.5.0.apk
+            cp app/build/outputs/apk/debug/app-debug.apk build-output/Yuranime-v1.6.0.apk
           else
-            find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-output/AnimeIn-v1.5.0.apk \;
+            find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-output/Yuranime-v1.6.0.apk \;
           fi
-          ls -lh build-output/AnimeIn-v1.5.0.apk
+          ls -lh build-output/Yuranime-v1.6.0.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AnimeIn-APK
-          path: build-output/AnimeIn-v1.5.0.apk
+          name: Yuranime-APK
+          path: build-output/Yuranime-v1.6.0.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.event_name != 'pull_request'
         with:
-          tag_name: "v1.5.0-build-${{ github.run_number }}"
-          name: "AnimeIn App v1.5.0 - Search Banners, PiuPiu In-Place Player Menu, Watch History & Pagination (Build #${{ github.run_number }})"
+          tag_name: "v1.6.0-build-${{ github.run_number }}"
+          name: "Yuranime v1.6.0 - Full-Bleed Notch Fix, Cuplix Reels Viewer, Search Filters & Popular Leaderboard (Build #${{ github.run_number }})"
           body: |
-            ## AnimeIn Android App v1.5.0 Release
-            - **Halaman Search / Cari (`SearchScreen`):**
-              - Kartu `KATEGORI` & `TAHUN`: Full background image banner (`fillMaxSize`, `ContentScale.Crop`, `height(96.dp)`, rounded `12.dp`). Kategori label Theme/Genre/Demographic abu-abu & judul besar SF Bold `#222222` di kiri; Tahun SF Bold `#222222` di kanan.
-              - Kartu `STUDIO` & `TIPE`: Ukuran lebih besar (`height(58.dp)`, rounded `12.dp`), latar navy gelap `#18202C`, teks SF Bold `17.5.sp` putih bersih.
-              - Kartu `KARAKTER`: Tinggi `96.dp`, latar `#18202C`, nama karakter SF Bold `21.sp` di kiri, gambar karakter di kanan dengan horizontal gradient fade overlay menyatu mulus tanpa garis potong.
-              - Header & navigasi chevron `>` tombol lingkaran gelap (`26.dp`, `#1E2430`).
-            - **Halaman Streaming & Player Video (`StreamingScreen`):**
-              - Player Header: Tombol Back (`<-`) dan tombol Settings (`⚙`) bersih tanpa bingkai glassmorphism.
-              - Player Bottom Bar: Bar durasi bersih dengan slider putih murni; indikator kecepatan dihapus dari bar bawah.
-              - Floating In-Place Settings Menu (Gaya PiuPiu): Mengambang di pojok kanan atas player (`210.dp`, `#141414E6`, rounded `12.dp`). Menu utama dan in-place subviews untuk Resolusi / Kualitas dan Kecepatan Putar (`0.25x` s/d `2.0x` dengan tanda centang `✓`).
-              - Info Episode: Baris 1 `Episode [N]` (`15.sp`, SF SemiBold, `#9CA3AF`), Baris 2 Judul Asli Anime (`22.sp`, SF Bold, putih), Baris 3 Sinopsis Asli Anime (maksimal 3 baris dengan ellipsis, `#9CA3AF`).
-              - Seksi `COVER & POSTER`: Berselang-seling (Poster 2:3 -> Cover 16:9 -> Poster 2:3 -> Cover 16:9) dengan tinggi sama persis `195.dp`.
-              - Aksi Komentar: Baris bersih selebar layar dengan Like di kiri, Dislike di tengah, dan Balasan di kanan (ikon chat oranye `#FF5722` + teks abu-abu `#9CA3AF`, tanpa kotak pill border).
-            - **Halaman Home (`HomeScreen`):**
-              - Infinite Scroll / Pagination Horizontal pada seluruh row (`Sedang Hangat`, `Episode Baru`, `Judul Baru`, `Jat For Yu`, `Paling Dinanti`, `Paling Populer`).
-              - Navigasi Tombol Panah `>` ke Sub-Halaman Daftar Lengkap dengan layout kartu identik Halaman Jadwal (Poster `115.dp` `2:3`, Genre oranye, Judul SF Bold putih, Sinopsis 2 baris, Views merah, Favorites kuning) beserta infinite scroll vertikal.
-              - Lanjut Nonton Nyata (Watch History): Terintegrasi dengan SQLite database lokal; disembunyikan otomatis bila kosong, dan mengklik kartu langsung melanjutkan tontonan di detik terakhir.
+            ## Yuranime Android App v1.6.0 Release
+
+            ### 🚀 Fitur & Peningkatan Utama:
+            1. **Video Player Imersif & Notch Cutout Fix (`MainActivity` & `StreamingScreen`):**
+               - Full-bleed status bar transparan menembus batas layar (`WindowCompat.setDecorFitsSystemWindows(window, false)` & `layoutInDisplayCutoutMode = SHORT_EDGES / ALWAYS`).
+               - Sembunyikan system bars secara imersif pada mode fullscreen / landscape dengan swipe transient (`WindowInsetsControllerCompat`).
+               - Overlay kontrol atas (`<-` dan `⚙`) tidak lagi terpotong notch kamera atau bar hitam.
+            2. **Halaman Search / Cari (`SearchScreen`):**
+               - Kartu `KATEGORI`, `TAHUN`, dan `KARAKTER` diperlebar menjadi tinggi `114.dp` dengan `alignment = Alignment.TopCenter` sehingga ilustrasi dan kepala karakter utuh tanpa terpotong.
+               - Integrasi filter klik langsung pada kartu Kategori (genre), Tahun, Studio, Tipe, dan Karakter ke halaman hasil pencarian.
+               - Fitur **Pull-to-Refresh** dengan pengacakan (`.shuffled()`) dinamis pada item kategori, tahun, studio, dan karakter.
+            3. **Halaman View Cuplix & Komentar Cuplix (`CuplixViewScreen`):**
+               - Tampilan video reels layar penuh vertikal tanpa seekbar/durasi/slider kecepatan.
+               - Menu titik tiga (`⋮`) di kanan atas dengan pop-up pemilihan resolusi (360p, 480p, 720p, 1080p) tersinkronisasi.
+               - Tap to Pause/Play dengan animasi tombol play transparan di tengah.
+               - Creator info: avatar pokemon showdown bulat border oranye, username oranye `#FF5722`, caption, kapsul judul anime oranye (`wrapContentWidth`), dan kapsul episode gelap.
+               - Action sidebar kanan: tombol Like hati dengan counter, tombol Komentar dengan counter, dan poster mini anime.
+               - Bottom sheet komentar Cuplix dengan input rounded dan fetch komentar asli.
+            4. **Paling Populer di Home (`HomeScreen` & `PopularLeaderboardCard`):**
+               - Daftar peringkat vertikal Top 1-10 bergaya leaderboard kartu gelap `#0F1420`.
+               - Ranks 1–3 dengan garis lengkung aksen emas di tepi kiri, angka miring (*italic*) SF Bold emas `34.sp`, 5 bintang emas (`★★★★★`) dan jumlah favorit pengguna (`favorites`).
+               - Ranks 4–10 dengan angka timbul gelap dan border minimalis.
+               - Artwork anime cover di sisi kanan dengan masking gradasi horizontal memudar alami ke latar kartu.
+            5. **Rebranding Total ke Yuranime & Global SVG Placeholder:**
+               - Nama aplikasi dan identitas visual diperbarui ke **Yuranime**.
+               - Ikon peluncur adaptif baru (`ic_launcher`) berbasis logo geometris kitsune.
+               - Placeholder vektor global (`placeholder_yuranime.xml` & `placeholder_yuranime_wide.xml`) pada seluruh gambar aplikasi.
           draft: false
           prerelease: false
           make_latest: true
           files: |
-            build-output/AnimeIn-v1.5.0.apk
+            build-output/Yuranime-v1.6.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
