@@ -173,14 +173,14 @@ fun StreamingScreen(
     // Periodic watch progress recording
     LaunchedEffect(uiState.isPlaying, uiState.currentPositionMs) {
         if (uiState.isPlaying && uiState.currentPositionMs > 5000L) {
-            val mId = uiState.movieId.ifBlank { uiState.episode?.movieId ?: "" }
+            val mId = uiState.movieId.ifBlank { uiState.episode?.idMovie ?: "" }
             if (mId.isNotBlank()) {
                 localDb.saveWatchProgress(
                     movieId = mId,
-                    animeTitle = uiState.movieDetail?.title ?: uiState.episode?.title?.substringBefore(" Episode") ?: "Anime",
+                    animeTitle = uiState.movieDetail?.movie?.title ?: uiState.episode?.title?.substringBefore(" Episode") ?: "Anime",
                     episodeId = uiState.episodeId,
                     episodeTitle = "Episode ${uiState.episode?.index ?: "1"}",
-                    posterUrl = uiState.movieDetail?.poster ?: uiState.episode?.thumb ?: "",
+                    posterUrl = uiState.movieDetail?.movie?.imagePoster ?: uiState.episode?.getEffectiveImage() ?: "",
                     positionMs = uiState.currentPositionMs,
                     durationMs = uiState.durationMs
                 )
@@ -192,14 +192,14 @@ fun StreamingScreen(
     DisposableEffect(uiState.episodeId, uiState.movieId) {
         onDispose {
             val state = viewModel.uiState.value
-            val mId = state.movieId.ifBlank { state.episode?.movieId ?: "" }
+            val mId = state.movieId.ifBlank { state.episode?.idMovie ?: "" }
             if (mId.isNotBlank() && state.currentPositionMs > 3000L) {
                 localDb.saveWatchProgress(
                     movieId = mId,
-                    animeTitle = state.movieDetail?.title ?: state.episode?.title?.substringBefore(" Episode") ?: "Anime",
+                    animeTitle = state.movieDetail?.movie?.title ?: state.episode?.title?.substringBefore(" Episode") ?: "Anime",
                     episodeId = state.episodeId,
                     episodeTitle = "Episode ${state.episode?.index ?: "1"}",
-                    posterUrl = state.movieDetail?.poster ?: state.episode?.thumb ?: "",
+                    posterUrl = state.movieDetail?.movie?.imagePoster ?: state.episode?.getEffectiveImage() ?: "",
                     positionMs = state.currentPositionMs,
                     durationMs = state.durationMs
                 )
@@ -316,7 +316,7 @@ fun StreamingScreen(
                                                 fontWeight = FontWeight.SemiBold
                                             )
                                             Spacer(modifier = Modifier.height(3.dp))
-                                            val realTitle = uiState.movieDetail?.title
+                                            val realTitle = uiState.movieDetail?.movie?.title
                                                 ?: uiState.episode?.title?.substringBefore(" Episode")
                                                 ?: "Anime Streaming"
                                             Text(
@@ -326,7 +326,7 @@ fun StreamingScreen(
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Spacer(modifier = Modifier.height(6.dp))
-                                            val realSynopsis = uiState.movieDetail?.synopsis?.ifBlank { null }
+                                            val realSynopsis = uiState.movieDetail?.movie?.synopsis?.ifBlank { null }
                                                 ?: "Streaming anime episode terlengkap dengan kualitas jernih dan subtitle Indonesia resmi di platform AnimeIn."
                                             Text(
                                                 text = realSynopsis,
