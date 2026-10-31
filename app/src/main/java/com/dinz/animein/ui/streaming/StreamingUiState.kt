@@ -3,7 +3,14 @@ package com.dinz.animein.ui.streaming
 import com.dinz.animein.data.model.CommunityMediaItem
 import com.dinz.animein.data.model.EpisodeCommentItem
 import com.dinz.animein.data.model.EpisodeItem
+import com.dinz.animein.data.model.MovieDetailData
 import com.dinz.animein.data.model.ServerItem
+
+enum class SettingsSubMenu {
+    MAIN,
+    RESOLUTION,
+    SPEED
+}
 
 data class StreamingUiState(
     val isLoading: Boolean = true,
@@ -12,6 +19,8 @@ data class StreamingUiState(
     val movieId: String = "",
     val episode: EpisodeItem? = null,
     val episodeNext: EpisodeItem? = null,
+    val movieDetail: MovieDetailData? = null,
+    val settingsSubMenu: SettingsSubMenu = SettingsSubMenu.MAIN,
     val servers: List<ServerItem> = emptyList(),
     val selectedServer: ServerItem? = null,
     val comments: List<EpisodeCommentItem> = emptyList(),

@@ -199,24 +199,7 @@ class AnimeRepository(
 
 
     fun getContinueWatchingList(): List<ContinueWatchingItem> {
-        return listOf(
-            ContinueWatchingItem(
-                id = "1",
-                idMovie = "6642",
-                title = "Soul Land 2: The Peerless Tang Clan",
-                episodeText = "Episode 176",
-                imageUrl = "https://xyz-api.animein.net/assets_xyz/images/movie/poster/ec95a08b5097987985d4a596d6d5d4b0.jpg",
-                progressFraction = 0.65f
-            ),
-            ContinueWatchingItem(
-                id = "2",
-                idMovie = "1755",
-                title = "Detective Conan",
-                episodeText = "Episode 429",
-                imageUrl = "https://api.animein.net/assets/images/movie/poster/6afc662198d6c50af1f6e5a669b268cd.jpg",
-                progressFraction = 0.30f
-            )
-        )
+        return emptyList()
     }
 
     fun getManreList(): List<AnimeItem> {

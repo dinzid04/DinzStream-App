@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.dinz.animein.data.model.EpisodeCommentItem
 
-class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_local.db", null, 1) {
+class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_local.db", null, 2) {
 
     private val prefs = context.getSharedPreferences("animein_auth_prefs", Context.MODE_PRIVATE)
 
@@ -33,12 +33,39 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
             )
             """.trimIndent()
         )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS watch_history (
+                movie_id TEXT PRIMARY KEY,
+                anime_title TEXT,
+                episode_id TEXT,
+                episode_title TEXT,
+                poster_url TEXT,
+                position_ms INTEGER,
+                duration_ms INTEGER,
+                updated_at INTEGER
+            )
+            """.trimIndent()
+        )
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.execSQL("DROP TABLE IF EXISTS comment_reactions")
-        db.execSQL("DROP TABLE IF EXISTS local_comments")
-        onCreate(db)
+        if (oldVersion < 2) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS watch_history (
+                    movie_id TEXT PRIMARY KEY,
+                    anime_title TEXT,
+                    episode_id TEXT,
+                    episode_title TEXT,
+                    poster_url TEXT,
+                    position_ms INTEGER,
+                    duration_ms INTEGER,
+                    updated_at INTEGER
+                )
+                """.trimIndent()
+            )
+        }
     }
 
     fun isLoggedIn(): Boolean {
@@ -146,4 +173,75 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
         }
         return list
     }
+
+    fun saveWatchProgress(
+        movieId: String,
+        animeTitle: String,
+        episodeId: String,
+        episodeTitle: String,
+        posterUrl: String,
+        positionMs: Long,
+        durationMs: Long
+    ) {
+        if (movieId.isBlank()) return
+        val db = writableDatabase
+        val cv = ContentValues().apply {
+            put("movie_id", movieId)
+            put("anime_title", animeTitle)
+            put("episode_id", episodeId)
+            put("episode_title", episodeTitle)
+            put("poster_url", posterUrl)
+            put("position_ms", positionMs)
+            put("duration_ms", durationMs)
+            put("updated_at", System.currentTimeMillis())
+        }
+        db.insertWithOnConflict("watch_history", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    fun getWatchHistory(): List<WatchHistoryItem> {
+        val db = readableDatabase
+        val list = mutableListOf<WatchHistoryItem>()
+        val cursor = db.rawQuery(
+            "SELECT movie_id, anime_title, episode_id, episode_title, poster_url, position_ms, duration_ms, updated_at FROM watch_history ORDER BY updated_at DESC",
+            null
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                list.add(
+                    WatchHistoryItem(
+                        movieId = it.getString(0) ?: "",
+                        animeTitle = it.getString(1) ?: "",
+                        episodeId = it.getString(2) ?: "",
+                        episodeTitle = it.getString(3) ?: "",
+                        posterUrl = it.getString(4) ?: "",
+                        positionMs = it.getLong(5),
+                        durationMs = it.getLong(6),
+                        updatedAt = it.getLong(7)
+                    )
+                )
+            }
+        }
+        return list
+    }
+
+    fun deleteWatchHistory(movieId: String) {
+        val db = writableDatabase
+        db.delete("watch_history", "movie_id = ?", arrayOf(movieId))
+    }
+
+    fun clearWatchHistory() {
+        val db = writableDatabase
+        db.delete("watch_history", null, null)
+    }
 }
+
+data class WatchHistoryItem(
+    val movieId: String,
+    val animeTitle: String,
+    val episodeId: String,
+    val episodeTitle: String,
+    val posterUrl: String,
+    val positionMs: Long,
+    val durationMs: Long,
+    val updatedAt: Long
+)

@@ -119,7 +119,9 @@ data class ContinueWatchingItem(
     val title: String,
     val episodeText: String,
     val imageUrl: String,
-    val progressFraction: Float
+    val progressFraction: Float,
+    val episodeId: String = "",
+    val positionMs: Long = 0L
 )
 
 // ==================== DETAIL MODELS ====================

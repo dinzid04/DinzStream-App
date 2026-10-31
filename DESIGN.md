@@ -1,581 +1,107 @@
-# DESIGN.md: Arsitektur & Spesifikasi UI Halaman Home (AnimeIn Android)
+# Spesifikasi Desain & Perbaikan UI Aplikasi AnimeIn v1.5.0
 
-Dokumen ini mendefinisikan arsitektur desain, tata letak antarmuka, dan sistem desain untuk halaman **Home** aplikasi Android **AnimeIn**. Seluruh spesifikasi disusun berdasarkan referensi visual dan aturan ketat anti-slop dari `.agents/skills/anti-slop/SKILL.md`.
-
----
-
-## 1. Identitas Visual & Liveliness Dials
-
-Sesuai aturan *Part 3: Liveliness Toolkit* pada `SKILL.md`:
-
-```text
-Reading this as: Native Android Anime Streaming & Short Video App for Indonesian anime community, in a dense content-focused matte dark style, dial ENERGY 2 / RHYTHM 2 / MOTION 1.
-```
-
-* **ENERGY 2 (Balanced):** Tampilan gelap pekat bersih (*clean matte dark*), memprioritaskan karya seni poster anime dan thumbnail video, bebas dari efek dekoratif semrawut, border tebal tak berguna, atau gradien ungu-biru generik.
-* **RHYTHM 2 (Structured & Varied):** Variasi ritme visual yang natural antar seksi (Banner Promo 16:9/21:9, Avatar Bulat Cuplix, Kartu Vertikal 2:3, Kartu Landscape Lebar 16:9, dan Kartu dengan Badge Spesifik).
-* **MOTION 1 (Functional & Responsive):** Animasi fungsional (shimmer loading skeleton terukur, paging carousel mulus, dan touch feedback Material Ripple standar).
+Dokumen ini mendokumentasikan spesifikasi perbaikan total untuk Halaman Search / Cari (`CARI`), Halaman Streaming (Video Player), dan Halaman Home pada aplikasi Android AnimeIn di `/storage/emulated/0/termux/Workspace_uiApp/` berdasarkan referensi visual asli dan aturan anti-slop visual.
 
 ---
 
-## 2. Tema & Palet Warna (Anti-Slop Dark UI)
+## 1. Halaman Search / Cari (`SearchScreen`)
 
-Semua warna memiliki tujuan fungsional yang jelas dan memenuhi standar kontras WCAG AA (R-25):
+### A. Kartu `KATEGORI` & `TAHUN` (Full Image Banner)
+* Menggunakan gambar ilustrasi resmi dari API AnimeIn sebagai **Full Background Card** (`Modifier.fillMaxSize()`, `ContentScale.Crop`).
+* **Dimensi Kartu:** Tinggi tetap `96.dp`, sudut membulat `12.dp`, dengan clipping bersih.
+* **Tipografi & Tata Letak:**
+  * **Kategori (`KATEGORI`):**
+    * Label kategori/kelompok di atas: `Theme` / `Genre` / `Demographic` (ukuran `12.sp`, SF Medium, abu-abu `#6B7280`).
+    * Nama kategori di bawahnya: ukuran besar `22.sp`, SF Bold, warna gelap `#222222` di sisi kiri dengan padding `start = 16.dp`.
+  * **Tahun (`TAHUN`):**
+    * Teks tahun ukuran besar `22.sp`, SF Bold, warna gelap `#222222` di sisi kanan dengan padding `end = 18.dp`.
 
-| Token Warna | Nilai Hex | Fungsi & Keterangan |
-| :--- | :--- | :--- |
-| **Background Utama** | `#0B0B0B` / `#101010` | Hitam pekat bersih tanpa tumpukan kotak ber-border abu-abu tebal. Menjadi kanvas tunggal yang solid. |
-| **Warna Aksen Utama** | `#FF5722` / `#FF6D3F` | Oranye kemerahan untuk teks episode, genre, border aktif, dan tab navigasi aktif. |
-| **Indikator Views** | `#EF4444` | Ikon mata & teks merah untuk total penayangan (views) anime dan bacaan. |
-| **Indikator Favorites** | `#FACC15` | Ikon bintang & teks kuning emas untuk metrik favorit pengguna. |
-| **Indikator Jam Tayang** | `#A855F7` | Ikon jam & teks ungu pada seksi `Jadwal Hari Ini` (contoh: `10:00`). |
-| **Indikator Tanggal Rilis** | `#3B82F6` | Ikon kalender & teks biru pada seksi `Paling Dinanti` (contoh: `2026-10-01`). |
-| **Teks Primer** | `#FFFFFF` | Judul anime dan nama seksi (putih tebal, kontras tinggi). |
-| **Teks Sekunder** | `#9CA3AF` | Keterangan tambahan dan teks pendukung. |
-| **Background Nav / Control** | `#161616` | Background lingkaran gelap untuk tombol panah chevron dan bar navigasi bawah. |
-| **Border Pemisah Tipis** | `rgba(255, 255, 255, 0.08)` | Garis batas 1dp tipis hanya untuk pemisah Bottom Nav (tanpa border tebal pada kartu). |
+### B. Kartu `STUDIO` & `TIPE`
+* **Dimensi Kartu:** Tinggi `58.dp`, padding horizontal `20.dp`, sudut membulat `12.dp`.
+* **Warna Latar:** Gelap navy `#18202C`.
+* **Tipografi:** SF Bold ukuran `17.5.sp` warna putih bersih `#FFFFFF`.
 
----
+### C. Kartu `KARAKTER` (Full Height Card + Horizontal Gradient Fade)
+* **Dimensi Kartu:** Tinggi tetap `96.dp`, sudut membulat `12.dp`.
+* **Warna Latar:** Gelap navy `#18202C`.
+* **Nama Karakter:** Ditampilkan di sisi kiri dengan padding `start = 18.dp`, font SF Bold ukuran `21.sp` warna putih `#FFFFFF`.
+* **Gambar Karakter di Sisi Kanan:**
+  * Tinggi memenuhi tinggi kartu (`96.dp`), `ContentScale.Crop`.
+  * **Gradient Fade Overlay:** Di atas gambar diterapkan brush horizontal gradient dari warna `#18202C` padat di sisi kiri gambar (100% solid `#18202C`) memudar ke transparan penuh (`Color.Transparent`) di sisi kanan gambar. Efek ini menghilangkan garis batas potongan gambar secara sempurna sehingga gambar menyatu alami dengan background kartu `#18202C`.
 
-## 3. Tipografi & Ukuran Interaksi (Ergonomi Mobile)
-
-* **Font Family:** San-Serif Sistem Android (Inter / Roboto).
-* **Section Header:** 16sp, Semi-Bold, teks warna `#FFFFFF`.
-* **Anime Title:** 12sp - 13sp, Bold, warna `#FFFFFF`, maksimal 2 baris dengan `ellipsize="end"`.
-* **Tag Episode / Genre:** 11sp, Semi-Bold, warna `#FF5722` (Oranye kemerahan).
-* **Statistik & Indikator:** 10sp, Medium, teks inline dengan ikon masing-masing metrik.
-* **Touch Target:** Seluruh area interaktif (tombol panah, avatar Cuplix, kartu anime, dan menu navigasi) memiliki ukuran minimal 48dp x 48dp (R-03 & R-39).
-* **Padding & Margin:**
-  * Margin horizontal layar: 16dp.
-  * Jarak vertikal antar seksi: 20dp.
-  * Jarak horizontal antar kartu di carousel: 10dp.
+### D. Header Seksi & Tombol Navigasi `>`
+* Header teks: SF Bold `14.sp`, putih `#FFFFFF`.
+* Tombol panah `>` di sisi kanan: Ikon chevron putih di dalam tombol lingkaran gelap kecil (`size = 26.dp`, background `#1E2430`, `CircleShape`).
 
 ---
 
-## 4. Urutan Komponen Halaman Home (Dari Atas ke Bawah)
+## 2. Halaman Streaming & Custom Video Player (`StreamingScreen`)
 
-Struktur antarmuka halaman Home tersusun secara berurutan dan mengalir secara presisi:
+### A. Kontrol Video Player
+* **Ikon Header Atas:**
+  * Tombol Back (`<-`) di kiri atas dan tombol Gerigi Settings (`⚙`) di kanan atas ditampilkan sebagai ikon putih bersih di atas gradasi hitam halus tanpa background lingkaran/kotak glassmorphism.
+* **Bar Durasi Bawah:**
+  * Format waktu kiri `00:11`, total durasi kanan `23:49`, tombol Full Screen di ujung kanan.
+  * Indikator/tombol kecepatan (`1.0x`) dihapus dari bar bawah.
+* **Glassmorphism Selektif:**
+  * Efek glassmorphism putih semi-transparan diterapkan HANYA pada tombol kontrol tengah (Play/Pause/Seek 10s) dan pada slider seekbar durasi (warna putih bersih `#FFFFFF`).
 
-```mermaid
-flowchart TD
-    A["Top Promo Banner (16:9 / 21:9 rounded-xl)"] --> B["Section 1: Lanjut Nonton (Header + Tombol >)"]
-    B --> C["Section 2: Cuplix (Horizontal Bulat + Border Ring)"]
-    C --> D["Section 3: Episode Baru (Kartu 2:3 + Episode Oranye + Views + Favorites)"]
-    D --> E["Section 4: Sedang Hangat (Landscape 16:9 + Poster Kecil + Genre + Judul)"]
-    E --> F["Section 5: Judul Baru (Kartu 2:3 + Genre + Judul + Views + Favorites)"]
-    F --> G["Section 6: Jadwal Hari Ini (Kartu 2:3 + Jam Tayang Ungu)"]
-    G --> H["Section 7: Jat For Yu (Landscape 16:9, sama dengan Sedang Hangat)"]
-    H --> I["Section 8: Paling Dinanti (Kartu 2:3 + Tanggal Rilis Biru + Favorites)"]
-    I --> J["Section 9: Paling Populer (Kartu 2:3 + Genre + Judul + Views + Favorites)"]
-    J --> K["Section 10: Baca Manre (Kartu 2:3 + Genre + Judul + Views Merah)"]
-    K --> L["Bottom Navigation Bar (Home, Jadwal, Cari, Chat, Profil)"]
-```
+### B. Floating In-Place Settings Menu (Gaya PiuPiu)
+* Menghilangkan Modal Bottom Sheet besar yang muncul dari bawah layar.
+* Menggantinya dengan **Floating Popup Menu** yang mengambang tepat di pojok kanan atas player:
+  * Dimensi: Kompak (lebar `200.dp`), sudut membulat `12.dp`, latar gelap semi-transparan `#141414E6` dengan border halus `0.5.dp` semi-transparan.
+  * **Menu Utama:**
+    * `Resolusi` / `Kualitas` (Ikon kualitas, chevron `>`)
+    * `Kecepatan` (Ikon speed, teks kecepatan saat ini seperti `1.0x`, chevron `>`)
+    * `Auto Next Episode` (Switch On/Off)
+    * `Kunci Layar (Lock)` (Switch On/Off, aktif di mode Full Screen)
+  * **In-Place Sub-View:**
+    * Saat item `Kecepatan` ditekan, konten floating menu berganti di tempat yang sama menjadi daftar kecepatan vertikal: `0.25x`, `0.5x`, `0.75x`, `✓ Normal`, `1.25x`, `1.5x`, `1.75x`, `2.0x`.
+    * Saat item `Resolusi` ditekan, konten floating menu berganti di tempat yang sama menjadi daftar server/resolusi vertikal: `360p`, `480p`, `720p`, `1080p` dengan tanda centang `✓` pada resolusi yang aktif.
+    * Posisi durasi video wajib tetap sinkron tanpa ter-reset saat pengguna mengganti resolusi/server.
 
----
+### C. Info Episode, Judul Anime & Sinopsis
+* Mengambil data asli dari detail anime terkait:
+  * Baris 1: `Episode [Nomor]` (ukuran `15.sp`, SF SemiBold, abu-abu `#9CA3AF`).
+  * Baris 2: **Judul Asli Anime** (ukuran `22.sp`, SF Bold, putih bersih `#FFFFFF`).
+  * Baris 3: **Sinopsis Asli Anime** (ukuran `12.5.sp`, maksimal 3 baris dengan `TextOverflow.Ellipsis`, warna abu-abu `#9CA3AF`).
 
-### Rincian Spesifikasi Setiap Komponen:
+### D. Seksi `COVER & POSTER` Selang-Seling (Interleaved)
+* Menggabungkan daftar Poster dan Cover secara selang-seling:
+  * Item 1: **Poster** (rasio `2:3`)
+  * Item 2: **Cover** (rasio `16:9`)
+  * Item 3: **Poster** (rasio `2:3`)
+  * Item 4: **Cover** (rasio `16:9`)
+* Ditampilkan di dalam `LazyRow` dengan tinggi tetap yang sama persis (`height = 195.dp`) sehingga sisi atas dan bawah sejajar rata sempurna.
+* Gambar bersih tanpa badge angka upvote/poin. Mengetuk gambar membuka preview layar penuh.
 
-### 1. Top Promo Banner
-* **Rasio Gambar:** `16:9` atau `21:9` selebar layar (dengan margin 16dp kiri dan kanan) di bagian paling atas.
-* **Bentuk:** Sudut membulat modern (`rounded-xl` / 14dp radius).
-* **Tampilan:** Gambar banner promosi event, mini games, atau pengumuman fitur penting dengan rendering tajam.
-* **Aksi:** Membuka detail promo / event yang bersangkutan saat diklik.
-
-### 2. Section `Lanjut Nonton`
-* **Header Seksi:**
-  * Sisi kiri: Teks judul "Lanjut Nonton" (16sp, putih tebal).
-  * Sisi kanan: Tombol ikon panah chevron `>` dengan background lingkaran gelap (`#161616`, diameter 32dp, touch target 48dp).
-* **Konten:** 
-  * Carousel horizontal episode terakhir yang ditonton beserta bilah progress pemutaran.
-  * Jika riwayat tontonan kosong, seksi disembunyikan otomatis (*GONE*) untuk menghemat ruang vertikal (C-3).
-
-### 3. Section `Cuplix`
-* **Karakter Visual:** Baris horizontal berisi item bulat/lingkaran (diameter 60dp).
-* **Ring Border:** Border ring tipis (1.5dp) berwarna aksen (`#FF5722` / oranye atau aksen status baru).
-* **Isi:** Cuplikan video pendek yang diambil dari endpoint Cuplix (`/data/fyp2/list_scroll`).
-* **Aksi:** Mengetuk salah satu lingkaran langsung memutar video reel vertikal Cuplix (endpoint `/data/fyp/server`).
-
-### 4. Section `Episode Baru`
-* **Karakter Visual:** Baris horizontal kartu poster vertikal dengan rasio `2:3`.
-* **Prinsip Bersih (Anti-Slop):** Di bawah poster **tanpa background card yang kaku** atau box ber-border tebal. Konten langsung menyatu dengan canvas utama:
-  1. Teks Oranye (`#FF5722`): `Episode [Nomor]` (11sp Semi-Bold).
-  2. Judul Anime: Putih tebal (12sp Bold, maksimal 2 baris, `ellipsis`).
-  3. Baris Statistik:
-     * Baris Views: Ikon mata & teks Merah (`#EF4444`).
-     * Baris Favorites: Ikon bintang & teks Kuning Emas (`#FACC15`).
-
-### 5. Section `Sedang Hangat`
-* **Karakter Visual:** Baris horizontal kartu landscape lebar dengan rasio `16:9` (lebar ~240dp, sudut membulat 10dp).
-* **Struktur Tata Letak di Bawah Gambar Banner Lebar:**
-  * **Sisi Kiri:** Poster kecil vertikal (rasio 2:3, lebar ~36dp, tinggi ~54dp, sudut membulat 4dp).
-  * **Sisi Kanan:** 
-    * Baris 1: Teks Genre warna Oranye (`#FF5722`, 10sp).
-    * Baris 2: Judul Anime warna Putih tebal (12sp Bold, 1 baris terpotong rapi).
-    * Baris 3: 1 baris terpadu berisi Views (ikon mata + teks merah `#EF4444`) dan Favorites (ikon bintang + teks kuning emas `#FACC15`).
-
-### 6. Section `Judul Baru`
-* **Karakter Visual:** Kartu poster vertikal (`2:3`) tanpa background box kaku.
-* **Elemen Informasi (Di Bawah Poster):**
-  1. Genre: Teks warna Oranye (`#FF5722`, 11sp).
-  2. Judul Anime: Teks warna Putih tebal (12sp, maksimal 2 baris).
-  3. Views: Ikon mata & teks Merah (`#EF4444`).
-  4. Favorites: Ikon bintang & teks Kuning Emas (`#FACC15`).
-
-### 7. Section `Jadwal Hari Ini`
-* **Karakter Visual:** Kartu poster vertikal (`2:3`) tanpa background box kaku.
-* **Elemen Informasi (Di Bawah Poster):**
-  1. Genre: Teks warna Oranye (`#FF5722`, 11sp).
-  2. Judul Anime: Teks warna Putih tebal (12sp, maksimal 2 baris).
-  3. Views: Ikon mata & teks Merah (`#EF4444`).
-  4. Favorites: Ikon bintang & teks Kuning Emas (`#FACC15`).
-  5. Jam Tayang: Ikon jam & teks Ungu (`#A855F7`, contoh: `10:00`).
-
-### 8. Section `Jat For Yu`
-* **Karakter Visual:** Layout kartu landscape lebar yang sama persis dengan Section `Sedang Hangat`:
-  * Banner lebar horizontal rasio `16:9`.
-  * Di bawah banner lebar terdapat: Poster kecil vertikal di sisi kiri, di sisi kanannya terdapat genre (oranye), judul anime (putih tebal), dan 1 baris views (merah) + favorites (kuning).
-
-### 9. Section `Paling Dinanti`
-* **Karakter Visual:** Kartu poster vertikal (`2:3`) tanpa background box kaku.
-* **Elemen Informasi (Di Bawah Poster):**
-  1. Genre: Teks warna Oranye (`#FF5722`, 11sp).
-  2. Judul Anime: Teks warna Putih tebal (12sp, maksimal 2 baris).
-  3. Tanggal Rilis: Ikon kalender & teks Biru (`#3B82F6`, contoh: `2026-10-01`).
-  4. Favorites: Ikon bintang & teks Kuning Emas (`#FACC15`).
-
-### 10. Section `Paling Populer`
-* **Karakter Visual:** Kartu poster vertikal (`2:3`) tanpa background box kaku.
-* **Elemen Informasi (Di Bawah Poster):**
-  1. Genre: Teks warna Oranye (`#FF5722`, 11sp).
-  2. Judul Anime: Teks warna Putih tebal (12sp, maksimal 2 baris).
-  3. Views: Ikon mata & teks Merah (`#EF4444`, angka penonton views jutaan).
-  4. Favorites: Ikon bintang & teks Kuning Emas (`#FACC15`).
-
-### 11. Section `Baca Manre`
-* **Karakter Visual:** Kartu poster vertikal (`2:3`) untuk katalog manga/manhwa/komik.
-* **Elemen Informasi (Di Bawah Poster):**
-  1. Genre: Teks warna Oranye (`#FF5722`, 11sp).
-  2. Judul: Teks warna Putih tebal (12sp, maksimal 2 baris).
-  3. Views: Ikon buku/mata & teks Merah (`#EF4444`) untuk statistik pembaca.
-
-### 12. Bottom Navigation Bar
-* **Penempatan:** Menempel tetap di bagian paling bawah layar (*Fixed Bottom Bar*).
-* **Background:** Hitam pekat solid (`#0B0B0B` / `#101010`) dengan garis pemisah tipis 1dp `rgba(255, 255, 255, 0.08)`.
-* **5 Menu Navigasi:**
-  1. `Home`: Ikon Rumah (Status Aktif: Teks & Ikon warna Oranye `#FF5722`).
-  2. `Jadwal`: Ikon Kalender / Jadwal rilis (Warna `#9CA3AF`).
-  3. `Cari`: Ikon Kaca Pembesar / Explore (Warna `#9CA3AF`).
-  4. `Chat`: Ikon Balon Pesan / Diskusi (Warna `#9CA3AF`).
-  5. `Profil`: Ikon User / Pengaturan (Warna `#9CA3AF`).
-* **Ergonomi:** Tinggi bar 56dp - 64dp, dengan touch target setiap item minimal 48dp x 48dp (R-03 & R-39).
+### E. Aksi Komentar: Like, Dislike & Balasan
+* Menggunakan baris `Row(modifier = Modifier.fillMaxWidth())` di bawah setiap teks komentar:
+  * **Kiri:** Ikon jempol Like + angka (klik toggle like terproteksi login).
+  * **Tengah:** Ikon jempol Dislike + angka (klik toggle dislike terproteksi login).
+  * **Kanan:** Tombol Balasan berupa **ikon pesan balasan oranye (`#FF5722`)** di sebelah kiri teks `[Jumlah] Balasan` (warna abu-abu `#9CA3AF`) tanpa background pill dan tanpa kotak border.
 
 ---
 
-## 5. Pemetaan Endpoint Data API ke Komponen UI
-
-Seluruh data komponen dihubungkan langsung ke scraper dan API yang tersedia di workspace:
-
-| Komponen Home | Endpoint Sumber Data | Field Data Utama |
-| :--- | :--- | :--- |
-| **Top Promo Banner** | `GET /3/2/home/data` (`data.slider`) | `image`, `title`, `link`, `id_movie` |
-| **Lanjut Nonton** | Local Cache / SharedPreferences | `id_movie`, `episode_id`, `progress_ms`, `image` |
-| **Cuplix** | `GET /data/fyp2/list_scroll?limit=15&sort=new` | `id`, `url_thumbnail`, `id_fyp`, `anime` |
-| **Episode Baru** | `GET /3/2/home/data` (`data.new`) | `id`, `title`, `image_poster`, `index`, `views`, `favorites` |
-| **Sedang Hangat** | `GET /3/2/home/data` (`data.hot`) | `id`, `title`, `image_cover`, `image_poster`, `genre`, `views`, `favorites` |
-| **Judul Baru** | `GET /3/2/home/data` (`data.new` / catalog) | `id`, `title`, `image_poster`, `genre`, `views`, `favorites` |
-| **Jadwal Hari Ini** | `GET /3/2/home/data` (`data.today`) | `id`, `title`, `image_poster`, `genre`, `time`, `views`, `favorites` |
-| **Jat For Yu** | `GET /3/2/home/data` (`data.fyp`) | `id`, `title`, `image_cover`, `image_poster`, `genre`, `views`, `favorites` |
-| **Paling Dinanti** | `GET /3/2/home/data` (`data.waiting`) | `id`, `title`, `image_poster`, `genre`, `aired_start`, `favorites` |
-| **Paling Populer** | `GET /3/2/home/data` (`data.popular`) | `id`, `title`, `image_poster`, `genre`, `views`, `favorites` |
-| **Baca Manre** | API Scraper Manga / Manhwa | `id`, `title`, `image_poster`, `genre`, `views` |
-
----
-
-## 6. Standar Penanganan Status UI (UI States — R-27)
-
-* **Loading State:**
-  * Komponen menggunakan animasi Shimmer Skeleton abu-abu gelap pekat (`#1A1C24`).
-  * Proporsi skeleton dibuat presisi mengikuti bentuk kartu: rasio 2:3 untuk poster dan 16:9 untuk banner lebar (tanpa memakai spinner melayang di tengah layar).
-* **Empty State:**
-  * Jika data kosong pada seksi opsional (misalnya Lanjut Nonton), seksi otomatis disembunyikan (*GONE*).
-* **Error State:**
-  * Menampilkan teks pesan kegagalan yang sopan dan tombol aksi coba lagi ("Coba Lagi") dengan touch target minimal 48dp.
-
----
-
-## 7. Arsitektur & Spesifikasi UI Halaman Detail Anime (Anime Detail Screen)
-
-Sesuai analisa mendalam membandingkan referensi desain asli (`reff_ui/reff_uidetail/`: `WA0022`, `WA0024`, `WA0027`, `WA0029`) terhadap hasil evaluasi sebelumnya (`reff_uidetailgagal/`), halaman detail anime disempurnakan dengan arsitektur 100% presisi:
-
-### 1. Full Screen / Edge-to-Edge Status Bar Transparan
-* **Tampilan Penuh (Edge-to-Edge):** Menggunakan `enableEdgeToEdge()` dengan status bar transparan penuh sehingga gambar backdrop cover atas menyatu langsung hingga ujung atas layar perangkat (tanpa bilah hitam notifikasi yang memotong gambar).
-* **Insets Padding:** Baris kontrol atas diberikan `statusBarsPadding()` agar tombol `Back`, pill status `ONGOING`, pill tipe `SERIES`, tombol bintang, dan tombol `Share` berada tepat di bawah jam dan indikator sinyal baterai tanpa terpotong.
-
-### 2. Header / Hero Cover (Cover Landscape dengan Kontrol Bersih)
-* **Visual Cover:** Gambar cover landscape (`image_cover`) diperbesar tingginya (~260dp) dengan gradasi hitam halus pekat di bagian bawahnya.
-* **Top Control Bar (Melayang Bersih Tanpa Lingkaran Hitam):**
-  * Sisi Kiri: Ikon panah kembali `Back` transparan bersih tanpa kotak lingkaran hitam (`ic_arrow_back`).
-  * Sisi Kanan:
-    * Status Pill: `ONGOING` (background abu-abu transparan `rgba(255, 255, 255, 0.18)`, teks putih 11sp semi-bold).
-    * Type Pill: `SERIES` / `MOVIE` (background hijau tosca / teal `#0D9488`, teks putih 11sp semi-bold).
-    * Action Favorite: Ikon bintang outline putih `Icons.Outlined.Star` transparan (kuning emas saat aktif).
-    * Action Share: Ikon share putih transparan `Icons.Default.Share`.
-* **Informasi Bawah Cover:**
-  * Sisi Kiri:
-    * Judul Anime: Teks putih tebal (18sp - 20sp Bold), maksimal 2 baris terpotong rapi.
-    * Baris Statistik: Menggunakan vektor ikon bersih (bukan emoji), teks merah `[jumlah] views` (`#EF4444`) dan teks kuning emas `[jumlah] favorites` (`#FACC15`).
-  * Sisi Kanan:
-    * Tombol Play Putar: Lingkaran transparan dengan **border putih tipis dan ikon segitiga play outline putih** (diameter 44dp, tanpa background oranye tebal), dengan teks putih `ep 1` di bawahnya.
-
----
-
-### 3. Scrollable TabBar (6 Tab Navigasi Bersih)
-* **Daftar Tab:** `INFO`, `EPISODE`, `SEASON`, `CUPLIX`, `POSTER`, `COVER` (Tab `DISCUSSION` dan `CONTRIBUTOR` dihapus sepenuhnya dari halaman detail).
-* **Karakter Tab:**
-  * Horizontal scrollable bar dengan background kanvas solid pekat (`#0B0B0B`).
-  * Indikator garis bawah oranye aktif (`#FF5722`, tebal 2.5dp).
-  * Warna teks tab aktif: Oranye `#FF5722` (13sp Bold).
-  * Warna teks tab non-aktif: Abu-abu `#9CA3AF` (13sp Medium).
-  * Touch target tinggi tab minimal 48dp.
-
----
-
-### 4. Spesifikasi Setiap Tab Halaman Detail
-
-#### A. Tab `INFO`
-* **Bagian Atas (Poster Besar & Judul):**
-  * Sisi Kiri: Poster vertikal rasio `2:3` diperbesar ukurannya (~42%–45% lebar layar, sudut membulat 8dp).
-  * Sisi Kanan:
-    * Label `Judul` (abu-abu kebiruan, 11sp) dan di bawahnya Judul Utama (putih tebal, 14sp).
-    * Label `Judul Alternatif` (abu-abu kebiruan, 11sp) dan di bawahnya Judul Sinonim (putih, 12sp).
-* **Bagian Sinopsis & Metadata (Vertikal Rata Kiri / Left-Aligned):**
-  * Seluruh baris disusun vertikal rata kiri (tanpa pemisah *space-between* kosong):
-    * Label `Sinopsis`: Teks sinopsis lengkap warna `#D1D5DB` (12.5sp, line-height 18sp).
-    * Label `Tipe`: Teks putih tebal `SERIES` / `MOVIE`.
-    * Label `Aired Start`: Teks putih tebal tanggal rilis (contoh: `2026-10-02`).
-    * Label `Aired End`: Teks putih tebal (contoh: `-` atau `2024-03-24`).
-    * Label `Studios`: Teks putih tebal studio produksi (contoh: `Studio Pierrot`, `OLM`).
-    * Label `Kategori`: Teks putih tebal biasa yang dipisahkan koma (contoh: `Action, Adventure, Comedy, Demons...`), **tanpa kotak chip/card**.
-* **Floating Action Button (FAB):** Tombol lingkaran gelap di kanan bawah dengan ikon pensil/edit oranye.
-
-#### B. Tab `EPISODE`
-* **Pencarian & Urutan Episode:** Bar pencarian episode (`Cari nomor episode...`) dan pemilih urutan (`Terbaru / Terlama`) di bagian atas tab.
-* **Pagination / Infinite Scroll:** Pemanggilan API otomatis memuat batch episode selanjutnya saat discroll ke bawah untuk anime ber-episode banyak (*One Piece*, *Conan*, dll.) hingga episode 1 tuntas.
-* **Layout Grid 3 Kolom:**
-  * Kartu thumbnail rasio 1:1 dengan sudut membulat halus (~12dp radius).
-  * Badge nomor episode putih tebal di kanan bawah.
-  * Pita merah `NEW` di kiri atas untuk episode terbaru.
-  * Placeholder siluet serigala AnimeIn jika gambar episode belum tersedia.
-
-#### C. Tab `SEASON`
-* **Layout Kartu Landscape (16:9):**
-  * Sudut membulat modern (12dp radius).
-  * Judul musim di pojok kiri bawah dengan **font SANGAT BESAR dan TEBAL (Bold 22sp–24sp)** (contoh: `Season 1`, `Mini Anime`, `Season 2`, `Collab`).
-  * Tepat di sebelah kanan judul besar tersebut, terdapat 2 baris bertumpuk vertikal:
-    * Baris atas: `▶ [views] views` (merah).
-    * Baris bawah: `★ [favorites] favorites` (kuning emas).
-
-#### D. Tab `CUPLIX`
-* Grid 3 kolom vertikal kartu cuplikan bersih murni gambar **tanpa ikon dan angka suka (`♡`)**.
-
-#### E. Tab `POSTER` & `COVER` + Full Screen Preview
-* **Tampilan Gambar Murni (Pure Images):** Menghilangkan seluruh teks uploader, badge donatur, angka poin (`145 P`), tombol upvote (`▲`), dan tombol floating tambah/filter.
-* **Full Screen Image Preview:** Mengklik poster atau cover mana pun akan membuka mode layar penuh (*Full Screen Preview*). Mengklik kembali gambar di layar penuh akan menutup preview.
-
----
-
-## 8. Arsitektur & Spesifikasi UI Halaman Streaming (Custom Video Player)
-
-Halaman streaming dibangun presisi berdasarkan referensi visual `reff_uistreaming/` (`WA0035`, `WA0036`, `WA0037`, `Screenshot_083533`, `Screenshot_083616`):
-
-### 1. Custom Video Player (Media3 / ExoPlayer 16:9)
-* **Permukaan Video:** Player responsif rasio aspek `16:9` menggunakan Jetpack Compose `AndroidView` dan Media3 ExoPlayer.
-* **Custom Video Controls:**
-  * Tombol Play/Pause di kiri bawah.
-  * Waktu berjalan (`01:00`) dan total durasi (`24:02`).
-  * *Seekbar* / slider kemajuan video dengan warna aktif tosca / teal (`#26A69A`).
-  * Pengatur kecepatan pemutaran (`1.0x`, `1.25x`, `1.5x`, `2.0x`).
-  * Tombol Ikon Gerigi (Settings):
-    * **Auto Next Episode:** Switch On/Off otomatis memutar episode selanjutnya.
-    * **Lock Screen:** Opsi kunci layar sentuh (hanya aktif saat mode **Full Screen**).
-  * Tombol Full Screen (mode landscape / layar penuh).
-
-### 2. Info Episode & 2 Tombol Aksi
-* **Info Header Episode:**
-  * Judul Episode: `Episode [Nomor]` (teks putih tebal, 18sp).
-  * Baris Metrik: Tanggal rilis warna tosca (contoh: `30 Oct 2026`) dan jumlah penayangan warna merah (contoh: `4874 views`).
-* **Hanya 2 Tombol Aksi:**
-  1. **`SERVER`:** Kotak gelap rounded dengan ikon chip/gear oranye `#FF5722` untuk memilih resolusi/server.
-  2. **`LOVE IT`:** Kotak gelap rounded dengan ikon bintang outline oranye `#FF5722` untuk memberi rating episode (1–5 bintang).
-
-### 3. Panel Pilih Server & Sinkronisasi Durasi
-* **Tampilan Panel `Pilih Server`:**
-  * Muncul di area atas player saat tombol `SERVER` ditekan (dengan tombol `X` di kanan atas).
-  * Kolom vertikal berdampingan menampilkan: Nama uploader (`Shizukana`), ikon Play, nama server (`RAPSODI`), serta pilihan resolusi (`360p direct`, `480p direct`, `720p direct`, `1080p direct`).
-  * Server aktif ditandai ikon play oranye.
-* **Sinkronisasi Durasi Otomatis:** Saat resolusi atau server berganti, player membaca `currentPosition` dan melanjutkan pemutaran di detik yang sama tanpa mengulang dari detik ke-0.
-
-### 4. Bagian `COVER & POSTER`
-* Header `COVER & POSTER` dengan tombol menu titik tiga (`⋮`) di sisi kanan.
-* Kartu Poster vertikal (kiri) dan Cover landscape (kanan) murni gambar.
-* Mengklik langsung membuka *Full Screen Preview*.
-* Mengklik titik tiga (`⋮`) atau menahan area membuka tampilan galeri lengkap (`POSTER` / `COVER`) dengan tombol kembali `<-`.
-
-### 5. Bagian Komentar (`COMMENTS`) & Sub-View Balasan
-* Header `COMMENTS ([Jumlah])` dengan ikon filter/sort di kanan.
-* **Avatar Animasi:** Menggunakan Coil `GifDecoder` / `ImageDecoderDecoder` sehingga avatar Pokemon/profil pengguna bergerak (*animated GIF / WebP*).
-* Komponen komentar: Avatar profil bergerak, username, waktu (`8 hours ago`), isi komentar, tombol jempol like (👍) beserta jumlah, tombol dislike (👎), dan tombol `[Jumlah] Balasan`.
-* **Sub-View Balasan:** Mengetuk tombol `[Jumlah] Balasan` membuka tampilan percakapan balasan komentar dengan input teks `Tulis Balasan..`.
-
----
-
-## 9. Pemetaan Endpoint Data API Detail & Streaming
-
-| Fitur / Komponen | Endpoint Sumber Data | Field Response Utama |
-| :--- | :--- | :--- |
-| **Info Detail Anime** | `GET /3/2/movie/detail/{id}` | `data.movie`, `data.season` |
-| **Daftar Episode (Pagination)** | `GET /3/2/movie/episode/{id}?page={page}` | `data.episode` (`id`, `index`, `title`, `views`, `image`, `is_new`) |
-| **Stream Video & Server** | `GET /3/2/episode/streamnew/{idEpisode}` | `data.episode`, `data.server` (`link`, `quality`, `name`, `type`, `username`) |
-| **Komentar Episode** | `GET /3/2/comment/data?id_episode={id}&page=0&sort=new` | `data.comment` (`id`, `user_name`, `user_pokemon`, `text`, `time`, `like`, `dislike`, `replay`) |
-| **Balasan Komentar** | `GET /data/comment_replay/data?id_comment={id}&page=1` | `data.comment_replay` (`id`, `user_name`, `user_pokemon`, `text`, `time`, `like`) |
-| **Cuplix per Anime** | `GET /data/movie/fyp/list_new?id_movie={id}&page=1` | `data.fyp` (`id`, `caption`, `url_thumbnail`) |
-| **Poster Komunitas** | `GET /3/2/movie_poster/data?id_movie={id}` | `data.poster` (`id`, `image`) |
-| **Cover Komunitas** | `GET /3/2/movie_cover/data?id_movie={id}` | `data.cover` (`id`, `image`) |
-
----
-
-## 10. Perombakan Presisi Halaman Streaming (Berdasarkan `IMG-20261031-WA0049` & `WA0055`)
-
-Berdasarkan komparasi antara kegagalan pada `reff_uistreaminggagal` vs gambar referensi final `reff_uistreaming/IMG-20261031-WA0049.jpg`:
-
-1. **Player Controls & Palet Warna Hijau Emerald:**
-   * Tombol Play/Pause tengah: Lingkaran **Hijau Emerald Menyala** (`#00C853` / `#10B981`) berukuran besar dengan ikon pause/play putih di dalamnya, diapit oleh ikon putih *Skip Backward 10s* (`<<`) dan *Skip Forward 10s* (`>>`).
-   * Top bar player: Tombol panah kembali `<` di kiri, dan teks `Menu v` (dengan ikon dropdown) di kanan atas player untuk memicu bottom sheet / modal pemilihan server dan resolusi video.
-   * Bottom bar seekbar: Track dan thumb seekbar berwarna hijau emerald (`#00C853`), durasi saat ini di kiri (`01:44`), total durasi di kanan (`23:49`), serta ikon fullscreen di ujung kanan.
-2. **Metadata Header di Bawah Player (Menghapus Tombol Kotak Raksasa SERVER/LOVE IT):**
-   * Teks abu-abu/putih: `Episode [Nomor]` (contoh: `Episode 4`).
-   * Judul Anime putih tebal besar: (contoh: `Black Clover`).
-   * Teks sinopsis singkat (maksimal 3 baris teks abu-abu sekunder, contoh: `Asta dan Yuno adalah dua anak yatim piatu yang menginginkan hal yang sama...`).
-   * **Menghilangkan dua kotak tombol besar SERVER & LOVE IT** yang menutupi konten; fungsi pemilihan server dipindahkan ke tombol `Menu v` di pojok kanan atas player.
-3. **Bagian `COVER & POSTER`:**
-   * Header teks putih `COVER & POSTER` dengan menu tiga titik vertikal (`⋮`) di kanan.
-   * Poster kiri berbingkai vertikal disertai penanda segitiga oranye `▲` dan jumlah poin (contoh: `44 P`) di sisi kanan poster.
-4. **Bagian `COMMENTS` & Floating Action Chat Button:**
-   * Header `COMMENTS ([Jumlah])` dengan ikon sort/filter baris di kanan.
-   * Tampilan komentar dengan avatar Pokémon GIF animasi di sebelah kiri, username, durasi waktu, isi teks komentar, tombol jempol Like + jumlah, Dislike + jumlah, dan tombol biru/cyan `💬 [N] Balasan`.
-   * Floating Action Button (FAB) lingkaran tosca/teal di pojok kanan bawah dengan ikon bubble chat `💬` untuk membuka bar ketik komentar.
-   * Input bar komentar mengambang: Bentuk pil rounded dengan ikon chat di kiri, placeholder `Tulis komentar..`, dan tombol panah oranye `>` di kanan.
-5. **Layar Penuh Balasan (`Balasan Screen`):**
-   * Top bar: Tombol back `<` di kiri, judul tengah `Balasan` dengan garis aksen oranye di bawahnya, dan tombol sort di kanan.
-   * Pinned parent comment di bagian teratas.
-   * Input bar pil `Tulis Balasan..`.
-   * Daftar balasan komentar dengan avatar Pokémon animasi, like, dan dislike.
-
----
-
-## 11. Perombakan Presisi Halaman Home (Koreksi `reff_uihomegagal` vs `Screenshot_ANIMEIN`)
-
-Berdasarkan komparasi presisi antara `reff_uihome/Screenshot_20261031_131918_ANIMEIN.jpg` vs kegagalan di `reff_uihomegagal`:
-
-1. **Seksi `Lanjut Nonton`:**
-   * Wajib menggunakan **kartu vertikal (2:3)** seperti poster anime standar, BUKAN kartu landscape 16:9 yang melebar kaku!
-   * Di bawah poster vertikal:
-     * Teks oranye: `Episode [Nomor]` (contoh: `Episode 1`).
-     * Judul anime: Teks putih tebal (maksimal 2 baris, ellipsis).
-     * Baris Views (merah) dan Baris Favorites (kuning emas).
-2. **Seksi `Cuplix`:**
-   * Item cuplikan pendek berbentuk **Squircle / Rounded Rectangle** (`rounded-2xl` / `rounded-xl`), BUKAN lingkaran bulat ber-border oranye tebal.
-3. **Seksi `Episode Baru`:**
-   * Teks oranye wajib menampilkan nomor episode dinamis dari data API (`Episode [Index]`, contoh: `Episode 7`, `Episode 5`, `Episode 177`), **BUKAN** teks statis generik "Episode Baru"!
-   * Di bawah nomor episode: Judul anime putih tebal + baris Views (merah) & Favorites (kuning).
-4. **Seksi `Sedang Hangat` & `Jas Por Yu`:**
-   * Menggunakan kartu landscape lebar (16:9) dengan banner anime.
-   * Di bawah banner lebar: Poster vertikal kecil di sisi kiri, mendampingi genre teks oranye, judul anime putih tebal, serta baris metrik Views (merah) + Favorites (kuning) secara horizontal.
-   * Seksi `Jas Por Yu` memiliki arsitektur tata letak yang identik dengan `Sedang Hangat`.
-5. **Seksi `Judul Baru`, `Jadwal Hari Ini`, & `Paling Populer`:**
-   * Menggunakan poster vertikal (2:3).
-   * Teks genre tunggal oranye (contoh: `Action`, `Comedy`) agar ringkas dan tidak meluber.
-   * Judul putih tebal, Views (merah), Favorites (kuning).
-   * Pada `Jadwal Hari Ini`: Disertai jam tayang / indikator rilis baru dengan ikon jam ungu (contoh: `🕒 new !!`).
-6. **Seksi `Paling Dinanti`:**
-   * Menampilkan tanggal rilis dengan ikon kalender biru (contoh: `📅 2026-10-??` / `📅 2025-10-02`) dan ikon bintang kuning dengan jumlah favorites (`⭐ 12.880 favorites`).
-   * **DILARANG menampilkan baris Views (`0 views`)** karena anime ini belum tayang di platform!
-7. **Seksi `Baca Manra`:**
-   * Header section bernama `Baca Manra`.
-   * Placeholder kartu gelap membulat dengan genre oranye, judul putih tebal, serta metrik pembaca berikon buku/play merah (contoh: `347 plays`, `19.433 plays`).
-8. **Bottom Navigation Bar (5 Tab):**
-   * 5 Tab: `HOME`, `JADWAL`, `CARI`, `CHAT`, `PROFILE`.
-   * Ikon vektor outline bersih tanpa background kotak berlebih; tab aktif memiliki ikon dan teks berwarna oranye `#FF5722`.
-
----
-
-## 12. Arsitektur & Spesifikasi UI Halaman Jadwal (`JadwalScreen.kt`)
-
-Sesuai referensi visual `reff_uijadwal/Screenshot_20261031_133246_ANIMEIN.jpg`:
-
-1. **Top Days Tab Row (Horizontal Scrollable):**
-   * Pilihan tab hari: `SEN`, `SEL`, `RAB`, `KAM`, `JUM`, `SAB`, `MIN`.
-   * Tab aktif ditandai teks oranye tebal `#FF5722` dengan garis bawah oranye (*underline indicator*).
-2. **Baris Cuplix Squircle Horizontal:**
-   * Baris item cuplikan pendek (bentuk squircle membulat) tepat di bawah tab baris hari.
-3. **Daftar Kartu Anime Jadwal Tayang (LazyColumn):**
-   * Kartu vertikal mendatar:
-     * **Sisi Kiri:** Poster anime vertikal (2:3) dengan sudut membulat halus (`rounded-xl`).
-     * **Sisi Kanan:**
-       * Teks Genre Oranye: (contoh: `Action, Adventure, Shounen`).
-       * Judul Anime Putih Tebal: (contoh: `Bleach: Sennen Kessen-hen - Kashin-tan`).
-       * Sinopsis Singkat Teks Abu-abu: (contoh: `Bagian terakhir dari Bleach: Sennen Kessen-hen`).
-       * Baris Metrik:
-         * Views Merah: Ikon play/mata merah + teks (contoh: `183.357 views`).
-         * Favorites Kuning: Ikon bintang kuning + teks (contoh: `6.342 favorites`).
-       * Countdown Jam Tayang Ungu: Ikon jam ungu + teks countdown waktu rilis dari API (contoh: `🕒 2h 11j 8m`).
-4. **Integrasi Data API:**
-   * Mengambil data dari endpoint `GET /3/2/schedule/data?day={HARI}` (dimana `{HARI}` bernilai `SENIN`, `SELASA`, `RABU`, `KAMIS`, `JUMAT`, `SABTU`, `MINGGU`).
-   * Cuplix feed diambil dari `GET /data/fyp2/list_scroll`.
-
----
-
-## 13. Arsitektur & Spesifikasi UI Halaman Search / Explore (`SearchScreen.kt`)
-
-Sesuai referensi visual `reff_uisearch/Screenshot_20261031_133332_ANIMEIN.jpg` (Mode Kategori) & `Screenshot_20261031_133429_ANIMEIN.jpg` (Mode Hasil Pencarian):
-
-1. **Top Search Bar (Kotak Pencarian):**
-   * Baris pil rounded abu-abu gelap dengan ikon search `🔍`, placeholder `Cari Anime..`, tombol hapus query, serta tombol kirim oranye `>` di sisi kanan.
-2. **Mode Default: Kategori, Studio, Tahun, Tipe & Karakter:**
-   * **Seksi `KATEGORI` (Header + `>`):**
-     * Kartu putih membulat (`rounded-xl`, teks hitam kontras):
-       * Kiri: Subtitle `Theme` / `Genre` + Judul Kategori tebal (contoh: `Demons`, `Sci-Fi`, `Comedy`).
-       * Kanan: Ilustrasi karakter anime cantik dari field `image`.
-     * Mengambil data dari endpoint `GET /3/2/explore/genre`. Mengetuk kartu langsung menyaring anime berdasarkan genre tersebut.
-   * **Seksi `STUDIO`:**
-     * Baris horizontal pill gelap: `MAPPA`, `Ufotable`, `Kyoto Animation`, `Bones`, `A-1 Pictures`, `Toei Animation`, `Madhouse`, `Wit Studio`.
-   * **Seksi `TAHUN` (Header + `>`):**
-     * Kartu putih membulat:
-       * Kiri: Ilustrasi karakter anime dari `image`.
-       * Kanan: Teks tahun tebal (contoh: `2026`, `2025`, `2017`, `2000an`, `1900an`).
-     * Mengambil data dari endpoint `GET /3/2/explore/year`.
-   * **Seksi `TIPE`:**
-     * Baris horizontal pill gelap: `MOVIE`, `ONA`, `OVA`, `LIVE ACTION`, `SPECIAL`, `TV`.
-   * **Seksi `KARAKTER` (Header + `>`):**
-     * Kartu abu-abu gelap kebiruan (`#1E293B`):
-       * Kiri: Nama karakter (contoh: `Hinata`, `Reanette`, `Kurisu`, `Aika`, `C.C.`).
-       * Kanan: Avatar gambar karakter dari endpoint `GET /3/2/explore/manra_npc`.
-3. **Mode Hasil Pencarian (Active Query / Filter Mode):**
-   * **Baris Filter Genre Chips:** Pil horizontal dengan outline border oranye tipis (`Action`, `Adventure`, `Comedy`, dll).
-   * **Baris Cuplix Squircle:** Menampilkan reel pendek anime terkait.
-   * **List Hasil Anime:**
-     * Poster vertikal (2:3) di kiri.
-     * Kanan: Genre oranye, Judul putih tebal, Sinopsis ringkas abu-abu (2 baris ellipsis), Views merah & Favorites kuning.
-   * **Floating Action Buttons (Kanan Bawah):**
-     * Tombol Sortir (`1->9` / `A->Z`).
-     * Tombol Toggle Tampilan (Grid `▦` vs List `≡`).
-4. **Integrasi Data API:**
-   * Mengambil hasil pencarian dari `GET /3/2/explore/movie?keyword={QUERY}&genre_in={GENRE}&type={TYPE}&sort={SORT}&page={PAGE}`.
-
----
-
-## 14. Pemetaan Lengkap Endpoint API Jadwal & Search
-
-| Fitur / Layar | Endpoint API Sumber | Parameter Kunci | Response Payload |
-| :--- | :--- | :--- | :--- |
-| **Daftar Jadwal Tayang** | `GET /3/2/schedule/data` | `day=SENIN` (dll) | `data.movie` (`id`, `title`, `synopsis`, `image_poster`, `genre`, `views`, `favorites`, `time`) |
-| **Kategori / Genre Search** | `GET /3/2/explore/genre` | - | `data.genre` (`id`, `name`, `group`, `image`) |
-| **Tahun Search** | `GET /3/2/explore/year` | - | `data.year` (`name`, `image`) |
-| **Karakter Search** | `GET /3/2/explore/manra_npc` | - | `data.character` (`id`, `name`, `image`) |
-| **Cari / Filter Anime** | `GET /3/2/explore/movie` | `keyword`, `genre_in`, `type`, `sort`, `page` | `data.movie` (`id`, `title`, `synopsis`, `image_poster`, `genre`, `views`, `favorites`) |
-
----
-
-## 15. Spesifikasi Font SF Pro & Sistem Typography Universal
-
-Aplikasi menggunakan custom font Apple **San Francisco (SF Pro Display)** yang terpasang pada `app/src/main/res/font/`:
-* `sf_pro_display_regular.otf` -> `FontWeight.Normal` (400)
-* `sf_pro_display_medium.otf` -> `FontWeight.Medium` (500)
-* `sf_pro_display_semibold.otf` -> `FontWeight.SemiBold` (600)
-* `sf_pro_display_bold.otf` -> `FontWeight.Bold` (700)
-
-Sistem tipografi diterapkan secara terpusat pada `Typography` di `Type.kt` dan menjadi default font pada seluruh komponen teks aplikasi.
-
----
-
-## 16. Desain Streaming & Custom Video Player (Tema Putih & Glassmorphism)
-
-Berdasarkan referensi visual terbaru dan koreksi kegagalan:
-
-1. **Player Controls Bertema Putih & Glassmorphism:**
-   * **Warna Kontrol:** JANGAN gunakan warna hijau! Seluruh kontrol (termasuk tombol Play/Pause tengah bulat, tombol rewind 10s, tombol forward 10s, dan aksen slider) berwarna **Putih bersih** dengan efek **Glassmorphism** (`background: rgba(255, 255, 255, 0.15)` dengan blur halus dan border 1dp tipis semi-transparan).
-   * **Ikon Gerigi (Settings) di Kanan Atas:** Menggantikan tulisan `Menu v`. Tombol gerigi membuka **YouTube-style Bottom Sheet**.
-   * **Waktu & Seekbar Bawah:** Format waktu `01:44` di kiri, seekbar putih dengan thumb putih, total waktu `23:49` di kanan, dan tombol Full Screen di ujung kanan.
-2. **YouTube-style Bottom Sheet Pengaturan:**
-   * Muncul dari bawah saat ikon gerigi ditekan (bukan popup di tengah player).
-   * Opsi pengaturan:
-     * **Kualitas Video:** `360p`, `480p`, `720p`, `1080p` (sinkronisasi durasi tetap terjaga saat ganti resolusi).
-     * **Kecepatan Putar:** `0.5x`, `0.75x`, `1.0x`, `1.25x`, `1.5x`, `2.0x`.
-     * **Auto Next Episode:** Switch On/Off.
-     * **Lock Screen:** Switch On/Off (hanya aktif saat player dalam mode Full Screen).
-3. **Info Episode di Bawah Player (Menghapus Tombol SERVER & LOVE IT):**
-   * Nomor episode (`Episode 4`) font SF SemiBold abu-abu terang.
-   * Judul Anime (`Black Clover`) font SF Bold putih besar.
-   * Sinopsis singkat (maksimal 3 baris dengan `ellipsis`) teks abu-abu.
-4. **Bagian `COVER & POSTER` (Tinggi Sejajar & Scroll Horizontal):**
-   * Menggunakan `LazyRow` sehingga pengguna dapat menggeser ke kanan untuk melihat kumpulan poster dan cover lainnya.
-   * **Tinggi Sejajar:** Menetapkan tinggi tetap (`height: 195.dp`) yang sama persis antara item Poster (`aspectRatio(2f/3f)`) dan item Cover (`aspectRatio(16f/9f)`) di sebelahnya sehingga dasar kartu sejajar tanpa rongga kosong.
-   * Gambar bersih tanpa badge poin/panah upvote. Klik untuk Full Screen Preview, klik titik tiga (`⋮`) untuk membuka sheet galeri lengkap.
-5. **Bagian `COMMENTS`, Halaman `Balasan`, Database & Proteksi Login:**
-   * **Aksen Oranye Glassmorphism:** Tombol jumlah balasan (`22 Balasan`) dan Floating Action Button (FAB) bulat di kanan bawah berwarna **Oranye kemerahan (`#FF5722`)** dengan efek Glassmorphism.
-   * **Layar `Balasan`:** Pinned parent comment di atas, kolom input `Tulis Balasan..`, daftar sub-komentar dengan teks di kiri dan **avatar Pokémon animasi GIF** di sisi kanan.
-   * **Database Lokal & Wajib Login:**
-     * Disinkronkan dengan database Room/SQLite untuk riwayat like/dislike dan komentar.
-     * Pengguna yang belum login dicegat saat mencoba Like, Dislike, menulis komentar, atau membalas, dan diberikan dialog peringatan **Wajib Login Terlebih Dahulu**.
-
----
-
-## 17. Redesain Halaman Home (Gaya PiuPiu + Data AnimeIn Asli)
-
-1. **Top Hero Slider Bergaya PiuPiu (Data dari `Jadwal Hari Ini`):**
-   * Menghapus banner promosi statis.
-   * Menggunakan `HorizontalPager` auto-slide dengan tampilan layar lebar penuh di atas, gradasi hitam halus di bawah, judul anime putih tebal, sinopsis 2 baris, dan indikator titik halaman (*pagination dots*) di kanan bawah.
-   * Mengambil anime dari daftar `Jadwal Hari Ini`. Mengetuk slide mengarahkan ke halaman Detail anime.
-2. **Pembedaan Data `Episode Baru` vs `Judul Baru`:**
-   * `Episode Baru`: Menampilkan anime yang baru saja merilis episode terbaru (`/3/2/home/new`).
-   * `Judul Baru`: Menampilkan judul-judul anime yang baru ditambahkan ke katalog (`/3/2/explore/movie?sort=new` / filter `new`).
-3. **Section `Jat For Yu`:**
-   * Diletakkan tepat di bawah `Jadwal Hari Ini`.
-   * Menggunakan kartu landscape lebar (16:9) identik dengan `Sedang Hangat`.
-4. **Poster Kecil Sejajar di Kartu Wide:**
-   * Pada kartu landscape `Sedang Hangat` dan `Jat For Yu`, ukuran poster kecil di kiri diperbesar (`52.dp x 74.dp`) agar sejajar dengan tinggi blok teks metadata di kanannya.
-5. **Pengetatan Jarak Teks Kartu:**
-   * Merapatkan spasi vertikal antar Genre/Episode, Judul, Views, dan Favorites di bawah kartu poster vertikal.
-6. **Penghapusan `Baca Manre`:**
-   * Seksi `Baca Manre` dihapus sepenuhnya dari halaman Home.
-7. **Bottom Navigation Bar Bergaya PiuPiu dengan Glassmorphism:**
-   * Latar transparan gelap dengan efek *frosted glassmorphism* (`background: rgba(18, 18, 18, 0.75)` dengan border atas tipis `1dp` dan blur elegan).
-   * 5 menu: `HOME`, `JADWAL`, `CARI`, `CHAT`, `PROFIL`.
-
----
-
-## 18. Arsitektur Halaman Jadwal & Search / Explore Presisi
-
-1. **Halaman Jadwal (`JadwalScreen`):**
-   * Top bar tab hari: `SEN`, `SEL`, `RAB`, `KAM`, `JUM`, `SAB`, `MIN` dengan garis bawah oranye.
-   * Baris horizontal Cuplix squircle jadwal.
-   * Daftar vertikal kartu anime jadwal: poster 2:3 di kiri, genre oranye, judul SF Bold putih, sinopsis 2 baris, views merah & favorites kuning, serta countdown jam tayang ungu (`time`).
-2. **Halaman Search / Explore (`SearchScreen`):**
-   * **Mode Default (Explore):**
-     * `KATEGORI` (>): Kartu putih lebar berlatar putih dengan teks hitam tebal dan ilustrasi karakter anime di kanan.
-     * `STUDIO`: Kapsul pill gelap (`MAPPA`, `Ufotable`, dll).
-     * `TAHUN` (>): Kartu putih lebar dengan karakter anime di kiri dan angka tahun tebal di kanan.
-     * `TIPE`: Kapsul pill gelap (`MOVIE`, `ONA`, `OVA`, `LIVE ACTION`).
-     * `KARAKTER` (>): Kartu gelap (`#18202C`) dengan nama karakter putih dan avatar di kanan.
-     * Mengetuk tombol `>` pada Kategori, Tahun, atau Karakter membuka tampilan daftar lengkapnya!
-   * **Mode Input / Hasil Pencarian:**
-     * **JANGAN** menampilkan barisan kapsul genre di atas Cuplix!
-     * Tepat di bawah kolom pencarian adalah baris horizontal **Cuplix**.
-     * Di bawah Cuplix adalah daftar anime **Rekomendasi** (saat belum ada query) atau **Hasil Pencarian** (saat mencari judul anime).
-     * Dua tombol floating di kanan bawah:
-       1. Tombol bulat atas untuk **Sortir (`1-9` / `A-Z`)** dengan ikon panah hijau.
-       2. Tombol bulat bawah untuk **Toggle Tampilan (List View vs Grid View)**.
-
-
-
-
+## 3. Halaman Home (`HomeScreen`)
+
+### A. Infinite Scroll / Pagination Horizontal
+* Pada setiap `LazyRow` horizontal di Home (`Sedang Hangat`, `Jat For Yu`, `Episode Baru`, `Judul Baru`, `Paling Populer`, `Paling Dinanti`):
+  * Memantau posisi scroll `LazyListState`. Ketika pengguna menggeser mendekati 3 item terakhir di sisi kanan, panggil halaman berikutnya (`page + 1`) dari API AnimeIn secara otomatis dan gabungkan datanya secara mulus tanpa interupsi.
+
+### B. Navigasi Tombol Panah `>` ke Halaman Daftar Lengkap
+* Seluruh header section Home yang memiliki tombol `>` (`Sedang Hangat >`, `Episode Baru >`, `Judul Baru >`, `Jat For Yu >`, `Paling Dinanti >`, `Paling Populer >`) dapat diklik.
+* Saat diklik, membuka tampilan **Daftar Lengkap Sub-Halaman**:
+  * Top bar dengan tombol kembali (`<-`) dan judul seksi.
+  * Daftar vertikal `LazyColumn` dengan tata letak kartu yang identik dengan daftar anime di Halaman Jadwal:
+    * Poster vertikal `2:3` di kiri (`width = 115.dp`, rounded `10.dp`).
+    * Metadata di kanan: Genre oranye, Judul SF Bold putih, Sinopsis 2 baris, Views merah, dan Favorites kuning.
+  * Mendukung infinite scroll vertikal ke bawah (load more page berikutnya).
+
+### C. Lanjut Nonton Nyata (Watch History)
+* Menghapus seluruh data dummy pada `Lanjut Nonton`.
+* Terintegrasi dengan database lokal:
+  * Menyimpan entri riwayat saat video diputar di Streaming Screen (ID anime, judul anime, episode index, episode ID, poster/thumbnail URL, posisi playback Ms, durasi total Ms, dan timestamp update).
+  * **Penyembunyian Otomatis:** Jika riwayat tontonan kosong (`historyList.isEmpty()`), seksi `Lanjut Nonton` disembunyikan sepenuhnya dari layar Home.
+  * Jika riwayat ada, tampilkan kartu anime yang belum selesai ditonton dengan progress bar tipis di bawah poster.
+  * Saat kartu `Lanjut Nonton` diklik, langsung membuka `StreamingScreen` pada episode dan detik terakhir yang ditonton.

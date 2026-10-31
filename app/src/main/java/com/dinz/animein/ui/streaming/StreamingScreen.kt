@@ -40,6 +40,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dns
@@ -167,6 +168,45 @@ fun StreamingScreen(
         }
     }
 
+    val localDb = remember { LocalAuthDatabase(context) }
+
+    // Periodic watch progress recording
+    LaunchedEffect(uiState.isPlaying, uiState.currentPositionMs) {
+        if (uiState.isPlaying && uiState.currentPositionMs > 5000L) {
+            val mId = uiState.movieId.ifBlank { uiState.episode?.movieId ?: "" }
+            if (mId.isNotBlank()) {
+                localDb.saveWatchProgress(
+                    movieId = mId,
+                    animeTitle = uiState.movieDetail?.title ?: uiState.episode?.title?.substringBefore(" Episode") ?: "Anime",
+                    episodeId = uiState.episodeId,
+                    episodeTitle = "Episode ${uiState.episode?.index ?: "1"}",
+                    posterUrl = uiState.movieDetail?.poster ?: uiState.episode?.thumb ?: "",
+                    positionMs = uiState.currentPositionMs,
+                    durationMs = uiState.durationMs
+                )
+            }
+        }
+    }
+
+    // Save watch progress on exit
+    DisposableEffect(uiState.episodeId, uiState.movieId) {
+        onDispose {
+            val state = viewModel.uiState.value
+            val mId = state.movieId.ifBlank { state.episode?.movieId ?: "" }
+            if (mId.isNotBlank() && state.currentPositionMs > 3000L) {
+                localDb.saveWatchProgress(
+                    movieId = mId,
+                    animeTitle = state.movieDetail?.title ?: state.episode?.title?.substringBefore(" Episode") ?: "Anime",
+                    episodeId = state.episodeId,
+                    episodeTitle = "Episode ${state.episode?.index ?: "1"}",
+                    posterUrl = state.movieDetail?.poster ?: state.episode?.thumb ?: "",
+                    positionMs = state.currentPositionMs,
+                    durationMs = state.durationMs
+                )
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -262,7 +302,7 @@ fun StreamingScreen(
                                     modifier = Modifier.fillMaxSize(),
                                     contentPadding = PaddingValues(bottom = 72.dp)
                                 ) {
-                                    // Episode Title, Anime Title & Synopsis (Matching IMG-20261031-WA0049)
+                                    // Episode Title, Anime Title & Synopsis (Matching IMG-20261031-WA0049 & DESIGN.md)
                                     item(key = "episode_header") {
                                         Column(
                                             modifier = Modifier
@@ -271,120 +311,105 @@ fun StreamingScreen(
                                         ) {
                                             Text(
                                                 text = "Episode ${uiState.episode?.index ?: "1"}",
-                                                color = ColorTextSecondary,
-                                                fontSize = 13.5.sp,
-                                                fontWeight = FontWeight.Medium
+                                                color = Color(0xFF9CA3AF),
+                                                fontSize = 15.sp,
+                                                fontWeight = FontWeight.SemiBold
                                             )
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            val animeTitle = uiState.episode?.title?.substringBefore(" Episode")
+                                            Spacer(modifier = Modifier.height(3.dp))
+                                            val realTitle = uiState.movieDetail?.title
+                                                ?: uiState.episode?.title?.substringBefore(" Episode")
                                                 ?: "Anime Streaming"
                                             Text(
-                                                text = animeTitle,
-                                                color = ColorTextPrimary,
-                                                fontSize = 20.sp,
+                                                text = realTitle,
+                                                color = Color.White,
+                                                fontSize = 22.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Spacer(modifier = Modifier.height(6.dp))
-                                            val syn = "Streaming anime episode terlengkap dengan kualitas jernih dan subtitle Indonesia resmi di platform AnimeIn."
+                                            val realSynopsis = uiState.movieDetail?.synopsis?.ifBlank { null }
+                                                ?: "Streaming anime episode terlengkap dengan kualitas jernih dan subtitle Indonesia resmi di platform AnimeIn."
                                             Text(
-                                                text = syn,
-                                                color = ColorTextSecondary,
-                                                fontSize = 12.sp,
+                                                text = realSynopsis,
+                                                color = Color(0xFF9CA3AF),
+                                                fontSize = 12.5.sp,
                                                 maxLines = 3,
                                                 overflow = TextOverflow.Ellipsis,
-                                                lineHeight = 16.sp
+                                                lineHeight = 17.sp
                                             )
                                         }
                                     }
 
-                                    // Section: COVER & POSTER (Equal Height 195dp, Horizontal Scroll)
+                                    // Section: COVER & POSTER (Equal Height 195dp, Interleaved, Horizontal Scroll)
                                     item(key = "cover_poster_section") {
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 16.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = "COVER & POSTER",
-                                                color = ColorTextPrimary,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            IconButton(
-                                                onClick = { viewModel.toggleGallerySheet(0) },
-                                                modifier = Modifier.size(36.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.MoreVert,
-                                                    contentDescription = "Menu Galeri",
-                                                    tint = ColorTextSecondary,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
+                                        val interleavedMedia = remember(uiState.posters, uiState.covers) {
+                                            val list = mutableListOf<Pair<CommunityMediaItem, Boolean>>() // Pair(item, isPoster)
+                                            val maxLen = maxOf(uiState.posters.size, uiState.covers.size)
+                                            for (i in 0 until maxLen) {
+                                                if (i < uiState.posters.size) list.add(uiState.posters[i] to true)
+                                                if (i < uiState.covers.size) list.add(uiState.covers[i] to false)
                                             }
+                                            list
                                         }
 
-                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                        LazyRow(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            contentPadding = PaddingValues(horizontal = 16.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                        ) {
-                                            // Posters (fixed height 195dp, aspect ratio 2:3)
-                                            items(uiState.posters) { poster ->
-                                                val posterImg = poster.getEffectiveImage()
-                                                Box(
-                                                    modifier = Modifier
-                                                        .height(195.dp)
-                                                        .aspectRatio(2f / 3f)
-                                                        .clip(RoundedCornerShape(8.dp))
-                                                        .background(Color(0xFF181A22))
-                                                        .clickable {
-                                                            if (posterImg.isNotBlank()) viewModel.openFullScreenImage(posterImg)
-                                                            else viewModel.toggleGallerySheet(0)
-                                                        }
+                                        if (interleavedMedia.isNotEmpty()) {
+                                            Spacer(modifier = Modifier.height(16.dp))
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 16.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "COVER & POSTER",
+                                                    color = ColorTextPrimary,
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                IconButton(
+                                                    onClick = { viewModel.toggleGallerySheet(0) },
+                                                    modifier = Modifier.size(36.dp)
                                                 ) {
-                                                    if (posterImg.isNotBlank()) {
-                                                        AsyncImage(
-                                                            model = ImageRequest.Builder(LocalContext.current)
-                                                                .data(posterImg)
-                                                                .crossfade(true)
-                                                                .build(),
-                                                            contentDescription = "Poster",
-                                                            modifier = Modifier.fillMaxSize(),
-                                                            contentScale = ContentScale.Crop
-                                                        )
-                                                    }
+                                                    Icon(
+                                                        imageVector = Icons.Default.MoreVert,
+                                                        contentDescription = "Menu Galeri",
+                                                        tint = ColorTextSecondary,
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
                                                 }
                                             }
 
-                                            // Covers (fixed height 195dp, aspect ratio 16:9)
-                                            items(uiState.covers) { cover ->
-                                                val coverImg = cover.getEffectiveImage()
-                                                Box(
-                                                    modifier = Modifier
-                                                        .height(195.dp)
-                                                        .aspectRatio(16f / 9f)
-                                                        .clip(RoundedCornerShape(8.dp))
-                                                        .background(Color(0xFF181A22))
-                                                        .clickable {
-                                                            if (coverImg.isNotBlank()) viewModel.openFullScreenImage(coverImg)
-                                                            else viewModel.toggleGallerySheet(1)
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            LazyRow(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            ) {
+                                                items(interleavedMedia) { (media, isPoster) ->
+                                                    val mediaImg = media.getEffectiveImage()
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .height(195.dp)
+                                                            .aspectRatio(if (isPoster) 2f / 3f else 16f / 9f)
+                                                            .clip(RoundedCornerShape(8.dp))
+                                                            .background(Color(0xFF181A22))
+                                                            .clickable {
+                                                                if (mediaImg.isNotBlank()) viewModel.openFullScreenImage(mediaImg)
+                                                                else viewModel.toggleGallerySheet(if (isPoster) 0 else 1)
+                                                            }
+                                                    ) {
+                                                        if (mediaImg.isNotBlank()) {
+                                                            AsyncImage(
+                                                                model = ImageRequest.Builder(LocalContext.current)
+                                                                    .data(mediaImg)
+                                                                    .crossfade(true)
+                                                                    .build(),
+                                                                contentDescription = if (isPoster) "Poster" else "Cover",
+                                                                modifier = Modifier.fillMaxSize(),
+                                                                contentScale = ContentScale.Crop
+                                                            )
                                                         }
-                                                ) {
-                                                    if (coverImg.isNotBlank()) {
-                                                        AsyncImage(
-                                                            model = ImageRequest.Builder(LocalContext.current)
-                                                                .data(coverImg)
-                                                                .crossfade(true)
-                                                                .build(),
-                                                            contentDescription = "Cover",
-                                                            modifier = Modifier.fillMaxSize(),
-                                                            contentScale = ContentScale.Crop
-                                                        )
                                                     }
                                                 }
                                             }
@@ -482,23 +507,6 @@ fun StreamingScreen(
                 currentRating = uiState.userRating,
                 onRatingSelected = { viewModel.setUserRating(it) },
                 onDismiss = { viewModel.toggleLoveItDialog() }
-            )
-        }
-
-        // YouTube-Style Settings Bottom Sheet
-        if (uiState.isSettingsOpen) {
-            YouTubeStyleSettingsBottomSheet(
-                servers = uiState.servers,
-                selectedServer = uiState.selectedServer,
-                playbackSpeed = uiState.playbackSpeed,
-                autoNext = uiState.autoNextEpisode,
-                isLocked = uiState.isLocked,
-                isFullScreen = uiState.isFullScreen,
-                onServerSelect = { viewModel.selectServer(it) },
-                onSpeedSelect = { viewModel.setPlaybackSpeed(it) },
-                onAutoNextChange = { viewModel.toggleAutoNext() },
-                onLockChange = { viewModel.toggleLock() },
-                onDismiss = { viewModel.toggleSettings() }
             )
         }
 
@@ -728,20 +736,16 @@ private fun CustomExoPlayerView(
                         )
                     }
 
-                    // YouTube-Style Settings Gear Button with Glassmorphism
+                    // Settings Gear Button (Clean white icon, no glassmorphism box)
                     IconButton(
                         onClick = { viewModel.toggleSettings() },
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Color(0x33FFFFFF))
-                            .border(1.dp, Color(0x4DFFFFFF), CircleShape)
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Pengaturan",
                             tint = Color.White,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
@@ -805,7 +809,7 @@ private fun CustomExoPlayerView(
                     }
                 }
 
-                // Bottom Control Bar (Progress, Time, Speed, Fullscreen)
+                // Bottom Control Bar (Progress, Time, Fullscreen)
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -862,24 +866,6 @@ private fun CustomExoPlayerView(
 
                         Spacer(modifier = Modifier.width(8.dp))
 
-                        // Playback Speed Toggle (1.0x, 1.25x, 1.5x, 2.0x)
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color(0x40FFFFFF))
-                                .clickable { viewModel.cycleSpeed() }
-                                .padding(horizontal = 6.dp, vertical = 3.dp)
-                        ) {
-                            Text(
-                                text = "${uiState.playbackSpeed}x",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(4.dp))
-
                         // Full Screen Toggle Button
                         IconButton(
                             onClick = { viewModel.toggleFullScreen() },
@@ -895,6 +881,26 @@ private fun CustomExoPlayerView(
                     }
                 }
             }
+        }
+
+        // Floating In-Place Settings Menu (PiuPiu Style)
+        if (uiState.isSettingsOpen && !uiState.isLocked) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { viewModel.toggleSettings() }
+            )
+
+            FloatingSettingsMenu(
+                uiState = uiState,
+                viewModel = viewModel,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 48.dp, end = 12.dp)
+            )
         }
     }
 }
@@ -1142,204 +1148,286 @@ private fun LoveItRatingDialog(
     }
 }
 
-// ==================== 5. YOUTUBE-STYLE SETTINGS BOTTOM SHEET ====================
+// ==================== 5. FLOATING SETTINGS MENU (PIUPIU STYLE) ====================
 
 @Composable
-private fun YouTubeStyleSettingsBottomSheet(
-    servers: List<ServerItem>,
-    selectedServer: ServerItem?,
-    playbackSpeed: Float,
-    autoNext: Boolean,
-    isLocked: Boolean,
-    isFullScreen: Boolean,
-    onServerSelect: (ServerItem) -> Unit,
-    onSpeedSelect: (Float) -> Unit,
-    onAutoNextChange: () -> Unit,
-    onLockChange: () -> Unit,
-    onDismiss: () -> Unit
+private fun FloatingSettingsMenu(
+    uiState: StreamingUiState,
+    viewModel: StreamingViewModel,
+    modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0x99000000))
+        modifier = modifier
+            .width(215.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xE6141414))
+            .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
-            ) { onDismiss() },
-        contentAlignment = Alignment.BottomCenter
+            ) { /* Consume taps */ }
+            .padding(vertical = 8.dp, horizontal = 12.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                .background(Color(0xFF141720))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) { /* Consume taps */ }
-                .padding(20.dp)
-        ) {
-            // Drag handle
-            Box(
-                modifier = Modifier
-                    .size(width = 36.dp, height = 4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(Color(0x40FFFFFF))
-                    .align(Alignment.CenterHorizontally)
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Pengaturan Video",
-                    color = ColorTextPrimary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Tutup",
-                        tint = ColorTextSecondary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Section 1: Video Quality / Server
-            Text(
-                text = "Kualitas Video & Server",
-                color = ColorTextSecondary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(servers) { srv ->
-                    val isSelected = srv.id == selectedServer?.id
-                    Box(
+        when (uiState.settingsSubMenu) {
+            SettingsSubMenu.MAIN -> {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Quality / Server
+                    Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) ColorAccentPrimary else Color(0xFF1E222D))
-                            .border(
-                                1.dp,
-                                if (isSelected) ColorAccentPrimary else Color(0x33FFFFFF),
-                                RoundedCornerShape(8.dp)
+                            .fillMaxWidth()
+                            .clickable { viewModel.setSettingsSubMenu(SettingsSubMenu.RESOLUTION) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Dns,
+                                contentDescription = "Kualitas",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
                             )
-                            .clickable { onServerSelect(srv) }
-                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Kualitas",
+                                color = Color.White,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = uiState.selectedServer?.quality ?: "720p",
+                                color = Color(0xFF9CA3AF),
+                                fontSize = 11.5.sp
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = "Pilih Kualitas",
+                                tint = Color(0xFF9CA3AF),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = Color(0x1FFFFFFF), thickness = 0.5.dp)
+
+                    // Playback Speed
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.setSettingsSubMenu(SettingsSubMenu.SPEED) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "Kecepatan",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Kecepatan",
+                                color = Color.White,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (uiState.playbackSpeed == 1.0f) "Normal" else "${uiState.playbackSpeed}x",
+                                color = Color(0xFF9CA3AF),
+                                fontSize = 11.5.sp
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = "Pilih Kecepatan",
+                                tint = Color(0xFF9CA3AF),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = Color(0x1FFFFFFF), thickness = 0.5.dp)
+
+                    // Auto Next Episode
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "${srv.name ?: "Server"} • ${srv.quality ?: "720p"}",
-                            color = if (isSelected) Color.White else ColorTextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            text = "Auto Next",
+                            color = Color.White,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Medium
                         )
+                        Switch(
+                            checked = uiState.autoNextEpisode,
+                            onCheckedChange = { viewModel.toggleAutoNext() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = ColorAccentPrimary,
+                                uncheckedThumbColor = Color(0xFF9CA3AF),
+                                uncheckedTrackColor = Color(0xFF2A2A2A)
+                            )
+                        )
+                    }
+
+                    // Lock Screen (if Full Screen)
+                    if (uiState.isFullScreen) {
+                        HorizontalDivider(color = Color(0x1FFFFFFF), thickness = 0.5.dp)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Kunci Layar",
+                                color = Color.White,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Switch(
+                                checked = uiState.isLocked,
+                                onCheckedChange = { viewModel.toggleLock() },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = ColorAccentPrimary,
+                                    uncheckedThumbColor = Color(0xFF9CA3AF),
+                                    uncheckedTrackColor = Color(0xFF2A2A2A)
+                                )
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Section 2: Playback Speed
-            Text(
-                text = "Kecepatan Putar",
-                color = ColorTextSecondary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                speeds.forEach { spd ->
-                    val isSelected = playbackSpeed == spd
-                    Box(
+            SettingsSubMenu.RESOLUTION -> {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(34.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) ColorAccentPrimary else Color(0xFF1E222D))
-                            .border(
-                                1.dp,
-                                if (isSelected) ColorAccentPrimary else Color(0x33FFFFFF),
-                                RoundedCornerShape(8.dp)
-                            )
-                            .clickable { onSpeedSelect(spd) },
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .clickable { viewModel.setSettingsSubMenu(SettingsSubMenu.MAIN) }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "${spd}x",
-                            color = if (isSelected) Color.White else ColorTextPrimary,
-                            fontSize = 11.5.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Kembali ke Menu Utama",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Kualitas Video",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    HorizontalDivider(color = Color(0x1FFFFFFF), thickness = 0.5.dp)
+
+                    uiState.servers.forEach { server ->
+                        val isSelected = server.id == uiState.selectedServer?.id
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.selectServer(server)
+                                    viewModel.setSettingsSubMenu(SettingsSubMenu.MAIN)
+                                }
+                                .padding(vertical = 7.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "${server.quality ?: "720p"} • ${server.name ?: "Server"}",
+                                color = if (isSelected) ColorAccentPrimary else Color(0xFFE5E7EB),
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                            if (isSelected) {
+                                Text(
+                                    text = "✓",
+                                    color = ColorAccentPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            SettingsSubMenu.SPEED -> {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.setSettingsSubMenu(SettingsSubMenu.MAIN) }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Kembali ke Menu Utama",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Kecepatan Putar",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
 
-            // Section 3: Auto Next Episode Switch
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(text = "Auto Next Episode", color = ColorTextPrimary, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
-                    Text(text = "Putar episode selanjutnya secara otomatis", color = ColorTextSecondary, fontSize = 11.sp)
+                    HorizontalDivider(color = Color(0x1FFFFFFF), thickness = 0.5.dp)
+
+                    val speeds = listOf(0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
+                    speeds.forEach { speed ->
+                        val isSelected = uiState.playbackSpeed == speed
+                        val speedLabel = if (speed == 1.0f) "Normal" else "${speed}x"
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setPlaybackSpeed(speed)
+                                    viewModel.setSettingsSubMenu(SettingsSubMenu.MAIN)
+                                }
+                                .padding(vertical = 5.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = speedLabel,
+                                color = if (isSelected) ColorAccentPrimary else Color(0xFFE5E7EB),
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                            if (isSelected) {
+                                Text(
+                                    text = "✓",
+                                    color = ColorAccentPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
-                Switch(
-                    checked = autoNext,
-                    onCheckedChange = { onAutoNextChange() },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = ColorAccentPrimary,
-                        checkedTrackColor = Color(0x66FF5722)
-                    )
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Section 4: Lock Screen Switch
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Kunci Layar (Lock)",
-                        color = if (isFullScreen) ColorTextPrimary else ColorTextSecondary,
-                        fontSize = 13.5.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = if (isFullScreen) "Kunci sentuhan layar" else "Hanya aktif di Full Screen",
-                        color = Color(0xFF6B7280),
-                        fontSize = 11.sp
-                    )
-                }
-                Switch(
-                    checked = isLocked,
-                    onCheckedChange = { if (isFullScreen) onLockChange() },
-                    enabled = isFullScreen,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = ColorAccentPrimary,
-                        checkedTrackColor = Color(0x66FF5722)
-                    )
-                )
             }
         }
     }
@@ -1416,12 +1504,13 @@ private fun CommentItemRow(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Action Row: Likes, Dislikes, Balasan
+            // Action Row: Likes, Dislikes, Balasan (Full Width, SpaceBetween, No pill border)
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Like
+                // Like (Left)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable {
@@ -1448,11 +1537,11 @@ private fun CommentItemRow(
                     Text(
                         text = (comment.like?.toIntOrNull() ?: 0 + if (isLiked) 1 else 0).toString(),
                         color = ColorTextSecondary,
-                        fontSize = 11.sp
+                        fontSize = 11.5.sp
                     )
                 }
 
-                // Dislike
+                // Dislike (Center)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable {
@@ -1479,26 +1568,29 @@ private fun CommentItemRow(
                     Text(
                         text = (comment.dislike?.toIntOrNull() ?: 0 + if (isDisliked) 1 else 0).toString(),
                         color = ColorTextSecondary,
-                        fontSize = 11.sp
+                        fontSize = 11.5.sp
                     )
                 }
 
-                // Balasan Button with Orange Glassmorphism Pill
+                // Balasan (Right): Orange chat icon + grey text, NO border, NO pill
                 val replayCount = comment.replay?.toIntOrNull() ?: 0
                 val replayText = if (replayCount > 0) "$replayCount Balasan" else "Balasan"
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x26FF5722))
-                        .border(0.8.dp, Color(0x80FF5722), RoundedCornerShape(12.dp))
-                        .clickable { onReplyClick() }
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { onReplyClick() }
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.ChatBubble,
+                        contentDescription = "Balasan",
+                        tint = Color(0xFFFF5722),
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
                     Text(
                         text = replayText,
-                        color = ColorAccentPrimary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
+                        color = Color(0xFF9CA3AF),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }

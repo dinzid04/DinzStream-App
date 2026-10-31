@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -347,9 +349,9 @@ private fun ExploreDefaultContent(
             Spacer(modifier = Modifier.height(10.dp))
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val sampleGenres = if (genres.isNotEmpty()) genres.take(3) else listOf(
-                    ExploreGenreItem("1", "Demons", "", "Theme"),
-                    ExploreGenreItem("2", "Sci-Fi", "", "Genre"),
-                    ExploreGenreItem("3", "Comedy", "", "Genre")
+                    ExploreGenreItem("1", "Magic", "", "Theme"),
+                    ExploreGenreItem("2", "Music", "", "Genre"),
+                    ExploreGenreItem("3", "Shoujo", "", "Demographic")
                 )
                 sampleGenres.forEach { g ->
                     WhiteCategoryCard(
@@ -382,9 +384,9 @@ private fun ExploreDefaultContent(
             Spacer(modifier = Modifier.height(10.dp))
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val sampleYears = if (years.isNotEmpty()) years.take(3) else listOf(
-                    ExploreYearItem("2017", ""),
-                    ExploreYearItem("2000an", ""),
-                    ExploreYearItem("1900an", "")
+                    ExploreYearItem("2019", ""),
+                    ExploreYearItem("2024", ""),
+                    ExploreYearItem("2025", "")
                 )
                 sampleYears.forEach { y ->
                     WhiteYearCard(
@@ -415,10 +417,10 @@ private fun ExploreDefaultContent(
             )
             Spacer(modifier = Modifier.height(10.dp))
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                val sampleChars = if (characters.isNotEmpty()) characters.take(4) else listOf(
-                    ExploreCharacterItem("1", "Hinata", image = ""),
-                    ExploreCharacterItem("2", "Reanette", image = ""),
-                    ExploreCharacterItem("3", "Kurisu", image = "")
+                val sampleChars = if (characters.isNotEmpty()) characters.take(3) else listOf(
+                    ExploreCharacterItem("1", "Kurisu", image = ""),
+                    ExploreCharacterItem("2", "Amane", image = ""),
+                    ExploreCharacterItem("3", "Shiori", image = "")
                 )
                 sampleChars.forEach { c ->
                     DarkCharacterCard(
@@ -650,12 +652,20 @@ private fun ExploreHeaderRow(
             fontWeight = FontWeight.Bold
         )
         if (showChevron) {
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = ColorTextSecondary,
-                modifier = Modifier.size(18.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1E2430)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
 }
@@ -670,21 +680,11 @@ private fun WhiteCategoryCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(84.dp)
+            .height(96.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.White)
             .clickable(onClick = onClick)
     ) {
-        Column(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 18.dp)
-        ) {
-            Text(text = group, color = Color(0xFF6B7280), fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(text = name, color = Color(0xFF111827), fontSize = 19.sp, fontWeight = FontWeight.Bold)
-        }
-
+        // Full background image from API
         if (imageUrl.isNotBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
@@ -692,11 +692,35 @@ private fun WhiteCategoryCard(
                     .crossfade(true)
                     .build(),
                 contentDescription = name,
-                contentScale = ContentScale.Fit,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Box(
                 modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 12.dp)
-                    .size(76.dp)
+                    .fillMaxSize()
+                    .background(Color.White)
+            )
+        }
+
+        // Text on top (Left aligned)
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 18.dp)
+        ) {
+            Text(
+                text = group,
+                color = Color(0xFF6B7280),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = name,
+                color = Color(0xFF222222),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
             )
         }
     }
@@ -711,11 +735,11 @@ private fun WhiteYearCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(84.dp)
+            .height(96.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.White)
             .clickable(onClick = onClick)
     ) {
+        // Full background image from API
         if (imageUrl.isNotBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
@@ -723,18 +747,22 @@ private fun WhiteYearCard(
                     .crossfade(true)
                     .build(),
                 contentDescription = year,
-                contentScale = ContentScale.Fit,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Box(
                 modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 12.dp)
-                    .size(76.dp)
+                    .fillMaxSize()
+                    .background(Color.White)
             )
         }
 
+        // Text on top (Right aligned)
         Text(
             text = year,
-            color = Color(0xFF111827),
-            fontSize = 20.sp,
+            color = Color(0xFF222222),
+            fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -749,38 +777,60 @@ private fun DarkCharacterCard(
     imageUrl: String,
     onClick: () -> Unit
 ) {
+    val cardBg = Color(0xFF18202C)
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(78.dp)
+            .height(96.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF1E293B))
+            .background(cardBg)
             .clickable(onClick = onClick)
     ) {
+        // Character image on right with horizontal gradient fade mask
+        if (imageUrl.isNotBlank()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .width(145.dp)
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(imageUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                // Gradient mask overlay: solid #18202C on left to transparent on right
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    cardBg,
+                                    cardBg.copy(alpha = 0.85f),
+                                    cardBg.copy(alpha = 0.4f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+            }
+        }
+
+        // Name on left
         Text(
             text = name,
             color = Color.White,
-            fontSize = 18.sp,
+            fontSize = 21.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .padding(start = 18.dp)
         )
-
-        if (imageUrl.isNotBlank()) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(imageUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = name,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 12.dp)
-                    .size(70.dp)
-            )
-        }
     }
 }
 
@@ -788,15 +838,17 @@ private fun DarkCharacterCard(
 private fun DarkPillChip(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
+            .height(58.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF1E293B))
+            .background(Color(0xFF18202C))
             .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 12.dp)
+            .padding(horizontal = 22.dp),
+        contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
             color = Color.White,
-            fontSize = 13.5.sp,
+            fontSize = 17.5.sp,
             fontWeight = FontWeight.Bold
         )
     }

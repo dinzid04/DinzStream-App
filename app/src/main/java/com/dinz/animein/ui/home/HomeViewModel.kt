@@ -1,7 +1,10 @@
 package com.dinz.animein.ui.home
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dinz.animein.data.local.LocalAuthDatabase
+import com.dinz.animein.data.model.ContinueWatchingItem
 import com.dinz.animein.data.repository.AnimeRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +22,27 @@ class HomeViewModel(
 
     init {
         loadHomeData()
+    }
+
+    fun refreshWatchHistory(context: Context) {
+        val localDb = LocalAuthDatabase(context)
+        val history = localDb.getWatchHistory()
+        val list = history.map { item ->
+            val fraction = if (item.durationMs > 0) {
+                (item.positionMs.toFloat() / item.durationMs.toFloat()).coerceIn(0.01f, 1f)
+            } else 0f
+            ContinueWatchingItem(
+                id = item.movieId,
+                idMovie = item.movieId,
+                title = item.animeTitle,
+                episodeText = item.episodeTitle,
+                imageUrl = item.posterUrl,
+                progressFraction = fraction,
+                episodeId = item.episodeId,
+                positionMs = item.positionMs
+            )
+        }
+        _uiState.update { it.copy(continueWatchingList = list) }
     }
 
     fun loadHomeData() {
@@ -41,12 +65,11 @@ class HomeViewModel(
                 val newTitles = newTitlesResult.getOrNull()?.ifEmpty { null } ?: data?.movies ?: emptyList()
                 val randomItems = randomResult.getOrNull()?.ifEmpty { null } ?: data?.hotAnime ?: emptyList()
 
-                _uiState.update {
-                    it.copy(
+                _uiState.update { current ->
+                    current.copy(
                         isLoading = false,
                         errorMessage = null,
                         sliderItem = data?.slider?.firstOrNull(),
-                        continueWatchingList = repository.getContinueWatchingList(),
                         cuplixList = cuplixItems,
                         newEpisodesList = data?.newEpisodes ?: emptyList(),
                         hotAnimeList = data?.hotAnime ?: emptyList(),
@@ -66,6 +89,111 @@ class HomeViewModel(
                         errorMessage = errorMsg
                     )
                 }
+            }
+        }
+    }
+
+    fun loadMoreHorizontal(section: HomeSectionType) {
+        if (_uiState.value.isLoadingSection[section] == true) return
+        val currentPage = _uiState.value.horizontalPageMap[section] ?: 1
+        val nextPage = currentPage + 1
+
+        _uiState.update {
+            it.copy(isLoadingSection = it.isLoadingSection + (section to true))
+        }
+
+        viewModelScope.launch {
+            val result = repository.searchMovies(sort = section.sortKey, page = nextPage)
+            val newItems = result.getOrDefault(emptyList())
+            _uiState.update { current ->
+                val updatedMap = current.horizontalPageMap + (section to nextPage)
+                val updatedLoading = current.isLoadingSection + (section to false)
+                when (section) {
+                    HomeSectionType.HOT -> current.copy(
+                        hotAnimeList = current.hotAnimeList + newItems,
+                        horizontalPageMap = updatedMap,
+                        isLoadingSection = updatedLoading
+                    )
+                    HomeSectionType.NEW_EPISODES -> current.copy(
+                        newEpisodesList = current.newEpisodesList + newItems,
+                        horizontalPageMap = updatedMap,
+                        isLoadingSection = updatedLoading
+                    )
+                    HomeSectionType.NEW_TITLES -> current.copy(
+                        newTitlesList = current.newTitlesList + newItems,
+                        horizontalPageMap = updatedMap,
+                        isLoadingSection = updatedLoading
+                    )
+                    HomeSectionType.JAT_FOR_YU -> current.copy(
+                        jatForYuList = current.jatForYuList + newItems,
+                        horizontalPageMap = updatedMap,
+                        isLoadingSection = updatedLoading
+                    )
+                    HomeSectionType.WAITING -> current.copy(
+                        waitingAnimeList = current.waitingAnimeList + newItems,
+                        horizontalPageMap = updatedMap,
+                        isLoadingSection = updatedLoading
+                    )
+                    HomeSectionType.POPULAR -> current.copy(
+                        popularAnimeList = current.popularAnimeList + newItems,
+                        horizontalPageMap = updatedMap,
+                        isLoadingSection = updatedLoading
+                    )
+                    else -> current.copy(isLoadingSection = updatedLoading)
+                }
+            }
+        }
+    }
+
+    fun openSectionDetail(section: HomeSectionType) {
+        val initialItems = when (section) {
+            HomeSectionType.HOT -> _uiState.value.hotAnimeList
+            HomeSectionType.NEW_EPISODES -> _uiState.value.newEpisodesList
+            HomeSectionType.NEW_TITLES -> _uiState.value.newTitlesList
+            HomeSectionType.JAT_FOR_YU -> _uiState.value.jatForYuList
+            HomeSectionType.WAITING -> _uiState.value.waitingAnimeList
+            HomeSectionType.POPULAR -> _uiState.value.popularAnimeList
+            HomeSectionType.TODAY -> _uiState.value.todayScheduleList
+        }
+        _uiState.update {
+            it.copy(
+                activeSectionDetail = HomeSectionDetailState(
+                    sectionType = section,
+                    items = initialItems,
+                    page = 1
+                )
+            )
+        }
+    }
+
+    fun closeSectionDetail() {
+        _uiState.update { it.copy(activeSectionDetail = null) }
+    }
+
+    fun loadMoreSectionDetail() {
+        val detail = _uiState.value.activeSectionDetail ?: return
+        if (detail.isLoadingMore || detail.hasReachedEnd) return
+
+        val nextPage = detail.page + 1
+        _uiState.update {
+            it.copy(activeSectionDetail = detail.copy(isLoadingMore = true))
+        }
+
+        viewModelScope.launch {
+            val result = repository.searchMovies(sort = detail.sectionType.sortKey, page = nextPage)
+            val newItems = result.getOrDefault(emptyList())
+            _uiState.update { current ->
+                val currentDetail = current.activeSectionDetail
+                if (currentDetail != null && currentDetail.sectionType == detail.sectionType) {
+                    current.copy(
+                        activeSectionDetail = currentDetail.copy(
+                            items = currentDetail.items + newItems,
+                            page = nextPage,
+                            isLoadingMore = false,
+                            hasReachedEnd = newItems.isEmpty()
+                        )
+                    )
+                } else current
             }
         }
     }

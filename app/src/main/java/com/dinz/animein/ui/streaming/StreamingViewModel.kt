@@ -69,17 +69,24 @@ class StreamingViewModel(
                 )
             }
 
-            // Fetch comments and covers/posters in parallel
+            // Fetch movie detail, comments, and covers/posters in parallel
+            val effectiveMovieId = movieId.ifBlank { streamData?.episode?.idMovie ?: "" }
+            val movieDetailDeferred = async {
+                if (effectiveMovieId.isNotBlank()) repository.getMovieDetail(effectiveMovieId)
+                else Result.success(null)
+            }
             val commentsDeferred = async { repository.getEpisodeComments(episodeId, page = 0, sort = "new") }
-            val postersDeferred = async { if (movieId.isNotBlank()) repository.getMoviePosters(movieId) else Result.success(emptyList()) }
-            val coversDeferred = async { if (movieId.isNotBlank()) repository.getMovieCovers(movieId) else Result.success(emptyList()) }
+            val postersDeferred = async { if (effectiveMovieId.isNotBlank()) repository.getMoviePosters(effectiveMovieId) else Result.success(emptyList()) }
+            val coversDeferred = async { if (effectiveMovieId.isNotBlank()) repository.getMovieCovers(effectiveMovieId) else Result.success(emptyList()) }
 
+            val movieDetail = movieDetailDeferred.await().getOrNull()
             val comments = commentsDeferred.await().getOrDefault(emptyList())
             val posters = postersDeferred.await().getOrDefault(emptyList())
             val covers = coversDeferred.await().getOrDefault(emptyList())
 
             _uiState.update {
                 it.copy(
+                    movieDetail = movieDetail,
                     comments = comments,
                     posters = posters,
                     covers = covers
@@ -157,8 +164,17 @@ class StreamingViewModel(
         _uiState.update { it.copy(userRating = stars) }
     }
 
+    fun setSettingsSubMenu(subMenu: SettingsSubMenu) {
+        _uiState.update { it.copy(settingsSubMenu = subMenu) }
+    }
+
     fun toggleSettings() {
-        _uiState.update { it.copy(isSettingsOpen = !it.isSettingsOpen) }
+        _uiState.update {
+            it.copy(
+                isSettingsOpen = !it.isSettingsOpen,
+                settingsSubMenu = SettingsSubMenu.MAIN
+            )
+        }
     }
 
     fun toggleGallerySheet(tab: Int = 0) {

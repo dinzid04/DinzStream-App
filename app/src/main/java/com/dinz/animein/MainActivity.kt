@@ -82,6 +82,10 @@ class MainActivity : ComponentActivity() {
                                         onAnimeClick = { animeId ->
                                             selectedAnimeId = animeId
                                         },
+                                        onEpisodeClick = { epId, mId ->
+                                            selectedStreamingMovieId = mId
+                                            selectedStreamingEpisodeId = epId
+                                        },
                                         onCuplixClick = { cuplixId ->
                                             Toast.makeText(this, "Putar Cuplix #$cuplixId", Toast.LENGTH_SHORT).show()
                                         }
