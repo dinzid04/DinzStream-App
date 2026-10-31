@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -82,6 +83,7 @@ import com.dinz.animein.ui.theme.ColorMetricFavorites
 import com.dinz.animein.ui.theme.ColorMetricViews
 import com.dinz.animein.ui.theme.ColorTextPrimary
 import com.dinz.animein.ui.theme.ColorTextSecondary
+import com.dinz.animein.ui.theme.SfProFontFamily
 
 private val StudioList = listOf("MAPPA", "Ufotable", "Kyoto Animation", "Bones", "A-1 Pictures", "Toei Animation", "Madhouse", "Wit Studio", "CloverWorks")
 private val TypeList = listOf("MOVIE", "ONA", "OVA", "LIVE ACTION", "SPECIAL", "TV")
@@ -133,11 +135,11 @@ fun SearchScreen(
                         viewModel.closeSubPage()
                     },
                     onYearClick = {
-                        viewModel.selectGenre(it)
+                        viewModel.selectYear(it)
                         viewModel.closeSubPage()
                     },
                     onCharacterClick = {
-                        viewModel.onQueryChange(it)
+                        viewModel.selectCharacter(it)
                         viewModel.closeSubPage()
                     }
                 )
@@ -251,17 +253,23 @@ fun SearchScreen(
 
                     // Main Content: Default Explore Mode vs Active Search Mode
                     if (!uiState.isSearchActive) {
-                        ExploreDefaultContent(
-                            genres = uiState.genres,
-                            years = uiState.years,
-                            characters = uiState.characters,
-                            onOpenSubPage = { viewModel.openSubPage(it) },
-                            onGenreClick = { viewModel.selectGenre(it) },
-                            onStudioClick = { viewModel.selectStudio(it) },
-                            onYearClick = { viewModel.selectGenre(it) },
-                            onTypeClick = { viewModel.selectType(it) },
-                            onCharacterClick = { viewModel.onQueryChange(it) }
-                        )
+                        PullToRefreshBox(
+                            isRefreshing = uiState.isRefreshing,
+                            onRefresh = { viewModel.refreshExploreData() },
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            ExploreDefaultContent(
+                                genres = uiState.genres,
+                                years = uiState.years,
+                                characters = uiState.characters,
+                                onOpenSubPage = { viewModel.openSubPage(it) },
+                                onGenreClick = { viewModel.selectGenre(it) },
+                                onStudioClick = { viewModel.selectStudio(it) },
+                                onYearClick = { viewModel.selectYear(it) },
+                                onTypeClick = { viewModel.selectType(it) },
+                                onCharacterClick = { viewModel.selectCharacter(it) }
+                            )
+                        }
                     } else {
                         SearchResultsContent(
                             uiState = uiState,
@@ -681,11 +689,11 @@ private fun WhiteCategoryCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(96.dp)
+            .height(114.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
     ) {
-        // Full background image from API
+        // Full background image from API (TopCenter to prevent cropping character heads)
         if (imageUrl.isNotBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
@@ -696,6 +704,7 @@ private fun WhiteCategoryCard(
                     .build(),
                 contentDescription = name,
                 contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter,
                 modifier = Modifier.fillMaxSize()
             )
         } else {
@@ -716,14 +725,16 @@ private fun WhiteCategoryCard(
                 text = group,
                 color = Color(0xFF6B7280),
                 fontSize = 12.sp,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                fontFamily = SfProFontFamily
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = name,
                 color = Color(0xFF222222),
                 fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                fontFamily = SfProFontFamily
             )
         }
     }
@@ -738,11 +749,11 @@ private fun WhiteYearCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(96.dp)
+            .height(114.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
     ) {
-        // Full background image from API
+        // Full background image from API (TopCenter alignment)
         if (imageUrl.isNotBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
@@ -753,6 +764,7 @@ private fun WhiteYearCard(
                     .build(),
                 contentDescription = year,
                 contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter,
                 modifier = Modifier.fillMaxSize()
             )
         } else {
@@ -769,6 +781,7 @@ private fun WhiteYearCard(
             color = Color(0xFF222222),
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
+            fontFamily = SfProFontFamily,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(end = 20.dp)
@@ -786,7 +799,7 @@ private fun DarkCharacterCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(96.dp)
+            .height(114.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(cardBg)
             .clickable(onClick = onClick)
@@ -797,7 +810,7 @@ private fun DarkCharacterCard(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .fillMaxHeight()
-                    .width(145.dp)
+                    .width(165.dp)
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
@@ -808,6 +821,7 @@ private fun DarkCharacterCard(
                         .build(),
                     contentDescription = name,
                     contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
                     modifier = Modifier.fillMaxSize()
                 )
                 // Gradient mask overlay: solid #18202C on left to transparent on right
@@ -832,8 +846,9 @@ private fun DarkCharacterCard(
         Text(
             text = name,
             color = Color.White,
-            fontSize = 21.sp,
+            fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
+            fontFamily = SfProFontFamily,
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .padding(start = 18.dp)

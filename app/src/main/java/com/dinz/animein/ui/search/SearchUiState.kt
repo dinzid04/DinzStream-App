@@ -19,9 +19,11 @@ data class SearchUiState(
     val selectedGenre: String? = null,
     val selectedType: String? = null,
     val selectedStudio: String? = null,
+    val selectedYear: String? = null,
     val isGridLayout: Boolean = false,
     val sortOrder: String = "views",
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
     // Explore sections
     val genres: List<ExploreGenreItem> = emptyList(),

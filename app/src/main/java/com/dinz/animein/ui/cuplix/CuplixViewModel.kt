@@ -81,6 +81,30 @@ class CuplixViewModel(
         }
     }
 
+    fun selectQuality(quality: String) {
+        _uiState.update { it.copy(selectedQuality = quality) }
+        val currentItem = _uiState.value.cuplixList.getOrNull(_uiState.value.currentIndex)
+        val epId = currentItem?.idEpisode ?: return
+
+        viewModelScope.launch {
+            val result = repository.getEpisodeStream(epId)
+            result.onSuccess { streamData ->
+                val matchedServer = streamData.servers?.firstOrNull {
+                    it.quality.equals(quality, ignoreCase = true) || it.name?.contains(quality, ignoreCase = true) == true
+                } ?: streamData.servers?.firstOrNull()
+
+                val directLink = matchedServer?.link
+                if (!directLink.isNullOrBlank()) {
+                    _uiState.update { current ->
+                        current.copy(
+                            streamUrlMap = current.streamUrlMap + (epId to directLink)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     fun loadStreamForEpisode(idEpisode: String) {
         if (_uiState.value.streamUrlMap.containsKey(idEpisode)) return
 

@@ -35,11 +35,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -179,7 +182,7 @@ fun CuplixViewScreen(
             )
         }
 
-        // Top Navigation Header (Back + Menu ⋮)
+        // Top Navigation Header (Back + Resolution Menu ⋮)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -198,13 +201,66 @@ fun CuplixViewScreen(
                 )
             }
 
-            IconButton(onClick = { /* More actions */ }) {
-                Icon(
-                    imageVector = Icons.Filled.MoreVert,
-                    contentDescription = "More",
-                    tint = Color.White,
-                    modifier = Modifier.size(26.dp)
-                )
+            var showResolutionMenu by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { showResolutionMenu = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = "Pilihan Resolusi",
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showResolutionMenu,
+                    onDismissRequest = { showResolutionMenu = false },
+                    modifier = Modifier
+                        .background(Color(0xFF161B26))
+                        .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(8.dp))
+                ) {
+                    Text(
+                        text = "Kualitas Video Cuplix",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = SfProFontFamily,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+                    val resolutions = listOf("360p", "480p", "720p", "1080p")
+                    resolutions.forEach { res ->
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = res,
+                                        color = Color.White,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = if (uiState.selectedQuality == res) FontWeight.Bold else FontWeight.Medium,
+                                        fontFamily = SfProFontFamily
+                                    )
+                                    if (uiState.selectedQuality == res) {
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Icon(
+                                            imageVector = Icons.Filled.Check,
+                                            contentDescription = "Terpilih",
+                                            tint = Color(0xFFFF5722),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            },
+                            onClick = {
+                                viewModel.selectQuality(res)
+                                showResolutionMenu = false
+                            }
+                        )
+                    }
+                }
             }
         }
 

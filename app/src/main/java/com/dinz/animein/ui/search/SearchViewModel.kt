@@ -25,9 +25,17 @@ class SearchViewModel(
         loadExploreData()
     }
 
-    fun loadExploreData() {
+    fun refreshExploreData() {
+        loadExploreData(isRefresh = true)
+    }
+
+    fun loadExploreData(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            if (isRefresh) {
+                _uiState.update { it.copy(isRefreshing = true) }
+            } else {
+                _uiState.update { it.copy(isLoading = true) }
+            }
 
             val genresDeferred = async { repository.getExploreGenres() }
             val yearsDeferred = async { repository.getExploreYears() }
@@ -44,11 +52,12 @@ class SearchViewModel(
             _uiState.update {
                 it.copy(
                     isLoading = false,
-                    genres = genresResult.getOrDefault(emptyList()),
-                    years = yearsResult.getOrDefault(emptyList()),
-                    characters = charsResult.getOrDefault(emptyList()),
+                    isRefreshing = false,
+                    genres = genresResult.getOrDefault(emptyList()).shuffled(),
+                    years = yearsResult.getOrDefault(emptyList()).shuffled(),
+                    characters = charsResult.getOrDefault(emptyList()).shuffled(),
                     cuplixList = cuplixResult.getOrDefault(emptyList()),
-                    recommendations = recResult.getOrDefault(emptyList())
+                    recommendations = recResult.getOrDefault(emptyList()).shuffled()
                 )
             }
         }
@@ -105,6 +114,28 @@ class SearchViewModel(
         executeSearch()
     }
 
+    fun selectYear(year: String?) {
+        val nextYear = if (_uiState.value.selectedYear == year) null else year
+        _uiState.update {
+            it.copy(
+                selectedYear = nextYear,
+                query = nextYear ?: it.query,
+                isSearchActive = true
+            )
+        }
+        executeSearch()
+    }
+
+    fun selectCharacter(charName: String) {
+        _uiState.update {
+            it.copy(
+                query = charName,
+                isSearchActive = true
+            )
+        }
+        executeSearch()
+    }
+
     fun toggleLayout() {
         _uiState.update { it.copy(isGridLayout = !it.isGridLayout) }
     }
@@ -139,6 +170,7 @@ class SearchViewModel(
                 selectedGenre = null,
                 selectedType = null,
                 selectedStudio = null,
+                selectedYear = null,
                 isSearchActive = false,
                 searchResults = emptyList()
             )

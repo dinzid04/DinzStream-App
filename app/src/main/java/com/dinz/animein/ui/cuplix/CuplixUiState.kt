@@ -10,6 +10,7 @@ data class CuplixUiState(
     val likedItemIds: Set<String> = emptySet(),
     val likesCountMap: Map<String, Int> = emptyMap(),
     val streamUrlMap: Map<String, String> = emptyMap(), // idEpisode -> direct stream mp4
+    val selectedQuality: String = "720p",
     val activeCommentsFypId: String? = null,
     val commentsList: List<EpisodeCommentItem> = emptyList(),
     val isLoadingComments: Boolean = false,

@@ -84,6 +84,26 @@ fun PopularLeaderboardCard(
             .background(cardBg)
             .clickable(onClick = onClick)
     ) {
+        // Stylized Left Accent Bar for Top 3 (Golden curved indicator)
+        if (rank in 1..3) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .width(4.5.dp)
+                    .fillMaxHeight(0.68f)
+                    .clip(RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            colors = when (rank) {
+                                1 -> listOf(Color(0xFFFBBF24), Color(0xFFF59E0B))
+                                2 -> listOf(Color(0xFFE2E8F0), Color(0xFF94A3B8))
+                                else -> listOf(Color(0xFFF59E0B), Color(0xFFD97706))
+                            }
+                        )
+                    )
+            )
+        }
+
         // 1. Right-side Anime Cover Artwork with Smooth Horizontal Gradient Fade
         val coverUrl = anime.imageCover ?: anime.getEffectiveCover()
         Box(

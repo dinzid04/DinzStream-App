@@ -25,10 +25,14 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -159,12 +163,29 @@ fun StreamingScreen(
         }
     }
 
-    // Fullscreen screen orientation control
+    // Fullscreen screen orientation control & immersive system bars handling
     LaunchedEffect(uiState.isFullScreen) {
-        if (uiState.isFullScreen) {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        } else {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        activity?.let { act ->
+            val window = act.window
+            val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+            if (uiState.isFullScreen) {
+                act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                insetsController.hide(WindowInsetsCompat.Type.systemBars())
+                insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                insetsController.show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            activity?.let { act ->
+                act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                val insetsController = WindowCompat.getInsetsController(act.window, act.window.decorView)
+                insetsController.show(WindowInsetsCompat.Type.systemBars())
+            }
         }
     }
 
@@ -723,7 +744,15 @@ private fun CustomExoPlayerView(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .then(
+                            if (uiState.isFullScreen) {
+                                Modifier.padding(start = 42.dp, end = 42.dp, top = 16.dp)
+                            } else {
+                                Modifier
+                                    .statusBarsPadding()
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                            }
+                        ),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -814,7 +843,15 @@ private fun CustomExoPlayerView(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .then(
+                            if (uiState.isFullScreen) {
+                                Modifier.padding(start = 42.dp, end = 42.dp, bottom = 14.dp)
+                            } else {
+                                Modifier
+                                    .navigationBarsPadding()
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            }
+                        )
                 ) {
                     // Time and Progress Row
                     Row(
@@ -899,7 +936,15 @@ private fun CustomExoPlayerView(
                 viewModel = viewModel,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 48.dp, end = 12.dp)
+                    .then(
+                        if (uiState.isFullScreen) {
+                            Modifier.padding(top = 56.dp, end = 42.dp)
+                        } else {
+                            Modifier
+                                .statusBarsPadding()
+                                .padding(top = 48.dp, end = 12.dp)
+                        }
+                    )
             )
         }
     }

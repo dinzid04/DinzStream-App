@@ -1,95 +1,115 @@
-# Spesifikasi Desain & Rencana Eksekusi Yuranime v1.6.0
+# Spesifikasi Desain & Panduan Eksekusi Yuranime (Single Source of Truth)
 
-Dokumen ini mendokumentasikan spesifikasi teknis dan rencana implementasi perbaikan menyeluruh pada **Video Player**, **Halaman Search (Cari)**, **Paling Populer di Home**, pembangunan **Halaman View Cuplix**, serta penerapan **Global SVG Placeholder & Rebranding ke Yuranime** di `/storage/emulated/0/termux/Workspace_uiApp/` berdasarkan gambar referensi terbaru di `reff_ui/` dan standar Anti-AI-Slop.
+Dokumen ini adalah satu-satunya acuan spesifikasi desain dan teknis aplikasi **Yuranime** di `/storage/emulated/0/termux/Workspace_uiApp/` yang disusun berdasarkan analisis 5 gambar referensi terbaru di `reff_ui/`, aset vektor di `design/logo/`, serta standar Anti-AI-Slop.
 
 ---
 
-## 1. Paling Populer di Home (Leaderboard Ranking Cards)
-*Referensi: `reff_ui/IMG-20261031-WA0125.jpg`*
+## 1. Window & Notch Fix: Full-Bleed Status Bar Transparan (Video Player)
+*Mengacu pada: `reff_ui/Screenshot_20261031_174938_AnimeIn.jpg`*
 
-Mengganti `LazyRow` horizontal lama menjadi **Daftar Peringkat Vertikal (Leaderboard Stack)** yang elegan dan berbobot:
+1. **Konfigurasi Activity & Window (`MainActivity.kt` & Orientation Listener):**
+   - Mengaktifkan `WindowCompat.setDecorFitsSystemWindows(window, false)` secara global.
+   - Mengatur warna bilah sistem:
+     - `window.statusBarColor = android.graphics.Color.TRANSPARENT`
+     - `window.navigationBarColor = android.graphics.Color.TRANSPARENT`
+   - Mengaktifkan rendering menembus area poni/kamera notch (*display cutout*):
+     - `window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES`
+     - Pada Android R+ (API 30+), gunakan mode `LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS` bila tersedia.
+2. **Mode Fullscreen / Landscape:**
+   - Menyembunyikan seluruh system bars secara imersif menggunakan `WindowInsetsControllerCompat`:
+     ```kotlin
+     val controller = WindowInsetsControllerCompat(window, window.decorView)
+     controller.hide(WindowInsetsCompat.Type.systemBars())
+     controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+     ```
+   - Mengembalikan system bars saat kembali ke mode Portrait.
+3. **Overlay Tombol Atas Video Player (`<-` dan `⚙`):**
+   - Menghilangkan bar hitam yang memotong ikon.
+   - Menerapkan padding yang aman (`statusBarsPadding()` atau safe cutout insets) pada layer overlay baris atas kontrol video player sehingga tombol kembali (`<-`) di kiri atas dan gerigi pengaturan (`⚙`) di kanan atas berada utuh di dalam area video dan TIDAK PERNAH terpotong notch kamera atau status bar.
+
+---
+
+## 2. Halaman Search (`CARI`): Gambar Utuh, Filter Klik & Pull-to-Refresh
+*Mengacu pada: `reff_ui/Screenshot_20261031_211627_AnimeIn.jpg`*
+
+1. **Proporsi Kartu & Keterlihatan Kepala Karakter (`KATEGORI`, `TAHUN`, `KARAKTER`):**
+   - Perbesar tinggi kartu (`height`) menjadi `112.dp`–`118.dp` agar ruang vertikal lebih leluasa.
+   - Pada kartu `KATEGORI` dan `TAHUN`: gunakan `ContentScale.Crop` dengan `alignment = Alignment.TopCenter` atau `Alignment.TopEnd` agar bagian kepala/wajah karakter anime tampil utuh tanpa terpotong di tepi atas kartu.
+   - Pada kartu `KARAKTER`: kartu berlatar `#18202C` dengan ilustrasi karakter di sisi kanan menggunakan `ContentScale.Crop` dan `alignment = Alignment.TopCenter`. Gradasi horizontal dari `#18202C` solid di kiri memudar mulus ke transparan di kanan.
+2. **Interaktivitas & Filter Otomatis:**
+   - Saat pengguna mengklik item pada:
+     - `KATEGORI` (*Theme / Genre / Demographic*, misal: Action, Adventure, Comedy)
+     - `TAHUN` (misal: 2026, 2025, 2024)
+     - `STUDIO` (misal: MAPPA, Ufotable, Kyoto Animation)
+     - `TIPE` (misal: MOVIE, ONA, OVA, LIVE ACTION)
+     - `KARAKTER` (misal: Aika, Amane, C.C.)
+   - Alihkan langsung ke mode tampilan hasil pencarian (`SearchResultsContent`) dan picu query filter API terkait (`genre_in`, `keyword`, `type`, dsb.) untuk menampilkan anime yang relevan secara dinamis.
+3. **Pull-to-Refresh & Acak (Shuffle) Item:**
+   - Mengimplementasikan `PullToRefreshBox` (atau `rememberPullToRefreshState`) pada tampilan awal `SearchScreen`.
+   - Setiap kali halaman dibuka atau ditarik ke bawah (refresh), lakukan `shuffle()` terhadap daftar `genres`, `studios`, `years`, dan `characters` dari API, sehingga item yang tampil selalu segar dan bervariasi.
+
+---
+
+## 3. Halaman View Cuplix & Komentar Cuplix (100% Persis Referensi)
+*Mengacu pada: `reff_ui/Screenshot_20261031_211731_ANIMEIN.jpg` & `Screenshot_20261031_211753_ANIMEIN.jpg`*
+
+1. **Perilaku Video Player Cuplix:**
+   - Autoplay seketika saat dibuka dalam latar hitam penuh.
+   - **DILARANG menampilkan seekbar, angka durasi/waktu, atau kontrol kecepatan.**
+   - Mengetuk area video langsung menghentikan sementara (**Pause**) dan menampilkan bulatan ikon play/pause bersih di tengah; mengetuk lagi langsung melanjutkan (**Play**).
+2. **Header Atas & Menu Titik Tiga (`⋮`):**
+   - Pojok kiri atas: Tombol panah kembali (`<-`).
+   - Pojok kanan atas: Tombol titik tiga (`⋮`). Saat diklik, menampilkan pop-up resolusi Cuplix (misal: 360p, 480p, 720p) dengan sinkronisasi posisi pemutaran.
+3. **Tata Letak Kiri Bawah (Creator & Metadata Anime):**
+   1. Foto profil lingkaran (avatar pokemon sprite) pengunggah berbingkai oranye.
+   2. Username pengunggah warna oranye (`#FF5722`, e.g. `Yuuichii`).
+   3. Teks caption di bawah username (warna putih).
+   4. **Overlay Judul Anime:** Kapsul/pill warna oranye (`#FF5722` / `#E65100`) dengan teks `[Judul Anime]  >` yang lebarnya menyesuaikan panjang teks (`Modifier.wrapContentWidth()`). Mengetuknya membuka `AnimeDetailScreen(idMovie)`.
+   5. **Overlay Episode:** Tepat di bawah kapsul judul, kapsul/pill warna abu-abu gelap (`#26282C`) berisi teks `Episode [Nomor]  >` dengan `wrapContentWidth()` (sehingga panjang kapsul episode terlihat lebih pendek daripada kapsul judul di atasnya, persis referensi).
+4. **Tata Letak Kanan Bawah (Action Sidebar):**
+   1. Ikon Hati outline putih (`♡` / merah bila disukai) dengan angka like di bawahnya (`440`).
+   2. Ikon Komentar outline putih dengan angka komentar di bawahnya (`8`).
+   3. Poster anime kecil persegi panjang vertikal rounded di paling kanan bawah (sejajar kapsul judul/episode).
+5. **Panel Komentar Cuplix:**
+   - Mengetuk ikon komentar membuka bottom sheet di paruh bawah layar sementara video tetap terlihat di atas.
+   - Input rounded `Tulis komentar..` dengan panah kirim oranye (`>`), diikuti daftar komentar asli dari API (`/data/fyp/comment/list`).
+
+---
+
+## 4. Section `Paling Populer` di Home (Top 10 Ranking Cards)
+*Mengacu pada: `reff_ui/IMG-20261031-WA0125.jpg`*
+
 1. **Struktur Kartu:**
-   - Bentuk kartu horizontal dengan tinggi tetap `88.dp`–`92.dp`, sudut membulat `14.dp`, margin horizontal `16.dp`.
-   - **Background Ilustrasi:** Menampilkan `image_cover` anime di sisi kanan kartu (`ContentScale.Crop`).
-   - **Gradient Masking Halus:** Lapisan gradasi horizontal dari warna kartu gelap solid (`#121622`) di sisi kiri (lebar ~50%), memudar mulus ke transparan (`Color.Transparent`) di sisi kanan, sehingga ilustrasi menyatu alami tanpa garis batas potong yang kasar.
-2. **Peringkat Top 3 (Gold / Silver / Bronze Accent):**
-   - **Rank 1:** Angka `1` besar bergaya miring tebal (*bold italic* `32.sp`), warna krem emas (`#FBBF24`), border kartu beraksen emas bercahaya (`1.5.dp`, `#F59E0B66`).
-   - **Rank 2:** Angka `2` besar warna perak/krem (`#E2E8F0`), border kartu perak halus (`1.dp`, `#94A3B840`).
-   - **Rank 3:** Angka `3` besar warna amber/perunggu (`#F59E0B`), border kartu amber halus (`1.dp`, `#D9770640`).
-   - **Rank 4 s/d 10:** Angka rank timbul gelap (*muted embossed* `30.sp`, warna `#334155`), background kartu gelap `#131824` dengan border minimalis `#1E2536`.
-3. **Tipografi & Metadata:**
-   - **Judul Anime:** Huruf kapital penuh (*all-caps*), SF Bold ukuran `15.sp`, warna putih bersih (`#FFFFFF`), maksimal 1 baris dengan `TextOverflow.Ellipsis`.
-   - **Rating Bintang & Favorites:** Baris di bawah judul berisi 5 bintang emas (`★★★★★`, `#F59E0B`, ukuran `13.sp`) diikuti jumlah favorit pengguna (diambil dari field `favorites` API, e.g. `39102`, SF SemiBold `13.sp`, warna `#FCD34D`).
-4. **Interaksi:** Mengetuk kartu membuka langsung `AnimeDetailScreen(anime.id)`.
+   - 10 urutan teratas (`1` sampai `10`) tersusun vertikal ke bawah di Home Screen.
+   - Tinggi kartu sekitar `84.dp`–`88.dp`, sudut membulat `14.dp`, warna latar abu-abu gelap pekat `#141414`.
+2. **Peringkat (Rank 1–10):**
+   - **Peringkat 1, 2, 3:**
+     - Garis aksen lengkung berwarna emas (`#D4AF37` / `#F5B041`) di tepi kiri kartu.
+     - Angka `1`, `2`, `3` sangat besar (`36.sp`), miring (*Italic*), **SF Bold**, warna emas.
+   - **Peringkat 4 sampai 10:**
+     - Tanpa garis emas di tepi kiri.
+     - Angka `4`–`10` besar (`30.sp`), miring (*Italic*), **SF Bold**, warna abu-abu gelap transparan (`#2C2C2C`).
+3. **Judul & Bintang:**
+   - Di sebelah kanan angka peringkat: Judul anime huruf kapital putih tebal (`UPPERCASE`, **SF Bold**, 1 baris dengan `ellipsis`).
+   - Tepat di bawahnya: 5 ikon bintang emas (`★★★★★`) diikuti angka jumlah favorit berwarna emas (`favorites`, e.g. `39102`).
+4. **Gambar Cover dengan Opacity Gradient:**
+   - Di separuh kanan kartu: gambar cover anime dengan *horizontal gradient brush mask* (opasitas memudar dari 100% gelap `#141414` di bagian tengah ke transparan di sisi kanan).
 
 ---
 
-## 2. Halaman View Cuplix (Vertical Swipeable Feed & Comments)
-*Referensi: `reff_ui/Screenshot_20261031_211731_ANIMEIN.jpg` & `Screenshot_20261031_211753_ANIMEIN.jpg`*
+## 5. Global Image Placeholder (`yuranime_outline.svg`) & Rebranding Aplikasi
+*Aset: `design/logo/yuranime_outline.svg` & `design/logo/yuranime-icon-app.svg`*
 
-Membangun layar baru `CuplixViewScreen.kt` bergaya TikTok/Reels untuk memutar cuplikan video pendek anime:
-1. **Vertical Pager Video Playback:**
-   - Menggunakan `VerticalPager` (atau `LazyColumn` dengan snapping per halaman) yang dapat di-swipe ke atas/bawah.
-   - Setiap item cuplikan memuat video dari endpoint stream anime (`/3/2/episode/streamnew/{id_episode}`) dan otomatis melompat (*seek*) ke `time_start` (ms), memutar hingga `time_end` (ms), lalu looping secara otomatis dan mulus.
-2. **Overlay Aksi Kanan (Action Sidebar):**
-   - **Tombol Like:** Ikon hati (Heart) putih + teks jumlah suka (`count_likes` e.g. `440`). Klik melakukan toggle like animasi.
-   - **Tombol Komentar:** Ikon balon obrolan + teks jumlah komentar (`count_comments` e.g. `8`). Klik membuka Bottom Sheet komentar.
-   - **Poster Anime Thumbnail:** Kartu rounded kecil (`width = 44.dp`, `height = 62.dp`) di pojok kanan bawah yang menampilkan poster resmi anime. Mengetuknya membuka `AnimeDetailScreen(id_movie)`.
-3. **Overlay Info Kiri Bawah (Creator & Anime Metadata):**
-   - **Avatar Pengguna:** Avatar lingkaran kecil (`36.dp`) dengan foto/pokemon avatar pengguna.
-   - **Nama Pengguna:** Teks warna oranye kemerahan (`#FF5722`), SF SemiBold `14.sp`.
-   - **Deskripsi / Caption:** Teks deskripsi pendek (e.g. `☕ 🗿`).
-   - **Pill Anime (Oranye):** Kotak pill oranye (`#FF5722`) berisi `[Judul Anime] >` yang dapat diklik untuk membuka Detail Anime.
-   - **Pill Episode (Transparan Gelap):** Kotak pill semi-transparan `#00000080` berisi `Episode [Nomor] >` yang dapat diklik untuk membuka Streaming Screen pada episode tersebut.
-4. **Header Bar Atas:**
-   - Tombol kembali (`<-`) di kiri atas dan tombol menu tiga titik (`⋮`) di kanan atas, di atas gradasi hitam halus.
-5. **Cuplix Comment Bottom Sheet:**
-   - Menampilkan modal bottom sheet saat tombol komentar ditekan.
-   - **Input Bar Atas:** Kolom input rounded `#1A202C` bertuliskan placeholder "Tulis komentar.." dan tombol kirim panah oranye (`#FF5722`).
-   - **Daftar Komentar:** Mengambil data komentar asli dari `/data/fyp/comment/list?id_fyp={id}&page=1`.
-   - Menampilkan avatar karakter pokemon (`https://assets.animein.net/images/pokemon/{pokemon}.png`), username, timestamp relatif (e.g. `5 months ago`), dan isi komentar pengguna.
+1. **Global SVG Placeholder:**
+   - Mengonversi `yuranime_outline.svg` menjadi vector drawable `ic_yuranime_outline.xml` di `res/drawable/`.
+   - Menggunakan `ic_yuranime_outline` di tengah-tengah (`Alignment.Center`) dengan latar gelap `#121622` sebagai placeholder saat memuat dan fallback error pada seluruh pemanggilan `AsyncImage` di seluruh aplikasi.
+2. **Rebranding:**
+   - Nama aplikasi: **`Yuranime`** di `strings.xml` dan `AndroidManifest.xml`.
+   - Ikon launcher: `yuranime-icon-app.svg` dikonversi ke `ic_launcher_foreground.xml` dan `ic_launcher_background.xml`.
 
 ---
 
-## 3. Video Player & Fullscreen Polish
-*Referensi: `reff_ui/Screenshot_20261031_174938_AnimeIn.jpg`*
-
-1. **Kontrol Player Fullscreen:**
-   - **Tengah:** Tombol Mundur 10 detik (`<<`), Bulatan Play/Pause bergaris putih tipis dengan ikon bersih di tengah, Tombol Maju 10 detik (`>>`).
-   - **Bar Bawah:**
-     - Waktu saat ini di kiri (e.g. `04:50`, SF Medium `13.sp`).
-     - Seekbar durasi warna putih bersih (`#FFFFFF`) tebal dengan buffer line semi-transparan.
-     - Total durasi di kanan (e.g. `23:39`).
-     - Tombol toggle fullscreen di sudut kanan bawah.
-   - **Bar Atas:** Tombol Back (`<-`) di kiri atas dan Ikon Gerigi Settings (`⚙`) di kanan atas.
-2. **Floating Popup Menu (Speed, Resolution, Auto Next, Lock):**
-   - Memastikan floating menu gaya PiuPiu di pojok kanan atas player tetap aktif dan responsif di mode fullscreen maupun portrait tanpa merusak layout player.
-   - Penggantian server/resolusi video mempertahankan posisi playback terakhir tanpa ter-reset ke awal.
-
----
-
-## 4. Halaman Search (Cari) Polish
-*Referensi: `reff_ui/Screenshot_20261031_211627_AnimeIn.jpg`*
-
-1. **Verifikasi Visual:**
-   - Mempertahankan kartu `KATEGORI` full banner dengan label kategori dan teks 22sp.
-   - Mempertahankan kartu `TAHUN` dengan ilustrasi kiri dan tahun kanan.
-   - Mempertahankan kartu `STUDIO` dan `TIPE` dengan font putih SF Bold dan tinggi 58dp.
-   - Mempertahankan kartu `KARAKTER` dengan masking horizontal gradient fade dari `#18202C` ke transparan.
-2. **Navigasi Search Sub-Pages:**
-   - Memastikan klik pada `Cuplix` di Search membuka CuplixViewScreen.
-   - Memastikan pagination dan filter genre/type bekerja presisi.
-
----
-
-## 5. Global SVG Placeholder & Rebranding ke Yuranime
-
-1. **Rebranding:**
-   - Mengubah nama aplikasi di `res/values/strings.xml` menjadi **"Yuranime"**.
-   - Memperbarui header logo di `HomeScreen` menggunakan monogram dan wordmark Yuranime baru.
-2. **Ikon Aplikasi Resmi (Adaptive Icon):**
-   - Memasang vector drawable ikon resmi Yuranime (Kitsune Play) yang telah divalidasi ke `res/drawable/ic_launcher_foreground.xml` dan latar `res/drawable/ic_launcher_background.xml`.
-3. **Global SVG Placeholder System (Coil):**
-   - Membuat vector drawable `placeholder_yuranime.xml` (siluet geometris Kitsune Play Yuranime pada latar slate gelap `#121622`).
-   - Mengintegrasikannya sebagai `placeholder()` dan `error()` default pada seluruh komponen kartu anime (`AnimeVerticalCard`, `AnimeWideCard`, `ContinueWatchingCard`, `TopPromoBanner`, `StreamingScreen`, `AnimeDetailScreen`, `SearchScreen`).
-   - Menghilangkan kotak abu-abu polos dan broken link saat gambar sedang dimuat atau mengalami kendala jaringan.
+## 6. Build & GitHub Release Workflow
+- Kode wajib terkompilasi bersih tanpa peringatan fatal.
+- Commit dan push ke remote `main`.
+- Memantau GitHub Actions CI/CD hingga build sukses dan merilis file APK **Yuranime** terbaru.
