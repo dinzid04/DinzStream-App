@@ -484,5 +484,98 @@ Sesuai referensi visual `reff_uisearch/Screenshot_20261031_133332_ANIMEIN.jpg` (
 | **Karakter Search** | `GET /3/2/explore/manra_npc` | - | `data.character` (`id`, `name`, `image`) |
 | **Cari / Filter Anime** | `GET /3/2/explore/movie` | `keyword`, `genre_in`, `type`, `sort`, `page` | `data.movie` (`id`, `title`, `synopsis`, `image_poster`, `genre`, `views`, `favorites`) |
 
+---
+
+## 15. Spesifikasi Font SF Pro & Sistem Typography Universal
+
+Aplikasi menggunakan custom font Apple **San Francisco (SF Pro Display)** yang terpasang pada `app/src/main/res/font/`:
+* `sf_pro_display_regular.otf` -> `FontWeight.Normal` (400)
+* `sf_pro_display_medium.otf` -> `FontWeight.Medium` (500)
+* `sf_pro_display_semibold.otf` -> `FontWeight.SemiBold` (600)
+* `sf_pro_display_bold.otf` -> `FontWeight.Bold` (700)
+
+Sistem tipografi diterapkan secara terpusat pada `Typography` di `Type.kt` dan menjadi default font pada seluruh komponen teks aplikasi.
+
+---
+
+## 16. Desain Streaming & Custom Video Player (Tema Putih & Glassmorphism)
+
+Berdasarkan referensi visual terbaru dan koreksi kegagalan:
+
+1. **Player Controls Bertema Putih & Glassmorphism:**
+   * **Warna Kontrol:** JANGAN gunakan warna hijau! Seluruh kontrol (termasuk tombol Play/Pause tengah bulat, tombol rewind 10s, tombol forward 10s, dan aksen slider) berwarna **Putih bersih** dengan efek **Glassmorphism** (`background: rgba(255, 255, 255, 0.15)` dengan blur halus dan border 1dp tipis semi-transparan).
+   * **Ikon Gerigi (Settings) di Kanan Atas:** Menggantikan tulisan `Menu v`. Tombol gerigi membuka **YouTube-style Bottom Sheet**.
+   * **Waktu & Seekbar Bawah:** Format waktu `01:44` di kiri, seekbar putih dengan thumb putih, total waktu `23:49` di kanan, dan tombol Full Screen di ujung kanan.
+2. **YouTube-style Bottom Sheet Pengaturan:**
+   * Muncul dari bawah saat ikon gerigi ditekan (bukan popup di tengah player).
+   * Opsi pengaturan:
+     * **Kualitas Video:** `360p`, `480p`, `720p`, `1080p` (sinkronisasi durasi tetap terjaga saat ganti resolusi).
+     * **Kecepatan Putar:** `0.5x`, `0.75x`, `1.0x`, `1.25x`, `1.5x`, `2.0x`.
+     * **Auto Next Episode:** Switch On/Off.
+     * **Lock Screen:** Switch On/Off (hanya aktif saat player dalam mode Full Screen).
+3. **Info Episode di Bawah Player (Menghapus Tombol SERVER & LOVE IT):**
+   * Nomor episode (`Episode 4`) font SF SemiBold abu-abu terang.
+   * Judul Anime (`Black Clover`) font SF Bold putih besar.
+   * Sinopsis singkat (maksimal 3 baris dengan `ellipsis`) teks abu-abu.
+4. **Bagian `COVER & POSTER` (Tinggi Sejajar & Scroll Horizontal):**
+   * Menggunakan `LazyRow` sehingga pengguna dapat menggeser ke kanan untuk melihat kumpulan poster dan cover lainnya.
+   * **Tinggi Sejajar:** Menetapkan tinggi tetap (`height: 195.dp`) yang sama persis antara item Poster (`aspectRatio(2f/3f)`) dan item Cover (`aspectRatio(16f/9f)`) di sebelahnya sehingga dasar kartu sejajar tanpa rongga kosong.
+   * Gambar bersih tanpa badge poin/panah upvote. Klik untuk Full Screen Preview, klik titik tiga (`⋮`) untuk membuka sheet galeri lengkap.
+5. **Bagian `COMMENTS`, Halaman `Balasan`, Database & Proteksi Login:**
+   * **Aksen Oranye Glassmorphism:** Tombol jumlah balasan (`22 Balasan`) dan Floating Action Button (FAB) bulat di kanan bawah berwarna **Oranye kemerahan (`#FF5722`)** dengan efek Glassmorphism.
+   * **Layar `Balasan`:** Pinned parent comment di atas, kolom input `Tulis Balasan..`, daftar sub-komentar dengan teks di kiri dan **avatar Pokémon animasi GIF** di sisi kanan.
+   * **Database Lokal & Wajib Login:**
+     * Disinkronkan dengan database Room/SQLite untuk riwayat like/dislike dan komentar.
+     * Pengguna yang belum login dicegat saat mencoba Like, Dislike, menulis komentar, atau membalas, dan diberikan dialog peringatan **Wajib Login Terlebih Dahulu**.
+
+---
+
+## 17. Redesain Halaman Home (Gaya PiuPiu + Data AnimeIn Asli)
+
+1. **Top Hero Slider Bergaya PiuPiu (Data dari `Jadwal Hari Ini`):**
+   * Menghapus banner promosi statis.
+   * Menggunakan `HorizontalPager` auto-slide dengan tampilan layar lebar penuh di atas, gradasi hitam halus di bawah, judul anime putih tebal, sinopsis 2 baris, dan indikator titik halaman (*pagination dots*) di kanan bawah.
+   * Mengambil anime dari daftar `Jadwal Hari Ini`. Mengetuk slide mengarahkan ke halaman Detail anime.
+2. **Pembedaan Data `Episode Baru` vs `Judul Baru`:**
+   * `Episode Baru`: Menampilkan anime yang baru saja merilis episode terbaru (`/3/2/home/new`).
+   * `Judul Baru`: Menampilkan judul-judul anime yang baru ditambahkan ke katalog (`/3/2/explore/movie?sort=new` / filter `new`).
+3. **Section `Jat For Yu`:**
+   * Diletakkan tepat di bawah `Jadwal Hari Ini`.
+   * Menggunakan kartu landscape lebar (16:9) identik dengan `Sedang Hangat`.
+4. **Poster Kecil Sejajar di Kartu Wide:**
+   * Pada kartu landscape `Sedang Hangat` dan `Jat For Yu`, ukuran poster kecil di kiri diperbesar (`52.dp x 74.dp`) agar sejajar dengan tinggi blok teks metadata di kanannya.
+5. **Pengetatan Jarak Teks Kartu:**
+   * Merapatkan spasi vertikal antar Genre/Episode, Judul, Views, dan Favorites di bawah kartu poster vertikal.
+6. **Penghapusan `Baca Manre`:**
+   * Seksi `Baca Manre` dihapus sepenuhnya dari halaman Home.
+7. **Bottom Navigation Bar Bergaya PiuPiu dengan Glassmorphism:**
+   * Latar transparan gelap dengan efek *frosted glassmorphism* (`background: rgba(18, 18, 18, 0.75)` dengan border atas tipis `1dp` dan blur elegan).
+   * 5 menu: `HOME`, `JADWAL`, `CARI`, `CHAT`, `PROFIL`.
+
+---
+
+## 18. Arsitektur Halaman Jadwal & Search / Explore Presisi
+
+1. **Halaman Jadwal (`JadwalScreen`):**
+   * Top bar tab hari: `SEN`, `SEL`, `RAB`, `KAM`, `JUM`, `SAB`, `MIN` dengan garis bawah oranye.
+   * Baris horizontal Cuplix squircle jadwal.
+   * Daftar vertikal kartu anime jadwal: poster 2:3 di kiri, genre oranye, judul SF Bold putih, sinopsis 2 baris, views merah & favorites kuning, serta countdown jam tayang ungu (`time`).
+2. **Halaman Search / Explore (`SearchScreen`):**
+   * **Mode Default (Explore):**
+     * `KATEGORI` (>): Kartu putih lebar berlatar putih dengan teks hitam tebal dan ilustrasi karakter anime di kanan.
+     * `STUDIO`: Kapsul pill gelap (`MAPPA`, `Ufotable`, dll).
+     * `TAHUN` (>): Kartu putih lebar dengan karakter anime di kiri dan angka tahun tebal di kanan.
+     * `TIPE`: Kapsul pill gelap (`MOVIE`, `ONA`, `OVA`, `LIVE ACTION`).
+     * `KARAKTER` (>): Kartu gelap (`#18202C`) dengan nama karakter putih dan avatar di kanan.
+     * Mengetuk tombol `>` pada Kategori, Tahun, atau Karakter membuka tampilan daftar lengkapnya!
+   * **Mode Input / Hasil Pencarian:**
+     * **JANGAN** menampilkan barisan kapsul genre di atas Cuplix!
+     * Tepat di bawah kolom pencarian adalah baris horizontal **Cuplix**.
+     * Di bawah Cuplix adalah daftar anime **Rekomendasi** (saat belum ada query) atau **Hasil Pencarian** (saat mencari judul anime).
+     * Dua tombol floating di kanan bawah:
+       1. Tombol bulat atas untuk **Sortir (`1-9` / `A-Z`)** dengan ikon panah hijau.
+       2. Tombol bulat bawah untuk **Toggle Tampilan (List View vs Grid View)**.
+
+
 
 

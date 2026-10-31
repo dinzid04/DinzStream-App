@@ -27,6 +27,12 @@ interface AnimeInApiService {
         @Query("limit") limit: Int = 16
     ): AnimeHomeResponse
 
+    @GET("/3/2/home/new")
+    suspend fun getHomeNewTitles(): AnimeHomeResponse
+
+    @GET("/3/2/home/random")
+    suspend fun getHomeRandom(): AnimeHomeResponse
+
     @GET("/data/fyp2/list_scroll")
     suspend fun getCuplixFeed(
         @Query("limit") limit: Int = 15,

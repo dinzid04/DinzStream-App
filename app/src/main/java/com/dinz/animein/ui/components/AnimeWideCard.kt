@@ -67,7 +67,7 @@ fun AnimeWideCard(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Small vertical poster thumbnail on the left (36dp x 52dp)
+            // Enlarged vertical poster thumbnail on the left (50dp x 74dp) to match text height
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(anime.getEffectivePoster())
@@ -76,12 +76,12 @@ fun AnimeWideCard(
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .width(36.dp)
-                    .height(52.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .width(50.dp)
+                    .height(74.dp)
+                    .clip(RoundedCornerShape(6.dp))
             )
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             // Right side column: Genre + Title + 1-line Views & Favorites
             Column(
@@ -92,7 +92,7 @@ fun AnimeWideCard(
                 Text(
                     text = anime.getDisplayGenre(),
                     color = ColorAccentPrimary,
-                    fontSize = 10.sp,
+                    fontSize = 10.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -100,17 +100,18 @@ fun AnimeWideCard(
 
                 Spacer(modifier = Modifier.height(2.dp))
 
-                // Title (Bold White, 1 line max, ellipsis)
+                // Title (Bold White, 2 lines max, ellipsis)
                 Text(
                     text = anime.title ?: "-",
                     color = ColorTextPrimary,
-                    fontSize = 12.sp,
+                    fontSize = 12.5.sp,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 16.sp
                 )
 
-                Spacer(modifier = Modifier.height(3.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // 1 Unified Row with Views (Red) + Favorites (Gold)
                 Row(

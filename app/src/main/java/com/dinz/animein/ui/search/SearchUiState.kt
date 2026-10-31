@@ -6,9 +6,16 @@ import com.dinz.animein.data.model.ExploreCharacterItem
 import com.dinz.animein.data.model.ExploreGenreItem
 import com.dinz.animein.data.model.ExploreYearItem
 
+enum class ExploreSubPage {
+    KATEGORI,
+    TAHUN,
+    KARAKTER
+}
+
 data class SearchUiState(
     val query: String = "",
     val isSearchActive: Boolean = false,
+    val selectedSubPage: ExploreSubPage? = null,
     val selectedGenre: String? = null,
     val selectedType: String? = null,
     val selectedStudio: String? = null,
@@ -21,6 +28,7 @@ data class SearchUiState(
     val years: List<ExploreYearItem> = emptyList(),
     val characters: List<ExploreCharacterItem> = emptyList(),
     val cuplixList: List<CuplixItem> = emptyList(),
-    // Search Results
-    val searchResults: List<AnimeItem> = emptyList()
+    // Search Results & Recommendations
+    val searchResults: List<AnimeItem> = emptyList(),
+    val recommendations: List<AnimeItem> = emptyList()
 )

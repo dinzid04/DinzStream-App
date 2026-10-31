@@ -27,13 +27,19 @@ class HomeViewModel(
 
             val homeDeferred = async { repository.getHomeData() }
             val cuplixDeferred = async { repository.getCuplixFeed() }
+            val newTitlesDeferred = async { repository.getHomeNewTitles() }
+            val randomDeferred = async { repository.getHomeRandom() }
 
             val homeResult = homeDeferred.await()
             val cuplixResult = cuplixDeferred.await()
+            val newTitlesResult = newTitlesDeferred.await()
+            val randomResult = randomDeferred.await()
 
             if (homeResult.isSuccess) {
                 val data = homeResult.getOrNull()
                 val cuplixItems = cuplixResult.getOrDefault(emptyList())
+                val newTitles = newTitlesResult.getOrNull()?.ifEmpty { null } ?: data?.movies ?: emptyList()
+                val randomItems = randomResult.getOrNull()?.ifEmpty { null } ?: data?.hotAnime ?: emptyList()
 
                 _uiState.update {
                     it.copy(
@@ -44,12 +50,12 @@ class HomeViewModel(
                         cuplixList = cuplixItems,
                         newEpisodesList = data?.newEpisodes ?: emptyList(),
                         hotAnimeList = data?.hotAnime ?: emptyList(),
-                        newTitlesList = data?.movies ?: data?.newEpisodes ?: emptyList(),
+                        newTitlesList = newTitles,
                         todayScheduleList = data?.todayAnime ?: emptyList(),
-                        jatForYuList = data?.fypAnime ?: data?.hotAnime ?: emptyList(),
+                        jatForYuList = randomItems,
                         waitingAnimeList = data?.waitingAnime ?: emptyList(),
                         popularAnimeList = data?.popularAnime ?: emptyList(),
-                        manreList = repository.getManreList()
+                        manreList = emptyList()
                     )
                 }
             } else {

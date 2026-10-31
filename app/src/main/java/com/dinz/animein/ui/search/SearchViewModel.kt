@@ -33,11 +33,13 @@ class SearchViewModel(
             val yearsDeferred = async { repository.getExploreYears() }
             val charsDeferred = async { repository.getExploreCharacters() }
             val cuplixDeferred = async { repository.getCuplixFeed(limit = 15) }
+            val recommendationsDeferred = async { repository.searchMovies(sort = "popular") }
 
             val genresResult = genresDeferred.await()
             val yearsResult = yearsDeferred.await()
             val charsResult = charsDeferred.await()
             val cuplixResult = cuplixDeferred.await()
+            val recResult = recommendationsDeferred.await()
 
             _uiState.update {
                 it.copy(
@@ -45,7 +47,8 @@ class SearchViewModel(
                     genres = genresResult.getOrDefault(emptyList()),
                     years = yearsResult.getOrDefault(emptyList()),
                     characters = charsResult.getOrDefault(emptyList()),
-                    cuplixList = cuplixResult.getOrDefault(emptyList())
+                    cuplixList = cuplixResult.getOrDefault(emptyList()),
+                    recommendations = recResult.getOrDefault(emptyList())
                 )
             }
         }
@@ -116,10 +119,23 @@ class SearchViewModel(
         executeSearch()
     }
 
+    fun openSubPage(page: ExploreSubPage) {
+        _uiState.update { it.copy(selectedSubPage = page) }
+    }
+
+    fun closeSubPage() {
+        _uiState.update { it.copy(selectedSubPage = null) }
+    }
+
+    fun activateSearch() {
+        _uiState.update { it.copy(isSearchActive = true) }
+    }
+
     fun clearSearch() {
         _uiState.update {
             it.copy(
                 query = "",
+                selectedSubPage = null,
                 selectedGenre = null,
                 selectedType = null,
                 selectedStudio = null,

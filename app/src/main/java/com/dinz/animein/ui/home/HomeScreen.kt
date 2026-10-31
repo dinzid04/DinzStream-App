@@ -30,8 +30,8 @@ import com.dinz.animein.ui.components.CuplixAvatarItem
 import com.dinz.animein.ui.components.HomeErrorState
 import com.dinz.animein.ui.components.HomeShimmerLoading
 import com.dinz.animein.ui.components.NavTab
+import com.dinz.animein.ui.components.PiuPiuHeroSlider
 import com.dinz.animein.ui.components.SectionHeader
-import com.dinz.animein.ui.components.TopPromoBanner
 import com.dinz.animein.ui.theme.ColorBackgroundPrimary
 
 @Composable
@@ -78,13 +78,12 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
-                        // 1. Top Promo Banner (16:9 / 21:9 with rounded-xl)
-                        item(key = "top_promo_banner") {
-                            TopPromoBanner(
-                                sliderItem = uiState.sliderItem,
-                                onClick = {
-                                    uiState.sliderItem?.idMovie?.let { onAnimeClick(it) }
-                                }
+                        // 1. Top Hero Slider Gaya PiuPiu (Data dari Jadwal Hari Ini)
+                        item(key = "piupiu_hero_slider") {
+                            val sliderAnimeList = uiState.todayScheduleList.ifEmpty { uiState.newEpisodesList }
+                            PiuPiuHeroSlider(
+                                items = sliderAnimeList,
+                                onAnimeClick = onAnimeClick
                             )
                         }
 
@@ -326,32 +325,7 @@ fun HomeScreen(
                             }
                         }
 
-                        // 11. Section "Baca Manra" (2:3 Vertical Cards)
-                        if (uiState.manreList.isNotEmpty()) {
-                            item(key = "section_baca_manra") {
-                                Spacer(modifier = Modifier.height(18.dp))
-                                SectionHeader(
-                                    title = "Baca Manra",
-                                    onChevronClick = { /* See All Manra */ }
-                                )
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    items(
-                                        items = uiState.manreList,
-                                        key = { "manra_" + (it.id ?: it.hashCode().toString()) }
-                                    ) { anime ->
-                                        val singleGenre = anime.getDisplayGenre().split(",").firstOrNull()?.trim() ?: "Comedy"
-                                        AnimeVerticalCard(
-                                            anime = anime,
-                                            overrideSubtitle = singleGenre,
-                                            onClick = { anime.id?.let { onAnimeClick(it) } }
-                                        )
-                                    }
-                                }
-                            }
-                        }
+
                     }
                 }
             }

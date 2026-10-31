@@ -67,7 +67,7 @@ fun AnimeVerticalCard(
                 .clip(RoundedCornerShape(8.dp))
         )
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         // Episode or Genre in Orange (#FF5722)
         val subtitle = overrideSubtitle ?: anime.index?.let { "Episode $it" } ?: anime.getDisplayGenre()
@@ -80,7 +80,7 @@ fun AnimeVerticalCard(
             overflow = TextOverflow.Ellipsis
         )
 
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(1.dp))
 
         // Anime Title (Bold White, max 2 lines, ellipsis)
         Text(
@@ -94,7 +94,7 @@ fun AnimeVerticalCard(
             lineHeight = 15.sp
         )
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(2.dp))
 
         if (showReleaseDate) {
             // Optional Release Date in Blue (#3B82F6) - Paling Dinanti only shows Release Date & Favorites

@@ -111,6 +111,7 @@ import coil.compose.AsyncImage
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import coil.request.ImageRequest
+import com.dinz.animein.data.local.LocalAuthDatabase
 import com.dinz.animein.data.model.CommunityMediaItem
 import com.dinz.animein.data.model.EpisodeCommentItem
 import com.dinz.animein.data.model.ServerItem
@@ -231,7 +232,17 @@ fun StreamingScreen(
                                     parentComment = uiState.activeCommentForReplies!!,
                                     replies = uiState.repliesList,
                                     isLoading = uiState.isLoadingReplies,
-                                    onBackClick = { viewModel.closeReplies() }
+                                    onBackClick = { viewModel.closeReplies() },
+                                    onRequireLogin = { viewModel.triggerLoginPrompt() },
+                                    onSendReply = { text ->
+                                        val localDb = LocalAuthDatabase(context)
+                                        val item = localDb.addLocalComment(
+                                            episodeId = uiState.episodeId,
+                                            text = text,
+                                            parentId = uiState.activeCommentForReplies?.id
+                                        )
+                                        viewModel.addLocalReply(item)
+                                    }
                                 )
                             }
                             uiState.isGallerySheetOpen -> {
@@ -249,7 +260,7 @@ fun StreamingScreen(
                                 // Main Content Column
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(bottom = 32.dp)
+                                    contentPadding = PaddingValues(bottom = 72.dp)
                                 ) {
                                     // Episode Title, Anime Title & Synopsis (Matching IMG-20261031-WA0049)
                                     item(key = "episode_header") {
@@ -288,9 +299,7 @@ fun StreamingScreen(
                                         }
                                     }
 
-
-
-                                    // Section: COVER & POSTER (Side by Side Preview)
+                                    // Section: COVER & POSTER (Equal Height 195dp, Horizontal Scroll)
                                     item(key = "cover_poster_section") {
                                         Spacer(modifier = Modifier.height(16.dp))
                                         Row(
@@ -321,18 +330,17 @@ fun StreamingScreen(
 
                                         Spacer(modifier = Modifier.height(8.dp))
 
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 16.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        LazyRow(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            contentPadding = PaddingValues(horizontal = 16.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
-                                            // Poster Card with upvote points
-                                            val posterImg = uiState.posters.firstOrNull()?.getEffectiveImage() ?: ""
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                            // Posters (fixed height 195dp, aspect ratio 2:3)
+                                            items(uiState.posters) { poster ->
+                                                val posterImg = poster.getEffectiveImage()
                                                 Box(
                                                     modifier = Modifier
-                                                        .width(105.dp)
+                                                        .height(195.dp)
                                                         .aspectRatio(2f / 3f)
                                                         .clip(RoundedCornerShape(8.dp))
                                                         .background(Color(0xFF181A22))
@@ -353,36 +361,33 @@ fun StreamingScreen(
                                                         )
                                                     }
                                                 }
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    Text(text = "▲", color = ColorAccentPrimary, fontSize = 11.sp)
-                                                    Text(text = "44 P", color = ColorTextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                                }
                                             }
 
-                                            // Cover Card
-                                            val coverImg = uiState.covers.firstOrNull()?.getEffectiveImage() ?: ""
-                                            Box(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .aspectRatio(16f / 9f)
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(Color(0xFF181A22))
-                                                    .clickable {
-                                                        if (coverImg.isNotBlank()) viewModel.openFullScreenImage(coverImg)
-                                                        else viewModel.toggleGallerySheet(1)
+                                            // Covers (fixed height 195dp, aspect ratio 16:9)
+                                            items(uiState.covers) { cover ->
+                                                val coverImg = cover.getEffectiveImage()
+                                                Box(
+                                                    modifier = Modifier
+                                                        .height(195.dp)
+                                                        .aspectRatio(16f / 9f)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(Color(0xFF181A22))
+                                                        .clickable {
+                                                            if (coverImg.isNotBlank()) viewModel.openFullScreenImage(coverImg)
+                                                            else viewModel.toggleGallerySheet(1)
+                                                        }
+                                                ) {
+                                                    if (coverImg.isNotBlank()) {
+                                                        AsyncImage(
+                                                            model = ImageRequest.Builder(LocalContext.current)
+                                                                .data(coverImg)
+                                                                .crossfade(true)
+                                                                .build(),
+                                                            contentDescription = "Cover",
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            contentScale = ContentScale.Crop
+                                                        )
                                                     }
-                                            ) {
-                                                if (coverImg.isNotBlank()) {
-                                                    AsyncImage(
-                                                        model = ImageRequest.Builder(LocalContext.current)
-                                                            .data(coverImg)
-                                                            .crossfade(true)
-                                                            .build(),
-                                                        contentDescription = "Cover",
-                                                        modifier = Modifier.fillMaxSize(),
-                                                        contentScale = ContentScale.Crop
-                                                    )
                                                 }
                                             }
                                         }
@@ -418,10 +423,44 @@ fun StreamingScreen(
                                     items(uiState.comments, key = { it.id ?: it.hashCode().toString() }) { comment ->
                                         CommentItemRow(
                                             comment = comment,
-                                            onReplyClick = { viewModel.openReplies(comment) }
+                                            onReplyClick = { viewModel.openReplies(comment) },
+                                            onRequireLogin = { viewModel.triggerLoginPrompt() }
                                         )
                                     }
                                 }
+                            }
+                        }
+
+                        // Floating Chat FAB (Bottom-Right, Orange Glassmorphism)
+                        if (uiState.activeCommentForReplies == null && !uiState.isGallerySheetOpen) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(end = 20.dp, bottom = 24.dp)
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(ColorAccentPrimary, Color(0xFFFF6D3F))
+                                        )
+                                    )
+                                    .border(1.dp, Color(0x66FFFFFF), CircleShape)
+                                    .clickable {
+                                        val localDb = LocalAuthDatabase(context)
+                                        if (!localDb.isLoggedIn()) {
+                                            viewModel.triggerLoginPrompt()
+                                        } else {
+                                            viewModel.toggleCommentInput()
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ChatBubble,
+                                    contentDescription = "Tulis Komentar",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
                             }
                         }
                     }
@@ -448,15 +487,48 @@ fun StreamingScreen(
             )
         }
 
-        // Settings Dialog
+        // YouTube-Style Settings Bottom Sheet
         if (uiState.isSettingsOpen) {
-            SettingsModalDialog(
+            YouTubeStyleSettingsBottomSheet(
+                servers = uiState.servers,
+                selectedServer = uiState.selectedServer,
+                playbackSpeed = uiState.playbackSpeed,
                 autoNext = uiState.autoNextEpisode,
                 isLocked = uiState.isLocked,
                 isFullScreen = uiState.isFullScreen,
+                onServerSelect = { viewModel.selectServer(it) },
+                onSpeedSelect = { viewModel.setPlaybackSpeed(it) },
                 onAutoNextChange = { viewModel.toggleAutoNext() },
                 onLockChange = { viewModel.toggleLock() },
                 onDismiss = { viewModel.toggleSettings() }
+            )
+        }
+
+        // Comment Input Dialog
+        if (uiState.isCommentInputOpen) {
+            CommentInputDialog(
+                onDismiss = { viewModel.toggleCommentInput() },
+                onSend = { text ->
+                    val localDb = LocalAuthDatabase(context)
+                    val newComment = localDb.addLocalComment(
+                        episodeId = uiState.episodeId,
+                        text = text
+                    )
+                    viewModel.addLocalComment(newComment)
+                }
+            )
+        }
+
+        // Login Required Alert Dialog
+        if (uiState.showLoginPrompt) {
+            LoginRequiredDialog(
+                onDismiss = { viewModel.dismissLoginPrompt() },
+                onSimulateLogin = {
+                    val localDb = LocalAuthDatabase(context)
+                    localDb.setLoggedIn(true, "OtakuKeren")
+                    viewModel.dismissLoginPrompt()
+                    Toast.makeText(context, "Berhasil masuk sebagai OtakuKeren", Toast.LENGTH_SHORT).show()
+                }
             )
         }
 
@@ -658,32 +730,25 @@ private fun CustomExoPlayerView(
                         )
                     }
 
-                    // Menu with dropdown arrow (Matching IMG-20261031-WA0049)
-                    Row(
+                    // YouTube-Style Settings Gear Button with Glassmorphism
+                    IconButton(
+                        onClick = { viewModel.toggleSettings() },
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0x40000000))
-                            .clickable { viewModel.toggleServerPicker() }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x33FFFFFF))
+                            .border(1.dp, Color(0x4DFFFFFF), CircleShape)
                     ) {
-                        Text(
-                            text = "Menu",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
                         Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = "Menu Server",
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Pengaturan",
                             tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
 
-                // Center Rewind, Emerald Play/Pause, Forward (Matching IMG-20261031-WA0049)
+                // Center Rewind, Pure White Glassmorphism Play/Pause, Forward (NO GREEN)
                 Row(
                     modifier = Modifier.align(Alignment.Center),
                     verticalAlignment = Alignment.CenterVertically,
@@ -705,12 +770,13 @@ private fun CustomExoPlayerView(
                         )
                     }
 
-                    // Center Play / Pause Big Button in Emerald Green (#00C853)
+                    // Center Play / Pause Big Button with Pure White Glassmorphism (NO GREEN)
                     Box(
                         modifier = Modifier
                             .size(56.dp)
                             .clip(CircleShape)
-                            .background(ColorEmerald)
+                            .background(Color(0x33FFFFFF))
+                            .border(1.5.dp, Color(0x66FFFFFF), CircleShape)
                             .clickable {
                                 if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
                             },
@@ -763,7 +829,7 @@ private fun CustomExoPlayerView(
 
                         Spacer(modifier = Modifier.width(6.dp))
 
-                        // Custom Progress Slider (Emerald Green #00C853)
+                        // Custom Progress Slider in Pure White
                         val totalDuration = if (uiState.durationMs > 0) uiState.durationMs else 1L
                         val currentPos = if (isSeeking) sliderPosition else uiState.currentPositionMs
                         val sliderFraction = (currentPos.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
@@ -779,9 +845,9 @@ private fun CustomExoPlayerView(
                                 isSeeking = false
                             },
                             colors = SliderDefaults.colors(
-                                thumbColor = ColorEmerald,
-                                activeTrackColor = ColorEmerald,
-                                inactiveTrackColor = Color(0x66FFFFFF)
+                                thumbColor = Color.White,
+                                activeTrackColor = Color.White,
+                                inactiveTrackColor = Color(0x55FFFFFF)
                             ),
                             modifier = Modifier.weight(1f)
                         )
@@ -1083,80 +1149,204 @@ private fun LoveItRatingDialog(
     }
 }
 
-// ==================== 5. SETTINGS DIALOG ====================
+// ==================== 5. YOUTUBE-STYLE SETTINGS BOTTOM SHEET ====================
 
 @Composable
-private fun SettingsModalDialog(
+private fun YouTubeStyleSettingsBottomSheet(
+    servers: List<ServerItem>,
+    selectedServer: ServerItem?,
+    playbackSpeed: Float,
     autoNext: Boolean,
     isLocked: Boolean,
     isFullScreen: Boolean,
+    onServerSelect: (ServerItem) -> Unit,
+    onSpeedSelect: (Float) -> Unit,
     onAutoNextChange: () -> Unit,
     onLockChange: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Box(
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0x99000000))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onDismiss() },
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF181A22))
+                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .background(Color(0xFF141720))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { /* Consume taps */ }
                 .padding(20.dp)
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            // Drag handle
+            Box(
+                modifier = Modifier
+                    .size(width = 36.dp, height = 4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color(0x40FFFFFF))
+                    .align(Alignment.CenterHorizontally)
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "Pengaturan Player",
+                    text = "Pengaturan Video",
                     color = ColorTextPrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Auto Next Switch
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(text = "Auto Next Episode", color = ColorTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        Text(text = "Putar episode selanjutnya otomatis", color = ColorTextSecondary, fontSize = 11.sp)
-                    }
-                    Switch(
-                        checked = autoNext,
-                        onCheckedChange = { onAutoNextChange() },
-                        colors = SwitchDefaults.colors(checkedThumbColor = ColorAccentPrimary, checkedTrackColor = Color(0x66FF5722))
+                IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Tutup",
+                        tint = ColorTextSecondary,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
+            }
 
-                Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-                // Lock Screen Switch (Active ONLY when in full screen!)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
+            // Section 1: Video Quality / Server
+            Text(
+                text = "Kualitas Video & Server",
+                color = ColorTextSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(servers) { srv ->
+                    val isSelected = srv.id == selectedServer?.id
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) ColorAccentPrimary else Color(0xFF1E222D))
+                            .border(
+                                1.dp,
+                                if (isSelected) ColorAccentPrimary else Color(0x33FFFFFF),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .clickable { onServerSelect(srv) }
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
                         Text(
-                            text = "Kunci Layar (Lock)",
-                            color = if (isFullScreen) ColorTextPrimary else ColorTextSecondary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = if (isFullScreen) "Kunci sentuhan layar" else "Hanya aktif di Full Screen",
-                            color = Color(0xFF6B7280),
-                            fontSize = 11.sp
+                            text = "${srv.name ?: "Server"} • ${srv.quality ?: "720p"}",
+                            color = if (isSelected) Color.White else ColorTextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
                     }
-                    Switch(
-                        checked = isLocked,
-                        onCheckedChange = { if (isFullScreen) onLockChange() },
-                        enabled = isFullScreen,
-                        colors = SwitchDefaults.colors(checkedThumbColor = ColorAccentPrimary, checkedTrackColor = Color(0x66FF5722))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Section 2: Playback Speed
+            Text(
+                text = "Kecepatan Putar",
+                color = ColorTextSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                speeds.forEach { spd ->
+                    val isSelected = playbackSpeed == spd
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) ColorAccentPrimary else Color(0xFF1E222D))
+                            .border(
+                                1.dp,
+                                if (isSelected) ColorAccentPrimary else Color(0x33FFFFFF),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .clickable { onSpeedSelect(spd) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${spd}x",
+                            color = if (isSelected) Color.White else ColorTextPrimary,
+                            fontSize = 11.5.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Section 3: Auto Next Episode Switch
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(text = "Auto Next Episode", color = ColorTextPrimary, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
+                    Text(text = "Putar episode selanjutnya secara otomatis", color = ColorTextSecondary, fontSize = 11.sp)
+                }
+                Switch(
+                    checked = autoNext,
+                    onCheckedChange = { onAutoNextChange() },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = ColorAccentPrimary,
+                        checkedTrackColor = Color(0x66FF5722)
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Section 4: Lock Screen Switch
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Kunci Layar (Lock)",
+                        color = if (isFullScreen) ColorTextPrimary else ColorTextSecondary,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = if (isFullScreen) "Kunci sentuhan layar" else "Hanya aktif di Full Screen",
+                        color = Color(0xFF6B7280),
+                        fontSize = 11.sp
                     )
                 }
+                Switch(
+                    checked = isLocked,
+                    onCheckedChange = { if (isFullScreen) onLockChange() },
+                    enabled = isFullScreen,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = ColorAccentPrimary,
+                        checkedTrackColor = Color(0x66FF5722)
+                    )
+                )
             }
         }
     }
@@ -1167,11 +1357,13 @@ private fun SettingsModalDialog(
 @Composable
 private fun CommentItemRow(
     comment: EpisodeCommentItem,
-    onReplyClick: () -> Unit
+    onReplyClick: () -> Unit,
+    onRequireLogin: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    var isLiked by remember { mutableStateOf(false) }
-    var isDisliked by remember { mutableStateOf(false) }
+    val localDb = remember { LocalAuthDatabase(context) }
+    var isLiked by remember { mutableStateOf(localDb.getReaction(comment.id ?: "") == "like") }
+    var isDisliked by remember { mutableStateOf(localDb.getReaction(comment.id ?: "") == "dislike") }
 
     Row(
         modifier = Modifier
@@ -1240,8 +1432,17 @@ private fun CommentItemRow(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable {
-                        isLiked = !isLiked
-                        if (isLiked) isDisliked = false
+                        if (!localDb.isLoggedIn()) {
+                            onRequireLogin()
+                        } else {
+                            isLiked = !isLiked
+                            if (isLiked) {
+                                isDisliked = false
+                                localDb.saveReaction(comment.id ?: "", "like")
+                            } else {
+                                localDb.saveReaction(comment.id ?: "", "")
+                            }
+                        }
                     }
                 ) {
                     Icon(
@@ -1262,8 +1463,17 @@ private fun CommentItemRow(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable {
-                        isDisliked = !isDisliked
-                        if (isDisliked) isLiked = false
+                        if (!localDb.isLoggedIn()) {
+                            onRequireLogin()
+                        } else {
+                            isDisliked = !isDisliked
+                            if (isDisliked) {
+                                isLiked = false
+                                localDb.saveReaction(comment.id ?: "", "dislike")
+                            } else {
+                                localDb.saveReaction(comment.id ?: "", "")
+                            }
+                        }
                     }
                 ) {
                     Icon(
@@ -1280,30 +1490,42 @@ private fun CommentItemRow(
                     )
                 }
 
-                // Balasan Button
+                // Balasan Button with Orange Glassmorphism Pill
                 val replayCount = comment.replay?.toIntOrNull() ?: 0
                 val replayText = if (replayCount > 0) "$replayCount Balasan" else "Balasan"
-                Text(
-                    text = replayText,
-                    color = ColorTosca,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.clickable { onReplyClick() }
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0x26FF5722))
+                        .border(0.8.dp, Color(0x80FF5722), RoundedCornerShape(12.dp))
+                        .clickable { onReplyClick() }
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = replayText,
+                        color = ColorAccentPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }
 }
 
-// ==================== 7. COMMENT REPLIES VIEW ====================
+// ==================== 7. COMMENT REPLIES VIEW & REPLY ITEM ROW ====================
 
 @Composable
 private fun CommentRepliesView(
     parentComment: EpisodeCommentItem,
     replies: List<EpisodeCommentItem>,
     isLoading: Boolean,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onRequireLogin: () -> Unit = {},
+    onSendReply: (String) -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val localDb = remember { LocalAuthDatabase(context) }
     var replyText by remember { mutableStateOf("") }
 
     Column(
@@ -1350,7 +1572,11 @@ private fun CommentRepliesView(
                         .fillMaxWidth()
                         .background(Color(0xFF141720))
                 ) {
-                    CommentItemRow(comment = parentComment, onReplyClick = {})
+                    CommentItemRow(
+                        comment = parentComment,
+                        onReplyClick = {},
+                        onRequireLogin = onRequireLogin
+                    )
                 }
                 HorizontalDivider(thickness = 0.5.dp, color = Color(0x22FFFFFF))
             }
@@ -1379,7 +1605,10 @@ private fun CommentRepliesView(
                 }
             } else {
                 items(replies, key = { it.id ?: it.hashCode().toString() }) { rep ->
-                    CommentItemRow(comment = rep, onReplyClick = {})
+                    CommentReplyItemRow(
+                        reply = rep,
+                        onRequireLogin = onRequireLogin
+                    )
                 }
             }
         }
@@ -1420,7 +1649,14 @@ private fun CommentRepliesView(
             Spacer(modifier = Modifier.width(8.dp))
 
             IconButton(
-                onClick = { replyText = "" },
+                onClick = {
+                    if (!localDb.isLoggedIn()) {
+                        onRequireLogin()
+                    } else if (replyText.isNotBlank()) {
+                        onSendReply(replyText.trim())
+                        replyText = ""
+                    }
+                },
                 modifier = Modifier.size(40.dp)
             ) {
                 Icon(
@@ -1429,6 +1665,295 @@ private fun CommentRepliesView(
                     tint = ColorAccentPrimary,
                     modifier = Modifier.size(20.dp)
                 )
+            }
+        }
+    }
+}
+
+// Sub-Item Balasan: Pokemon Avatar on the RIGHT side
+@Composable
+private fun CommentReplyItemRow(
+    reply: EpisodeCommentItem,
+    onRequireLogin: () -> Unit = {}
+) {
+    val context = LocalContext.current
+    val localDb = remember { LocalAuthDatabase(context) }
+    var isLiked by remember { mutableStateOf(localDb.getReaction(reply.id ?: "") == "like") }
+    var isDisliked by remember { mutableStateOf(localDb.getReaction(reply.id ?: "") == "dislike") }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        // Left Column: User info, Comment text, Like & Dislike
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = reply.userName ?: "Pengguna",
+                    color = ColorTextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(text = "•", color = ColorTextSecondary, fontSize = 11.sp)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = reply.time ?: "",
+                    color = ColorTextSecondary,
+                    fontSize = 11.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(3.dp))
+
+            Text(
+                text = reply.text ?: "",
+                color = Color(0xFFE5E7EB),
+                fontSize = 12.5.sp,
+                lineHeight = 17.sp
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Like
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        if (!localDb.isLoggedIn()) onRequireLogin()
+                        else {
+                            isLiked = !isLiked
+                            if (isLiked) {
+                                isDisliked = false
+                                localDb.saveReaction(reply.id ?: "", "like")
+                            } else {
+                                localDb.saveReaction(reply.id ?: "", "")
+                            }
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ThumbUp,
+                        contentDescription = "Like",
+                        tint = if (isLiked) ColorAccentPrimary else ColorTextSecondary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = (reply.like?.toIntOrNull() ?: 0 + if (isLiked) 1 else 0).toString(),
+                        color = ColorTextSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+
+                // Dislike
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        if (!localDb.isLoggedIn()) onRequireLogin()
+                        else {
+                            isDisliked = !isDisliked
+                            if (isDisliked) {
+                                isLiked = false
+                                localDb.saveReaction(reply.id ?: "", "dislike")
+                            } else {
+                                localDb.saveReaction(reply.id ?: "", "")
+                            }
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ThumbDown,
+                        contentDescription = "Dislike",
+                        tint = if (isDisliked) ColorAccentPrimary else ColorTextSecondary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = (reply.dislike?.toIntOrNull() ?: 0 + if (isDisliked) 1 else 0).toString(),
+                        color = ColorTextSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        // Right side: Pokemon Animated GIF Avatar (Matching Screenshot_20261031_125604_ANIMEIN)
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(reply.getPokemonAvatarUrl())
+                .decoderFactory(
+                    if (Build.VERSION.SDK_INT >= 28) ImageDecoderDecoder.Factory()
+                    else GifDecoder.Factory()
+                )
+                .crossfade(true)
+                .build(),
+            contentDescription = "Avatar",
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Fit
+        )
+    }
+}
+
+// ==================== 7B. COMMENT INPUT & LOGIN REQUIRED DIALOGS ====================
+
+@Composable
+private fun CommentInputDialog(
+    onDismiss: () -> Unit,
+    onSend: (String) -> Unit
+) {
+    var text by remember { mutableStateOf("") }
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF181A22))
+                .padding(18.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Tulis Komentar",
+                    color = ColorTextPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(90.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF222634))
+                        .padding(12.dp)
+                ) {
+                    BasicTextField(
+                        value = text,
+                        onValueChange = { text = it },
+                        modifier = Modifier.fillMaxSize(),
+                        textStyle = TextStyle(color = ColorTextPrimary, fontSize = 13.sp),
+                        cursorBrush = SolidColor(ColorAccentPrimary),
+                        decorationBox = { innerTextField ->
+                            if (text.isEmpty()) {
+                                Text(
+                                    text = "Tulis tanggapanmu mengenai anime ini...",
+                                    color = Color(0xFF6B7280),
+                                    fontSize = 12.5.sp
+                                )
+                            }
+                            innerTextField()
+                        }
+                    )
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Batal",
+                        color = ColorTextSecondary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .clickable { onDismiss() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (text.isNotBlank()) ColorAccentPrimary else Color(0x40FF5722))
+                            .clickable(enabled = text.isNotBlank()) {
+                                onSend(text)
+                                onDismiss()
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "Kirim",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoginRequiredDialog(
+    onDismiss: () -> Unit,
+    onSimulateLogin: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF181A22))
+                .padding(22.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Wajib Login Terlebih Dahulu",
+                    color = ColorTextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Fitur ini memerlukan autentikasi akun. Silakan login untuk memberikan like, dislike, atau komentar.",
+                    color = ColorTextSecondary,
+                    fontSize = 12.5.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF262A36))
+                            .clickable { onDismiss() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "Tutup", color = ColorTextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(ColorAccentPrimary)
+                            .clickable { onSimulateLogin() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "Masuk Akun", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
     }

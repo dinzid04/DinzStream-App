@@ -46,36 +46,35 @@ fun BottomNavBar(
     onTabSelected: (NavTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Glassmorphism PiuPiu-style Bottom Navbar
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(ColorBackgroundPrimary)
+            .background(Color(0xD90E1116))
             .navigationBarsPadding()
     ) {
-        // Thin 1dp subtle top divider
+        // Ultra-thin subtle glass top border
         HorizontalDivider(
-            color = ColorBorderSubtle,
-            thickness = 1.dp
+            color = Color(0x26FFFFFF),
+            thickness = 0.75.dp
         )
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(58.dp),
+                .height(60.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
             NavTab.entries.forEach { tab ->
                 val isSelected = tab == selectedTab
-                val itemColor = if (isSelected) ColorAccentPrimary else ColorTextSecondary
+                val itemColor = if (isSelected) ColorAccentPrimary else Color(0xFF8E95A5)
 
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(58.dp) // Touch target >= 48dp (R-03 & R-39)
-                        .clickable {
-                            onTabSelected(tab)
-                        },
+                        .height(60.dp)
+                        .clickable { onTabSelected(tab) },
                     contentAlignment = Alignment.Center
                 ) {
                     Column(

@@ -35,5 +35,7 @@ data class StreamingUiState(
     val repliesList: List<EpisodeCommentItem> = emptyList(),
     val isLoadingReplies: Boolean = false,
     val fullScreenPreviewUrl: String? = null,
-    val userRating: Int = 0
+    val userRating: Int = 0,
+    val showLoginPrompt: Boolean = false,
+    val isCommentInputOpen: Boolean = false
 )

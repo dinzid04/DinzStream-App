@@ -213,4 +213,31 @@ class StreamingViewModel(
     fun closeFullScreenImage() {
         _uiState.update { it.copy(fullScreenPreviewUrl = null) }
     }
+
+    fun toggleCommentInput() {
+        _uiState.update { it.copy(isCommentInputOpen = !it.isCommentInputOpen) }
+    }
+
+    fun triggerLoginPrompt() {
+        _uiState.update { it.copy(showLoginPrompt = true) }
+    }
+
+    fun dismissLoginPrompt() {
+        _uiState.update { it.copy(showLoginPrompt = false) }
+    }
+
+    fun addLocalComment(comment: EpisodeCommentItem) {
+        _uiState.update {
+            it.copy(
+                comments = listOf(comment) + it.comments,
+                isCommentInputOpen = false
+            )
+        }
+    }
+
+    fun addLocalReply(reply: EpisodeCommentItem) {
+        _uiState.update {
+            it.copy(repliesList = listOf(reply) + it.repliesList)
+        }
+    }
 }

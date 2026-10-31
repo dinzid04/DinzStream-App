@@ -95,8 +95,12 @@ fun SearchScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
 
-    BackHandler(enabled = uiState.isSearchActive) {
-        viewModel.clearSearch()
+    BackHandler(enabled = uiState.selectedSubPage != null || uiState.isSearchActive) {
+        if (uiState.selectedSubPage != null) {
+            viewModel.closeSubPage()
+        } else {
+            viewModel.clearSearch()
+        }
     }
 
     Scaffold(
@@ -115,144 +119,166 @@ fun SearchScreen(
                 .padding(innerPadding)
                 .background(ColorBackgroundPrimary)
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Top Search Bar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (uiState.isSearchActive) {
-                        IconButton(
-                            onClick = { viewModel.clearSearch() },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Kembali",
-                                tint = ColorTextPrimary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
+            if (uiState.selectedSubPage != null) {
+                // Sub-Page Full List for KATEGORI, TAHUN, KARAKTER
+                ExploreSubPageContent(
+                    subPage = uiState.selectedSubPage!!,
+                    uiState = uiState,
+                    onClose = { viewModel.closeSubPage() },
+                    onGenreClick = {
+                        viewModel.selectGenre(it)
+                        viewModel.closeSubPage()
+                    },
+                    onYearClick = {
+                        viewModel.selectGenre(it)
+                        viewModel.closeSubPage()
+                    },
+                    onCharacterClick = {
+                        viewModel.onQueryChange(it)
+                        viewModel.closeSubPage()
                     }
-
-                    // Pill input box
-                    Box(
+                )
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Top Search Bar
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp)
-                            .clip(RoundedCornerShape(22.dp))
-                            .background(Color(0xFF161922))
-                            .border(width = 1.dp, color = Color(0x33FFFFFF), shape = RoundedCornerShape(22.dp))
-                            .padding(horizontal = 14.dp),
-                        contentAlignment = Alignment.CenterStart
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
+                        if (uiState.isSearchActive) {
+                            IconButton(
+                                onClick = { viewModel.clearSearch() },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Kembali",
+                                    tint = ColorTextPrimary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+
+                        // Pill input box
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(22.dp))
+                                .background(Color(0xFF161922))
+                                .border(width = 1.dp, color = Color(0x33FFFFFF), shape = RoundedCornerShape(22.dp))
+                                .padding(horizontal = 14.dp),
+                            contentAlignment = Alignment.CenterStart
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Search,
-                                contentDescription = "Cari",
-                                tint = ColorTextSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            BasicTextField(
-                                value = uiState.query,
-                                onValueChange = { viewModel.onQueryChange(it) },
-                                singleLine = true,
-                                textStyle = TextStyle(
-                                    color = ColorTextPrimary,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                cursorBrush = SolidColor(ColorAccentPrimary),
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                keyboardActions = KeyboardActions(onSearch = {
-                                    focusManager.clearFocus()
-                                    viewModel.executeSearch()
-                                }),
-                                modifier = Modifier.weight(1f),
-                                decorationBox = { innerTextField ->
-                                    if (uiState.query.isEmpty()) {
-                                        Text(
-                                            text = "Cari Anime..",
-                                            color = ColorTextSecondary,
-                                            fontSize = 13.5.sp
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Search,
+                                    contentDescription = "Cari",
+                                    tint = ColorTextSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                BasicTextField(
+                                    value = uiState.query,
+                                    onValueChange = { viewModel.onQueryChange(it) },
+                                    singleLine = true,
+                                    textStyle = TextStyle(
+                                        color = ColorTextPrimary,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Medium
+                                    ),
+                                    cursorBrush = SolidColor(ColorAccentPrimary),
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                    keyboardActions = KeyboardActions(onSearch = {
+                                        focusManager.clearFocus()
+                                        viewModel.executeSearch()
+                                    }),
+                                    modifier = Modifier.weight(1f),
+                                    decorationBox = { innerTextField ->
+                                        if (uiState.query.isEmpty()) {
+                                            Text(
+                                                text = "Cari Anime..",
+                                                color = ColorTextSecondary,
+                                                fontSize = 13.5.sp
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                )
+                                if (uiState.query.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = { viewModel.onQueryChange("") },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Close,
+                                            contentDescription = "Hapus",
+                                            tint = ColorTextSecondary,
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
-                                    innerTextField()
                                 }
-                            )
-                            if (uiState.query.isNotEmpty()) {
-                                IconButton(
-                                    onClick = { viewModel.onQueryChange("") },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Close,
-                                        contentDescription = "Hapus",
-                                        tint = ColorTextSecondary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
+                            }
+                        }
+
+                        if (uiState.isSearchActive) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    viewModel.executeSearch()
+                                },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "Kirim",
+                                    tint = ColorAccentPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
                         }
                     }
 
-                    if (uiState.isSearchActive) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(
-                            onClick = {
-                                focusManager.clearFocus()
-                                viewModel.executeSearch()
-                            },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Kirim",
-                                tint = ColorAccentPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                    // Main Content: Default Explore Mode vs Active Search Mode
+                    if (!uiState.isSearchActive) {
+                        ExploreDefaultContent(
+                            genres = uiState.genres,
+                            years = uiState.years,
+                            characters = uiState.characters,
+                            onOpenSubPage = { viewModel.openSubPage(it) },
+                            onGenreClick = { viewModel.selectGenre(it) },
+                            onStudioClick = { viewModel.selectStudio(it) },
+                            onYearClick = { viewModel.selectGenre(it) },
+                            onTypeClick = { viewModel.selectType(it) },
+                            onCharacterClick = { viewModel.onQueryChange(it) }
+                        )
+                    } else {
+                        SearchResultsContent(
+                            uiState = uiState,
+                            onAnimeClick = onAnimeClick,
+                            onCuplixClick = onCuplixClick
+                        )
                     }
-                }
-
-                // Main Content: Default Explore Mode vs Active Search Mode
-                if (!uiState.isSearchActive) {
-                    ExploreDefaultContent(
-                        genres = uiState.genres,
-                        years = uiState.years,
-                        characters = uiState.characters,
-                        onGenreClick = { viewModel.selectGenre(it) },
-                        onStudioClick = { viewModel.selectStudio(it) },
-                        onYearClick = { viewModel.selectGenre(it) },
-                        onTypeClick = { viewModel.selectType(it) },
-                        onCharacterClick = { viewModel.onQueryChange(it) }
-                    )
-                } else {
-                    SearchResultsContent(
-                        uiState = uiState,
-                        onGenreSelect = { viewModel.selectGenre(it) },
-                        onAnimeClick = onAnimeClick,
-                        onCuplixClick = onCuplixClick
-                    )
                 }
             }
 
-            // Floating Buttons in Active Search Mode (Sort + Layout Toggle)
-            if (uiState.isSearchActive && uiState.searchResults.isNotEmpty()) {
+            // Floating Buttons in Active Search Mode (Sort with Green Arrow + Layout Toggle)
+            val hasItems = if (uiState.query.isNotBlank()) uiState.searchResults.isNotEmpty() else uiState.recommendations.isNotEmpty()
+            if (uiState.isSearchActive && hasItems && uiState.selectedSubPage == null) {
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(end = 16.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Sort order button
+                    // Sort order button with Emerald Green Arrow
                     Box(
                         modifier = Modifier
                             .size(44.dp)
@@ -265,7 +291,7 @@ fun SearchScreen(
                         Icon(
                             imageVector = Icons.Default.Sort,
                             contentDescription = "Urutkan",
-                            tint = ColorAccentPrimary,
+                            tint = Color(0xFF00C853),
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -300,6 +326,7 @@ private fun ExploreDefaultContent(
     genres: List<ExploreGenreItem>,
     years: List<ExploreYearItem>,
     characters: List<ExploreCharacterItem>,
+    onOpenSubPage: (ExploreSubPage) -> Unit,
     onGenreClick: (String) -> Unit,
     onStudioClick: (String) -> Unit,
     onYearClick: (String) -> Unit,
@@ -313,7 +340,10 @@ private fun ExploreDefaultContent(
     ) {
         // 1. KATEGORI (White Cards with Right Illustration)
         item {
-            ExploreHeaderRow(title = "KATEGORI")
+            ExploreHeaderRow(
+                title = "KATEGORI",
+                onClick = { onOpenSubPage(ExploreSubPage.KATEGORI) }
+            )
             Spacer(modifier = Modifier.height(10.dp))
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val sampleGenres = if (genres.isNotEmpty()) genres.take(3) else listOf(
@@ -345,7 +375,10 @@ private fun ExploreDefaultContent(
 
         // 3. TAHUN (White Cards with Left Illustration)
         item {
-            ExploreHeaderRow(title = "TAHUN")
+            ExploreHeaderRow(
+                title = "TAHUN",
+                onClick = { onOpenSubPage(ExploreSubPage.TAHUN) }
+            )
             Spacer(modifier = Modifier.height(10.dp))
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val sampleYears = if (years.isNotEmpty()) years.take(3) else listOf(
@@ -376,7 +409,10 @@ private fun ExploreDefaultContent(
 
         // 5. KARAKTER (Dark Blue-Gray Cards)
         item {
-            ExploreHeaderRow(title = "KARAKTER")
+            ExploreHeaderRow(
+                title = "KARAKTER",
+                onClick = { onOpenSubPage(ExploreSubPage.KARAKTER) }
+            )
             Spacer(modifier = Modifier.height(10.dp))
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val sampleChars = if (characters.isNotEmpty()) characters.take(4) else listOf(
@@ -397,49 +433,19 @@ private fun ExploreDefaultContent(
 }
 
 // ==================== 2. ACTIVE SEARCH RESULTS CONTENT ====================
+// Note: NO genre capsules above Cuplix per specification!
+// Cuplix is directly under search bar, followed by Recommendations / Search Results.
 
 @Composable
 private fun SearchResultsContent(
     uiState: SearchUiState,
-    onGenreSelect: (String) -> Unit,
     onAnimeClick: (String) -> Unit,
     onCuplixClick: (String) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Horizontal Genre Filter Chips
-        if (uiState.genres.isNotEmpty()) {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(uiState.genres) { g ->
-                    val name = g.name ?: return@items
-                    val isSelected = uiState.selectedGenre == name
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) ColorAccentPrimary else Color.Transparent)
-                            .border(
-                                width = 1.dp,
-                                color = if (isSelected) ColorAccentPrimary else Color(0x66FF5722),
-                                shape = RoundedCornerShape(16.dp)
-                            )
-                            .clickable { onGenreSelect(name) }
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = name,
-                            color = if (isSelected) Color.White else ColorTextPrimary,
-                            fontSize = 11.5.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-        }
+    val displayedList = if (uiState.query.isNotBlank()) uiState.searchResults else uiState.recommendations
 
-        // Cuplix Bar
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Cuplix Bar directly under the search bar
         if (uiState.cuplixList.isNotEmpty()) {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 12.dp),
@@ -455,19 +461,33 @@ private fun SearchResultsContent(
             Spacer(modifier = Modifier.height(10.dp))
         }
 
+        // Section Title: "Hasil Pencarian" or "Rekomendasi Anime"
+        val headerTitle = if (uiState.query.isNotBlank()) {
+            "Hasil Pencarian \"${uiState.query}\""
+        } else {
+            "Rekomendasi Anime Populer"
+        }
+        Text(
+            text = headerTitle,
+            color = ColorTextSecondary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+        )
+
         // Results List or Grid
         Box(modifier = Modifier.fillMaxSize()) {
             when {
-                uiState.isLoading && uiState.searchResults.isEmpty() -> {
+                uiState.isLoading && displayedList.isEmpty() -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = ColorAccentPrimary, modifier = Modifier.size(36.dp))
                     }
                 }
 
-                uiState.searchResults.isEmpty() -> {
+                displayedList.isEmpty() -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            text = "Tidak ada anime ditemukan.",
+                            text = if (uiState.query.isNotBlank()) "Tidak ada anime ditemukan." else "Belum ada rekomendasi.",
                             color = ColorTextSecondary,
                             fontSize = 13.sp
                         )
@@ -483,7 +503,7 @@ private fun SearchResultsContent(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        items(uiState.searchResults, key = { it.id ?: it.hashCode().toString() }) { anime ->
+                        items(displayedList, key = { it.id ?: it.hashCode().toString() }) { anime ->
                             AnimeVerticalCard(
                                 anime = anime,
                                 onClick = { anime.id?.let { onAnimeClick(it) } }
@@ -499,7 +519,7 @@ private fun SearchResultsContent(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 64.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        items(uiState.searchResults, key = { it.id ?: it.hashCode().toString() }) { anime ->
+                        items(displayedList, key = { it.id ?: it.hashCode().toString() }) { anime ->
                             SearchResultWideCard(
                                 anime = anime,
                                 onClick = { anime.id?.let { onAnimeClick(it) } }
@@ -512,12 +532,114 @@ private fun SearchResultsContent(
     }
 }
 
+// ==================== 2B. SUB-PAGE FULL LIST CONTENT ====================
+
+@Composable
+private fun ExploreSubPageContent(
+    subPage: ExploreSubPage,
+    uiState: SearchUiState,
+    onClose: () -> Unit,
+    onGenreClick: (String) -> Unit,
+    onYearClick: (String) -> Unit,
+    onCharacterClick: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ColorBackgroundPrimary)
+    ) {
+        // Sub-page Top Bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Kembali",
+                    tint = ColorTextPrimary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            val title = when (subPage) {
+                ExploreSubPage.KATEGORI -> "KATEGORI"
+                ExploreSubPage.TAHUN -> "TAHUN"
+                ExploreSubPage.KARAKTER -> "KARAKTER"
+            }
+            Text(
+                text = title,
+                color = ColorTextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            when (subPage) {
+                ExploreSubPage.KATEGORI -> {
+                    items(uiState.genres) { g ->
+                        WhiteCategoryCard(
+                            group = g.group ?: "Genre",
+                            name = g.name ?: "-",
+                            imageUrl = g.getEffectiveImage(),
+                            onClick = {
+                                g.name?.let {
+                                    onGenreClick(it)
+                                }
+                            }
+                        )
+                    }
+                }
+                ExploreSubPage.TAHUN -> {
+                    items(uiState.years) { y ->
+                        WhiteYearCard(
+                            year = y.name ?: "-",
+                            imageUrl = y.getEffectiveImage(),
+                            onClick = {
+                                y.name?.let {
+                                    onYearClick(it)
+                                }
+                            }
+                        )
+                    }
+                }
+                ExploreSubPage.KARAKTER -> {
+                    items(uiState.characters) { c ->
+                        DarkCharacterCard(
+                            name = c.name ?: "-",
+                            imageUrl = c.getEffectiveImage(),
+                            onClick = {
+                                c.name?.let {
+                                    onCharacterClick(it)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ==================== 3. COMPONENT HELPERS ====================
 
 @Composable
-private fun ExploreHeaderRow(title: String, showChevron: Boolean = true) {
+private fun ExploreHeaderRow(
+    title: String,
+    showChevron: Boolean = true,
+    onClick: (() -> Unit)? = null
+) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

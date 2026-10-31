@@ -55,11 +55,31 @@ class AnimeRepository(
         }
     }
 
-    suspend fun getCuplixFeed(): Result<List<CuplixItem>> = withContext(Dispatchers.IO) {
+    suspend fun getCuplixFeed(limit: Int = 15): Result<List<CuplixItem>> = withContext(Dispatchers.IO) {
         try {
-            val response = api.getCuplixFeed(limit = 15, sort = "new")
+            val response = api.getCuplixFeed(limit = limit, sort = "new")
             val items = response.data?.fypList ?: emptyList()
             Result.success(items)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getHomeNewTitles(): Result<List<AnimeItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getHomeNewTitles()
+            val list = response.data?.movies ?: response.data?.newEpisodes ?: emptyList()
+            Result.success(list.take(16))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getHomeRandom(): Result<List<AnimeItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getHomeRandom()
+            val list = response.data?.movies ?: response.data?.newEpisodes ?: emptyList()
+            Result.success(list)
         } catch (e: Exception) {
             Result.failure(e)
         }
