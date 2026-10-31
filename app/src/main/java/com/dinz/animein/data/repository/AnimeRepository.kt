@@ -4,9 +4,13 @@ import com.dinz.animein.data.api.ApiClient
 import com.dinz.animein.data.api.AnimeInApiService
 import com.dinz.animein.data.model.AnimeHomeData
 import com.dinz.animein.data.model.AnimeItem
+import com.dinz.animein.data.model.CommunityMediaItem
 import com.dinz.animein.data.model.ContinueWatchingItem
+import com.dinz.animein.data.model.ContributorItem
 import com.dinz.animein.data.model.CuplixItem
-import com.dinz.animein.data.model.SliderItem
+import com.dinz.animein.data.model.DiscussionItem
+import com.dinz.animein.data.model.EpisodeItem
+import com.dinz.animein.data.model.MovieDetailData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -56,8 +60,83 @@ class AnimeRepository(
         }
     }
 
+    // ==================== DETAIL REPOSITORY METHODS ====================
+
+    suspend fun getMovieDetail(id: String): Result<MovieDetailData> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getMovieDetail(id)
+            val data = response.data
+            if (data?.movie != null) {
+                Result.success(data)
+            } else {
+                Result.failure(Exception("Informasi anime tidak ditemukan"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getMovieEpisodes(id: String, page: Int = 0): Result<List<EpisodeItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getMovieEpisodes(id, page = page)
+            val episodes = response.data?.episodes ?: emptyList()
+            Result.success(episodes)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getMovieCuplix(idMovie: String, page: Int = 1): Result<List<CuplixItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getMovieCuplix(idMovie = idMovie, page = page)
+            val items = response.data?.fypList ?: emptyList()
+            Result.success(items)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getMoviePosters(idMovie: String): Result<List<CommunityMediaItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getMoviePosters(idMovie = idMovie)
+            val items = response.data?.posters ?: emptyList()
+            Result.success(items)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getMovieCovers(idMovie: String): Result<List<CommunityMediaItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getMovieCovers(idMovie = idMovie)
+            val items = response.data?.covers ?: emptyList()
+            Result.success(items)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getMovieDiscussions(idMovie: String, page: Int = 1): Result<List<DiscussionItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getMovieDiscussions(idMovie = idMovie, page = page)
+            val items = response.data?.discussions ?: emptyList()
+            Result.success(items)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getMovieContributors(idMovie: String, page: Int = 1): Result<List<ContributorItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getMovieContributors(idMovie = idMovie, page = page)
+            val items = response.data?.contributors ?: emptyList()
+            Result.success(items)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     fun getContinueWatchingList(): List<ContinueWatchingItem> {
-        // Sample cached / local continue watching items
         return listOf(
             ContinueWatchingItem(
                 id = "1",

@@ -1,0 +1,79 @@
+name: Android Release Build
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Publish Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant Execute Permission to Gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build APK via Gradle
+        run: |
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Prepare APK for Release
+        run: |
+          mkdir -p build-output
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk build-output/AnimeIn-v1.1.0.apk
+          elif [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp app/build/outputs/apk/debug/app-debug.apk build-output/AnimeIn-v1.1.0.apk
+          else
+            find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-output/AnimeIn-v1.1.0.apk \;
+          fi
+          ls -lh build-output/AnimeIn-v1.1.0.apk
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnimeIn-APK
+          path: build-output/AnimeIn-v1.1.0.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name != 'pull_request'
+        with:
+          tag_name: "v1.1.0-build-${{ github.run_number }}"
+          name: "AnimeIn App v1.1.0 - Detail Screen (Build #${{ github.run_number }})"
+          body: |
+            ## AnimeIn Android App v1.1.0 Release
+            - Added native **Anime Detail Screen** with Hero Header, backdrop cover, and quick episode play.
+            - 8 Interactive Detail Tabs:
+              - `INFO`: Complete metadata, 2:3 poster, synopsis, types, airing schedule, studio, and category tags.
+              - `EPISODE`: 3-column grid with `NEW` badges and custom wolf logo silhouette fallback.
+              - `SEASON`: Landscape cards for related seasons, movies, OVAs, and spin-offs.
+              - `DISCUSSION`: Community comments and live discussion threads.
+              - `CUPLIX`: Short video reels specific to each anime with like counts.
+              - `POSTER` & `COVER`: Community submissions with contributor cards and upvotes.
+              - `CONTRIBUTOR`: Top contributor leaderboards and metrics.
+            - Seamless navigation between Home Screen and Anime Detail Screen with system BackHandler support.
+            - Anti-slop dark matte theme adhering to design specifications.
+          draft: false
+          prerelease: false
+          make_latest: true
+          files: |
+            build-output/AnimeIn-v1.1.0.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -3,11 +3,17 @@ package com.dinz.animein
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.dinz.animein.ui.detail.AnimeDetailScreen
 import com.dinz.animein.ui.home.HomeScreen
 import com.dinz.animein.ui.theme.AnimeInTheme
 import com.dinz.animein.ui.theme.ColorBackgroundPrimary
@@ -24,14 +30,31 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = ColorBackgroundPrimary
                 ) {
-                    HomeScreen(
-                        onAnimeClick = { animeId ->
-                            Toast.makeText(this, "Buka Anime #$animeId", Toast.LENGTH_SHORT).show()
-                        },
-                        onCuplixClick = { cuplixId ->
-                            Toast.makeText(this, "Putar Cuplix #$cuplixId", Toast.LENGTH_SHORT).show()
+                    var selectedAnimeId by remember { mutableStateOf<String?>(null) }
+
+                    if (selectedAnimeId != null) {
+                        BackHandler {
+                            selectedAnimeId = null
                         }
-                    )
+                        AnimeDetailScreen(
+                            movieId = selectedAnimeId!!,
+                            onBackClick = {
+                                selectedAnimeId = null
+                            },
+                            onAnimeClick = { newId ->
+                                selectedAnimeId = newId
+                            }
+                        )
+                    } else {
+                        HomeScreen(
+                            onAnimeClick = { animeId ->
+                                selectedAnimeId = animeId
+                            },
+                            onCuplixClick = { cuplixId ->
+                                Toast.makeText(this, "Putar Cuplix #$cuplixId", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
                 }
             }
         }
