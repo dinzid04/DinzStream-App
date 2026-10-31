@@ -37,58 +37,48 @@ jobs:
         run: |
           mkdir -p build-output
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk build-output/Yuranime-v1.6.0.apk
+            cp app/build/outputs/apk/release/app-release.apk build-output/Yuranime-v1.7.0.apk
           elif [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
-            cp app/build/outputs/apk/debug/app-debug.apk build-output/Yuranime-v1.6.0.apk
+            cp app/build/outputs/apk/debug/app-debug.apk build-output/Yuranime-v1.7.0.apk
           else
-            find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-output/Yuranime-v1.6.0.apk \;
+            find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-output/Yuranime-v1.7.0.apk \;
           fi
-          ls -lh build-output/Yuranime-v1.6.0.apk
+          ls -lh build-output/Yuranime-v1.7.0.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Yuranime-APK
-          path: build-output/Yuranime-v1.6.0.apk
+          path: build-output/Yuranime-v1.7.0.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.event_name != 'pull_request'
         with:
-          tag_name: "v1.6.0-build-${{ github.run_number }}"
-          name: "Yuranime v1.6.0 - Full-Bleed Notch Fix, Cuplix Reels Viewer, Search Filters & Popular Leaderboard (Build #${{ github.run_number }})"
+          tag_name: "v1.7.0-build-${{ github.run_number }}"
+          name: "Yuranime v1.7.0 - Critical Bug Fixes: Search Filter System, Cuplix Autoplay & Like/Comment Sync (Build #${{ github.run_number }})"
           body: |
-            ## Yuranime Android App v1.6.0 Release
+            ## Yuranime Android App v1.7.0 Release
 
-            ### 🚀 Fitur & Peningkatan Utama:
-            1. **Video Player Imersif & Notch Cutout Fix (`MainActivity` & `StreamingScreen`):**
-               - Full-bleed status bar transparan menembus batas layar (`WindowCompat.setDecorFitsSystemWindows(window, false)` & `layoutInDisplayCutoutMode = SHORT_EDGES / ALWAYS`).
-               - Sembunyikan system bars secara imersif pada mode fullscreen / landscape dengan swipe transient (`WindowInsetsControllerCompat`).
-               - Overlay kontrol atas (`<-` dan `⚙`) tidak lagi terpotong notch kamera atau bar hitam.
-            2. **Halaman Search / Cari (`SearchScreen`):**
-               - Kartu `KATEGORI`, `TAHUN`, dan `KARAKTER` diperlebar menjadi tinggi `114.dp` dengan `alignment = Alignment.TopCenter` sehingga ilustrasi dan kepala karakter utuh tanpa terpotong.
-               - Integrasi filter klik langsung pada kartu Kategori (genre), Tahun, Studio, Tipe, dan Karakter ke halaman hasil pencarian.
-               - Fitur **Pull-to-Refresh** dengan pengacakan (`.shuffled()`) dinamis pada item kategori, tahun, studio, dan karakter.
-            3. **Halaman View Cuplix & Komentar Cuplix (`CuplixViewScreen`):**
-               - Tampilan video reels layar penuh vertikal tanpa seekbar/durasi/slider kecepatan.
-               - Menu titik tiga (`⋮`) di kanan atas dengan pop-up pemilihan resolusi (360p, 480p, 720p, 1080p) tersinkronisasi.
-               - Tap to Pause/Play dengan animasi tombol play transparan di tengah.
-               - Creator info: avatar pokemon showdown bulat border oranye, username oranye `#FF5722`, caption, kapsul judul anime oranye (`wrapContentWidth`), dan kapsul episode gelap.
-               - Action sidebar kanan: tombol Like hati dengan counter, tombol Komentar dengan counter, dan poster mini anime.
-               - Bottom sheet komentar Cuplix dengan input rounded dan fetch komentar asli.
-            4. **Paling Populer di Home (`HomeScreen` & `PopularLeaderboardCard`):**
-               - Daftar peringkat vertikal Top 1-10 bergaya leaderboard kartu gelap `#0F1420`.
-               - Ranks 1–3 dengan garis lengkung aksen emas di tepi kiri, angka miring (*italic*) SF Bold emas `34.sp`, 5 bintang emas (`★★★★★`) dan jumlah favorit pengguna (`favorites`).
-               - Ranks 4–10 dengan angka timbul gelap dan border minimalis.
-               - Artwork anime cover di sisi kanan dengan masking gradasi horizontal memudar alami ke latar kartu.
-            5. **Rebranding Total ke Yuranime & Global SVG Placeholder:**
-               - Nama aplikasi dan identitas visual diperbarui ke **Yuranime**.
-               - Ikon peluncur adaptif baru (`ic_launcher`) berbasis logo geometris kitsune.
-               - Placeholder vektor global (`placeholder_yuranime.xml` & `placeholder_yuranime_wide.xml`) pada seluruh gambar aplikasi.
+            ### 🚀 Perbaikan Bug Kritis & Peningkatan Fitur:
+            1. **Sistem Filter Search Terverifikasi AnimeIn APK (`classes7.dex`):**
+               - Endpoint khusus: `/3/2/explore/movie_genre` (`id_genre`, `genre_in`), `/3/2/explore/movie_studio` (`studio`), `/3/2/explore/movie_type` (`type`), `/3/2/explore/movie_year` (`year`), dan `/3/2/explore/movie` (`keyword`).
+               - Indikator Active Filter Chip di bagian atas dengan tombol `[✕]` untuk membatalkan filter secara elegan.
+               - Menyembunyikan "Rekomendasi Populer" saat filter aktif sehingga daftar anime yang tampil benar-benar murni hasil filter yang diklik.
+               - Mendukung pengurutan (`views`, `alphabet`, `new`), toggle tampilan Grid/List, serta pagination infinite scroll.
+            2. **Sinkronisasi Like & Komentar Cuplix:**
+               - Parsing field JSON asli: `@SerializedName("count_likes", alternate = ["likes", "like", "total_likes", "count_like"])` dan `@SerializedName("count_comments", alternate = ["comments", "comment", "total_comments", "count_comment"])`.
+               - Sinkronisasi realtime `commentsCountMap` dan `likesCountMap` di `CuplixViewModel` dengan data detail komentar yang dimuat di background agar tidak pernah menampilkan angka `0` jika terdapat komentar riil.
+            3. **Cuplix Seamless Autoplay & Zero-Black-Screen Crossfade:**
+               - Video cuplix otomatis langsung berputar saat halaman aktif (`playWhenReady = true; prepare(); play()`).
+               - Mengeliminasi kedipan layar hitam saat buffering/loading awal menggunakan `Player.Listener.onRenderedFirstFrame()` yang mempertahankan poster thumbnail menutupi `PlayerView` hingga frame video pertama siap, lalu melakukan transisi fade-out halus (`tween(300)`).
+            4. **Interaksi Cuplix di Detail Anime (`AnimeDetailScreen`):**
+               - Kartu Cuplix di tab CUPLIX kini sepenuhnya interaktif (`clickable { onCuplixClick(item.id) }`).
+               - Navigasi tersambung langsung ke `CuplixViewScreen` di `MainActivity` sehingga pengguna dapat langsung memutar video cuplix yang dipilih dari halaman detail anime.
           draft: false
           prerelease: false
           make_latest: true
           files: |
-            build-output/Yuranime-v1.6.0.apk
+            build-output/Yuranime-v1.7.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

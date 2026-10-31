@@ -5,6 +5,7 @@ import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -167,6 +168,7 @@ fun CuplixViewScreen(
                 isCurrentPage = isCurrentPage,
                 isLiked = uiState.likedItemIds.contains(item.id ?: ""),
                 likesCount = uiState.likesCountMap[item.id ?: ""] ?: (item.countLikes?.toIntOrNull() ?: 0),
+                commentsCount = uiState.commentsCountMap[item.id ?: ""] ?: (item.countComments?.toIntOrNull() ?: 0),
                 onToggleLike = { item.id?.let { viewModel.toggleLike(it) } },
                 onCommentClick = {
                     item.id?.let { fypId ->
@@ -291,13 +293,15 @@ private fun CuplixVideoPage(
     isCurrentPage: Boolean,
     isLiked: Boolean,
     likesCount: Int,
+    commentsCount: Int,
     onToggleLike: () -> Unit,
     onCommentClick: () -> Unit,
     onAnimeClick: () -> Unit,
     onEpisodeClick: () -> Unit
 ) {
     val context = LocalContext.current
-    var isPlaying by remember { mutableStateOf(true) }
+    var isPlaying by remember(isCurrentPage, streamUrl) { mutableStateOf(true) }
+    var isFirstFrameRendered by remember(isCurrentPage, streamUrl) { mutableStateOf(false) }
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
 
     val startMs = remember(item) { item.getTimeStartMs() }
@@ -308,20 +312,36 @@ private fun CuplixVideoPage(
             val player = ExoPlayer.Builder(context).build().apply {
                 val mediaItem = MediaItem.fromUri(streamUrl)
                 setMediaItem(mediaItem)
-                prepare()
+                playWhenReady = true
+                repeatMode = Player.REPEAT_MODE_OFF
                 if (startMs > 0) {
                     seekTo(startMs)
                 }
-                playWhenReady = true
-                repeatMode = Player.REPEAT_MODE_OFF
+                prepare()
+                play()
             }
+            val listener = object : Player.Listener {
+                override fun onRenderedFirstFrame() {
+                    isFirstFrameRendered = true
+                    isPlaying = true
+                }
+
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_READY) {
+                        player.play()
+                    }
+                }
+            }
+            player.addListener(listener)
             exoPlayer = player
         } else {
+            isFirstFrameRendered = false
             exoPlayer?.release()
             exoPlayer = null
         }
 
         onDispose {
+            isFirstFrameRendered = false
             exoPlayer?.release()
             exoPlayer = null
         }
@@ -379,19 +399,33 @@ private fun CuplixVideoPage(
                 },
                 modifier = Modifier.fillMaxSize()
             )
-        } else {
-            // Thumbnail poster while buffering
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(item.getEffectiveThumbnail())
-                    .crossfade(true)
-                    .placeholder(R.drawable.placeholder_yuranime_wide)
-                    .error(R.drawable.placeholder_yuranime_wide)
-                    .build(),
-                contentDescription = item.anime,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize()
-            )
+        }
+
+        // Thumbnail poster while buffering / until first video frame renders (NO BLACK SCREEN FLASH)
+        AnimatedVisibility(
+            visible = !isFirstFrameRendered || !isCurrentPage || exoPlayer == null,
+            enter = fadeIn(animationSpec = tween(150)),
+            exit = fadeOut(animationSpec = tween(300)),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(item.getEffectiveThumbnail())
+                        .crossfade(true)
+                        .placeholder(R.drawable.placeholder_yuranime_wide)
+                        .error(R.drawable.placeholder_yuranime_wide)
+                        .build(),
+                    contentDescription = item.anime,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
 
         // Pause Indicator Overlay
@@ -458,9 +492,8 @@ private fun CuplixVideoPage(
                     modifier = Modifier.size(32.dp)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                val commentCount = item.countComments?.toIntOrNull() ?: 0
                 Text(
-                    text = commentCount.toString(),
+                    text = commentsCount.toString(),
                     color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,

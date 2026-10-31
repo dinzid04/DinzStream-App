@@ -313,4 +313,92 @@ class AnimeRepository(
             Result.failure(e)
         }
     }
+
+    suspend fun exploreMovieGenre(
+        idGenre: String? = null,
+        genreIn: String? = null,
+        sort: String? = null,
+        page: Int = 0
+    ): Result<List<AnimeItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getExploreMovieGenre(
+                idGenre = idGenre?.ifBlank { null },
+                genreIn = genreIn?.ifBlank { null },
+                sort = sort?.ifBlank { null },
+                page = page
+            )
+            val movies = response.data?.movies
+                ?: response.data?.hotAnime
+                ?: response.data?.newEpisodes
+                ?: emptyList()
+            Result.success(movies)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun exploreMovieStudio(
+        studio: String,
+        sort: String? = null,
+        page: Int = 0
+    ): Result<List<AnimeItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getExploreMovieStudio(
+                studio = studio,
+                sort = sort?.ifBlank { null },
+                page = page
+            )
+            val movies = response.data?.movies
+                ?: response.data?.hotAnime
+                ?: response.data?.newEpisodes
+                ?: emptyList()
+            Result.success(movies)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun exploreMovieType(
+        type: String,
+        sort: String? = null,
+        page: Int = 0
+    ): Result<List<AnimeItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getExploreMovieType(
+                type = type,
+                sort = sort?.ifBlank { null },
+                page = page
+            )
+            val movies = response.data?.movies
+                ?: response.data?.hotAnime
+                ?: response.data?.newEpisodes
+                ?: emptyList()
+            Result.success(movies)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun exploreMovieYear(
+        year: String,
+        season: String? = null,
+        sort: String? = null,
+        page: Int = 0
+    ): Result<List<AnimeItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getExploreMovieYear(
+                year = year,
+                season = season?.ifBlank { null },
+                sort = sort?.ifBlank { null },
+                page = page
+            )
+            val movies = response.data?.movies
+                ?: response.data?.hotAnime
+                ?: response.data?.newEpisodes
+                ?: emptyList()
+            Result.success(movies)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

@@ -2,6 +2,7 @@ package com.dinz.animein.ui.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dinz.animein.data.model.AnimeItem
 import com.dinz.animein.data.repository.AnimeRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -20,6 +21,7 @@ class SearchViewModel(
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
     private var searchDebounceJob: Job? = null
+    private var searchExecutionJob: Job? = null
 
     init {
         loadExploreData()
@@ -67,73 +69,54 @@ class SearchViewModel(
         _uiState.update {
             it.copy(
                 query = newQuery,
-                isSearchActive = newQuery.isNotBlank() || it.selectedGenre != null
+                isSearchActive = newQuery.isNotBlank() || it.activeFilter != null
             )
         }
 
         searchDebounceJob?.cancel()
         searchDebounceJob = viewModelScope.launch {
             delay(400)
-            if (newQuery.isNotBlank() || _uiState.value.selectedGenre != null) {
-                executeSearch()
+            if (newQuery.isNotBlank() || _uiState.value.activeFilter != null) {
+                executeCurrentSearch(page = 0, isInitial = true)
             }
         }
     }
 
-    fun selectGenre(genreName: String?) {
-        val nextGenre = if (_uiState.value.selectedGenre == genreName) null else genreName
+    fun applyFilter(type: FilterType, value: String, label: String) {
+        val filter = SearchFilter(type = type, value = value, label = label)
         _uiState.update {
             it.copy(
-                selectedGenre = nextGenre,
-                isSearchActive = nextGenre != null || it.query.isNotBlank()
+                activeFilter = filter,
+                query = "",
+                isSearchActive = true,
+                selectedSubPage = null,
+                currentPage = 0,
+                canPaginate = true,
+                searchResults = emptyList()
             )
         }
-        executeSearch()
+        executeCurrentSearch(page = 0, isInitial = true)
     }
 
-    fun selectType(type: String?) {
-        val nextType = if (_uiState.value.selectedType == type) null else type
+    fun clearFilter() {
+        val currentQuery = _uiState.value.query
         _uiState.update {
             it.copy(
-                selectedType = nextType,
-                isSearchActive = nextType != null || it.query.isNotBlank()
+                activeFilter = null,
+                currentPage = 0,
+                canPaginate = true
             )
         }
-        executeSearch()
-    }
-
-    fun selectStudio(studio: String?) {
-        val nextStudio = if (_uiState.value.selectedStudio == studio) null else studio
-        _uiState.update {
-            it.copy(
-                selectedStudio = nextStudio,
-                query = nextStudio ?: it.query,
-                isSearchActive = true
-            )
+        if (currentQuery.isNotBlank()) {
+            executeCurrentSearch(page = 0, isInitial = true)
+        } else {
+            _uiState.update {
+                it.copy(
+                    isSearchActive = false,
+                    searchResults = emptyList()
+                )
+            }
         }
-        executeSearch()
-    }
-
-    fun selectYear(year: String?) {
-        val nextYear = if (_uiState.value.selectedYear == year) null else year
-        _uiState.update {
-            it.copy(
-                selectedYear = nextYear,
-                query = nextYear ?: it.query,
-                isSearchActive = true
-            )
-        }
-        executeSearch()
-    }
-
-    fun selectCharacter(charName: String) {
-        _uiState.update {
-            it.copy(
-                query = charName,
-                isSearchActive = true
-            )
-        }
-        executeSearch()
     }
 
     fun toggleLayout() {
@@ -142,12 +125,12 @@ class SearchViewModel(
 
     fun cycleSort() {
         val nextSort = when (_uiState.value.sortOrder) {
-            "views" -> "popular"
-            "popular" -> "new"
+            "views" -> "alphabet"
+            "alphabet" -> "new"
             else -> "views"
         }
-        _uiState.update { it.copy(sortOrder = nextSort) }
-        executeSearch()
+        _uiState.update { it.copy(sortOrder = nextSort, currentPage = 0, canPaginate = true) }
+        executeCurrentSearch(page = 0, isInitial = true)
     }
 
     fun openSubPage(page: ExploreSubPage) {
@@ -163,53 +146,113 @@ class SearchViewModel(
     }
 
     fun clearSearch() {
+        searchDebounceJob?.cancel()
+        searchExecutionJob?.cancel()
         _uiState.update {
             it.copy(
                 query = "",
                 selectedSubPage = null,
-                selectedGenre = null,
-                selectedType = null,
-                selectedStudio = null,
-                selectedYear = null,
+                activeFilter = null,
                 isSearchActive = false,
-                searchResults = emptyList()
+                currentPage = 0,
+                canPaginate = true,
+                searchResults = emptyList(),
+                errorMessage = null
             )
         }
     }
 
     fun executeSearch() {
-        val current = _uiState.value
-        val keyword = current.query.ifBlank { null }
-        val genre = current.selectedGenre
-        val type = current.selectedType
+        executeCurrentSearch(page = 0, isInitial = true)
+    }
 
-        if (keyword == null && genre == null && type == null) {
+    fun loadNextPage() {
+        val state = _uiState.value
+        if (state.isLoading || state.isPaginating || !state.canPaginate || !state.isSearchActive) return
+        val nextPage = state.currentPage + 1
+        executeCurrentSearch(page = nextPage, isInitial = false)
+    }
+
+    private fun executeCurrentSearch(page: Int, isInitial: Boolean) {
+        val current = _uiState.value
+        val activeFilter = current.activeFilter
+        val keyword = current.query.ifBlank { null }
+
+        // If no filter and no keyword, reset search results
+        if (activeFilter == null && keyword == null) {
             _uiState.update { it.copy(isSearchActive = false, searchResults = emptyList()) }
             return
         }
 
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            val result = repository.searchMovies(
-                keyword = keyword,
-                genreIn = genre,
-                type = type,
-                sort = current.sortOrder
-            )
+        searchExecutionJob?.cancel()
+        searchExecutionJob = viewModelScope.launch {
+            if (isInitial) {
+                _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            } else {
+                _uiState.update { it.copy(isPaginating = true) }
+            }
+
+            val sortParam = current.sortOrder
+
+            val result: Result<List<AnimeItem>> = when {
+                activeFilter != null -> {
+                    when (activeFilter.type) {
+                        FilterType.GENRE -> {
+                            val id = activeFilter.value.toIntOrNull()?.toString()
+                            if (id != null) {
+                                repository.exploreMovieGenre(idGenre = id, sort = sortParam, page = page)
+                            } else {
+                                repository.exploreMovieGenre(genreIn = activeFilter.value, sort = sortParam, page = page)
+                            }
+                        }
+                        FilterType.STUDIO -> {
+                            repository.exploreMovieStudio(studio = activeFilter.value, sort = sortParam, page = page)
+                        }
+                        FilterType.YEAR -> {
+                            repository.exploreMovieYear(year = activeFilter.value, sort = sortParam, page = page)
+                        }
+                        FilterType.TYPE -> {
+                            repository.exploreMovieType(type = activeFilter.value, sort = sortParam, page = page)
+                        }
+                        FilterType.CHARACTER -> {
+                            repository.searchMovies(keyword = activeFilter.value, sort = sortParam, page = page)
+                        }
+                    }
+                }
+                keyword != null -> {
+                    repository.searchMovies(keyword = keyword, sort = sortParam, page = page)
+                }
+                else -> {
+                    Result.success(emptyList())
+                }
+            }
 
             if (result.isSuccess) {
-                _uiState.update {
-                    it.copy(
+                val newItems = result.getOrDefault(emptyList())
+                _uiState.update { prev ->
+                    val combined = if (isInitial) {
+                        newItems
+                    } else {
+                        val existingIds = prev.searchResults.mapNotNull { it.id }.toSet()
+                        val filteredNew = newItems.filter { it.id == null || !existingIds.contains(it.id) }
+                        prev.searchResults + filteredNew
+                    }
+                    prev.copy(
                         isLoading = false,
-                        searchResults = result.getOrDefault(emptyList()),
-                        isSearchActive = true
+                        isPaginating = false,
+                        searchResults = combined,
+                        currentPage = page,
+                        canPaginate = newItems.isNotEmpty(),
+                        isSearchActive = true,
+                        errorMessage = null
                     )
                 }
             } else {
-                _uiState.update {
-                    it.copy(
+                _uiState.update { prev ->
+                    prev.copy(
                         isLoading = false,
-                        errorMessage = result.exceptionOrNull()?.message ?: "Gagal memuat hasil pencarian"
+                        isPaginating = false,
+                        errorMessage = if (isInitial) result.exceptionOrNull()?.message ?: "Gagal memuat hasil filter" else null
                     )
                 }
             }

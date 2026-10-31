@@ -113,3 +113,29 @@ Dokumen ini adalah satu-satunya acuan spesifikasi desain dan teknis aplikasi **Y
 - Kode wajib terkompilasi bersih tanpa peringatan fatal.
 - Commit dan push ke remote `main`.
 - Memantau GitHub Actions CI/CD hingga build sukses dan merilis file APK **Yuranime** terbaru.
+
+---
+
+## 7. Perbaikan Bug Kritis: Search Filter, Cuplix Like/Comment & Seamless Autoplay (v1.7.0)
+1. **Search Filter Architecture (Reverse Engineered dari AnimeIn APK `classes7.dex`):**
+   - Menggunakan endpoint filter dedikasi:
+     - `/3/2/explore/movie_genre` dengan parameter `id_genre`, `genre_in`, `sort`, `page`
+     - `/3/2/explore/movie_studio` dengan parameter `studio`, `sort`, `page`
+     - `/3/2/explore/movie_type` dengan parameter `type`, `sort`, `page`
+     - `/3/2/explore/movie_year` dengan parameter `year`, `season`, `sort`, `page`
+     - `/3/2/explore/movie` dengan parameter `keyword`, `sort`, `page`
+   - Indikator Active Filter Chip di bagian atas dengan tombol `[✕]` untuk membatalkan filter.
+   - Sembunyikan 'Rekomendasi Populer' saat filter aktif sehingga daftar anime murni menampilkan hasil filter yang diklik.
+   - Mendukung sorting (`views`, `alphabet`, `new`), toggle Grid/List, serta pagination infinite scroll.
+2. **Cuplix Metric Keys & Comment Synchronization:**
+   - Serialized keys asli terverifikasi:
+     - `@SerializedName(value = "count_likes", alternate = ["likes", "like", "total_likes", "count_like"])`
+     - `@SerializedName(value = "count_comments", alternate = ["comments", "comment", "total_comments", "count_comment"])`
+     - `@SerializedName(value = "count_views", alternate = ["views", "view", "total_views", "count_view"])`
+     - `@SerializedName(value = "is_like", alternate = ["is_liked", "liked"])`
+   - Sinkronisasi realtime `commentsCountMap` dan `likesCountMap` di `CuplixViewModel` dengan data detail komentar yang dimuat di background agar tidak pernah menampilkan `0` jika terdapat komentar riil.
+3. **Cuplix Seamless Autoplay & Zero-Black-Screen Crossfade:**
+   - Autoplay instan saat page cuplix aktif (`playWhenReady = true; prepare(); play()`).
+   - Mencegah kedipan layar hitam saat buffering/inisialisasi player dengan listener `Player.Listener.onRenderedFirstFrame()` yang mempertahankan poster thumbnail (`AsyncImage`) menutupi `PlayerView` hingga frame video pertama siap, lalu melakukan transisi fade-out halus (`tween(300)`).
+4. **Interaktivitas Cuplix di Detail Anime (`AnimeDetailScreen`):**
+   - Menghubungkan klik kartu Cuplix di tab Cuplix (`AnimeDetailScreen`) ke navigation controller `onCuplixClick(id)` di `MainActivity.kt` menuju `selectedCuplixId = cuplixId` sehingga pengguna dapat langsung memutar video cuplix tersebut.

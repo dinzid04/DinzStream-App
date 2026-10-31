@@ -22,9 +22,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -48,7 +51,10 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -130,16 +136,16 @@ fun SearchScreen(
                     subPage = uiState.selectedSubPage!!,
                     uiState = uiState,
                     onClose = { viewModel.closeSubPage() },
-                    onGenreClick = {
-                        viewModel.selectGenre(it)
+                    onGenreClick = { id, name ->
+                        viewModel.applyFilter(FilterType.GENRE, id, name)
                         viewModel.closeSubPage()
                     },
-                    onYearClick = {
-                        viewModel.selectYear(it)
+                    onYearClick = { year ->
+                        viewModel.applyFilter(FilterType.YEAR, year, year)
                         viewModel.closeSubPage()
                     },
-                    onCharacterClick = {
-                        viewModel.selectCharacter(it)
+                    onCharacterClick = { charName ->
+                        viewModel.applyFilter(FilterType.CHARACTER, charName, charName)
                         viewModel.closeSubPage()
                     }
                 )
@@ -263,25 +269,31 @@ fun SearchScreen(
                                 years = uiState.years,
                                 characters = uiState.characters,
                                 onOpenSubPage = { viewModel.openSubPage(it) },
-                                onGenreClick = { viewModel.selectGenre(it) },
-                                onStudioClick = { viewModel.selectStudio(it) },
-                                onYearClick = { viewModel.selectYear(it) },
-                                onTypeClick = { viewModel.selectType(it) },
-                                onCharacterClick = { viewModel.selectCharacter(it) }
+                                onGenreClick = { id, name -> viewModel.applyFilter(FilterType.GENRE, id, name) },
+                                onStudioClick = { studio -> viewModel.applyFilter(FilterType.STUDIO, studio, studio) },
+                                onYearClick = { year -> viewModel.applyFilter(FilterType.YEAR, year, year) },
+                                onTypeClick = { type -> viewModel.applyFilter(FilterType.TYPE, type, type) },
+                                onCharacterClick = { charName -> viewModel.applyFilter(FilterType.CHARACTER, charName, charName) }
                             )
                         }
                     } else {
                         SearchResultsContent(
                             uiState = uiState,
                             onAnimeClick = onAnimeClick,
-                            onCuplixClick = onCuplixClick
+                            onCuplixClick = onCuplixClick,
+                            onClearFilter = { viewModel.clearFilter() },
+                            onLoadNextPage = { viewModel.loadNextPage() }
                         )
                     }
                 }
             }
 
             // Floating Buttons in Active Search Mode (Sort with Green Arrow + Layout Toggle)
-            val hasItems = if (uiState.query.isNotBlank()) uiState.searchResults.isNotEmpty() else uiState.recommendations.isNotEmpty()
+            val hasItems = if (uiState.activeFilter != null || uiState.query.isNotBlank()) {
+                uiState.searchResults.isNotEmpty()
+            } else {
+                uiState.recommendations.isNotEmpty()
+            }
             if (uiState.isSearchActive && hasItems && uiState.selectedSubPage == null) {
                 Column(
                     modifier = Modifier
@@ -338,7 +350,7 @@ private fun ExploreDefaultContent(
     years: List<ExploreYearItem>,
     characters: List<ExploreCharacterItem>,
     onOpenSubPage: (ExploreSubPage) -> Unit,
-    onGenreClick: (String) -> Unit,
+    onGenreClick: (id: String, name: String) -> Unit,
     onStudioClick: (String) -> Unit,
     onYearClick: (String) -> Unit,
     onTypeClick: (String) -> Unit,
@@ -367,7 +379,7 @@ private fun ExploreDefaultContent(
                         group = g.group ?: "Genre",
                         name = g.name ?: "-",
                         imageUrl = g.getEffectiveImage(),
-                        onClick = { g.name?.let { onGenreClick(it) } }
+                        onClick = { onGenreClick(g.id ?: g.name ?: "", g.name ?: "-") }
                     )
                 }
             }
@@ -451,9 +463,48 @@ private fun ExploreDefaultContent(
 private fun SearchResultsContent(
     uiState: SearchUiState,
     onAnimeClick: (String) -> Unit,
-    onCuplixClick: (String) -> Unit
+    onCuplixClick: (String) -> Unit,
+    onClearFilter: () -> Unit,
+    onLoadNextPage: () -> Unit
 ) {
-    val displayedList = if (uiState.query.isNotBlank()) uiState.searchResults else uiState.recommendations
+    val isFilterActive = uiState.activeFilter != null
+    val isQueryActive = uiState.query.isNotBlank()
+    val displayedList = if (isFilterActive || isQueryActive) {
+        uiState.searchResults
+    } else {
+        uiState.recommendations
+    }
+
+    val gridState = rememberLazyGridState()
+    val listState = rememberLazyListState()
+
+    val shouldLoadMoreGrid = remember {
+        derivedStateOf {
+            val total = gridState.layoutInfo.totalItemsCount
+            val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            total > 0 && lastVisible >= total - 3
+        }
+    }
+
+    val shouldLoadMoreList = remember {
+        derivedStateOf {
+            val total = listState.layoutInfo.totalItemsCount
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            total > 0 && lastVisible >= total - 3
+        }
+    }
+
+    LaunchedEffect(shouldLoadMoreGrid.value) {
+        if (shouldLoadMoreGrid.value && uiState.canPaginate && !uiState.isLoading && !uiState.isPaginating) {
+            onLoadNextPage()
+        }
+    }
+
+    LaunchedEffect(shouldLoadMoreList.value) {
+        if (shouldLoadMoreList.value && uiState.canPaginate && !uiState.isLoading && !uiState.isPaginating) {
+            onLoadNextPage()
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Cuplix Bar directly under the search bar
@@ -472,11 +523,63 @@ private fun SearchResultsContent(
             Spacer(modifier = Modifier.height(10.dp))
         }
 
-        // Section Title: "Hasil Pencarian" or "Rekomendasi Anime"
-        val headerTitle = if (uiState.query.isNotBlank()) {
-            "Hasil Pencarian \"${uiState.query}\""
-        } else {
-            "Rekomendasi Anime Populer"
+        // Active Filter Banner / Chip (Emerald accent, clean clear button)
+        if (uiState.activeFilter != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF1E293B))
+                        .border(1.dp, ColorAccentPrimary.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                        .clickable(onClick = onClearFilter)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    val typeLabel = when (uiState.activeFilter.type) {
+                        FilterType.GENRE -> "Kategori"
+                        FilterType.STUDIO -> "Studio"
+                        FilterType.YEAR -> "Tahun"
+                        FilterType.TYPE -> "Tipe"
+                        FilterType.CHARACTER -> "Karakter"
+                    }
+                    Text(
+                        text = "$typeLabel: ${uiState.activeFilter.label}",
+                        color = Color.White,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Hapus Filter",
+                        tint = ColorAccentPrimary,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+
+                Text(
+                    text = "${displayedList.size} anime",
+                    color = ColorTextSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = SfProFontFamily
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        // Section Title: "Hasil Filter", "Hasil Pencarian", or "Rekomendasi Anime Populer"
+        val headerTitle = when {
+            uiState.activeFilter != null -> "Hasil Filter \"${uiState.activeFilter.label}\""
+            uiState.query.isNotBlank() -> "Hasil Pencarian \"${uiState.query}\""
+            else -> "Rekomendasi Anime Populer"
         }
         Text(
             text = headerTitle,
@@ -498,7 +601,11 @@ private fun SearchResultsContent(
                 displayedList.isEmpty() -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            text = if (uiState.query.isNotBlank()) "Tidak ada anime ditemukan." else "Belum ada rekomendasi.",
+                            text = if (uiState.activeFilter != null || uiState.query.isNotBlank()) {
+                                "Tidak ada anime ditemukan."
+                            } else {
+                                "Belum ada rekomendasi."
+                            },
                             color = ColorTextSecondary,
                             fontSize = 13.sp
                         )
@@ -509,8 +616,9 @@ private fun SearchResultsContent(
                     // Grid 3 Columns
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(3),
+                        state = gridState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
@@ -520,14 +628,31 @@ private fun SearchResultsContent(
                                 onClick = { anime.id?.let { onAnimeClick(it) } }
                             )
                         }
+                        if (uiState.isPaginating) {
+                            item(span = { GridItemSpan(3) }) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(
+                                        color = ColorAccentPrimary,
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
                 else -> {
                     // Wide Cards List
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 64.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 80.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(displayedList, key = { it.id ?: it.hashCode().toString() }) { anime ->
@@ -535,6 +660,22 @@ private fun SearchResultsContent(
                                 anime = anime,
                                 onClick = { anime.id?.let { onAnimeClick(it) } }
                             )
+                        }
+                        if (uiState.isPaginating) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(
+                                        color = ColorAccentPrimary,
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -550,7 +691,7 @@ private fun ExploreSubPageContent(
     subPage: ExploreSubPage,
     uiState: SearchUiState,
     onClose: () -> Unit,
-    onGenreClick: (String) -> Unit,
+    onGenreClick: (id: String, name: String) -> Unit,
     onYearClick: (String) -> Unit,
     onCharacterClick: (String) -> Unit
 ) {
@@ -600,11 +741,7 @@ private fun ExploreSubPageContent(
                             group = g.group ?: "Genre",
                             name = g.name ?: "-",
                             imageUrl = g.getEffectiveImage(),
-                            onClick = {
-                                g.name?.let {
-                                    onGenreClick(it)
-                                }
-                            }
+                            onClick = { onGenreClick(g.id ?: g.name ?: "", g.name ?: "-") }
                         )
                     }
                 }

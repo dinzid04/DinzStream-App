@@ -12,17 +12,31 @@ enum class ExploreSubPage {
     KARAKTER
 }
 
+enum class FilterType {
+    GENRE,
+    STUDIO,
+    YEAR,
+    TYPE,
+    CHARACTER
+}
+
+data class SearchFilter(
+    val type: FilterType,
+    val value: String,
+    val label: String
+)
+
 data class SearchUiState(
     val query: String = "",
     val isSearchActive: Boolean = false,
+    val activeFilter: SearchFilter? = null,
     val selectedSubPage: ExploreSubPage? = null,
-    val selectedGenre: String? = null,
-    val selectedType: String? = null,
-    val selectedStudio: String? = null,
-    val selectedYear: String? = null,
     val isGridLayout: Boolean = false,
     val sortOrder: String = "views",
     val isLoading: Boolean = false,
+    val isPaginating: Boolean = false,
+    val canPaginate: Boolean = true,
+    val currentPage: Int = 0,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
     // Explore sections

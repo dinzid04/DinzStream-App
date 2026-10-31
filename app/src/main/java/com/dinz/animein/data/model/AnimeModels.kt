@@ -102,14 +102,14 @@ data class CuplixItem(
     @SerializedName("anime") val anime: String? = null,
     @SerializedName("episode") val episode: String? = null,
     @SerializedName("poster") val poster: String? = null,
-    @SerializedName("count_views") val countViews: String? = null,
-    @SerializedName("count_likes") val countLikes: String? = null,
-    @SerializedName("count_comments") val countComments: String? = null,
+    @SerializedName(value = "count_views", alternate = ["views", "view", "total_views", "count_view"]) val countViews: String? = null,
+    @SerializedName(value = "count_likes", alternate = ["likes", "like", "total_likes", "count_like"]) val countLikes: String? = null,
+    @SerializedName(value = "count_comments", alternate = ["comments", "comment", "total_comments", "count_comment"]) val countComments: String? = null,
     @SerializedName("username") val username: String? = null,
     @SerializedName("pokemon") val pokemon: String? = null,
     @SerializedName("time_start") val timeStart: String? = null,
     @SerializedName("time_end") val timeEnd: String? = null,
-    @SerializedName("is_like") val isLike: String? = null
+    @SerializedName(value = "is_like", alternate = ["is_liked", "liked"]) val isLike: String? = null
 ) {
     fun getEffectiveThumbnail(): String {
         val raw = urlThumbnail ?: poster ?: ""

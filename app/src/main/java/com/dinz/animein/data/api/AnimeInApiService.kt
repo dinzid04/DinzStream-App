@@ -140,4 +140,34 @@ interface AnimeInApiService {
         @Query("sort") sort: String = "views",
         @Query("page") page: Int = 0
     ): AnimeHomeResponse
+
+    @GET("/3/2/explore/movie_genre")
+    suspend fun getExploreMovieGenre(
+        @Query("id_genre") idGenre: String? = null,
+        @Query("genre_in") genreIn: String? = null,
+        @Query("sort") sort: String? = null,
+        @Query("page") page: Int = 0
+    ): AnimeHomeResponse
+
+    @GET("/3/2/explore/movie_studio")
+    suspend fun getExploreMovieStudio(
+        @Query("studio") studio: String,
+        @Query("sort") sort: String? = null,
+        @Query("page") page: Int = 0
+    ): AnimeHomeResponse
+
+    @GET("/3/2/explore/movie_type")
+    suspend fun getExploreMovieType(
+        @Query("type") type: String,
+        @Query("sort") sort: String? = null,
+        @Query("page") page: Int = 0
+    ): AnimeHomeResponse
+
+    @GET("/3/2/explore/movie_year")
+    suspend fun getExploreMovieYear(
+        @Query("year") year: String,
+        @Query("season") season: String? = null,
+        @Query("sort") sort: String? = null,
+        @Query("page") page: Int = 0
+    ): AnimeHomeResponse
 }

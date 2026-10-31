@@ -96,6 +96,9 @@ class MainActivity : ComponentActivity() {
                                 onEpisodeClick = { epId ->
                                     selectedStreamingMovieId = selectedAnimeId
                                     selectedStreamingEpisodeId = epId
+                                },
+                                onCuplixClick = { cuplixId ->
+                                    selectedCuplixId = cuplixId
                                 }
                             )
                         }

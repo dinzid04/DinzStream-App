@@ -94,6 +94,7 @@ fun AnimeDetailScreen(
     modifier: Modifier = Modifier,
     onAnimeClick: (String) -> Unit = {},
     onEpisodeClick: (String) -> Unit = {},
+    onCuplixClick: (String) -> Unit = {},
     viewModel: AnimeDetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -249,7 +250,10 @@ fun AnimeDetailScreen(
                                     onAnimeClick(seasonId)
                                 }
                             )
-                            DetailTab.CUPLIX -> TabCuplixContent(cuplixList = uiState.cuplixList)
+                            DetailTab.CUPLIX -> TabCuplixContent(
+                                cuplixList = uiState.cuplixList,
+                                onCuplixClick = onCuplixClick
+                            )
                             DetailTab.POSTER -> TabPosterContent(
                                 posters = uiState.posters,
                                 onImageClick = { viewModel.openFullScreenImage(it) }
@@ -986,7 +990,10 @@ private fun TabSeasonContent(
 // ==================== 5. TAB CUPLIX (Pure Clean Images) ====================
 
 @Composable
-private fun TabCuplixContent(cuplixList: List<CuplixItem>) {
+private fun TabCuplixContent(
+    cuplixList: List<CuplixItem>,
+    onCuplixClick: (String) -> Unit = {}
+) {
     if (cuplixList.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(text = "Belum ada Cuplix untuk anime ini.", color = ColorTextSecondary, fontSize = 13.sp)
@@ -1008,11 +1015,16 @@ private fun TabCuplixContent(cuplixList: List<CuplixItem>) {
                     .aspectRatio(9f / 14f)
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color(0xFF181920))
+                    .clickable {
+                        item.id?.let { onCuplixClick(it) }
+                    }
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(item.getEffectiveThumbnail())
                         .crossfade(true)
+                        .placeholder(R.drawable.placeholder_yuranime_wide)
+                        .error(R.drawable.placeholder_yuranime_wide)
                         .build(),
                     contentDescription = item.caption,
                     modifier = Modifier.fillMaxSize(),
