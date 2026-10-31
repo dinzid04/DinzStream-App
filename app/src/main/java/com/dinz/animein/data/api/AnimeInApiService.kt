@@ -39,6 +39,12 @@ interface AnimeInApiService {
         @Query("sort") sort: String = "new"
     ): CuplixResponse
 
+    @GET("/data/fyp/comment/list")
+    suspend fun getCuplixComments(
+        @Query("id_fyp") idFyp: String,
+        @Query("page") page: Int = 1
+    ): EpisodeCommentResponse
+
     @GET("/3/2/explore/movie")
     suspend fun getExplore(
         @Query("page") page: Int = 0,

@@ -72,7 +72,7 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
         return prefs.getBoolean("is_logged_in", false)
     }
 
-    fun setLoggedIn(loggedIn: Boolean, username: String = "UserAnimeIn") {
+    fun setLoggedIn(loggedIn: Boolean, username: String = "UserYuranime") {
         prefs.edit()
             .putBoolean("is_logged_in", loggedIn)
             .putString("username", username)
@@ -80,7 +80,7 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
     }
 
     fun getUsername(): String {
-        return prefs.getString("username", "UserAnimeIn") ?: "UserAnimeIn"
+        return prefs.getString("username", "UserYuranime") ?: "UserYuranime"
     }
 
     fun saveReaction(commentId: String, reaction: String) {

@@ -178,7 +178,7 @@ fun AnimeDetailScreen(
                         onShareClick = {
                             val sendIntent = Intent().apply {
                                 action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, "Nonton ${movie.title} di AnimeIn!")
+                                putExtra(Intent.EXTRA_TEXT, "Nonton ${movie.title} di Yuranime!")
                                 type = "text/plain"
                             }
                             context.startActivity(Intent.createChooser(sendIntent, "Bagikan anime"))
@@ -804,7 +804,7 @@ private fun TabEpisodeContent(
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_wolf_logo),
-                                    contentDescription = "AnimeIn Wolf Logo",
+                                    contentDescription = "Yuranime Kitsune Logo",
                                     tint = Color(0xFF6B7280),
                                     modifier = Modifier.size(36.dp)
                                 )

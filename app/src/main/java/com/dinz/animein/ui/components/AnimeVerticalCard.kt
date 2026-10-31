@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.dinz.animein.R
 import com.dinz.animein.data.model.AnimeItem
 import com.dinz.animein.ui.theme.ColorAccentPrimary
 import com.dinz.animein.ui.theme.ColorMetricFavorites
@@ -58,6 +59,8 @@ fun AnimeVerticalCard(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(anime.getEffectivePoster())
                 .crossfade(true)
+                .placeholder(R.drawable.placeholder_yuranime)
+                .error(R.drawable.placeholder_yuranime)
                 .build(),
             contentDescription = anime.title ?: "Poster Anime",
             contentScale = ContentScale.Crop,

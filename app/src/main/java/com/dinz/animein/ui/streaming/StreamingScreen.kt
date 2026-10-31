@@ -327,7 +327,7 @@ fun StreamingScreen(
                                             )
                                             Spacer(modifier = Modifier.height(6.dp))
                                             val realSynopsis = uiState.movieDetail?.movie?.synopsis?.ifBlank { null }
-                                                ?: "Streaming anime episode terlengkap dengan kualitas jernih dan subtitle Indonesia resmi di platform AnimeIn."
+                                                ?: "Streaming anime episode terlengkap dengan kualitas jernih dan subtitle Indonesia resmi di platform Yuranime."
                                             Text(
                                                 text = realSynopsis,
                                                 color = Color(0xFF9CA3AF),

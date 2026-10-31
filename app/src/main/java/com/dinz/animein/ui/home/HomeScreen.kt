@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -60,6 +61,7 @@ import com.dinz.animein.ui.components.HomeErrorState
 import com.dinz.animein.ui.components.HomeShimmerLoading
 import com.dinz.animein.ui.components.NavTab
 import com.dinz.animein.ui.components.PiuPiuHeroSlider
+import com.dinz.animein.ui.components.PopularLeaderboardCard
 import com.dinz.animein.ui.components.SectionHeader
 import com.dinz.animein.ui.theme.ColorAccentPrimary
 import com.dinz.animein.ui.theme.ColorBackgroundPrimary
@@ -392,30 +394,32 @@ fun HomeScreen(
                             }
                         }
 
-                        // 10. Section "Paling Populer" (2:3 Vertical Cards)
+                        // 10. Section "Paling Populer" (Leaderboard Ranking Cards sesuai referensi)
                         if (uiState.popularAnimeList.isNotEmpty()) {
-                            item(key = "section_popular_anime") {
-                                Spacer(modifier = Modifier.height(18.dp))
+                            item(key = "section_popular_header") {
+                                Spacer(modifier = Modifier.height(20.dp))
                                 SectionHeader(
                                     title = "Paling Populer",
                                     onChevronClick = { viewModel.openSectionDetail(HomeSectionType.POPULAR) }
                                 )
-                                LazyRow(
-                                    state = popularListState,
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                Spacer(modifier = Modifier.height(6.dp))
+                            }
+
+                            val topRankItems = uiState.popularAnimeList.take(10)
+                            itemsIndexed(
+                                items = topRankItems,
+                                key = { index, anime -> "pop_rank_${index + 1}_${anime.id ?: anime.hashCode()}" }
+                            ) { index, anime ->
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 5.dp)
                                 ) {
-                                    items(
-                                        items = uiState.popularAnimeList,
-                                        key = { "popular_" + (it.id ?: it.hashCode().toString()) }
-                                    ) { anime ->
-                                        val singleGenre = anime.getDisplayGenre().split(",").firstOrNull()?.trim() ?: "Action"
-                                        AnimeVerticalCard(
-                                            anime = anime,
-                                            overrideSubtitle = singleGenre,
-                                            onClick = { anime.id?.let { onAnimeClick(it) } }
-                                        )
-                                    }
+                                    PopularLeaderboardCard(
+                                        anime = anime,
+                                        rank = index + 1,
+                                        onClick = { anime.id?.let { onAnimeClick(it) } }
+                                    )
                                 }
                             }
                         }

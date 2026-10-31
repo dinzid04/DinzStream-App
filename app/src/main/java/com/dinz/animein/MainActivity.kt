@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.dinz.animein.ui.components.NavTab
+import com.dinz.animein.ui.cuplix.CuplixViewScreen
 import com.dinz.animein.ui.detail.AnimeDetailScreen
 import com.dinz.animein.ui.home.HomeScreen
 import com.dinz.animein.ui.jadwal.JadwalScreen
@@ -37,9 +38,25 @@ class MainActivity : ComponentActivity() {
                     var selectedAnimeId by remember { mutableStateOf<String?>(null) }
                     var selectedStreamingEpisodeId by remember { mutableStateOf<String?>(null) }
                     var selectedStreamingMovieId by remember { mutableStateOf<String?>(null) }
+                    var selectedCuplixId by remember { mutableStateOf<String?>(null) }
                     var currentTab by remember { mutableStateOf(NavTab.HOME) }
 
                     when {
+                        selectedCuplixId != null -> {
+                            CuplixViewScreen(
+                                initialCuplixId = selectedCuplixId,
+                                onBackClick = { selectedCuplixId = null },
+                                onAnimeClick = { animeId ->
+                                    selectedCuplixId = null
+                                    selectedAnimeId = animeId
+                                },
+                                onEpisodeClick = { epId, mId ->
+                                    selectedCuplixId = null
+                                    selectedStreamingMovieId = mId
+                                    selectedStreamingEpisodeId = epId
+                                }
+                            )
+                        }
                         selectedStreamingEpisodeId != null -> {
                             StreamingScreen(
                                 episodeId = selectedStreamingEpisodeId!!,
@@ -87,7 +104,7 @@ class MainActivity : ComponentActivity() {
                                             selectedStreamingEpisodeId = epId
                                         },
                                         onCuplixClick = { cuplixId ->
-                                            Toast.makeText(this, "Putar Cuplix #$cuplixId", Toast.LENGTH_SHORT).show()
+                                            selectedCuplixId = cuplixId
                                         }
                                     )
                                 }
@@ -108,7 +125,7 @@ class MainActivity : ComponentActivity() {
                                             selectedAnimeId = animeId
                                         },
                                         onCuplixClick = { cuplixId ->
-                                            Toast.makeText(this, "Putar Cuplix #$cuplixId", Toast.LENGTH_SHORT).show()
+                                            selectedCuplixId = cuplixId
                                         }
                                     )
                                 }
@@ -129,7 +146,7 @@ class MainActivity : ComponentActivity() {
                                             selectedAnimeId = animeId
                                         },
                                         onCuplixClick = { cuplixId ->
-                                            Toast.makeText(this, "Putar Cuplix #$cuplixId", Toast.LENGTH_SHORT).show()
+                                            selectedCuplixId = cuplixId
                                         }
                                     )
                                 }

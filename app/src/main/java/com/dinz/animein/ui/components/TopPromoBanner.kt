@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.dinz.animein.R
 import com.dinz.animein.data.model.AnimeItem
 import com.dinz.animein.ui.theme.ColorBackgroundPrimary
 import com.dinz.animein.ui.theme.ColorTextPrimary
@@ -84,6 +85,8 @@ fun PiuPiuHeroSlider(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(coverUrl)
                         .crossfade(true)
+                        .placeholder(R.drawable.placeholder_yuranime_wide)
+                        .error(R.drawable.placeholder_yuranime_wide)
                         .build(),
                     contentDescription = anime.title,
                     contentScale = ContentScale.Crop,
@@ -127,7 +130,7 @@ fun PiuPiuHeroSlider(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     val synText = anime.synopsis
-                        ?: "Tonton streaming anime terupdate dengan kualitas terbaik dan subtitle Indonesia resmi di platform AnimeIn."
+                        ?: "Tonton streaming anime terupdate dengan kualitas terbaik dan subtitle Indonesia resmi di platform Yuranime."
                     Text(
                         text = synText,
                         color = ColorTextSecondary,

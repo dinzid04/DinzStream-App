@@ -105,12 +105,29 @@ data class CuplixItem(
     @SerializedName("count_views") val countViews: String? = null,
     @SerializedName("count_likes") val countLikes: String? = null,
     @SerializedName("count_comments") val countComments: String? = null,
-    @SerializedName("username") val username: String? = null
+    @SerializedName("username") val username: String? = null,
+    @SerializedName("pokemon") val pokemon: String? = null,
+    @SerializedName("time_start") val timeStart: String? = null,
+    @SerializedName("time_end") val timeEnd: String? = null,
+    @SerializedName("is_like") val isLike: String? = null
 ) {
     fun getEffectiveThumbnail(): String {
         val raw = urlThumbnail ?: poster ?: ""
         return normalizeImageUrl(raw)
     }
+
+    fun getEffectivePoster(): String {
+        val raw = poster ?: urlThumbnail ?: ""
+        return normalizeImageUrl(raw)
+    }
+
+    fun getPokemonAvatarUrl(): String {
+        val p = pokemon?.toIntOrNull()?.coerceAtLeast(1) ?: 25
+        return "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/$p.gif"
+    }
+
+    fun getTimeStartMs(): Long = timeStart?.toLongOrNull() ?: 0L
+    fun getTimeEndMs(): Long = timeEnd?.toLongOrNull() ?: 0L
 }
 
 data class ContinueWatchingItem(

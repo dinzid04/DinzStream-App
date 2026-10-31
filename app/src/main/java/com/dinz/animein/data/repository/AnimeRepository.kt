@@ -65,6 +65,16 @@ class AnimeRepository(
         }
     }
 
+    suspend fun getCuplixComments(idFyp: String, page: Int = 1): Result<List<EpisodeCommentItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getCuplixComments(idFyp = idFyp, page = page)
+            val comments = response.data?.comments ?: emptyList()
+            Result.success(comments)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun getHomeNewTitles(): Result<List<AnimeItem>> = withContext(Dispatchers.IO) {
         try {
             val response = api.getHomeNewTitles()
