@@ -68,3 +68,46 @@ Dokumen ini adalah acuan spesifikasi desain dan teknis aplikasi **Yuranime** di 
      - Emblem bulat serigala yang sudah utuh bergeser mulus dari tengah ke sisi kiri menggunakan `FastOutSlowInEasing`.
      - Bersamaan dengan pergeseran emblem ke kiri, teks **`Yuranime`** muncul secara mulus (*slide-in + staggered fade-in* dari kiri ke kanan) di sebelah kanan logo hingga membentuk komposisi `yuranime-full-logo.svg` yang utuh dan presisi di tengah layar.
    - **Tahap D (2200ms - 2600ms | Transisi Masuk ke Home):** Setelah komposisi logo penuh tampil sejenak, layar melakukan *crossfade + slight scale* menuju **Home Screen** yang datanya sudah di-*preload* di background sejak awal aplikasi dibuka.
+
+
+---
+
+## PRIORITAS 4: Perubahan UI Home Slider & Animasi Logo
+*Mengacu pada tangkapan layar referensi: `/storage/emulated/0/termux/design/reff/Proyek Baru 157 [BD62D8D].png`*
+
+1. **Header Bar & Animasi Logo Yuranime (`YuranimeAnimatedLogo`):**
+   - Ditempatkan di bagian paling atas Home Screen (`statusBarsPadding()`) melayang anggun di atas backdrop slider.
+   - Emblem bulat serigala dengan rotasi busur merah 360 derajat secara halus (`FastOutSlowInEasing`) saat pertama kali render, serta animasi mikro responsif (scale spring + rotasi 180 derajat) saat logo di-tap oleh pengguna.
+   - Wordmark teks "Yuranime" menggunakan font resmi Calistoga Regular (`YuranimeLogoFontFamily`) warna putih solid.
+2. **Hero Slider Sinematik (`YuranimeHeroSlider`):**
+   - Latar belakang landscape cover beresolusi tinggi dengan gradien ganda (gelap di atas untuk keterbacaan logo/status bar, dan gelap pekat menyatu ke `#0B0B0B` di bawah).
+   - Di sisi kiri bawah: Poster anime vertikal vertikal rasio 2:3 (`88.dp` x `132.dp`, rounded `8.dp`, border halus `#33FFFFFF`).
+   - Di sisi kanan poster: Judul anime lengkap (**SF Bold**, uppercase/title case, `19.sp`, putih), sinopsis anime (`11.5.sp`, `#CBD5E1`, max 2 baris), dan tombol aksi CTA **"TONTON SEKARANG"** berwarna merah brand Yuranime (`#E23441`) lengkap dengan ikon Play putih.
+   - Indikator paginasi pil aktif dan titik inaktif di sudut kanan bawah.
+
+---
+
+## PRIORITAS 5: Pembaruan Layar Login (Profile) Sinematik
+*Mengacu pada aset video referensi `/storage/emulated/0/termux/design/reff/VID-20261101-WA0035.mp4` dan poster di `/storage/emulated/0/termux/design/reff/poster/`*
+
+1. **Latar Belakang Poster Anime Marquee Miring (Tilted 3-Column Marquee):**
+   - 3 kolom vertikal poster anime offline di drawable (`poster_login_01.jpg` s/d `poster_login_12.jpg`) dimiringkan -9 derajat dan bergerak vertikal mulus secara terus-menerus pada 60fps.
+   - Lapisan vignette gradient gelap pekat di bagian atas dan bawah untuk memastikan kontras maksimal.
+2. **Komposisi Identitas & Tombol Masuk:**
+   - Bagian tengah: Logo bulat serigala Yuranime, teks "YURANIME" Calistoga, dan tagline "Tempat Nonton Anime Subtitle Indonesia".
+   - Bagian bawah: Tombol putih bersih **"Masuk dengan Google"** dengan logo 4-warna Google resmi (`ic_google_logo.xml`), tombol **"Login Tester"**, disclaimer persetujuan layanan, dan teks versi app ("Versi 1.9.0").
+3. **Tampilan Profil Akun Aktif & Avatar Bergerak (`AnimatedAvatarBorder`):**
+   - Saat pengguna login, halaman profil menampilkan kartu akun dengan avatar border berputar 60fps native Compose, pemilih tema dekorasi avatar (Kitsune Flame, Neon Cyberpunk, Celestial Gold, Sakura Bloom, Void Abyss), riwayat tontonan lokal, dan opsi keluar akun.
+
+---
+
+## PRIORITAS 6: Perbaikan Randomisasi Cuplix
+- Penggantian pengambilan Cuplix statis dengan fungsi `getRandomizedCuplixFeed` di `AnimeRepository.kt` yang menggabungkan feed populer dan terbaru serta melakukan pengacakan dinamis (shuffled).
+- Menjamin klip yang diklik pengguna tetap berada di index 0 untuk pemutaran instan, sedangkan seluruh sisa feed di-randomize sehingga penonton selalu menemukan tayangan anime yang bervariasi setiap saat.
+- Pengacakan juga aktif pada avatar bulat Cuplix di Home Screen dan Jadwal Screen.
+
+---
+
+## PRIORITAS 7: Migrasi Package Name Menjadi `com.yuranime.dinz`
+- Seluruh namespace dan applicationId pada `app/build.gradle.kts` dimutakhirkan menjadi `com.yuranime.dinz`.
+- Refactor struktur package direktori dari `com.dinz.animein` ke `com.yuranime.dinz` di seluruh 38 file Kotlin, AndroidManifest.xml, dan aturan ProGuard.

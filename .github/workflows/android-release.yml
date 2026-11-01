@@ -37,44 +37,46 @@ jobs:
         run: |
           mkdir -p build-output
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk build-output/Yuranime-v1.8.0.apk
+            cp app/build/outputs/apk/release/app-release.apk build-output/Yuranime-v1.9.0.apk
           elif [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
-            cp app/build/outputs/apk/debug/app-debug.apk build-output/Yuranime-v1.8.0.apk
+            cp app/build/outputs/apk/debug/app-debug.apk build-output/Yuranime-v1.9.0.apk
           else
-            find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-output/Yuranime-v1.8.0.apk \;
+            find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-output/Yuranime-v1.9.0.apk \;
           fi
-          ls -lh build-output/Yuranime-v1.8.0.apk
+          ls -lh build-output/Yuranime-v1.9.0.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Yuranime-APK
-          path: build-output/Yuranime-v1.8.0.apk
+          path: build-output/Yuranime-v1.9.0.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.event_name != 'pull_request'
         with:
-          tag_name: "v1.8.0-build-${{ github.run_number }}"
-          name: "Yuranime v1.8.0 - Streaming Info Card, Monochrome Placeholder, App Icon & 60fps Motion Splash (Build #${{ github.run_number }})"
+          tag_name: "v1.9.0-build-${{ github.run_number }}"
+          name: "Yuranime v1.9.0 - Home Slider, Logo Animation, Cinematic Login & Cuplix Randomizer (Build #${{ github.run_number }})"
           body: |
-            ## Yuranime Android App v1.8.0 Release
+            ## Yuranime Android App v1.9.0 Release
 
             ### Pembaruan Utama:
-            1. **Halaman Streaming - Kontainer Info Anime (`#12151C`):**
-               - Kontainer kartu `#12151C` (`12.dp` rounded) di bawah Video Player dan di atas `COVER & POSTER`.
-               - Baris atas: Poster vertikal (`2:3`, `80.dp`) di sisi kiri, serta Judul Anime (**SF Bold** putih) dan baris metadata (`Episode [Nomor]`, ikon mata + views singkat, dan kondisional `airedStart` dengan pemisah `•` hanya jika tanggal tersedia) di sisi kanan.
-               - Baris bawah: Sinopsis anime (`#94A3B8`, default 3 baris) dengan tombol interaktif `Selengkapnya >` / `Sembunyikan` berwarna biru (`#3B82F6`) untuk membuka atau menutup sinopsis penuh.
-            2. **Global SVG Placeholder (`yuranime-monochrome.svg`) & Launcher Icon (`yuranime-app-icon.svg`):**
-               - Konversi `yuranime-monochrome.svg` ke VectorDrawable `ic_yuranime_monochrome.xml`, `placeholder_yuranime.xml`, dan `placeholder_yuranime_wide.xml` di seluruh komponen `AsyncImage`.
-               - Pembaruan ikon aplikasi utama (`ic_launcher`, `ic_launcher_round`, adaptive foreground & background) menggunakan `yuranime-app-icon.svg`.
-            3. **Motion Graphics Splash Screen 60fps (`yuranime-full-logo.svg` + `Calistoga Regular`):**
-               - Ekstraksi layer independen: Segitiga Play Putih, Dua Busur Lingkaran Merah, Siluet Kepala Serigala/Rubah Putih, dan teks `Yuranime` (`yuranime_logo_font.ttf`).
-               - Sekuens 4 tahap (0ms - 2600ms) dengan preloading data Home di background dan transisi crossfade + scale menuju `HomeScreen`.
+            1. **Perubahan UI Home Slider & Animasi Logo:**
+               - Hero Slider gaya baru dengan poster vertikal di sisi kiri, judul bold uppercase, sinopsis rapi, tombol CTA "TONTON SEKARANG" merah Yuranime, dan indikator paginasi horizontal.
+               - Header Logo Animasi (`YuranimeAnimatedLogo`) dengan transisi busur merah rotasi 360° saat layar dimuat serta efek sentuhan mikro (spring bounce + arc rotation).
+            2. **Pembaruan Halaman Login (Profile):**
+               - Tampilan login sinematik dengan latar belakang 3 kolom poster anime tilted yang scrolling vertikal offline dari 12 poster lokal di drawable.
+               - Tombol masuk bersih "Masuk dengan Google" berikon vector resmi dan tombol "Login Tester".
+               - Tampilan profil pengguna dengan avatar berputar 60fps (`AnimatedAvatarBorder`), pemilih preset border bergerak (Kitsune Flame, Neon Cyberpunk, Celestial Gold, Sakura Bloom, Void Abyss), riwayat tontonan lokal, dan opsi keluar akun.
+            3. **Perbaikan Randomisasi Cuplix:**
+               - Fungsi `getRandomizedCuplixFeed` cerdas yang menggabungkan feed populer dan terbaru serta melakukan pengacakan dinamis (shuffled).
+               - Memastikan klip yang diklik tetap diputar instan di index 0, sementara sisa feed dan baris avatar Cuplix di Home/Jadwal selalu menampilkan anime yang bervariasi.
+            4. **Perubahan Package Name (`com.yuranime.dinz`):**
+               - Migrasi seluruh namespace, applicationId, manifest, struktur direktori kode, dan ProGuard menjadi `com.yuranime.dinz`.
           draft: false
           prerelease: false
           make_latest: true
           files: |
-            build-output/Yuranime-v1.8.0.apk
+            build-output/Yuranime-v1.9.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

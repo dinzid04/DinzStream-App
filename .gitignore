@@ -14,6 +14,7 @@ app/build/
 reff_ui/
 design/
 *.jpg
+!app/src/main/res/**/*.jpg
 *.png
 !app/src/main/res/**/*.png
 *.mp4
