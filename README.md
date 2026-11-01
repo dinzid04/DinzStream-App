@@ -1,33 +1,47 @@
-# AnimeIn - Native Android (Jetpack Compose)
+# Yuranime - Tempat Nonton Anime Subtitle Indonesia
 
-Aplikasi streaming anime dan video pendek Cuplix native Android yang dibangun menggunakan **Kotlin**, **Jetpack Compose**, **Material 3**, serta mematuhi aturan kebersihan desain dari `.agents/skills/anti-slop/SKILL.md` dan [`DESIGN.md`](./DESIGN.md).
+![Yuranime Banner](https://raw.githubusercontent.com/dinzid04/DinzStream-App/main/app/src/main/res/drawable/poster_login_01.jpg)
+
+> Nikmati pengalaman streaming anime terbaik dan terlengkap dengan kualitas tinggi, bebas hambatan, serta antarmuka modern yang nyaman bagi para penikmat anime Indonesia.
 
 ---
 
-## Fitur & Arsitektur Layar
+## Pembaruan Terbaru Versi 1.9.1
 
-### 1. Halaman Home
-* **Top Promo Banner:** Banner horizontal `16:9` / `21:9` dengan sudut membulat modern (`rounded-xl`).
-* **Section Lanjut Nonton:** Riwayat tontonan dengan tombol `>` dan progress bar pemutaran.
-* **Section Cuplix:** Avatar baris lingkaran dengan border ring tipis oranye `#FF5722` untuk cuplikan video pendek.
-* **Section Episode Baru:** Kartu vertikal `2:3` dengan teks nomor episode oranye, judul putih tebal, metrik views (merah), dan favorites (kuning emas).
-* **Section Sedang Hangat:** Banner horizontal `16:9` dengan thumbnail vertikal di kiri, teks genre oranye, judul putih, serta metrik views & favorites.
-* **Section Judul Baru:** Katalog rilisan judul baru vertikal `2:3`.
-* **Section Jadwal Hari Ini:** Kartu anime dengan badge jam tayang ungu `#A855F7`.
-* **Section Jat For Yu:** Rekomendasi anime kurasi dalam format kartu landscape `16:9`.
-* **Section Paling Dinanti:** Rilisan mendatang dengan badge tanggal rilis biru `#3B82F6`.
-* **Section Paling Populer:** Anime terpopuler dengan metrik views & favorites.
-* **Section Baca Manre:** Katalog komik / manhwa dengan statistik pembaca merah.
-* **Bottom Navigation Bar:** 5 Tab presisi (`Home`, `Jadwal`, `Cari`, `Chat`, `Profil`) dengan touch target minimal 48dp.
+Aplikasi **Yuranime** kini hadir dengan pembaruan besar yang meningkatkan kenyamanan, estetika, dan stabilitas:
 
-### 2. Halaman Detail Anime (Anime Detail Screen)
-* **Hero Cover Header:** Cover landscape di atas dengan gradasi hitam halus, tombol Back, pill status `ONGOING`, pill tipe `SERIES`, tombol bintang favorit, tombol share, serta tombol Play episode terbaru.
-* **Scrollable TabBar (8 Tab):**
-  1. `INFO`: Poster 2:3, judul utama, judul alternatif, sinopsis lengkap, tipe, tanggal rilis, studio, badge kategori genre, dan FAB edit.
-  2. `EPISODE`: Grid 3 kolom dengan pita merah `NEW` dan placeholder logo serigala AnimeIn (`ic_wolf_logo`).
-  3. `SEASON`: Daftar vertikal kartu 16:9 untuk setiap season, OVA, atau kolaborasi terkait.
-  4. `DISCUSSION`: Diskusi komunitas pengguna dengan timestamp dan avatar.
-  5. `CUPLIX`: Grid 3 kolom video cuplikan pendek khusus anime tersebut dengan indikator jumlah suka (`♡`).
-  6. `POSTER`: Galeri poster vertikal kiriman pengguna dengan poin `P` dan upvote `▲`.
-  7. `COVER`: Galeri cover landscape kiriman komunitas pengguna dengan info kontributor.
-  8. `CONTRIBUTOR`: Papan peringkat kontributor dengan total poin, penayangan, dan suka.
+### 1. In-App Update Notification Popup
+- **Pengecekan Otomatis:** Sistem mendeteksi versi SemVer terbaru secara otomatis saat aplikasi dibuka.
+- **Desain iOS Dark Frosted Glassmorphism:** Dialog pop-up elegan dengan overlay buram semi-transparan dan sudut membulat modern.
+- **Custom Markdown & Image Renderer:** Menampilkan catatan rilis lengkap beserta gambar pratinjau, teks kutipan beraksen oranye, dan tautan biru yang dapat diklik langsung.
+- **Tombol Aksi Cepat:** Unduh langsung file APK rilis terbaru melalui tombol **Update Sekarang**.
+
+---
+
+### 2. Tampilan Baru Halaman Login Sinematik
+- **Navigasi Bersih:** Bottom Navigation Bar disembunyikan sepenuhnya di layar Login.
+- **Tombol Kembali:** Ikon panah di pojok kanan atas untuk langsung kembali ke Beranda Utama.
+- **Ikon Rubah Transparan:** Logo serigala/rubah putih kini 100% transparan tanpa bulatan hitam dan diposisikan seimbang di bagian atas.
+- **Kolase Poster Bergerak:** Tiga kolom poster bergerak vertikal lebih perlahan, lebih rapat, dan bersiklus tak terbatas tanpa glitch.
+
+---
+
+### 3. Halaman Profil Eksklusif
+- **Header Landscape Anime:** Menampilkan banner anime dengan gradasi gelap menyatu ke latar utama.
+- **Avatar & Badge:** Foto profil bulat ber-border oranye dengan lencana kamera biru untuk kustomisasi instan.
+- **Akses Komunitas:** Deretan tombol kapsul media sosial resmi (**WhatsApp**, **Telegram**, **Instagram**, **TikTok**, dan **Discord**).
+- **Menu Pilihan Lengkap:**
+  - **Edit Profil:** Kustomisasi nama pengguna, foto avatar, dan cover banner.
+  - **Unduh:** Kelola daftar anime yang tersimpan secara offline.
+  - **Papan Peringkat:** Pantau ranking penonton bulanan (**TOP 100**).
+  - **Points & Rewards:** Check-in harian dan kumpulkan koin reward (**★ 60**).
+  - **Info Cerita Kami:** Informasi pengembang dan tombol cek pembaruan aplikasi.
+  - **Keluar / Logout:** Keluar akun dengan aman.
+
+---
+
+## Tautan Resmi & Komunitas
+
+- **Download APK Terbaru:** [Unduh di GitHub Releases](https://github.com/dinzid04/DinzStream-App/releases)
+- **Repositori Proyek:** [GitHub dinzid04/DinzStream-App](https://github.com/dinzid04/DinzStream-App)
+- **Website Resmi:** [Kunjungi Portal Yuranime](https://github.com/dinzid04/DinzStream-App)

@@ -1,91 +1,115 @@
-# Spesifikasi Desain & Panduan Eksekusi Yuranime (Single Source of Truth)
+# Spesifikasi Desain & Panduan Pembaruan Yuranime (Single Source of Truth)
 
-Dokumen ini adalah acuan spesifikasi desain dan teknis aplikasi **Yuranime** di `/storage/emulated/0/termux/Workspace_uiApp/` berdasarkan inspeksi menyeluruh pada folder referensi `/storage/emulated/0/termux/design/reff/` dan kepatuhan penuh terhadap aturan `.agents/skills/anti-slop/SKILL.md`.
+Dokumen ini adalah acuan spesifikasi desain dan teknis aplikasi **Yuranime (`com.yuranime.dinz`)** di `/storage/emulated/0/termux/Workspace_uiApp/` berdasarkan gambar referensi terbaru pada `/storage/emulated/0/termux/design/reff/` dan kepatuhan penuh terhadap aturan `.agents/skills/anti-slop/SKILL.md`.
 
 ---
 
 ## 1. Identitas Brand, Tipografi & Parameter Desain (Anti-Slop Direction)
 
-- **Design Read:** Platform streaming anime mobile native Android untuk penonton Indonesia bergaya dark sinematik dengan visual contrast tinggi, tanpa elemen template murahan (anti-slop). Dial parameter: `ENERGY 2 / RHYTHM 2 / MOTION 2`.
+- **Design Read:** Platform streaming anime mobile native Android untuk penonton Indonesia bergaya dark sinematik premium dengan sentuhan iOS Dark Glassmorphism, tanpa elemen template murahan (anti-slop). Dial parameter: `ENERGY 2 / RHYTHM 2 / MOTION 2`.
 - **Palet Warna Inti (R-01, R-29):**
-  - Background Utama: `#0B0B0B` (Layar Utama, Home, Splash & Video Player)
-  - Card Surface: `#12151C` / `#161B26` (Midnight Slate Surface)
-  - Aksen Brand: Crimson Red `#E11D48` / `#EF4444` / `#E23441` (Tombol Aksi Utama, Badge, Aksen Navigasi)
+  - Background Utama: `#0B0B0B` (Home, Splash, Video Player) & `#0E0F12` (Profile Screen)
+  - Card Surface / Menu Box: `#1A1C20` / `#161B26`
+  - Kontainer iOS Frosted Glassmorphism: `#CC1C1C1E` / `#D9242426` dengan border tipis `0.5.dp` `#26FFFFFF`
+  - Aksen Utama: Crimson Red `#E11D48` / `#EF4444`, iOS Blue `#0A84FF` / `#3B82F6`, Orange `#F97316`
   - Teks Utama: `#FFFFFF` (Putih Bersih)
-  - Teks Sekunder: `#CBD5E1` / `#94A3B8` (Abu-abu terang untuk sinopsis & metadata)
-  - Tombol Google: Background `#FFFFFF` dengan teks `#111827` dan logo Google 4-warna asli.
+  - Teks Sekunder: `#CBD5E1` / `#94A3B8` / `#E5E5EA`
 - **Tipografi Resmi (R-06):**
-  - Brand Wordmark & Judul Slider Home: **`Yuranime-logo-font.ttf`** (**Calistoga-Regular**) yang menyatu dengan identitas brand Yuranime.
-  - UI Umum, Navigasi, Metadata & Sinopsis: **SF Pro Display** (`Regular`, `Medium`, `SemiBold`, `Bold`).
+  - Brand Wordmark: **`Yuranime-logo-font.ttf`** (**Calistoga-Regular**)
+  - UI Umum, Navigasi, Menu & Markdown: **SF Pro Display** (`Regular`, `Medium`, `SemiBold`, `Bold`)
 
 ---
 
-## 2. SPESIFIKASI TAHAP 1: Package Name `com.yuranime.dinz`
-- `namespace` dan `applicationId` pada `app/build.gradle.kts` adalah **`com.yuranime.dinz`**.
-- Seluruh file Kotlin, konfigurasi AndroidManifest, dan aturan ProGuard berada di dalam package `com.yuranime.dinz` tanpa menyisakan dependensi lama `com.dinz.animein`.
-- Versi aplikasi: `versionCode = 6`, `versionName = "1.9.0"`.
+## 2. SPESIFIKASI FITUR 1: In-App Update Notification Popup (iOS Blurred Style + Full GitHub README & Image Renderer)
+
+Mengacu pada struktur referensi kartu `/storage/emulated/0/termux/design/reff/6a2395898afdd4a30a15119b92cca46c.jpg` dipadukan dengan gaya visual iOS Dark Glassmorphism.
+
+### A. Deteksi Versi Semver Otomatis (`UpdateChecker`)
+1. Mengambil data rilis terbaru dari GitHub API repositori `dinzid04/DinzStream-App`:
+   - Endpoint: `https://api.github.com/repos/dinzid04/DinzStream-App/releases/latest`
+   - Ambil `tag_name`, `name`, `body`, dan URL file `.apk` pada `assets`.
+2. Bandingkan versi yang terpasang (`BuildConfig.VERSION_NAME`, misal `1.9.0`) dengan versi di GitHub (`tag_name`, misal `v1.9.0-build-17` atau `v1.9.1` atau `v2.0.0`):
+   - Parsing semver (Major.Minor.Patch serta build counter).
+   - Jika versi GitHub lebih tinggi atau terdapat rilis baru, otomatis munculkan **Update Notification Dialog**.
+
+### B. Desain Popup Bergaya iOS Frosted Glassmorphism
+1. **Dialog Overlay & Card:**
+   - Card container berbentuk membulat elegan (`RoundedCornerShape(22.dp)`).
+   - Latar belakang dark frosted glass (`#CC1C1C1E` / `#D9242426`) dengan border putih tipis `0.5.dp` (`#26FFFFFF`).
+   - Lebar dialog proporsional (maksimal `360.dp` - `380.dp`) di tengah layar dengan background scrim semi-transparan buram.
+2. **Struktur Konten:**
+   - **Header Atas:** Ikon ilustrasi roket / update badge modern, teks judul **"Pembaruan Tersedia"** atau **"Update Notice"** (SF Bold Putih `18.sp`), teks versi rilis baru (pill oranye/biru), serta tombol silang (close) di pojok kanan atas.
+   - **Area Konten Tengah (Scrollable):** Dapat di-scroll vertikal halus (`rememberScrollState`), menampilkan isi catatan rilis atau `README.md` repositori yang di-render secara rapi.
+   - **Pembatas:** Garis horizontal tipis `0.5.dp` (`#26FFFFFF`) di atas tombol aksi.
+   - **Tombol Aksi Bawah:** Tombol penuh bergaya iOS dengan teks **"Update Sekarang"** (SF Bold Putih), berlatar Crimson Red / iOS Blue (`#0A84FF`), yang membuka browser atau intent unduh file `.apk` terbaru secara langsung.
+
+### C. Custom Markdown & README Renderer (Wajib Render Gambar, Simbol & Link Biru)
+1. **Render Gambar Otomatis:**
+   - Sintaks Markdown `![alt](url)` atau `<img src="url">` diproses dan di-render menjadi komponen `AsyncImage` Coil asli:
+   - Sudut gambar membulat `10.dp`, scale fit/crop rapi, dengan fallback placeholder `R.drawable.ic_yuranime_monochrome`.
+2. **Konversi Simbol Markdown Menjadi Visual Rapi:**
+   - `##` / `###` (Heading): Teks judul tebal (**SF Bold Putih** `15.sp` - `17.sp`) dengan garis aksen tipis di bawahnya.
+   - `*` atau `-` (Bullet list): Baris item rapi dengan titik bulat kecil (`CircleShape` aksen merah/biru) di sebelah kiri dan teks rapi di kanan.
+   - `>` (Blockquote): Kotak kutipan dengan padding dalam, latar gelap semi-transparan, dan garis vertikal tebal di sisi kiri (aksen oranye `#F97316` atau biru `#0A84FF`) tanpa menampilkan karakter `>`.
+   - `**teks**`: Dirender tebal (**SF Bold Putih**).
+   - `---` / `***`: Dirender sebagai `HorizontalDivider(thickness = 0.5.dp, color = Color(0x26FFFFFF))`.
+3. **Teks URL Berwarna Biru & Bisa Diklik:**
+   - Semua format URL (`https://...` atau `[teks](url)`) dirender dengan warna Biru iOS (`#0A84FF`), bergaris bawah halus, dan dapat diklik untuk membuka tautan via `Intent(Intent.ACTION_VIEW, Uri.parse(url))`.
 
 ---
 
-## 3. SPESIFIKASI TAHAP 2: Hero Slider Home & Motion Graphics Logo Header
-*Mengacu pada tangkapan layar `/storage/emulated/0/termux/design/reff/Proyek Baru 157 [BD62D8D].png` & logo vector di `/storage/emulated/0/termux/design/reff/`*
+## 3. SPESIFIKASI FITUR 2: Perbaikan Total Halaman Login
 
-### A. Animasi Motion Graphics Berkala pada Logo Header (Pojok Kiri Atas)
-1. **Pemisahan Layer:**
-   - Layer 1: **Ikon Serigala/Rubah + Busur Merah** (`ic_splash_wolf_white`, `ic_splash_red_arc_left`, `ic_splash_red_arc_right`, `ic_splash_play_triangle`).
-   - Layer 2: **Teks `Yuranime`** menggunakan `Yuranime-logo-font.ttf` (`Calistoga-Regular`).
-2. **Siklus Animasi Teratur & Tenang via `LaunchedEffect`:**
-   - **Siklus Awal:** Teks `Yuranime` muncul keluar dari balik ikon rubah dengan gerakan *slide* ke kanan (`translationX` + `alpha` + `clipToBounds`) langsung disusul sapuan kilau cahaya (*linear gradient shimmer sweep*) yang melintas di permukaan teks. Setelah itu masuk ke **jeda tenang selama ~4–5 detik**.
-   - **Siklus Berkala Berikutnya (Animasi Ikon disusul Teks):**
-     1. Teks `Yuranime` ditarik/disembunyikan masuk kembali ke balik ikon rubah (`alpha -> 0f`, `translationX -> 0f`).
-     2. Jalankan animasi *motion graphics* pada **Ikon Rubah & Busur Merah**: dua busur merah berputar menyapu lingkaran (sweep rotation 360°) dan siluet rubah melakukan animasi *scale pulse* yang halus (1.0f -> 1.08f -> 1.0f).
-     3. Begitu animasi ikon selesai, teks `Yuranime` **ngeslide keluar ke arah kanan** dari balik ikon rubah, diikuti sapuan **efek cahaya mengkilap (*glossy shimmer*)**, lalu kembali ke **jeda tenang selama ~4–5 detik**.
+Mengacu pada screenshot evaluasi `/storage/emulated/0/termux/design/reff/Screenshot_20261101_220141_Yuranime.jpg`.
 
-### B. Desain Baru Hero Slider
-1. **Background Cover:**
-   - Menampilkan gambar cover anime secara lebar dengan *overlay* gelap tingkat **sedang** (tidak hitam pekat di tengah, memakai vignette sedang dan gradasi halus ke `#0B0B0B` di batas bawah agar gambar cover tetap hidup).
-2. **Poster di Pojok Kiri Bawah:**
-   - Kartu poster vertikal rasio `2:3` (`aspectRatio(2f/3f)`), sudut membulat `10.dp`, lebar `105.dp`–`115.dp`, ditempatkan di pojok kiri bawah.
-3. **Kolom Informasi di Sebelah Kanan Poster:**
-   - Disusun dalam `Row` dengan `Alignment.Bottom`.
-   - **Pembatas Ketinggian:** Kolom teks kanan dibatasi agar **TIDAK PERNAH melewati batas atas gambar Poster** (`Modifier.heightIn(max = posterHeight)`).
-   - **Judul Anime:** Menggunakan font **`Yuranime-logo-font.ttf`** (**Calistoga-Regular**) warna putih bersih. Jika judul pendek (seperti `ONE PIECE`), tampil 1 baris. Jika panjang, otomatis menyesuaikan ukuran (`20.sp`–`26.sp`, `maxLines = 2`) dengan bagian atas teks tetap berada di bawah/sejajar dengan batas atas poster.
-   - **Sinopsis Singkat:** Di bawah judul, sinopsis ringkas (`maxLines = 2` atau `3`, `overflow = TextOverflow.Ellipsis`, font SF Regular/Medium `12.sp`–`13.sp`, warna `#CBD5E1`).
-   - **Baris Bawah (Tombol CTA + Indikator Slide):**
-     - Sisi Kiri: Tombol kapsul merah menyala (`#E11D48` / `#EF4444`) berisi ikon play putih di dalam lingkaran dan teks **`TONTON SEKARANG`** (SF Bold putih). Klik tombol langsung menuju **Halaman Detail Anime** (`onAnimeClick(anime.id)`).
-     - Sisi Kanan: Indikator paginasi titik slide sejajar dengan tombol (titik aktif berupa kapsul putih memanjang, titik lainnya bulat abu-abu).
+1. **Sembunyikan Bottom Navigation Bar:**
+   - Saat pengguna belum login dan berada di layar Login (`!isLoggedIn`), **SEMBUNYIKAN sepenuhnya Bottom Navigation Bar**. Jangan ada ruang kosong maupun tab navbar yang terlihat.
+2. **Ikon Panah Kembali di Pojok Kanan Atas:**
+   - Di pojok kanan atas layar Login (dengan status bar padding yang aman), sediakan tombol ikon panah kembali (`Icons.AutoMirrored.Filled.ArrowForward` atau `Icons.Default.ArrowForward` / tombol `✕` / panah kembali bersih) yang saat diklik langsung mengarahkan pengguna kembali ke **Beranda Utama (`HomeScreen`)**.
+3. **Perbaiki Ikon Rubah & Posisi Teks `YURANIME`:**
+   - **Hapus Background Hitam:** Hilangkan background lingkaran hitam pada ikon rubah. Latar belakang ikon menjadi 100% transparan menyatu dengan poster overlay.
+   - **Perbesar Ukuran Ikon:** Gunakan ukuran ikon rubah putih `84.dp` (menggunakan `ic_yuranime_monochrome` berkualitas tinggi).
+   - **Geser Posisi ke Atas:** Posisikan keseluruhan grup (Ikon Rubah + Teks `YURANIME` + Subteks "Tempat Nonton Anime Subtitle Indonesia") di sekitar posisi 28% - 32% dari atas layar, menghasilkan komposisi visual yang seimbang dan tidak tenggelam ke tengah.
+4. **Perbaiki Kolase Poster Bergerak:**
+   - **Perlambat Kecepatan:** Kecepatan *auto-scroll* vertikal diperlambat secara signifikan agar pergerakan poster tenang, halus, dan sinematik.
+   - **Rapatkan Jarak Poster:** Jarak horizontal dan vertikal antar poster dirapatkan menggunakan `Arrangement.spacedBy(8.dp)`.
+   - **True Seamless Infinite Loop (Anti-Glitch):** Implementasikan infinite scroll menggunakan indeks modulo virtual berulang tanpa lompatan atau glitch saat loop berjalan.
 
 ---
 
-## 4. SPESIFIKASI TAHAP 3: Halaman Login Saat Klik `PROFILE` di Bottom Navbar
-*Mengacu pada video referensi `/storage/emulated/0/termux/design/reff/VID-20261101-WA0035.mp4` dan aset poster di `/storage/emulated/0/termux/design/reff/poster/`*
+## 4. SPESIFIKASI FITUR 3: Pembuatan Halaman Profile Setelah Login
 
-1. **Background Kolase Poster Anime Bergerak Naik-Turun:**
-   - Menggunakan 12 poster offline dari `/storage/emulated/0/termux/design/reff/poster/` (`anime_01.jpg` s/d `anime_12.jpg`) yang disimpan di drawable / assets.
-   - 3 kolom *grid* poster dengan sudut kemiringan diagonal halus (`graphicsLayer { rotationZ = -12f; scaleX = 1.25f; scaleY = 1.25f }`).
-   - Pergerakan *infinite auto-scroll* perlahan: kolom kiri & kanan bergerak ke atas, kolom tengah bergerak ke bawah persis seperti video referensi.
-   - Lapisan *gradient overlay* gelap di atasnya (semi-transparan di atas dan tengah, lalu pekat `#0B0B0B` di bawah).
-2. **Logo Utama di Tengah-Atas:**
-   - Menampilkan logo lengkap **`yuranime-full-logo.svg`** / lockup emblem + Calistoga wordmark di posisi tengah-atas.
-3. **Komponen Tombol & Informasi di Bagian Bawah:**
-   - **Tombol Google:** Tombol kapsul penuh (`RoundedCornerShape(50)`, background **Putih `#FFFFFF`**, tinggi `52.dp`), berisi ikon Google vector 4-warna di kiri dan teks **`Masuk dengan Google`** (`#111827`, SF SemiBold/Bold) di tengah.
-   - **Tombol `Login Tanpa Akun`:** Tombol teks **`Login Tanpa Akun`** (menggantikan teks "Login Tester" di referensi, warna abu-abu terang `#9CA3AF`, SF Medium `14.sp`), memungkinkan pengguna masuk sebagai tamu.
-   - **Teks Persetujuan Layanan:** Teks terpusat menggunakan `buildAnnotatedString`:
-     `Dengan melanjutkan, kamu menyetujui Ketentuan Layanan dan Kebijakan Privasi` (di mana **Ketentuan Layanan** dan **Kebijakan Privasi** bergaris bawah `TextDecoration.Underline` dan berwarna putih terang).
-   - **Teks Versi Aplikasi:** Teks **`Versi 1.3.2`** (atau dari `BuildConfig.VERSION_NAME`) di paling bawah dengan warna abu-abu redup.
+Mengacu persis pada tangkapan layar desain `/storage/emulated/0/termux/design/reff/Screenshot_20261101_220757.jpg`.
+
+1. **Header Banner, Avatar, Nama & Level:**
+   - Bagian atas menampilkan **Cover/Banner Profil Landscape Anime** dengan gradasi halus menghitam ke warna background utama (`#0E0F12`) di batas bawah.
+   - Sisi kiri bawah banner: **Foto Profil Bulat** berukuran `78.dp` dengan border oranye tipis (`#F97316`) dan **badge ikon kamera biru kecil** (`#3B82F6`) di pojok kanan bawah avatar.
+   - Sisi kanan avatar: **Nama Pengguna** (font **SF Bold Putih** `20.sp`) diikuti **ikon pensil edit** di sebelahnya, serta teks status **`Lv. 1`** (warna abu-abu terang `#94A3B8`) tepat di bawah nama.
+2. **Baris Tombol Media Sosial (Scrollable Row):**
+   - Deretan kapsul (*pill buttons*) ber-border tipis dengan background `#161B22` transparan:
+     - **WhatsApp** (ikon & teks hijau `#25D366`)
+     - **Telegram** (ikon & teks biru `#38BDF8`)
+     - **Instagram** (ikon & teks pink kemerahan `#E1306C`)
+     - **TikTok** (ikon & teks putih bersih `#FFFFFF`)
+     - **Discord** (ikon & teks ungu kebiruan `#5865F2`)
+   - Setiap tombol dapat diklik untuk membuka tautan sosial media resmi Yuranime atau browser.
+3. **Daftar Menu Profil (Hanya Menu Pilihan Sesuai Permintaan):**
+   - **HAPUS / JANGAN TAMPILKAN:** `Berlangganan`, `Nonton Bareng`, `Squad`, `Giveaway`, dan `Event`.
+   - **TAMPILKAN 5 MENU UTAMA + LOGOUT:**
+     Desain menu menggunakan ikon dalam kotak membulat gelap (`#1A1C20`) di kiri, teks judul **SF SemiBold Putih** `15.sp` + deskripsi abu-abu di tengah, dan aksen/indikator di kanan:
+     1. **`Edit Profil`** (Ikon Pensil) : Sub-teks *"Ganti Foto atau Cover"* (kanan: chevron `>`). Membuka dialog interaktif untuk mengganti nama pengguna, foto avatar, atau banner cover profil secara langsung dan tersimpan di database lokal.
+     2. **`Unduh`** (Ikon Download) : Sub-teks *"Kelola konten yang diunduh"* (kanan: chevron `>`).
+     3. **`Papan Peringkat`** (Ikon Trophy) : Sub-teks *"Lihat peringkat XP bulanan"* (kanan: badge pill biru **`TOP 100`**).
+     4. **`Points & Rewards`** (Ikon Bintang) : Sub-teks *"Check-in harian & tukar poin"* (kanan: badge pill kuning emas **`★ 60`**).
+     5. **`Info`** (Ikon Info) : Sub-teks *"Simak Cerita Kami"* (kanan: chevron `>`).
+     6. **`Keluar dari Akun / Logout`** (Ikon Logout Merah) : Opsi keluar akun yang rapi di bagian bawah yang mengembalikan status sesi menjadi belum login dan berpindah ke layar Login.
+4. **Bottom Navigation Bar Tetap Ditampilkan:**
+   - Saat pengguna berada di `ProfileScreen` dalam keadaan sudah login, Bottom Navigation Bar tetap aktif di bagian bawah layar.
 
 ---
 
-## 5. SPESIFIKASI TAHAP 4: Perbaikan Randomisasi `Cuplix` di Home, Jadwal, dan Search
-1. **Independensi Antar Halaman:**
-   - Daftar Cuplix di **Home Screen**, **Jadwal Screen**, dan **Search Screen** tidak boleh sama persis. Masing-masing memuat batch atau variasi acak yang berbeda.
-2. **Selalu Berganti Saat Refresh & Saat Buka Ulang Aplikasi:**
-   - Tidak ada hard-cache urutan Cuplix statis.
-   - Setiap kali *pull-to-refresh* atau saat aplikasi dibuka kembali, feed Cuplix diambil dengan pengacakan dinamis (`.shuffled()`) yang menggabungkan variasi video terbaru dan populer.
+## 5. SPESIFIKASI FITUR 4: Verifikasi Build, Release & GitHub Actions
 
----
-
-## 6. SPESIFIKASI TAHAP 5: Verifikasi Build, Release & CI/CD
-- Repositori bersih tanpa file video besar (video tetap diabaikan oleh `.gitignore`).
-- Commit dan push ke remote `dinzid04/DinzStream-App` di GitHub.
-- GitHub Actions workflow build release menghasilkan `Yuranime-v1.9.0.apk` yang terverifikasi sukses.
+1. Kode ter-compile bersih tanpa error melalui Gradle.
+2. Commit dan push dilakukan dari direktori `/storage/emulated/0/termux/Workspace_uiApp/` ke repositori `dinzid04/DinzStream-App`.
+3. Pantau workflow GitHub Actions hingga berstatus **Success (Hijau)** dan rilis `.apk` terbaru siap diunduh.

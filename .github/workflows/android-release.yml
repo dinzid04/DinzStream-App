@@ -37,46 +37,50 @@ jobs:
         run: |
           mkdir -p build-output
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk build-output/Yuranime-v1.9.0.apk
+            cp app/build/outputs/apk/release/app-release.apk build-output/Yuranime-v1.9.1.apk
           elif [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
-            cp app/build/outputs/apk/debug/app-debug.apk build-output/Yuranime-v1.9.0.apk
+            cp app/build/outputs/apk/debug/app-debug.apk build-output/Yuranime-v1.9.1.apk
           else
-            find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-output/Yuranime-v1.9.0.apk \;
+            find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-output/Yuranime-v1.9.1.apk \;
           fi
-          ls -lh build-output/Yuranime-v1.9.0.apk
+          ls -lh build-output/Yuranime-v1.9.1.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Yuranime-APK
-          path: build-output/Yuranime-v1.9.0.apk
+          path: build-output/Yuranime-v1.9.1.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.event_name != 'pull_request'
         with:
-          tag_name: "v1.9.0-build-${{ github.run_number }}"
-          name: "Yuranime v1.9.0 - Home Slider, Logo Animation, Cinematic Login & Cuplix Randomizer (Build #${{ github.run_number }})"
+          tag_name: "v1.9.1-build-${{ github.run_number }}"
+          name: "Yuranime v1.9.1 - In-App Update Notice, New Login Experience & Profile Screen (Build #${{ github.run_number }})"
           body: |
-            ## Yuranime Android App v1.9.0 Release
+            ## Yuranime Android App v1.9.1 Release
 
             ### Pembaruan Utama:
-            1. **Perubahan UI Home Slider & Animasi Logo:**
-               - Hero Slider gaya baru dengan poster vertikal di sisi kiri, judul bold uppercase, sinopsis rapi, tombol CTA "TONTON SEKARANG" merah Yuranime, dan indikator paginasi horizontal.
-               - Header Logo Animasi (`YuranimeAnimatedLogo`) dengan transisi busur merah rotasi 360° saat layar dimuat serta efek sentuhan mikro (spring bounce + arc rotation).
-            2. **Pembaruan Halaman Login (Profile):**
-               - Tampilan login sinematik dengan latar belakang 3 kolom poster anime tilted yang scrolling vertikal offline dari 12 poster lokal di drawable.
-               - Tombol masuk bersih "Masuk dengan Google" berikon vector resmi dan tombol "Login Tester".
-               - Tampilan profil pengguna dengan avatar berputar 60fps (`AnimatedAvatarBorder`), pemilih preset border bergerak (Kitsune Flame, Neon Cyberpunk, Celestial Gold, Sakura Bloom, Void Abyss), riwayat tontonan lokal, dan opsi keluar akun.
-            3. **Perbaikan Randomisasi Cuplix:**
-               - Fungsi `getRandomizedCuplixFeed` cerdas yang menggabungkan feed populer dan terbaru serta melakukan pengacakan dinamis (shuffled).
-               - Memastikan klip yang diklik tetap diputar instan di index 0, sementara sisa feed dan baris avatar Cuplix di Home/Jadwal selalu menampilkan anime yang bervariasi.
-            4. **Perubahan Package Name (`com.yuranime.dinz`):**
-               - Migrasi seluruh namespace, applicationId, manifest, struktur direktori kode, dan ProGuard menjadi `com.yuranime.dinz`.
+            1. **In-App Update Notification Popup (iOS Blurred Style + Full GitHub README & Image Renderer):**
+               - Pengecekan otomatis versi semver saat aplikasi dibuka membandingkan versi lokal dengan rilis GitHub.
+               - Dialog popup bergaya iOS Dark Frosted Glassmorphism dengan overlay hitam semi-transparan (`#CC1C1C1E` / `#D9242426`), border putih tipis `0.5.dp`, dan tipografi SF Bold & SF SemiBold.
+               - Custom Markdown & GitHub README renderer yang merender gambar (`AsyncImage` dengan rounded corner `10.dp`), heading dengan aksen pembatas, bullet list titik bulat, blockquote dengan aksen oranye vertikal, format tebal, dan teks URL biru iOS (`#0A84FF`) yang bisa diklik.
+               - Tombol aksi penuh bergaya iOS "Update Sekarang" yang langsung mengunduh/membuka file APK terbaru.
+            2. **Perbaikan Total Halaman Login:**
+               - Bottom Navigation Bar disembunyikan sepenuhnya saat pengguna berada di halaman login.
+               - Tombol ikon panah kembali ke beranda di pojok kanan atas dengan jarak aman status bar.
+               - Ikon rubah diperbesar dan berlatar belakang 100% transparan (tanpa bulatan hitam) serta digeser ke posisi sekitar 28%-32% dari atas layar.
+               - Kolase poster bergerak lebih lambat, lebih rapat (`Arrangement.spacedBy(8.dp)`), dan True Seamless Infinite Loop (anti-glitch).
+            3. **Pembuatan Halaman Profile Setelah Login:**
+               - Header banner landscape anime dengan gradasi gelap menyatu ke latar utama (`#0E0F12`).
+               - Foto profil bulat dengan border oranye tipis dan badge kamera biru di pojok kanan bawah.
+               - Nama pengguna dengan ikon pensil edit serta teks level pengguna `Lv. 1`.
+               - Baris scrollable tombol media sosial: WhatsApp (hijau), Telegram (biru), Instagram (pink), TikTok (putih), Discord (ungu-kebiruan).
+               - 5 Menu profil bersih: Edit Profil (interaktif), Unduh, Papan Peringkat (TOP 100), Points & Rewards (★ 60), Info Cerita Kami (+ Cek Pembaruan), dan Keluar / Logout.
           draft: false
           prerelease: false
           make_latest: true
           files: |
-            build-output/Yuranime-v1.9.0.apk
+            build-output/Yuranime-v1.9.1.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

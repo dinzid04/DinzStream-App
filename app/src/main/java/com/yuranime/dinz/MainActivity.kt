@@ -12,15 +12,19 @@ import androidx.core.view.WindowCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.yuranime.dinz.data.model.CuplixItem
+import com.yuranime.dinz.data.update.AppUpdateInfo
+import com.yuranime.dinz.data.update.UpdateChecker
 import com.yuranime.dinz.ui.components.NavTab
 import com.yuranime.dinz.ui.cuplix.CuplixViewScreen
 import com.yuranime.dinz.ui.detail.AnimeDetailScreen
@@ -33,6 +37,8 @@ import com.yuranime.dinz.ui.splash.YuranimeSplashScreen
 import com.yuranime.dinz.ui.streaming.StreamingScreen
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
 import com.yuranime.dinz.ui.theme.YuranimeTheme
+import com.yuranime.dinz.ui.update.UpdateNoticeDialog
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -60,12 +66,26 @@ class MainActivity : ComponentActivity() {
                 ) {
                     // Preload Home data in the background while the motion splash screen runs
                     val homeViewModel: HomeViewModel = viewModel()
+                    val scope = rememberCoroutineScope()
                     var showSplash by rememberSaveable { mutableStateOf(true) }
                     var selectedAnimeId by remember { mutableStateOf<String?>(null) }
                     var selectedStreamingEpisodeId by remember { mutableStateOf<String?>(null) }
                     var selectedStreamingMovieId by remember { mutableStateOf<String?>(null) }
                     var selectedCuplixItem by remember { mutableStateOf<CuplixItem?>(null) }
                     var currentTab by remember { mutableStateOf(NavTab.HOME) }
+                    var pendingUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
+
+                    // TAHAP 1: Pengecekan versi SemVer otomatis saat aplikasi dibuka
+                    LaunchedEffect(Unit) {
+                        try {
+                            val info = UpdateChecker.checkUpdate(BuildConfig.VERSION_NAME)
+                            if (info != null && info.isUpdateAvailable) {
+                                pendingUpdateInfo = info
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         when {
@@ -202,6 +222,17 @@ class MainActivity : ComponentActivity() {
                                             onEpisodeClick = { epId, mId ->
                                                 selectedStreamingMovieId = mId
                                                 selectedStreamingEpisodeId = epId
+                                            },
+                                            onCheckUpdateClick = {
+                                                scope.launch {
+                                                    Toast.makeText(this@MainActivity, "Memeriksa pembaruan...", Toast.LENGTH_SHORT).show()
+                                                    val info = UpdateChecker.checkUpdate(BuildConfig.VERSION_NAME, forceCheck = true)
+                                                    if (info != null) {
+                                                        pendingUpdateInfo = info
+                                                    } else {
+                                                        Toast.makeText(this@MainActivity, "Gagal memeriksa pembaruan", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
                                             }
                                         )
                                     }
@@ -210,6 +241,14 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
+                        }
+
+                        // Dialog Pembaruan Otomatis Bergaya iOS Frosted Glassmorphism
+                        if (pendingUpdateInfo != null) {
+                            UpdateNoticeDialog(
+                                updateInfo = pendingUpdateInfo!!,
+                                onDismiss = { pendingUpdateInfo = null }
+                            )
                         }
 
                         if (showSplash) {

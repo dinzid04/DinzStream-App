@@ -72,7 +72,7 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
         return prefs.getBoolean("is_logged_in", false)
     }
 
-    fun setLoggedIn(loggedIn: Boolean, username: String = "UserYuranime") {
+    fun setLoggedIn(loggedIn: Boolean, username: String = "Gading Kencana") {
         prefs.edit()
             .putBoolean("is_logged_in", loggedIn)
             .putString("username", username)
@@ -80,7 +80,56 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
     }
 
     fun getUsername(): String {
-        return prefs.getString("username", "UserYuranime") ?: "UserYuranime"
+        return prefs.getString("username", "Gading Kencana") ?: "Gading Kencana"
+    }
+
+    fun setUsername(username: String) {
+        prefs.edit().putString("username", username).apply()
+    }
+
+    fun getAvatarUrl(): String {
+        return prefs.getString("avatar_url", "") ?: ""
+    }
+
+    fun setAvatarUrl(url: String) {
+        prefs.edit().putString("avatar_url", url).apply()
+    }
+
+    fun getCoverUrl(): String {
+        return prefs.getString("cover_url", "") ?: ""
+    }
+
+    fun setCoverUrl(url: String) {
+        prefs.edit().putString("cover_url", url).apply()
+    }
+
+    fun getUserLevel(): Int {
+        return prefs.getInt("user_level", 1)
+    }
+
+    fun getUserCoins(): Int {
+        return prefs.getInt("user_coins", 60)
+    }
+
+    fun addCoins(amount: Int) {
+        val current = getUserCoins()
+        prefs.edit().putInt("user_coins", current + amount).apply()
+    }
+
+    fun isDailyCheckedIn(): Boolean {
+        val lastCheckIn = prefs.getLong("last_check_in_date", 0L)
+        val now = System.currentTimeMillis()
+        // Cek dalam 24 jam terakhir
+        return (now - lastCheckIn) < (24L * 60 * 60 * 1000)
+    }
+
+    fun performDailyCheckIn(): Boolean {
+        if (isDailyCheckedIn()) return false
+        prefs.edit()
+            .putLong("last_check_in_date", System.currentTimeMillis())
+            .apply()
+        addCoins(10)
+        return true
     }
 
     fun saveReaction(commentId: String, reaction: String) {
