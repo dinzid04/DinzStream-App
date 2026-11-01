@@ -75,6 +75,8 @@ fun AnimeWideCard(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(anime.getEffectivePoster())
                     .crossfade(true)
+                    .placeholder(R.drawable.placeholder_yuranime)
+                    .error(R.drawable.placeholder_yuranime)
                     .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,

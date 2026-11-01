@@ -300,6 +300,8 @@ private fun HeroCoverHeader(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(movie.getEffectiveCover())
                 .crossfade(true)
+                .placeholder(R.drawable.placeholder_yuranime_wide)
+                .error(R.drawable.placeholder_yuranime_wide)
                 .build(),
             contentDescription = movie.title,
             modifier = Modifier.fillMaxSize(),
@@ -522,6 +524,8 @@ private fun TabInfoContent(movie: MovieDetail) {
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(movie.getEffectivePoster())
                             .crossfade(true)
+                            .placeholder(R.drawable.placeholder_yuranime)
+                            .error(R.drawable.placeholder_yuranime)
                             .build(),
                         contentDescription = movie.title,
                         modifier = Modifier
@@ -795,6 +799,8 @@ private fun TabEpisodeContent(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(imageUrl)
                                     .crossfade(true)
+                                    .placeholder(R.drawable.placeholder_yuranime_wide)
+                                    .error(R.drawable.placeholder_yuranime_wide)
                                     .build(),
                                 contentDescription = ep.title,
                                 modifier = Modifier.fillMaxSize(),
@@ -807,7 +813,7 @@ private fun TabEpisodeContent(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    painter = painterResource(id = R.drawable.ic_wolf_logo),
+                                    painter = painterResource(id = R.drawable.ic_yuranime_monochrome),
                                     contentDescription = "Yuranime Kitsune Logo",
                                     tint = Color(0xFF6B7280),
                                     modifier = Modifier.size(36.dp)
@@ -907,6 +913,8 @@ private fun TabSeasonContent(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(season.getEffectiveCover())
                         .crossfade(true)
+                        .placeholder(R.drawable.placeholder_yuranime_wide)
+                        .error(R.drawable.placeholder_yuranime_wide)
                         .build(),
                     contentDescription = season.title,
                     modifier = Modifier.fillMaxSize(),
@@ -1070,6 +1078,8 @@ private fun TabPosterContent(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(imageUrl)
                         .crossfade(true)
+                        .placeholder(R.drawable.placeholder_yuranime)
+                        .error(R.drawable.placeholder_yuranime)
                         .build(),
                     contentDescription = "Poster",
                     modifier = Modifier.fillMaxSize(),
@@ -1111,6 +1121,8 @@ private fun TabCoverContent(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(imageUrl)
                         .crossfade(true)
+                        .placeholder(R.drawable.placeholder_yuranime_wide)
+                        .error(R.drawable.placeholder_yuranime_wide)
                         .build(),
                     contentDescription = "Cover",
                     modifier = Modifier.fillMaxSize(),

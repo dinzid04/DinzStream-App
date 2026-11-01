@@ -15,6 +15,11 @@ val SfProFontFamily = FontFamily(
     Font(R.font.sf_pro_display_bold, FontWeight.Bold)
 )
 
+// Calistoga Regular (from design/reff/Yuranime-logo-font.ttf) for the Yuranime Splash Screen wordmark
+val YuranimeLogoFontFamily = FontFamily(
+    Font(R.font.yuranime_logo_font, FontWeight.Normal)
+)
+
 val Typography = Typography(
     headlineSmall = TextStyle(
         fontFamily = SfProFontFamily,

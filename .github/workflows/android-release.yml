@@ -37,48 +37,44 @@ jobs:
         run: |
           mkdir -p build-output
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk build-output/Yuranime-v1.7.0.apk
+            cp app/build/outputs/apk/release/app-release.apk build-output/Yuranime-v1.8.0.apk
           elif [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
-            cp app/build/outputs/apk/debug/app-debug.apk build-output/Yuranime-v1.7.0.apk
+            cp app/build/outputs/apk/debug/app-debug.apk build-output/Yuranime-v1.8.0.apk
           else
-            find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-output/Yuranime-v1.7.0.apk \;
+            find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-output/Yuranime-v1.8.0.apk \;
           fi
-          ls -lh build-output/Yuranime-v1.7.0.apk
+          ls -lh build-output/Yuranime-v1.8.0.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Yuranime-APK
-          path: build-output/Yuranime-v1.7.0.apk
+          path: build-output/Yuranime-v1.8.0.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.event_name != 'pull_request'
         with:
-          tag_name: "v1.7.0-build-${{ github.run_number }}"
-          name: "Yuranime v1.7.0 - Critical Bug Fixes: Search Filter System, Cuplix Autoplay & Like/Comment Sync (Build #${{ github.run_number }})"
+          tag_name: "v1.8.0-build-${{ github.run_number }}"
+          name: "Yuranime v1.8.0 - Streaming Info Card, Monochrome Placeholder, App Icon & 60fps Motion Splash (Build #${{ github.run_number }})"
           body: |
-            ## Yuranime Android App v1.7.0 Release
+            ## Yuranime Android App v1.8.0 Release
 
-            ### 🚀 Perbaikan Bug Kritis & Peningkatan Fitur:
-            1. **Sistem Filter Search Terverifikasi AnimeIn APK (`classes7.dex`):**
-               - Endpoint khusus: `/3/2/explore/movie_genre` (`id_genre`, `genre_in`), `/3/2/explore/movie_studio` (`studio`), `/3/2/explore/movie_type` (`type`), `/3/2/explore/movie_year` (`year`), dan `/3/2/explore/movie` (`keyword`).
-               - Indikator Active Filter Chip di bagian atas dengan tombol `[✕]` untuk membatalkan filter secara elegan.
-               - Menyembunyikan "Rekomendasi Populer" saat filter aktif sehingga daftar anime yang tampil benar-benar murni hasil filter yang diklik.
-               - Mendukung pengurutan (`views`, `alphabet`, `new`), toggle tampilan Grid/List, serta pagination infinite scroll.
-            2. **Sinkronisasi Like & Komentar Cuplix:**
-               - Parsing field JSON asli: `@SerializedName("count_likes", alternate = ["likes", "like", "total_likes", "count_like"])` dan `@SerializedName("count_comments", alternate = ["comments", "comment", "total_comments", "count_comment"])`.
-               - Sinkronisasi realtime `commentsCountMap` dan `likesCountMap` di `CuplixViewModel` dengan data detail komentar yang dimuat di background agar tidak pernah menampilkan angka `0` jika terdapat komentar riil.
-            3. **Cuplix Seamless Autoplay & Zero-Black-Screen Crossfade:**
-               - Video cuplix otomatis langsung berputar saat halaman aktif (`playWhenReady = true; prepare(); play()`).
-               - Mengeliminasi kedipan layar hitam saat buffering/loading awal menggunakan `Player.Listener.onRenderedFirstFrame()` yang mempertahankan poster thumbnail menutupi `PlayerView` hingga frame video pertama siap, lalu melakukan transisi fade-out halus (`tween(300)`).
-            4. **Interaksi Cuplix di Detail Anime (`AnimeDetailScreen`):**
-               - Kartu Cuplix di tab CUPLIX kini sepenuhnya interaktif (`clickable { onCuplixClick(item.id) }`).
-               - Navigasi tersambung langsung ke `CuplixViewScreen` di `MainActivity` sehingga pengguna dapat langsung memutar video cuplix yang dipilih dari halaman detail anime.
+            ### Pembaruan Utama:
+            1. **Halaman Streaming - Kontainer Info Anime (`#12151C`):**
+               - Kontainer kartu `#12151C` (`12.dp` rounded) di bawah Video Player dan di atas `COVER & POSTER`.
+               - Baris atas: Poster vertikal (`2:3`, `80.dp`) di sisi kiri, serta Judul Anime (**SF Bold** putih) dan baris metadata (`Episode [Nomor]`, ikon mata + views singkat, dan kondisional `airedStart` dengan pemisah `•` hanya jika tanggal tersedia) di sisi kanan.
+               - Baris bawah: Sinopsis anime (`#94A3B8`, default 3 baris) dengan tombol interaktif `Selengkapnya >` / `Sembunyikan` berwarna biru (`#3B82F6`) untuk membuka atau menutup sinopsis penuh.
+            2. **Global SVG Placeholder (`yuranime-monochrome.svg`) & Launcher Icon (`yuranime-app-icon.svg`):**
+               - Konversi `yuranime-monochrome.svg` ke VectorDrawable `ic_yuranime_monochrome.xml`, `placeholder_yuranime.xml`, dan `placeholder_yuranime_wide.xml` di seluruh komponen `AsyncImage`.
+               - Pembaruan ikon aplikasi utama (`ic_launcher`, `ic_launcher_round`, adaptive foreground & background) menggunakan `yuranime-app-icon.svg`.
+            3. **Motion Graphics Splash Screen 60fps (`yuranime-full-logo.svg` + `Calistoga Regular`):**
+               - Ekstraksi layer independen: Segitiga Play Putih, Dua Busur Lingkaran Merah, Siluet Kepala Serigala/Rubah Putih, dan teks `Yuranime` (`yuranime_logo_font.ttf`).
+               - Sekuens 4 tahap (0ms - 2600ms) dengan preloading data Home di background dan transisi crossfade + scale menuju `HomeScreen`.
           draft: false
           prerelease: false
           make_latest: true
           files: |
-            build-output/Yuranime-v1.7.0.apk
+            build-output/Yuranime-v1.8.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -53,6 +54,7 @@ import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MoreVert
@@ -67,6 +69,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarOutline
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -116,7 +119,9 @@ import coil.compose.AsyncImage
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import coil.request.ImageRequest
+import com.dinz.animein.R
 import com.dinz.animein.data.local.LocalAuthDatabase
+import java.util.Locale
 import com.dinz.animein.data.model.CommunityMediaItem
 import com.dinz.animein.data.model.EpisodeCommentItem
 import com.dinz.animein.data.model.ServerItem
@@ -323,40 +328,159 @@ fun StreamingScreen(
                                     modifier = Modifier.fillMaxSize(),
                                     contentPadding = PaddingValues(bottom = 72.dp)
                                 ) {
-                                    // Episode Title, Anime Title & Synopsis (Matching IMG-20261031-WA0049 & DESIGN.md)
+                                    // Anime Info Surface Card (#12151C) directly below Player and above COVER & POSTER
                                     item(key = "episode_header") {
+                                        var isSynopsisExpanded by remember(uiState.episodeId, uiState.movieId) {
+                                            mutableStateOf(false)
+                                        }
+                                        val posterUrl = uiState.movieDetail?.movie?.getEffectivePoster()?.ifBlank { null }
+                                            ?: uiState.episode?.getEffectiveImage().orEmpty()
+                                        val realTitle = uiState.movieDetail?.movie?.title
+                                            ?: uiState.episode?.title?.substringBefore(" Episode")
+                                            ?: "Anime Streaming"
+                                        val episodeNumber = uiState.episode?.index ?: "1"
+                                        val shortViews = formatShortViews(
+                                            uiState.episode?.views?.ifBlank { null }
+                                                ?: uiState.movieDetail?.movie?.views
+                                        )
+                                        val formattedAiredStart = formatAiredStartDate(
+                                            uiState.movieDetail?.movie?.airedStart
+                                        )
+                                        val realSynopsis = uiState.movieDetail?.movie?.synopsis?.ifBlank { null }
+                                            ?: "Streaming anime episode terlengkap dengan kualitas jernih dan subtitle Indonesia resmi di platform Yuranime."
+
                                         Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                                                .padding(horizontal = 8.dp, vertical = 8.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(Color(0xFF12151C))
+                                                .animateContentSize()
+                                                .padding(horizontal = 14.dp, vertical = 14.dp)
                                         ) {
-                                            Text(
-                                                text = "Episode ${uiState.episode?.index ?: "1"}",
-                                                color = Color(0xFF9CA3AF),
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                            Spacer(modifier = Modifier.height(3.dp))
-                                            val realTitle = uiState.movieDetail?.movie?.title
-                                                ?: uiState.episode?.title?.substringBefore(" Episode")
-                                                ?: "Anime Streaming"
-                                            Text(
-                                                text = realTitle,
-                                                color = Color.White,
-                                                fontSize = 22.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Spacer(modifier = Modifier.height(6.dp))
-                                            val realSynopsis = uiState.movieDetail?.movie?.synopsis?.ifBlank { null }
-                                                ?: "Streaming anime episode terlengkap dengan kualitas jernih dan subtitle Indonesia resmi di platform Yuranime."
+                                            // Top Row: Vertical Poster on Left + Title & Metadata on Right
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.Top
+                                            ) {
+                                                AsyncImage(
+                                                    model = ImageRequest.Builder(LocalContext.current)
+                                                        .data(posterUrl.ifBlank { null })
+                                                        .crossfade(true)
+                                                        .placeholder(R.drawable.placeholder_yuranime)
+                                                        .error(R.drawable.placeholder_yuranime)
+                                                        .build(),
+                                                    contentDescription = realTitle,
+                                                    modifier = Modifier
+                                                        .width(80.dp)
+                                                        .aspectRatio(2f / 3f)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(Color(0xFF181A22)),
+                                                    contentScale = ContentScale.Crop
+                                                )
+
+                                                Spacer(modifier = Modifier.width(14.dp))
+
+                                                Column(
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Text(
+                                                        text = realTitle,
+                                                        color = Color.White,
+                                                        fontSize = 19.sp,
+                                                        lineHeight = 24.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        maxLines = 2,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+
+                                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = "Episode $episodeNumber",
+                                                            color = Color(0xFFCBD5E1),
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.Medium
+                                                        )
+
+                                                        Spacer(modifier = Modifier.width(10.dp))
+
+                                                        Icon(
+                                                            imageVector = Icons.Default.Visibility,
+                                                            contentDescription = "Views",
+                                                            tint = Color(0xFFCBD5E1),
+                                                            modifier = Modifier.size(14.dp)
+                                                        )
+
+                                                        Spacer(modifier = Modifier.width(4.dp))
+
+                                                        Text(
+                                                            text = shortViews,
+                                                            color = Color(0xFFCBD5E1),
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.Medium
+                                                        )
+
+                                                        if (formattedAiredStart != null) {
+                                                            Text(
+                                                                text = "  •  $formattedAiredStart",
+                                                                color = Color(0xFFCBD5E1),
+                                                                fontSize = 13.sp,
+                                                                fontWeight = FontWeight.Medium,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(12.dp))
+
+                                            // Bottom Section: Synopsis + Expand/Collapse "Selengkapnya >"
                                             Text(
                                                 text = realSynopsis,
-                                                color = Color(0xFF9CA3AF),
-                                                fontSize = 12.5.sp,
-                                                maxLines = 3,
-                                                overflow = TextOverflow.Ellipsis,
-                                                lineHeight = 17.sp
+                                                color = Color(0xFF94A3B8),
+                                                fontSize = 13.sp,
+                                                lineHeight = 19.sp,
+                                                maxLines = if (isSynopsisExpanded) Int.MAX_VALUE else 3,
+                                                overflow = TextOverflow.Ellipsis
                                             )
+
+                                            Spacer(modifier = Modifier.height(6.dp))
+
+                                            Row(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .clickable { isSynopsisExpanded = !isSynopsisExpanded }
+                                                    .padding(vertical = 2.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = if (isSynopsisExpanded) "Sembunyikan" else "Selengkapnya",
+                                                    color = Color(0xFF3B82F6),
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                                Spacer(modifier = Modifier.width(2.dp))
+                                                Icon(
+                                                    imageVector = if (isSynopsisExpanded) {
+                                                        Icons.Default.KeyboardArrowUp
+                                                    } else {
+                                                        Icons.AutoMirrored.Filled.KeyboardArrowRight
+                                                    },
+                                                    contentDescription = if (isSynopsisExpanded) {
+                                                        "Sembunyikan sinopsis"
+                                                    } else {
+                                                        "Selengkapnya sinopsis"
+                                                    },
+                                                    tint = Color(0xFF3B82F6),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
                                         }
                                     }
 
@@ -373,7 +497,7 @@ fun StreamingScreen(
                                         }
 
                                         if (interleavedMedia.isNotEmpty()) {
-                                            Spacer(modifier = Modifier.height(16.dp))
+                                            Spacer(modifier = Modifier.height(8.dp))
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
@@ -409,6 +533,7 @@ fun StreamingScreen(
                                             ) {
                                                 items(interleavedMedia) { (media, isPoster) ->
                                                     val mediaImg = media.getEffectiveImage()
+                                                    val placeholderRes = if (isPoster) R.drawable.placeholder_yuranime else R.drawable.placeholder_yuranime_wide
                                                     Box(
                                                         modifier = Modifier
                                                             .height(195.dp)
@@ -420,17 +545,17 @@ fun StreamingScreen(
                                                                 else viewModel.toggleGallerySheet(if (isPoster) 0 else 1)
                                                             }
                                                     ) {
-                                                        if (mediaImg.isNotBlank()) {
-                                                            AsyncImage(
-                                                                model = ImageRequest.Builder(LocalContext.current)
-                                                                    .data(mediaImg)
-                                                                    .crossfade(true)
-                                                                    .build(),
-                                                                contentDescription = if (isPoster) "Poster" else "Cover",
-                                                                modifier = Modifier.fillMaxSize(),
-                                                                contentScale = ContentScale.Crop
-                                                            )
-                                                        }
+                                                        AsyncImage(
+                                                            model = ImageRequest.Builder(LocalContext.current)
+                                                                .data(mediaImg.ifBlank { null })
+                                                                .crossfade(true)
+                                                                .placeholder(placeholderRes)
+                                                                .error(placeholderRes)
+                                                                .build(),
+                                                            contentDescription = if (isPoster) "Poster" else "Cover",
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            contentScale = ContentScale.Crop
+                                                        )
                                                     }
                                                 }
                                             }
@@ -1163,7 +1288,7 @@ private fun LoveItRatingDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Kuy bantu ANIMEIN dapatkan bintang terbaik agar lebih semangat lagi hehe",
+                    text = "Kuy bantu Yuranime dapatkan bintang terbaik agar lebih semangat lagi hehe",
                     color = Color(0xFF6B7280),
                     fontSize = 11.sp,
                     textAlign = TextAlign.Center
@@ -2191,8 +2316,10 @@ private fun FullGallerySheet(
                     ) {
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
-                                .data(img)
+                                .data(img.ifBlank { null })
                                 .crossfade(true)
+                                .placeholder(R.drawable.placeholder_yuranime)
+                                .error(R.drawable.placeholder_yuranime)
                                 .build(),
                             contentDescription = "Poster",
                             modifier = Modifier.fillMaxSize(),
@@ -2219,8 +2346,10 @@ private fun FullGallerySheet(
                     ) {
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
-                                .data(img)
+                                .data(img.ifBlank { null })
                                 .crossfade(true)
+                                .placeholder(R.drawable.placeholder_yuranime_wide)
+                                .error(R.drawable.placeholder_yuranime_wide)
                                 .build(),
                             contentDescription = "Cover",
                             modifier = Modifier.fillMaxSize(),
@@ -2239,4 +2368,44 @@ private fun formatTime(ms: Long): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return String.format("%02d:%02d", minutes, seconds)
+}
+
+private fun formatShortViews(raw: String?): String {
+    if (raw.isNullOrBlank()) return "0"
+    val trimmed = raw.trim()
+    if (trimmed.endsWith("K", ignoreCase = true) || trimmed.endsWith("M", ignoreCase = true)) {
+        return trimmed
+    }
+    val digitsOnly = trimmed.replace(".", "").replace(",", "").trim()
+    val number = digitsOnly.toLongOrNull() ?: return trimmed
+    return when {
+        number >= 1_000_000L -> {
+            val m = number / 1_000_000.0
+            String.format(Locale.US, "%.1fM", m).replace(".0M", "M")
+        }
+        number >= 1_000L -> {
+            val k = number / 1_000.0
+            String.format(Locale.US, "%.1fK", k).replace(".0K", "K")
+        }
+        else -> number.toString()
+    }
+}
+
+private fun formatAiredStartDate(raw: String?): String? {
+    if (raw.isNullOrBlank()) return null
+    val cleaned = raw.trim()
+    if (cleaned == "-" || cleaned.equals("null", ignoreCase = true) || cleaned.startsWith("0000") || cleaned.contains("?")) {
+        return null
+    }
+    val parts = cleaned.split("-")
+    if (parts.size == 3 && parts[0].length == 4) {
+        val year = parts[0]
+        val monthNum = parts[1].toIntOrNull()
+        val dayNum = parts[2].take(2).toIntOrNull()
+        if (monthNum != null && monthNum in 1..12 && dayNum != null && dayNum in 1..31) {
+            val months = arrayOf("Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des")
+            return "$dayNum ${months[monthNum - 1]} $year"
+        }
+    }
+    return cleaned
 }

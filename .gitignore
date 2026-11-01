@@ -12,6 +12,10 @@ app/build/
 *.apk
 *.aab
 reff_ui/
+design/
 *.jpg
 *.png
-
+!app/src/main/res/**/*.png
+*.mp4
+*.webm
+*.mkv

@@ -51,6 +51,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.dinz.animein.R
 import com.dinz.animein.data.model.AnimeItem
 import com.dinz.animein.data.model.CuplixItem
 import com.dinz.animein.ui.components.AnimeVerticalCard
@@ -553,6 +554,8 @@ private fun SectionAnimeCard(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(anime.getEffectivePoster())
                 .crossfade(true)
+                .placeholder(R.drawable.placeholder_yuranime)
+                .error(R.drawable.placeholder_yuranime)
                 .build(),
             contentDescription = anime.title,
             contentScale = ContentScale.Crop,
