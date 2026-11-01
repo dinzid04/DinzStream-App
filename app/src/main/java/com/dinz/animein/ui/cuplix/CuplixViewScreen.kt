@@ -90,7 +90,8 @@ import kotlinx.coroutines.delay
 @OptIn(UnstableApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun CuplixViewScreen(
-    initialCuplixId: String? = null,
+    initialCuplix: CuplixItem? = null,
+    initialCuplixId: String? = initialCuplix?.id,
     viewModel: CuplixViewModel = viewModel(),
     onBackClick: () -> Unit,
     onAnimeClick: (idMovie: String) -> Unit,
@@ -99,8 +100,8 @@ fun CuplixViewScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    LaunchedEffect(initialCuplixId) {
-        viewModel.initialize(initialCuplixId)
+    LaunchedEffect(initialCuplix, initialCuplixId) {
+        viewModel.initialize(initialCuplix, initialCuplixId)
     }
 
     BackHandler {
@@ -141,7 +142,7 @@ fun CuplixViewScreen(
     }
 
     val pagerState = rememberPagerState(
-        initialPage = uiState.currentIndex.coerceIn(0, cuplixList.size - 1),
+        initialPage = 0,
         pageCount = { cuplixList.size }
     )
 
@@ -172,7 +173,7 @@ fun CuplixViewScreen(
                 onToggleLike = { item.id?.let { viewModel.toggleLike(it) } },
                 onCommentClick = {
                     item.id?.let { fypId ->
-                        viewModel.openComments(fypId, item.idEpisode)
+                        viewModel.openComments(fypId)
                     }
                 },
                 onAnimeClick = { item.idMovie?.let { onAnimeClick(it) } },
@@ -300,14 +301,14 @@ private fun CuplixVideoPage(
     onEpisodeClick: () -> Unit
 ) {
     val context = LocalContext.current
-    var isPlaying by remember(isCurrentPage, streamUrl) { mutableStateOf(true) }
-    var isFirstFrameRendered by remember(isCurrentPage, streamUrl) { mutableStateOf(false) }
-    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
+    var isPlaying by remember(isCurrentPage, streamUrl, item.id) { mutableStateOf(true) }
+    var isFirstFrameRendered by remember(isCurrentPage, streamUrl, item.id) { mutableStateOf(false) }
+    var exoPlayer by remember(item.id) { mutableStateOf<ExoPlayer?>(null) }
 
     val startMs = remember(item) { item.getTimeStartMs() }
     val endMs = remember(item) { item.getTimeEndMs() }
 
-    DisposableEffect(isCurrentPage, streamUrl) {
+    DisposableEffect(isCurrentPage, streamUrl, item.id) {
         if (isCurrentPage && !streamUrl.isNullOrBlank()) {
             val player = ExoPlayer.Builder(context).build().apply {
                 val mediaItem = MediaItem.fromUri(streamUrl)

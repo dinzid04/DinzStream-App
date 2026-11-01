@@ -55,9 +55,9 @@ class AnimeRepository(
         }
     }
 
-    suspend fun getCuplixFeed(limit: Int = 15): Result<List<CuplixItem>> = withContext(Dispatchers.IO) {
+    suspend fun getCuplixFeed(limit: Int = 30, sort: String = "views"): Result<List<CuplixItem>> = withContext(Dispatchers.IO) {
         try {
-            val response = api.getCuplixFeed(limit = limit, sort = "new")
+            val response = api.getCuplixFeed(limit = limit, sort = sort)
             val items = response.data?.fypList ?: emptyList()
             Result.success(items)
         } catch (e: Exception) {
@@ -65,9 +65,9 @@ class AnimeRepository(
         }
     }
 
-    suspend fun getCuplixComments(idFyp: String, page: Int = 1): Result<List<EpisodeCommentItem>> = withContext(Dispatchers.IO) {
+    suspend fun getCuplixComments(idFyp: String): Result<List<EpisodeCommentItem>> = withContext(Dispatchers.IO) {
         try {
-            val response = api.getCuplixComments(idFyp = idFyp, page = page)
+            val response = api.getCuplixComments(idFyp = idFyp)
             val comments = response.data?.comments ?: emptyList()
             Result.success(comments)
         } catch (e: Exception) {

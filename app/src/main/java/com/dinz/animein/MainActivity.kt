@@ -11,11 +11,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.dinz.animein.data.model.CuplixItem
 import com.dinz.animein.ui.components.NavTab
 import com.dinz.animein.ui.cuplix.CuplixViewScreen
 import com.dinz.animein.ui.detail.AnimeDetailScreen
@@ -53,24 +55,26 @@ class MainActivity : ComponentActivity() {
                     var selectedAnimeId by remember { mutableStateOf<String?>(null) }
                     var selectedStreamingEpisodeId by remember { mutableStateOf<String?>(null) }
                     var selectedStreamingMovieId by remember { mutableStateOf<String?>(null) }
-                    var selectedCuplixId by remember { mutableStateOf<String?>(null) }
+                    var selectedCuplixItem by remember { mutableStateOf<CuplixItem?>(null) }
                     var currentTab by remember { mutableStateOf(NavTab.HOME) }
 
                     when {
-                        selectedCuplixId != null -> {
-                            CuplixViewScreen(
-                                initialCuplixId = selectedCuplixId,
-                                onBackClick = { selectedCuplixId = null },
-                                onAnimeClick = { animeId ->
-                                    selectedCuplixId = null
-                                    selectedAnimeId = animeId
-                                },
-                                onEpisodeClick = { epId, mId ->
-                                    selectedCuplixId = null
-                                    selectedStreamingMovieId = mId
-                                    selectedStreamingEpisodeId = epId
-                                }
-                            )
+                        selectedCuplixItem != null -> {
+                            key(selectedCuplixItem?.id) {
+                                CuplixViewScreen(
+                                    initialCuplix = selectedCuplixItem,
+                                    onBackClick = { selectedCuplixItem = null },
+                                    onAnimeClick = { animeId ->
+                                        selectedCuplixItem = null
+                                        selectedAnimeId = animeId
+                                    },
+                                    onEpisodeClick = { epId, mId ->
+                                        selectedCuplixItem = null
+                                        selectedStreamingMovieId = mId
+                                        selectedStreamingEpisodeId = epId
+                                    }
+                                )
+                            }
                         }
                         selectedStreamingEpisodeId != null -> {
                             StreamingScreen(
@@ -97,8 +101,8 @@ class MainActivity : ComponentActivity() {
                                     selectedStreamingMovieId = selectedAnimeId
                                     selectedStreamingEpisodeId = epId
                                 },
-                                onCuplixClick = { cuplixId ->
-                                    selectedCuplixId = cuplixId
+                                onCuplixClick = { cuplixItem ->
+                                    selectedCuplixItem = cuplixItem
                                 }
                             )
                         }
@@ -121,8 +125,8 @@ class MainActivity : ComponentActivity() {
                                             selectedStreamingMovieId = mId
                                             selectedStreamingEpisodeId = epId
                                         },
-                                        onCuplixClick = { cuplixId ->
-                                            selectedCuplixId = cuplixId
+                                        onCuplixClick = { cuplixItem ->
+                                            selectedCuplixItem = cuplixItem
                                         }
                                     )
                                 }
@@ -142,8 +146,8 @@ class MainActivity : ComponentActivity() {
                                         onAnimeClick = { animeId ->
                                             selectedAnimeId = animeId
                                         },
-                                        onCuplixClick = { cuplixId ->
-                                            selectedCuplixId = cuplixId
+                                        onCuplixClick = { cuplixItem ->
+                                            selectedCuplixItem = cuplixItem
                                         }
                                     )
                                 }
@@ -163,8 +167,8 @@ class MainActivity : ComponentActivity() {
                                         onAnimeClick = { animeId ->
                                             selectedAnimeId = animeId
                                         },
-                                        onCuplixClick = { cuplixId ->
-                                            selectedCuplixId = cuplixId
+                                        onCuplixClick = { cuplixItem ->
+                                            selectedCuplixItem = cuplixItem
                                         }
                                     )
                                 }

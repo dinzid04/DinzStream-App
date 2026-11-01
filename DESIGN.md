@@ -139,3 +139,26 @@ Dokumen ini adalah satu-satunya acuan spesifikasi desain dan teknis aplikasi **Y
    - Mencegah kedipan layar hitam saat buffering/inisialisasi player dengan listener `Player.Listener.onRenderedFirstFrame()` yang mempertahankan poster thumbnail (`AsyncImage`) menutupi `PlayerView` hingga frame video pertama siap, lalu melakukan transisi fade-out halus (`tween(300)`).
 4. **Interaktivitas Cuplix di Detail Anime (`AnimeDetailScreen`):**
    - Menghubungkan klik kartu Cuplix di tab Cuplix (`AnimeDetailScreen`) ke navigation controller `onCuplixClick(id)` di `MainActivity.kt` menuju `selectedCuplixId = cuplixId` sehingga pengguna dapat langsung memutar video cuplix tersebut.
+
+---
+
+## 8. Perbaikan Menyeluruh Navigasi Cuplix, Pager Synchronization & Endpoint Fix (v1.7.1)
+
+1. **Sinkronisasi Video Cuplix & State Pager (`MainActivity.kt` & `CuplixViewScreen.kt`):**
+   - Mengganti passing ID mentah dengan passing objek utuh `selectedCuplixItem: CuplixItem?` yang dibungkus dengan `key(selectedCuplixItem?.id)`. Hal ini menjamin setiap kali item Cuplix diklik dari halaman mana pun (`HomeScreen`, `JadwalScreen`, `SearchScreen`, `AnimeDetailScreen`), instance `CuplixViewScreen` dan `VerticalPager` terinisialisasi bersih pada halaman 0 (video yang diklik langsung berputar seketika).
+   - Di `CuplixViewModel`, item yang diklik ditempatkan di posisi paling awal (`listOf(initialItem) + otherItems`), sehingga `pagerState.currentPage = 0` selalu memutar klip Cuplix yang dipilih pengguna, bukan klip sebelumnya.
+   - Mengikat siklus hidup pemutar video `DisposableEffect(isCurrentPage, streamUrl, item.id)` agar video sebelumnya langsung di-*release* dan video klip baru langsung dipersiapkan tanpa risiko *stuck* di video lama.
+
+2. **Perbaikan Endpoint Komentar Cuplix (`AnimeInApiService.kt`):**
+   - Mengoreksi endpoint komentar Cuplix dari jalur yang keliru (`/data/fyp/comment/list` ➔ 404) menjadi endpoint asli AnimeIn: `@GET("/data/fyp/comment")` dengan query parameter `id_fyp`.
+   - Menghilangkan *fallback* ke komentar episode anime utuh (`getEpisodeComments`), sehingga komentar di setiap klip Cuplix murni menampilkan komentar milik klip tersebut dan tidak lagi berulang/sama semua antar video yang berbeda.
+
+3. **Perbaikan Serialized JSON Komentar Cuplix (`AnimeModels.kt`):**
+   - Menambahkan alias serializer `@SerializedName` pada `EpisodeCommentItem` untuk membaca key JSON asli endpoint Cuplix:
+     - `userId`: `@SerializedName(value = "user_id", alternate = ["id_user", "userId"])`
+     - `userName`: `@SerializedName(value = "user_name", alternate = ["username", "userName", "name"])`
+     - `userPokemon`: `@SerializedName(value = "user_pokemon", alternate = ["pokemon", "userPokemon"])`
+     - `time`: `@SerializedName(value = "time", alternate = ["key_time", "time_ago", "time_created"])`
+
+4. **Default Feed Sort & Akurasi Metrik Like/Komentar Populer:**
+   - Mengubah default parameter `sort` pada `getCuplixFeed` menjadi `"views"` (bukan `"new"`). Feed baru (`new`) diisi klip kiriman pengguna yang baru terunggah (0 view, 0 like), sedangkan mode `"views"` memuat klip populer asli AnimeIn yang memiliki ratusan like (misal 500-999 like) dan puluhan komentar, menyamakan tampilan Cuplix Yuranime dengan aplikasi resmi AnimeIn.

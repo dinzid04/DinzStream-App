@@ -52,6 +52,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.dinz.animein.data.model.AnimeItem
+import com.dinz.animein.data.model.CuplixItem
 import com.dinz.animein.ui.components.AnimeVerticalCard
 import com.dinz.animein.ui.components.AnimeWideCard
 import com.dinz.animein.ui.components.BottomNavBar
@@ -78,7 +79,7 @@ fun HomeScreen(
     onTabSelected: (NavTab) -> Unit = {},
     onAnimeClick: (id: String) -> Unit = {},
     onEpisodeClick: (episodeId: String, movieId: String) -> Unit = { _, _ -> },
-    onCuplixClick: (id: String) -> Unit = {}
+    onCuplixClick: (CuplixItem) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -222,7 +223,7 @@ fun HomeScreen(
                                         CuplixAvatarItem(
                                             item = cuplixItem,
                                             onClick = {
-                                                cuplixItem.id?.let { onCuplixClick(it) }
+                                                onCuplixClick(cuplixItem)
                                             }
                                         )
                                     }

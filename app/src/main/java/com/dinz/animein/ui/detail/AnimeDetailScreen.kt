@@ -94,7 +94,7 @@ fun AnimeDetailScreen(
     modifier: Modifier = Modifier,
     onAnimeClick: (String) -> Unit = {},
     onEpisodeClick: (String) -> Unit = {},
-    onCuplixClick: (String) -> Unit = {},
+    onCuplixClick: (CuplixItem) -> Unit = {},
     viewModel: AnimeDetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -992,7 +992,7 @@ private fun TabSeasonContent(
 @Composable
 private fun TabCuplixContent(
     cuplixList: List<CuplixItem>,
-    onCuplixClick: (String) -> Unit = {}
+    onCuplixClick: (CuplixItem) -> Unit = {}
 ) {
     if (cuplixList.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1016,7 +1016,7 @@ private fun TabCuplixContent(
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color(0xFF181920))
                     .clickable {
-                        item.id?.let { onCuplixClick(it) }
+                        onCuplixClick(item)
                     }
             ) {
                 AsyncImage(

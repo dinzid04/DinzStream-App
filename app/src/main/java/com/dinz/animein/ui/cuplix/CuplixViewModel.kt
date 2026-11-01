@@ -17,51 +17,118 @@ class CuplixViewModel(
     private val _uiState = MutableStateFlow(CuplixUiState())
     val uiState: StateFlow<CuplixUiState> = _uiState.asStateFlow()
 
-    fun initialize(initialCuplixId: String? = null) {
-        if (_uiState.value.cuplixList.isNotEmpty()) {
-            if (initialCuplixId != null) {
-                jumpToId(initialCuplixId)
+    fun initialize(initialItem: com.dinz.animein.data.model.CuplixItem? = null, initialCuplixId: String? = initialItem?.id) {
+        val targetId = initialItem?.id ?: initialCuplixId
+
+        // When a specific item was clicked, always put it at index 0 so it plays immediately
+        if (initialItem != null) {
+            val existingList = _uiState.value.cuplixList.filter { it.id != initialItem.id }
+            val combinedList = listOf(initialItem) + existingList
+            val likesMap = _uiState.value.likesCountMap + (initialItem.id.orEmpty() to (initialItem.countLikes?.toIntOrNull() ?: 0))
+            val commentsMap = _uiState.value.commentsCountMap + (initialItem.id.orEmpty() to (initialItem.countComments?.toIntOrNull() ?: 0))
+            val likedIds = if (initialItem.isLike == "1") _uiState.value.likedItemIds + initialItem.id.orEmpty() else _uiState.value.likedItemIds
+
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    cuplixList = combinedList,
+                    currentIndex = 0,
+                    likesCountMap = likesMap,
+                    commentsCountMap = commentsMap,
+                    likedItemIds = likedIds,
+                    activeCommentsFypId = null,
+                    commentsList = emptyList()
+                )
+            }
+
+            initialItem.idEpisode?.let { epId -> loadStreamForEpisode(epId) }
+            initialItem.id?.let { fypId -> syncCommentsForCuplix(fypId) }
+
+            if (combinedList.size < 5) {
+                loadPopularFeedInBackground(excludeId = initialItem.id)
             }
             return
         }
-        loadFeed(initialCuplixId)
+
+        if (!targetId.isNullOrBlank()) {
+            val foundIdx = _uiState.value.cuplixList.indexOfFirst { it.id == targetId }
+            if (foundIdx >= 0) {
+                val target = _uiState.value.cuplixList[foundIdx]
+                val reordered = listOf(target) + _uiState.value.cuplixList.filter { it.id != targetId }
+                _uiState.update { it.copy(cuplixList = reordered, currentIndex = 0) }
+                target.idEpisode?.let { epId -> loadStreamForEpisode(epId) }
+                target.id?.let { fypId -> syncCommentsForCuplix(fypId) }
+                return
+            }
+        }
+
+        loadFeed(targetId)
     }
 
-    fun loadFeed(initialCuplixId: String? = null) {
+    private fun loadPopularFeedInBackground(excludeId: String?) {
+        viewModelScope.launch {
+            val result = repository.getCuplixFeed(limit = 30)
+            result.onSuccess { items ->
+                val filtered = items.filter { it.id != excludeId }
+                _uiState.update { current ->
+                    val combined = current.cuplixList + filtered
+                    val likesMap = current.likesCountMap + filtered.associate { item ->
+                        (item.id ?: "") to (item.countLikes?.toIntOrNull() ?: 0)
+                    }
+                    val commentsMap = current.commentsCountMap + filtered.associate { item ->
+                        (item.id ?: "") to (item.countComments?.toIntOrNull() ?: 0)
+                    }
+                    current.copy(
+                        cuplixList = combined,
+                        likesCountMap = likesMap,
+                        commentsCountMap = commentsMap
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadFeed(targetId: String? = null) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             val result = repository.getCuplixFeed(limit = 30)
             result.onSuccess { items ->
-                val likesMap = items.associate { item ->
-                    (item.id ?: "") to (item.countLikes?.toIntOrNull() ?: 0)
-                }
-                val commentsMap = items.associate { item ->
-                    (item.id ?: "") to (item.countComments?.toIntOrNull() ?: 0)
-                }
-                val likedIds = items.filter { it.isLike == "1" }.mapNotNull { it.id }.toSet()
-
                 var targetIdx = 0
-                if (initialCuplixId != null) {
-                    val foundIdx = items.indexOfFirst { it.id == initialCuplixId }
+                if (!targetId.isNullOrBlank()) {
+                    val foundIdx = items.indexOfFirst { it.id == targetId }
                     if (foundIdx >= 0) targetIdx = foundIdx
                 }
+
+                val orderedItems = if (targetIdx > 0 && targetIdx < items.size) {
+                    val target = items[targetIdx]
+                    listOf(target) + items.filterIndexed { idx, _ -> idx != targetIdx }
+                } else {
+                    items
+                }
+
+                val likesMap = orderedItems.associate { item ->
+                    (item.id ?: "") to (item.countLikes?.toIntOrNull() ?: 0)
+                }
+                val commentsMap = orderedItems.associate { item ->
+                    (item.id ?: "") to (item.countComments?.toIntOrNull() ?: 0)
+                }
+                val likedIds = orderedItems.filter { it.isLike == "1" }.mapNotNull { it.id }.toSet()
 
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        cuplixList = items,
-                        currentIndex = targetIdx,
+                        cuplixList = orderedItems,
+                        currentIndex = 0,
                         likesCountMap = likesMap,
                         commentsCountMap = commentsMap,
                         likedItemIds = likedIds
                     )
                 }
 
-                // Preload stream & sync comments for initial target item
-                val targetItem = items.getOrNull(targetIdx)
-                targetItem?.let { item ->
+                val firstItem = orderedItems.firstOrNull()
+                firstItem?.let { item ->
                     item.idEpisode?.let { epId -> loadStreamForEpisode(epId) }
-                    item.id?.let { fypId -> syncCommentsForCuplix(fypId, item.idEpisode) }
+                    item.id?.let { fypId -> syncCommentsForCuplix(fypId) }
                 }
             }.onFailure { err ->
                 _uiState.update {
@@ -77,7 +144,11 @@ class CuplixViewModel(
     fun jumpToId(id: String) {
         val idx = _uiState.value.cuplixList.indexOfFirst { it.id == id }
         if (idx >= 0) {
-            onPageChanged(idx)
+            val target = _uiState.value.cuplixList[idx]
+            val reordered = listOf(target) + _uiState.value.cuplixList.filter { it.id != id }
+            _uiState.update { it.copy(cuplixList = reordered, currentIndex = 0) }
+            target.idEpisode?.let { epId -> loadStreamForEpisode(epId) }
+            target.id?.let { fypId -> syncCommentsForCuplix(fypId) }
         }
     }
 
@@ -86,26 +157,19 @@ class CuplixViewModel(
         val item = _uiState.value.cuplixList.getOrNull(newIndex)
         item?.let {
             it.idEpisode?.let { epId -> loadStreamForEpisode(epId) }
-            it.id?.let { fypId -> syncCommentsForCuplix(fypId, it.idEpisode) }
+            it.id?.let { fypId -> syncCommentsForCuplix(fypId) }
         }
     }
 
-    private fun syncCommentsForCuplix(fypId: String, episodeId: String?) {
+    private fun syncCommentsForCuplix(fypId: String) {
         viewModelScope.launch {
             val fypResult = repository.getCuplixComments(fypId)
             val comments = fypResult.getOrNull().orEmpty()
-            val actualCount = if (comments.isNotEmpty()) {
-                comments.size
-            } else if (!episodeId.isNullOrBlank()) {
-                val epResult = repository.getEpisodeComments(idEpisode = episodeId, page = 0)
-                epResult.getOrNull().orEmpty().size
-            } else 0
-
-            if (actualCount > 0) {
+            if (comments.isNotEmpty()) {
                 _uiState.update { current ->
                     val existing = current.commentsCountMap[fypId] ?: 0
                     current.copy(
-                        commentsCountMap = current.commentsCountMap + (fypId to maxOf(existing, actualCount))
+                        commentsCountMap = current.commentsCountMap + (fypId to maxOf(existing, comments.size))
                     )
                 }
             }
@@ -175,7 +239,7 @@ class CuplixViewModel(
         }
     }
 
-    fun openComments(fypId: String, episodeId: String?) {
+    fun openComments(fypId: String, episodeId: String? = null) {
         _uiState.update {
             it.copy(
                 activeCommentsFypId = fypId,
@@ -185,33 +249,16 @@ class CuplixViewModel(
         }
 
         viewModelScope.launch {
-            // First try Cuplix comments endpoint
             val fypResult = repository.getCuplixComments(fypId)
             val comments = fypResult.getOrNull().orEmpty()
 
-            if (comments.isNotEmpty()) {
-                _uiState.update { current ->
-                    val existing = current.commentsCountMap[fypId] ?: 0
-                    current.copy(
-                        isLoadingComments = false,
-                        commentsList = comments,
-                        commentsCountMap = current.commentsCountMap + (fypId to maxOf(existing, comments.size))
-                    )
-                }
-            } else if (!episodeId.isNullOrBlank()) {
-                // Fallback to episode comments so user always sees active discussion
-                val epResult = repository.getEpisodeComments(idEpisode = episodeId, page = 0)
-                val epComments = epResult.getOrNull().orEmpty()
-                _uiState.update { current ->
-                    val existing = current.commentsCountMap[fypId] ?: 0
-                    current.copy(
-                        isLoadingComments = false,
-                        commentsList = epComments,
-                        commentsCountMap = current.commentsCountMap + (fypId to maxOf(existing, epComments.size))
-                    )
-                }
-            } else {
-                _uiState.update { it.copy(isLoadingComments = false) }
+            _uiState.update { current ->
+                val existing = current.commentsCountMap[fypId] ?: 0
+                current.copy(
+                    isLoadingComments = false,
+                    commentsList = comments,
+                    commentsCountMap = current.commentsCountMap + (fypId to maxOf(existing, comments.size))
+                )
             }
         }
     }

@@ -49,6 +49,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.dinz.animein.data.model.AnimeItem
+import com.dinz.animein.data.model.CuplixItem
 import com.dinz.animein.ui.components.BottomNavBar
 import com.dinz.animein.ui.components.CuplixAvatarItem
 import com.dinz.animein.ui.components.NavTab
@@ -67,7 +68,7 @@ fun JadwalScreen(
     selectedTab: NavTab = NavTab.JADWAL,
     onTabSelected: (NavTab) -> Unit = {},
     onAnimeClick: (id: String) -> Unit = {},
-    onCuplixClick: (id: String) -> Unit = {}
+    onCuplixClick: (CuplixItem) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -136,7 +137,7 @@ fun JadwalScreen(
                     items(uiState.cuplixList, key = { it.id ?: it.hashCode().toString() }) { cuplixItem ->
                         CuplixAvatarItem(
                             item = cuplixItem,
-                            onClick = { cuplixItem.id?.let { onCuplixClick(it) } }
+                            onClick = { onCuplixClick(cuplixItem) }
                         )
                     }
                 }

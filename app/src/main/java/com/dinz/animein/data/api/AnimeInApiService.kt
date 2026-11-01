@@ -35,14 +35,13 @@ interface AnimeInApiService {
 
     @GET("/data/fyp2/list_scroll")
     suspend fun getCuplixFeed(
-        @Query("limit") limit: Int = 15,
-        @Query("sort") sort: String = "new"
+        @Query("limit") limit: Int = 30,
+        @Query("sort") sort: String = "views"
     ): CuplixResponse
 
-    @GET("/data/fyp/comment/list")
+    @GET("/data/fyp/comment")
     suspend fun getCuplixComments(
-        @Query("id_fyp") idFyp: String,
-        @Query("page") page: Int = 1
+        @Query("id_fyp") idFyp: String
     ): EpisodeCommentResponse
 
     @GET("/3/2/explore/movie")

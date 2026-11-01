@@ -76,6 +76,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.dinz.animein.R
 import com.dinz.animein.data.model.AnimeItem
+import com.dinz.animein.data.model.CuplixItem
 import com.dinz.animein.data.model.ExploreCharacterItem
 import com.dinz.animein.data.model.ExploreGenreItem
 import com.dinz.animein.data.model.ExploreYearItem
@@ -101,7 +102,7 @@ fun SearchScreen(
     selectedTab: NavTab = NavTab.CARI,
     onTabSelected: (NavTab) -> Unit = {},
     onAnimeClick: (id: String) -> Unit = {},
-    onCuplixClick: (id: String) -> Unit = {}
+    onCuplixClick: (CuplixItem) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
@@ -463,7 +464,7 @@ private fun ExploreDefaultContent(
 private fun SearchResultsContent(
     uiState: SearchUiState,
     onAnimeClick: (String) -> Unit,
-    onCuplixClick: (String) -> Unit,
+    onCuplixClick: (CuplixItem) -> Unit,
     onClearFilter: () -> Unit,
     onLoadNextPage: () -> Unit
 ) {
@@ -516,7 +517,7 @@ private fun SearchResultsContent(
                 items(uiState.cuplixList, key = { it.id ?: it.hashCode().toString() }) { cuplixItem ->
                     CuplixAvatarItem(
                         item = cuplixItem,
-                        onClick = { cuplixItem.id?.let { onCuplixClick(it) } }
+                        onClick = { onCuplixClick(cuplixItem) }
                     )
                 }
             }
