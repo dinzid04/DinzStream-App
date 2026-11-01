@@ -62,10 +62,10 @@ import com.yuranime.dinz.ui.components.CuplixAvatarItem
 import com.yuranime.dinz.ui.components.HomeErrorState
 import com.yuranime.dinz.ui.components.HomeShimmerLoading
 import com.yuranime.dinz.ui.components.NavTab
-import com.yuranime.dinz.ui.components.PiuPiuHeroSlider
 import com.yuranime.dinz.ui.components.PopularLeaderboardCard
 import com.yuranime.dinz.ui.components.SectionHeader
 import com.yuranime.dinz.ui.components.YuranimeAnimatedLogo
+import com.yuranime.dinz.ui.components.YuranimeHeroSlider
 import com.yuranime.dinz.ui.theme.ColorAccentPrimary
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
 import com.yuranime.dinz.ui.theme.ColorMetricFavorites
@@ -170,7 +170,7 @@ fun HomeScreen(
                         item(key = "piupiu_hero_slider") {
                             val sliderAnimeList = uiState.todayScheduleList.ifEmpty { uiState.newEpisodesList }
                             Box(modifier = Modifier.fillMaxWidth()) {
-                                PiuPiuHeroSlider(
+                                YuranimeHeroSlider(
                                     items = sliderAnimeList,
                                     onAnimeClick = onAnimeClick
                                 )

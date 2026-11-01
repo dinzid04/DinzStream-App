@@ -42,7 +42,12 @@ class SearchViewModel(
             val genresDeferred = async { repository.getExploreGenres() }
             val yearsDeferred = async { repository.getExploreYears() }
             val charsDeferred = async { repository.getExploreCharacters() }
-            val cuplixDeferred = async { repository.getCuplixFeed(limit = 15) }
+            val cuplixDeferred = async {
+                repository.getRandomizedCuplixFeed(
+                    limit = 15,
+                    source = AnimeRepository.CuplixPageSource.SEARCH
+                )
+            }
             val recommendationsDeferred = async { repository.searchMovies(sort = "popular") }
 
             val genresResult = genresDeferred.await()
@@ -58,7 +63,7 @@ class SearchViewModel(
                     genres = genresResult.getOrDefault(emptyList()).shuffled(),
                     years = yearsResult.getOrDefault(emptyList()).shuffled(),
                     characters = charsResult.getOrDefault(emptyList()).shuffled(),
-                    cuplixList = cuplixResult.getOrDefault(emptyList()),
+                    cuplixList = cuplixResult.getOrNull()?.takeIf { list -> list.isNotEmpty() } ?: it.cuplixList,
                     recommendations = recResult.getOrDefault(emptyList()).shuffled()
                 )
             }

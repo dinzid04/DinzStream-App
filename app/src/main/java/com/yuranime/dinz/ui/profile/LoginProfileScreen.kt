@@ -1,15 +1,12 @@
 package com.yuranime.dinz.ui.profile
 
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,11 +34,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -61,10 +56,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -79,10 +77,7 @@ import com.yuranime.dinz.ui.components.BottomNavBar
 import com.yuranime.dinz.ui.components.NavTab
 import com.yuranime.dinz.ui.components.ProfileEntranceEffect
 import com.yuranime.dinz.ui.components.ProfileEntranceTheme
-import com.yuranime.dinz.ui.theme.ColorAccentPrimary
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
-import com.yuranime.dinz.ui.theme.ColorTextPrimary
-import com.yuranime.dinz.ui.theme.ColorTextSecondary
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import com.yuranime.dinz.ui.theme.YuranimeLogoFontFamily
 
@@ -126,7 +121,7 @@ fun LoginProfileScreen(
                 .background(ColorBackgroundPrimary)
         ) {
             if (!isLoggedIn) {
-                // Tampilan A: Login Sinematik (Tilted Poster Marquee + Google Button)
+                // Tampilan Login Sinematik (TAHAP 3)
                 CinematicLoginView(
                     onGoogleLoginClick = {
                         authDb.setLoggedIn(true, "User Google")
@@ -134,15 +129,15 @@ fun LoginProfileScreen(
                         isLoggedIn = true
                         Toast.makeText(context, "Berhasil masuk dengan Akun Google", Toast.LENGTH_SHORT).show()
                     },
-                    onTesterLoginClick = {
-                        authDb.setLoggedIn(true, "Tester Dinz")
-                        username = "Tester Dinz"
+                    onGuestLoginClick = {
+                        authDb.setLoggedIn(true, "Pengguna Tamu")
+                        username = "Pengguna Tamu"
                         isLoggedIn = true
-                        Toast.makeText(context, "Masuk sebagai Akun Tester Yuranime", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Melanjutkan sesi sebagai Pengguna Tamu", Toast.LENGTH_SHORT).show()
                     }
                 )
             } else {
-                // Tampilan B: Profil Akun Aktif dengan Border Bergerak & Riwayat Nonton
+                // Tampilan Profil Akun Aktif
                 UserProfileView(
                     username = username,
                     watchHistory = watchHistory,
@@ -162,7 +157,7 @@ fun LoginProfileScreen(
                     }
                 )
 
-                // Entrance shockwave effect when entering profile
+                // Efek Masuk Sinematik Shockwave
                 ProfileEntranceEffect(
                     isActive = showEntranceEffect,
                     onFinished = { showEntranceEffect = false },
@@ -174,41 +169,47 @@ fun LoginProfileScreen(
 }
 
 /**
- * Tampilan Login Sinematik (Sesuai Referensi Video & Animuse):
- * - 3 kolom poster anime yang dimiringkan (-10°) dan bergerak vertikal (marquee scroll)
- * - Vignette & dark gradient overlay elegan
- * - Logo serigala Yuranime & wordmark Calistoga
- * - Tombol putih "Masuk dengan Google" + tombol "Login Tester"
+ * Tampilan Login Sinematik (TAHAP 3):
+ * 1. Background kolase 3 kolom poster anime dengan sudut kemiringan diagonal halus
+ *    graphicsLayer { rotationZ = -12f; scaleX = 1.25f; scaleY = 1.25f }
+ *    Kolom kiri & kanan bergerak ke atas, kolom tengah bergerak ke bawah secara mulus.
+ * 2. Gradient overlay gelap (semi-transparan di atas & tengah, pekat #0B0B0B di bawah).
+ * 3. Logo utama di tengah-atas (yuranime-full-logo / wolf emblem + Calistoga wordmark).
+ * 4. Tombol Google: kapsul penuh RoundedCornerShape(50), background #FFFFFF, tinggi 52.dp,
+ *    ikon Google vector 4-warna di kiri, teks "Masuk dengan Google" di tengah.
+ * 5. Tombol "Login Tanpa Akun" warna abu-abu terang #9CA3AF (SF Medium 14.sp).
+ * 6. Teks persetujuan layanan dengan buildAnnotatedString (Ketentuan Layanan dan Kebijakan Privasi bergaris bawah).
+ * 7. Teks Versi Aplikasi "Versi 1.3.2" di paling bawah dengan jarak aman navigation bar.
  */
 @Composable
 private fun CinematicLoginView(
     onGoogleLoginClick: () -> Unit,
-    onTesterLoginClick: () -> Unit
+    onGuestLoginClick: () -> Unit
 ) {
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
-        // 1. Tilted Poster Marquee Background
+        // 1. Kolase Poster Anime Bergerak Naik-Turun (Tilted 3-Column Marquee)
         TiltedPosterBackground()
 
-        // 2. High-Contrast Vignette Gradient Overlay
+        // 2. Gradient Overlay Gelap (Semi-transparan atas/tengah, menghitam pekat #0B0B0B di bawah)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xDD000000),
+                            Color(0xCC000000),
                             Color(0x77000000),
-                            Color(0xBB000000),
-                            Color(0xF5000000),
-                            Color(0xFF000000)
+                            Color(0xAA000000),
+                            Color(0xE60B0B0B),
+                            Color(0xFF0B0B0B)
                         )
                     )
                 )
         )
 
-        // 3. Foreground Center Logo & Bottom Controls
+        // 3. Foreground Content: Logo Tengah-Atas & Tombol Bawah
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -217,52 +218,56 @@ private fun CinematicLoginView(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.weight(1.1f))
+            Spacer(modifier = Modifier.weight(1.0f))
 
-            // Center Logo & Identity Lockup
-            Box(
-                modifier = Modifier
-                    .size(68.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black),
-                contentAlignment = Alignment.Center
+            // Logo Utama di Tengah-Atas (yuranime-full-logo)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_yuranime_logo),
-                    contentDescription = "Logo Yuranime",
-                    modifier = Modifier.fillMaxSize(0.9f)
+                Box(
+                    modifier = Modifier
+                        .size(68.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_yuranime_logo),
+                        contentDescription = "Logo Yuranime",
+                        modifier = Modifier.fillMaxSize(0.9f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "YURANIME",
+                    color = Color.White,
+                    fontSize = 26.sp,
+                    fontFamily = YuranimeLogoFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "Tempat Nonton Anime Subtitle Indonesia",
+                    color = Color(0xFFCBD5E1),
+                    fontSize = 13.sp,
+                    fontFamily = SfProFontFamily,
+                    fontWeight = FontWeight.Medium
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.weight(1.2f))
 
-            Text(
-                text = "YURANIME",
-                color = Color.White,
-                fontSize = 26.sp,
-                fontFamily = YuranimeLogoFontFamily,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = "Tempat Nonton Anime Subtitle Indonesia",
-                color = Color(0xFFCBD5E1),
-                fontSize = 13.sp,
-                fontFamily = SfProFontFamily,
-                fontWeight = FontWeight.Medium
-            )
-
-            Spacer(modifier = Modifier.weight(1.3f))
-
-            // Google Login Button (Clean White Surface)
+            // Tombol Google Kapsul Penuh (RoundedCornerShape(50), Latar Putih #FFFFFF, Tinggi 52.dp)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(CircleShape)
                     .background(Color.White)
                     .clickable { onGoogleLoginClick() },
                 contentAlignment = Alignment.Center
@@ -279,7 +284,7 @@ private fun CinematicLoginView(
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "Masuk dengan Google",
-                        color = Color(0xFF1F2937),
+                        color = Color(0xFF111827),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = SfProFontFamily
@@ -289,38 +294,63 @@ private fun CinematicLoginView(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Login Tester Button
+            // Tombol "Login Tanpa Akun" (SF Medium 14.sp, warna #9CA3AF)
             Text(
-                text = "Login Tester",
-                color = Color(0xFF94A3B8),
-                fontSize = 13.5.sp,
+                text = "Login Tanpa Akun",
+                color = Color(0xFF9CA3AF),
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 fontFamily = SfProFontFamily,
                 modifier = Modifier
-                    .clickable { onTesterLoginClick() }
-                    .padding(vertical = 4.dp, horizontal = 12.dp)
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Disclaimer & Terms
-            Text(
-                text = "Dengan melanjutkan, kamu menyetujui Ketentuan Layanan dan Kebijakan Privasi",
-                color = Color(0xFF64748B),
-                fontSize = 11.sp,
-                fontFamily = SfProFontFamily,
-                textAlign = TextAlign.Center,
-                lineHeight = 15.sp,
-                modifier = Modifier.fillMaxWidth(0.9f)
+                    .clickable { onGuestLoginClick() }
+                    .padding(vertical = 4.dp, horizontal = 16.dp)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Version Label
+            // Teks Persetujuan Layanan menggunakan buildAnnotatedString
+            val agreementText = remember {
+                buildAnnotatedString {
+                    append("Dengan melanjutkan, kamu menyetujui ")
+                    withStyle(
+                        style = SpanStyle(
+                            color = Color.White,
+                            textDecoration = TextDecoration.Underline,
+                            fontWeight = FontWeight.Medium
+                        )
+                    ) {
+                        append("Ketentuan Layanan")
+                    }
+                    append(" dan ")
+                    withStyle(
+                        style = SpanStyle(
+                            color = Color.White,
+                            textDecoration = TextDecoration.Underline,
+                            fontWeight = FontWeight.Medium
+                        )
+                    ) {
+                        append("Kebijakan Privasi")
+                    }
+                }
+            }
+
             Text(
-                text = "Versi 1.9.0",
-                color = Color(0xFF475569),
-                fontSize = 11.sp,
+                text = agreementText,
+                color = Color(0xFF94A3B8),
+                fontSize = 11.5.sp,
+                fontFamily = SfProFontFamily,
+                textAlign = TextAlign.Center,
+                lineHeight = 16.sp,
+                modifier = Modifier.fillMaxWidth(0.9f)
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Teks Versi Aplikasi
+            Text(
+                text = "Versi 1.3.2",
+                color = Color(0xFF6B7280),
+                fontSize = 12.sp,
                 fontFamily = SfProFontFamily
             )
 
@@ -330,9 +360,10 @@ private fun CinematicLoginView(
 }
 
 /**
- * 3-Column Tilted Poster Marquee
- * Menggunakan 12 poster lokal offline di drawable (poster_login_01 sampai 12)
- * Bergerak halus secara vertikal pada 60fps dengan sudut kemiringan -10 derajat.
+ * 3 Kolom Grid Poster dengan Sudut Kemiringan Diagonal Halus (-12°)
+ * - Kolom Kiri & Kanan bergerak perlahan ke ATAS
+ * - Kolom Tengah bergerak perlahan ke BAWAH
+ * Persis seperti pada video referensi VID-20261101-WA0035.mp4
  */
 @Composable
 private fun TiltedPosterBackground() {
@@ -356,54 +387,60 @@ private fun TiltedPosterBackground() {
     )
 
     val infiniteTransition = rememberInfiniteTransition(label = "marqueeTransition")
-    val scrollOffsetDown by infiniteTransition.animateFloat(
+
+    // Kolom Kiri & Kanan bergerak perlahan ke ATAS (negatif offsetY)
+    val scrollUpOffset by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 600f,
+        targetValue = -650f,
         animationSpec = infiniteRepeatable(
-            animation = tween(18000, easing = LinearEasing),
+            animation = tween(22000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "scrollOffsetDown"
+        label = "scrollUpOffset"
     )
-    val scrollOffsetUp by infiniteTransition.animateFloat(
-        initialValue = 600f,
+
+    // Kolom Tengah bergerak perlahan ke BAWAH (positif offsetY)
+    val scrollDownOffset by infiniteTransition.animateFloat(
+        initialValue = -650f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
             animation = tween(22000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "scrollOffsetUp"
+        label = "scrollDownOffset"
     )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .graphicsLayer {
-                rotationZ = -9f
-                scaleX = 1.35f
-                scaleY = 1.35f
+                rotationZ = -12f
+                scaleX = 1.25f
+                scaleY = 1.25f
             }
     ) {
         Row(
             modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Column 1 (Scrolls Down)
-            MarqueePosterColumn(
-                posters = col1Posters + col1Posters,
-                offsetY = scrollOffsetDown,
+            // Kolom 1 (Bergerak Perlahan ke ATAS)
+            MarqueeColumn(
+                posters = col1Posters + col1Posters + col1Posters,
+                offsetY = scrollUpOffset,
                 modifier = Modifier.weight(1f)
             )
-            // Column 2 (Scrolls Up)
-            MarqueePosterColumn(
-                posters = col2Posters + col2Posters,
-                offsetY = scrollOffsetUp,
+
+            // Kolom 2 (Bergerak Perlahan ke BAWAH)
+            MarqueeColumn(
+                posters = col2Posters + col2Posters + col2Posters,
+                offsetY = scrollDownOffset,
                 modifier = Modifier.weight(1f)
             )
-            // Column 3 (Scrolls Down)
-            MarqueePosterColumn(
-                posters = col3Posters + col3Posters,
-                offsetY = scrollOffsetDown * 0.85f,
+
+            // Kolom 3 (Bergerak Perlahan ke ATAS)
+            MarqueeColumn(
+                posters = col3Posters + col3Posters + col3Posters,
+                offsetY = scrollUpOffset * 0.9f,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -411,7 +448,7 @@ private fun TiltedPosterBackground() {
 }
 
 @Composable
-private fun MarqueePosterColumn(
+private fun MarqueeColumn(
     posters: List<Int>,
     offsetY: Float,
     modifier: Modifier = Modifier
@@ -419,8 +456,8 @@ private fun MarqueePosterColumn(
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .offset { IntOffset(0, (offsetY % 450).toInt() - 250) },
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .offset { IntOffset(0, (offsetY % 500).toInt() - 250) },
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         posters.forEach { resId ->
             Box(
@@ -442,11 +479,8 @@ private fun MarqueePosterColumn(
 }
 
 /**
- * Tampilan Pengguna yang Sudah Login:
- * - Card Profil Lengkap dengan Avatar Border Bergerak (AnimatedAvatarBorder)
- * - Pilihan Tema Border (Kitsune Flame, Neon Cyberpunk, Celestial Gold, Sakura Bloom, Void Abyss)
- * - Daftar Riwayat Tontonan (Watch History)
- * - Tombol Keluar Akun (Logout)
+ * Tampilan Pengguna Setelah Berhasil Masuk:
+ * Menampilkan Avatar Border Bergerak, Informasi Akun, Riwayat Tontonan & Tombol Keluar
  */
 @Composable
 private fun UserProfileView(
@@ -499,7 +533,6 @@ private fun UserProfileView(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Animated Avatar Border
                     AnimatedAvatarBorder(
                         avatarUrl = R.drawable.ic_yuranime_monochrome,
                         avatarSize = 72.dp,
@@ -519,15 +552,14 @@ private fun UserProfileView(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // Badge Role
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFFE23441))
+                            .background(Color(0xFFE11D48))
                             .padding(horizontal = 10.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = "VIP TESTER",
+                            text = "MEMBER AKTIF",
                             color = Color.White,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
@@ -540,23 +572,13 @@ private fun UserProfileView(
                     HorizontalDivider(color = Color(0x1AFFFFFF), thickness = 0.75.dp)
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Quick Stats Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        ProfileStatItem(
-                            title = "Riwayat Ditonton",
-                            value = "${watchHistory.size} Judul"
-                        )
-                        ProfileStatItem(
-                            title = "Status Akun",
-                            value = "Aktif"
-                        )
-                        ProfileStatItem(
-                            title = "Versi App",
-                            value = "v1.9.0"
-                        )
+                        ProfileStatItem(title = "Riwayat Ditonton", value = "${watchHistory.size} Judul")
+                        ProfileStatItem(title = "Status Akun", value = "Aktif")
+                        ProfileStatItem(title = "Versi App", value = "v1.9.0")
                     }
                 }
             }
@@ -579,7 +601,7 @@ private fun UserProfileView(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Pilih tema animasi rotasi avatar dekorasi profil kamu",
+                    text = "Pilih tema animasi rotasi avatar profil kamu",
                     color = Color(0xFF94A3B8),
                     fontSize = 12.sp,
                     fontFamily = SfProFontFamily
@@ -597,7 +619,7 @@ private fun UserProfileView(
                                 .background(if (isSelected) Color(0xFF1E293B) else Color(0xFF12151C))
                                 .border(
                                     width = if (isSelected) 1.5.dp else 0.75.dp,
-                                    color = if (isSelected) Color(0xFFE23441) else Color(0x22FFFFFF),
+                                    color = if (isSelected) Color(0xFFE11D48) else Color(0x22FFFFFF),
                                     shape = RoundedCornerShape(8.dp)
                                 )
                                 .clickable { onBorderThemeSelected(theme) }
@@ -645,7 +667,7 @@ private fun UserProfileView(
                 if (watchHistory.isNotEmpty()) {
                     Text(
                         text = "Bersihkan",
-                        color = Color(0xFFE23441),
+                        color = Color(0xFFE11D48),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         fontFamily = SfProFontFamily,
@@ -743,7 +765,7 @@ private fun UserProfileView(
                     Icon(
                         imageVector = Icons.Filled.PlayArrow,
                         contentDescription = "Putar",
-                        tint = Color(0xFFE23441),
+                        tint = Color(0xFFE11D48),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -759,7 +781,7 @@ private fun UserProfileView(
                     .padding(horizontal = 16.dp)
                     .clip(RoundedCornerShape(10.dp))
                     .background(Color(0xFF1C1315))
-                    .border(0.75.dp, Color(0x33E23441), RoundedCornerShape(10.dp))
+                    .border(0.75.dp, Color(0x33E11D48), RoundedCornerShape(10.dp))
                     .clickable { onLogout() }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center
@@ -768,13 +790,13 @@ private fun UserProfileView(
                     Icon(
                         imageVector = Icons.Filled.Logout,
                         contentDescription = null,
-                        tint = Color(0xFFE23441),
+                        tint = Color(0xFFE11D48),
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Keluar dari Akun",
-                        color = Color(0xFFE23441),
+                        color = Color(0xFFE11D48),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = SfProFontFamily

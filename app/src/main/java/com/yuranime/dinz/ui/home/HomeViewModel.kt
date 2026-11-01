@@ -50,7 +50,7 @@ class HomeViewModel(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             val homeDeferred = async { repository.getHomeData() }
-            val cuplixDeferred = async { repository.getRandomizedCuplixFeed(limit = 25) }
+            val cuplixDeferred = async { repository.getRandomizedCuplixFeed(limit = 25, source = AnimeRepository.CuplixPageSource.HOME) }
             val newTitlesDeferred = async { repository.getHomeNewTitles() }
             val randomDeferred = async { repository.getHomeRandom() }
 

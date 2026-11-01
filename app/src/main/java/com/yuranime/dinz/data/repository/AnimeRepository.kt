@@ -77,25 +77,59 @@ class AnimeRepository(
         }
     }
 
+    enum class CuplixPageSource {
+        HOME, JADWAL, SEARCH, FEED
+    }
+
     /**
-     * Mengambil feed Cuplix acak berkualitas tinggi dengan menggabungkan konten populer ('views')
-     * dan konten terbaru ('new') lalu di-shuffle secara dinamis.
+     * Mengambil feed Cuplix acak berkualitas tinggi dengan variasi batch independen untuk
+     * setiap halaman (Home, Jadwal, Search, Cuplix Feed) serta pengacakan dinamis (shuffled).
      */
-    suspend fun getRandomizedCuplixFeed(limit: Int = 35): Result<List<CuplixItem>> = withContext(Dispatchers.IO) {
+    suspend fun getRandomizedCuplixFeed(
+        limit: Int = 30,
+        source: CuplixPageSource = CuplixPageSource.FEED
+    ): Result<List<CuplixItem>> = withContext(Dispatchers.IO) {
         coroutineScope {
             try {
-                val viewsDeferred = async { getCuplixFeed(limit = limit, sort = "views").getOrDefault(emptyList()) }
-                val newDeferred = async { getCuplixFeed(limit = limit, sort = "new").getOrDefault(emptyList()) }
-
-                val viewsItems = viewsDeferred.await()
-                val newItems = newDeferred.await()
-
-                val combined = (viewsItems + newItems)
-                    .filter { !it.id.isNullOrBlank() }
-                    .distinctBy { it.id }
-                    .shuffled()
-
-                Result.success(combined)
+                val items = when (source) {
+                    CuplixPageSource.HOME -> {
+                        val popular = async { getCuplixFeed(limit = 35, sort = "views").getOrDefault(emptyList()) }
+                        val latest = async { getCuplixFeed(limit = 35, sort = "new").getOrDefault(emptyList()) }
+                        val merged = (popular.await() + latest.await())
+                            .filter { !it.id.isNullOrBlank() }
+                            .distinctBy { it.id }
+                            .shuffled()
+                        merged.take(limit)
+                    }
+                    CuplixPageSource.JADWAL -> {
+                        val latest = async { getCuplixFeed(limit = 40, sort = "new").getOrDefault(emptyList()) }
+                        val popular = async { getCuplixFeed(limit = 20, sort = "views").getOrDefault(emptyList()) }
+                        val merged = (latest.await().shuffled() + popular.await())
+                            .filter { !it.id.isNullOrBlank() }
+                            .distinctBy { it.id }
+                            .shuffled()
+                        merged.take(limit)
+                    }
+                    CuplixPageSource.SEARCH -> {
+                        val popular = async { getCuplixFeed(limit = 45, sort = "views").getOrDefault(emptyList()) }
+                        val latest = async { getCuplixFeed(limit = 25, sort = "new").getOrDefault(emptyList()) }
+                        val list = popular.await().shuffled() + latest.await().shuffled()
+                        list.filter { !it.id.isNullOrBlank() }
+                            .distinctBy { it.id }
+                            .shuffled()
+                            .take(limit)
+                    }
+                    CuplixPageSource.FEED -> {
+                        val popular = async { getCuplixFeed(limit = 40, sort = "views").getOrDefault(emptyList()) }
+                        val latest = async { getCuplixFeed(limit = 40, sort = "new").getOrDefault(emptyList()) }
+                        val merged = (popular.await() + latest.await())
+                            .filter { !it.id.isNullOrBlank() }
+                            .distinctBy { it.id }
+                            .shuffled()
+                        merged
+                    }
+                }
+                Result.success(items)
             } catch (e: Exception) {
                 getCuplixFeed(limit = limit, sort = "views")
             }

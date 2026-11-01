@@ -53,8 +53,10 @@ class JadwalViewModel(
 
             val scheduleDeferred = async { repository.getSchedule(day.apiDay) }
             val cuplixDeferred = async {
-                if (_uiState.value.cuplixList.isEmpty()) repository.getRandomizedCuplixFeed(limit = 15)
-                else Result.success(_uiState.value.cuplixList)
+                repository.getRandomizedCuplixFeed(
+                    limit = 15,
+                    source = AnimeRepository.CuplixPageSource.JADWAL
+                )
             }
 
             val scheduleResult = scheduleDeferred.await()
@@ -65,7 +67,7 @@ class JadwalViewModel(
                     it.copy(
                         isLoading = false,
                         scheduledAnimeList = scheduleResult.getOrDefault(emptyList()),
-                        cuplixList = cuplixResult.getOrDefault(emptyList())
+                        cuplixList = cuplixResult.getOrNull()?.takeIf { list -> list.isNotEmpty() } ?: it.cuplixList
                     )
                 }
             } else {
