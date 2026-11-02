@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -209,8 +210,7 @@ fun LoginProfileScreen(
                         bottomBar = {
                             BottomNavBar(
                                 selectedTab = selectedTab,
-                                onTabSelected = onTabSelected,
-                                onHomeClick = { onTabSelected(NavTab.HOME) }
+                                onTabSelected = onTabSelected
                             )
                         }
                     ) { innerPadding ->
