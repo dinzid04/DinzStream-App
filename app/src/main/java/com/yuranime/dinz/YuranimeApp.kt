@@ -12,6 +12,19 @@ import coil.memory.MemoryCache
 class YuranimeApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
+        try {
+            com.google.firebase.FirebaseApp.initializeApp(this)
+        } catch (e: Exception) {
+            try {
+                val options = com.google.firebase.FirebaseOptions.Builder()
+                    .setApplicationId("1:400464992596:android:68fde66c88d351699610c1")
+                    .setApiKey("AIzaSyAPZsUFl1RoV3bfMWWOsJ0M9yt_YPqrRSg")
+                    .setProjectId("dinz-ai-gemini-copy")
+                    .setStorageBucket("dinz-ai-gemini-copy.firebasestorage.app")
+                    .build()
+                com.google.firebase.FirebaseApp.initializeApp(this, options)
+            } catch (ignored: Exception) {}
+        }
     }
 
     override fun newImageLoader(): ImageLoader {

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "400464992596",
+    "project_id": "dinz-ai-gemini-copy",
+    "storage_bucket": "dinz-ai-gemini-copy.firebasestorage.app",
+    "firebase_url": "https://dinz-ai-gemini-copy-default-rtdb.firebaseio.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:400464992596:android:68fde66c88d351699610c1",
+        "android_client_info": {
+          "package_name": "com.yuranime.dinz"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "400464992596-68fde66c88d351699610c1.apps.googleusercontent.com",
+          "client_type": 3
+        },
+        {
+          "client_id": "400464992596-f9sveo5332t463b2f29n0269v1eb66d8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yuranime.dinz",
+            "certificate_hash": "246875908b8b0e892c53a313b5bf08d2de897932"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPZsUFl1RoV3bfMWWOsJ0M9yt_YPqrRSg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "400464992596-68fde66c88d351699610c1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

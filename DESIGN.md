@@ -1,189 +1,166 @@
 # Spesifikasi Desain & Panduan Pembaruan Yuranime (Single Source of Truth)
 
-Dokumen ini adalah acuan spesifikasi desain dan teknis aplikasi **Yuranime (`com.yuranime.dinz`)** di `/storage/emulated/0/termux/Workspace_uiApp/` berdasarkan gambar referensi terbaru pada `/storage/emulated/0/termux/design/reff/` dan kepatuhan penuh terhadap aturan `.agents/skills/anti-slop/SKILL.md`.
+Dokumen ini adalah acuan spesifikasi desain dan arsitektur teknis aplikasi **Yuranime (`com.yuranime.dinz`)** di `/storage/emulated/0/termux/Workspace_uiApp/` berdasarkan gambar referensi resmi `/storage/emulated/0/termux/design/reff/4d7ec2d15d1d3b7dd4b9ab92096e7692.jpg`, konfigurasi Firebase dari proyek `nimedinz` (`dinz-ai-gemini-copy`), dan kepatuhan penuh terhadap aturan `.agents/skills/anti-slop/SKILL.md` serta `/antislop-ui`.
 
 ---
 
 ## 1. Identitas Brand, Tipografi & Parameter Desain (Anti-Slop Direction)
 
-- **Design Read:** Platform streaming anime mobile native Android untuk penonton Indonesia bergaya dark sinematik premium dengan sentuhan iOS Dark Glassmorphism, tanpa elemen template murahan (anti-slop). Dial parameter: `ENERGY 2 / RHYTHM 2 / MOTION 2`.
-- **Palet Warna Inti (R-01, R-29):**
-  - Background Utama: `#0B0B0B` (Home, Splash, Video Player) & `#0E0F12` (Profile Screen)
-  - Card Surface / Menu Box: `#1A1C20` / `#161B26`
-  - Kontainer iOS Frosted Glassmorphism: `#CC1C1C1E` / `#D9242426` dengan border tipis `0.5.dp` `#26FFFFFF`
-  - Aksen Utama: Crimson Red `#E11D48` / `#EF4444`, iOS Blue `#0A84FF` / `#3B82F6`, Orange `#F97316`
+- **Design Read:** Platform streaming anime mobile native Android untuk penonton Indonesia bergaya *dark cinematic anime* berkelas, dengan sentuhan *cosmic & gold luxury* pada Papan Peringkat, serta *clean iOS Dark Glassmorphism* pada halaman Profile, Edit Profil, Points & Rewards, dan Unduh. Menghilangkan elemen template murah, kotak kaku tebal, dan teks placeholder tanpa arah.
+- **Dial Parameter Anti-Slop:** `ENERGY 2 / RHYTHM 2 / MOTION 2`.
+- **Palet Warna Resmi (R-01, R-29):**
+  - Background Utama: `#0B0B0B` (Home, Splash, Video Player) & `#0E0F12` (Profile & Sub-screens)
+  - Background Kosmik Leaderboard: `#0A071B` / `#0D0A22` dengan aksen gradasi nebula `#19113B`
+  - Kartu Papan Peringkat: `#141026` / `#18132F` dengan garis tepi halus `#2D2258` dan ornamen sudut emas `#EAB308` / `#FACC15`
+  - Podium Emas (TOP 1): Gradasi `#FFF1B8` -> `#F59E0B` -> `#D97706` (Wings emas berkilau)
+  - Podium Perak (TOP 2): Gradasi `#EEF2FF` -> `#818CF8` -> `#6366F1` (Wings perak kebiruan)
+  - Podium Perunggu (TOP 3): Gradasi `#FFE4E6` -> `#FB7185` -> `#E11D48` (Wings coral-rose)
+  - Kontainer Kartu Menu: `#161B26` / `#1A1C20` dengan border `0.5.dp` `#26FFFFFF`
+  - Aksen Utama: Crimson Red `#E11D48` / `#EF4444`, Yuranime Orange `#FF5722` / `#F97316`, Golden Star `#FBBF24`
   - Teks Utama: `#FFFFFF` (Putih Bersih)
-  - Teks Sekunder: `#CBD5E1` / `#94A3B8` / `#E5E5EA`
+  - Teks Sekunder: `#CBD5E1` / `#94A3B8` / `#A5B4FC`
 - **Tipografi Resmi (R-06):**
   - Brand Wordmark: **`Yuranime-logo-font.ttf`** (**Calistoga-Regular**)
-  - UI Umum, Navigasi, Menu & Markdown: **SF Pro Display** (`Regular`, `Medium`, `SemiBold`, `Bold`)
+  - UI Umum, Navigasi, Menu, Skor & Papan Peringkat: **SF Pro Display** (`Regular`, `Medium`, `SemiBold`, `Bold`)
 
 ---
 
-## 2. SPESIFIKASI FITUR 1: Strict SemVer Update Checker & In-App Update Dialog (Anti-False-Positive)
+## 2. SPESIFIKASI FITUR 1: Real-Time Google Login & Firebase Database Architecture
 
-Mengacu pada arsitektur pembaruan aplikasi native yang bersih dan tahan terhadap false-positive rilis GitHub Actions:
+Menggantikan sistem login placeholder/dummy dengan **Real-Time Firebase Authentication + Cloud Firestore** yang terintegrasi langsung dengan database `nimedinz`:
 
-### A. Sinkronisasi Hulu ke Hilir (Gradle & GitHub Actions)
-1. **Injeksi Versi Dinamis:**
-   - `app/build.gradle.kts` mendukung properti `versionName` dan `versionCode` dari Gradle CLI (`-PversionName=...` dan `-PversionCode=...`), dengan fallback default yang valid (contoh: `versionName = "1.9.2"`).
-   - `.github/workflows/android-release.yml` menyuntikkan nilai versi rilis secara konsisten saat `./gradlew assembleRelease` sehingga `BuildConfig.VERSION_NAME` dalam file `.apk` yang dihasilkan 100% identik dengan `tag_name` rilis GitHub.
-2. **Pembersihan String Versi (Normalisasi):**
-   - Hapus semua awalan non-angka seperti `"v"`, `"V"`, `"release-"`, `"Release-"`.
-   - Normalisasikan pemisah build seperti `"-build-"` atau `"-b"` menjadi titik (`.`) atau pecah menjadi segmen angka murni (`major`, `minor`, `patch`, `build`).
+### A. Konfigurasi Proyek Firebase (`dinz-ai-gemini-copy`)
+1. **Identitas & Kunci Proyek:**
+   - **`project_id`**: `dinz-ai-gemini-copy`
+   - **`project_number`**: `400464992596`
+   - **`api_key`**: `AIzaSyAPZsUFl1RoV3bfMWWOsJ0M9yt_YPqrRSg`
+   - **`storage_bucket`**: `dinz-ai-gemini-copy.firebasestorage.app`
+   - **`firestore_database_id`**: `ai-studio-eff2e4c3-4396-44bb-b0c9-0936b4c631a4` (atau `(default)`)
+   - **`application_id` Android**: `1:400464992596:android:68fde66c88d351699610c1`
+   - **`package_name`**: `com.yuranime.dinz`
+2. **File Konfigurasi `app/google-services.json`:**
+   - Menyertakan file `google-services.json` yang memuat konfigurasi lengkap project `dinz-ai-gemini-copy` dengan package name `com.yuranime.dinz`.
+   - Menginisialisasikan `FirebaseApp` secara aman melalui `FirebaseOptions.Builder` sebagai inisialisasi eksplisit agar tidak terjadi crash saat start pada build release atau debug.
 
-### B. Algoritma Strict SemVer Comparison (`isNewerVersion(remote, local)`)
-1. **Aturan Evaluasi Numerik Murni:**
-   - Tidak menggunakan perbandingan string mentah (`!=`) dan tidak membandingkan timestamp `published_at`.
-   - Mengonversi tiap segmen versi menjadi `Int` (contoh: `"1.9.2.19"` -> `[1, 9, 2, 19]`).
-   - Melakukan perbandingan segmen demi segmen dari kiri ke kanan (`major` -> `minor` -> `patch` -> `build`). Jika salah satu segmen tidak tersedia, gunakan nilai default `0`.
-   - Nilai `isNewerVersion(remote, local)` bernilai `true` **HANYA JIKA** remote secara numerik lebih besar dari local (`remote > local`).
-   - Jika remote sama dengan local (`remote == local`) atau remote lebih kecil, atau request API gagal/kosong, hasil perbandingan **WAJIB** `false`.
-2. **Popup Update Trigger:**
-   - Dialog pembaruan otomatis **HANYA BOLEH MUNCUL** saat `info != null && info.isUpdateAvailable == true`.
-   - Pada pengecekan manual di Profil, jika tidak ada versi baru, tampilkan toast informatif bahwa aplikasi sudah menggunakan versi terbaru, bukan memunculkan dialog pembaruan.
-
-### C. Desain Popup Bergaya iOS Frosted Glassmorphism
-1. **Dialog Overlay & Card:**
-   - Card container berbentuk membulat elegan (`RoundedCornerShape(22.dp)`).
-   - Latar belakang dark frosted glass (`#CC1C1C1E` / `#D9242426`) dengan border putih tipis `0.5.dp` (`#26FFFFFF`).
-   - Lebar dialog proporsional (maksimal `360.dp` - `380.dp`) di tengah layar dengan background scrim semi-transparan buram.
-2. **Struktur Konten:**
-   - **Header Atas:** Ikon ilustrasi roket / update badge modern, teks judul **"Pembaruan Tersedia"** atau **"Update Notice"** (SF Bold Putih `18.sp`), teks versi rilis baru (pill oranye/biru), serta tombol silang (close) di pojok kanan atas.
-   - **Area Konten Tengah (Scrollable):** Dapat di-scroll vertikal halus (`rememberScrollState`), menampilkan isi catatan rilis atau `README.md` repositori yang di-render secara rapi.
-   - **Pembatas:** Garis horizontal tipis `0.5.dp` (`#26FFFFFF`) di atas tombol aksi.
-   - **Tombol Aksi Bawah:** Tombol penuh bergaya iOS dengan teks **"Update Sekarang"** (SF Bold Putih), berlatar Crimson Red / iOS Blue (`#0A84FF`), yang membuka browser atau intent unduh file `.apk` terbaru secara langsung.
-
-### D. Custom Markdown & README Renderer (Wajib Render Gambar, Simbol & Link Biru)
-1. **Render Gambar Otomatis:**
-   - Sintaks Markdown `![alt](url)` atau `<img src="url">` diproses dan di-render menjadi komponen `AsyncImage` Coil asli.
-   - Sudut gambar membulat `10.dp`, scale fit/crop rapi, dengan fallback placeholder `ic_yuranime_monochrome`.
-2. **Konversi Simbol Markdown Menjadi Visual Rapi:**
-   - `##` / `###` (Heading): Teks judul tebal (**SF Bold Putih** `15.sp` - `17.sp`) dengan garis aksen tipis di bawahnya.
-   - `*` atau `-` (Bullet list): Baris item rapi dengan titik bulat kecil (`CircleShape` aksen merah/biru) di sebelah kiri dan teks rapi di kanan.
-   - `>` (Blockquote): Kotak kutipan dengan padding dalam, latar gelap semi-transparan, dan garis vertikal tebal di sisi kiri (aksen oranye `#F97316` atau biru `#0A84FF`) tanpa menampilkan karakter `>`.
-   - `**teks**`: Dirender tebal (**SF Bold Putih**).
-   - `---` / `***`: Dirender sebagai `HorizontalDivider(thickness = 0.5.dp, color = Color(0x26FFFFFF))`.
-3. **Teks URL Berwarna Biru & Bisa Diklik:**
-   - Semua format URL (`https://...` atau `[teks](url)`) dirender dengan warna Biru iOS (`#0A84FF`), bergaris bawah halus, dan dapat diklik untuk membuka tautan via browser.
+### B. Alur Real-Time Google Sign-In & Fallback Web OAuth
+1. **Dual Flow Login Google:**
+   - **Flow Utama:** Menggunakan Google Credential Manager / `GoogleSignInClient` dengan Web Client ID untuk mendapatkan ID Token, lalu login via `FirebaseAuth.getInstance().signInWithCredential(GoogleAuthProvider.getCredential(idToken, null))`.
+   - **Flow Fallback (100% Reliable di Semua HP):** Menggunakan `FirebaseAuth.getInstance().startActivityForSignInWithProvider(activity, OAuthProvider.newBuilder("google.com").build())` via Chrome Custom Tabs yang menjamin login Google sukses tanpa ketergantungan pencocokan SHA-1 fingerprint keystore lokal.
+2. **Sinkronisasi Profil Dokumen Firestore (`users/{uid}`):**
+   - Saat user pertama kali login atau membuka aplikasi:
+     - Dokumen `users/{uid}` disinkronkan secara *real-time* via snapshot listener.
+     - Struktur field:
+       - `uid`: String ID unik dari Google
+       - `name`: String nama asli dari akun Google (dapat diedit)
+       - `username`: String tag pengguna (contoh `@gading_04`)
+       - `email`: String email pengguna
+       - `avatar`: String URL foto profil (default foto Google)
+       - `banner`: String URL gambar cover (default banner anime berkualitas tinggi)
+       - `bio`: String bio profil
+       - `level`: Int level saat ini (dimulai dari `1`)
+       - `exp`: Long akumulasi XP pengguna (default `0`)
+       - `points`: Long koin/poin reward pengguna (default `100`)
+       - `lastCheckInDate`: Long timestamp atau string tanggal check-in harian terakhir
+       - `levelInfo`: Object `{ level: 1, exp: 0, unlockedBadges: [] }` (kompatibel penuh dengan `nimedinz`)
+3. **Akumulasi XP & Poin Real-Time:**
+   - Menonton episode: `+20 XP` & `+10 Points`
+   - Memberi komentar/reaksi: `+10 XP` & `+5 Points`
+   - Daily Check-In: `+50 XP` & `+10..50 Points`
 
 ---
 
-## 3. SPESIFIKASI FITUR 2: Perbaikan Total Halaman Login
+## 3. SPESIFIKASI FITUR 2: Perbaikan Halaman Profile (Anti-Slop & Anti-Gap)
 
-Mengacu pada screenshot evaluasi `/storage/emulated/0/termux/design/reff/Screenshot_20261101_220141_Yuranime.jpg`.
-
-1. **Sembunyikan Bottom Navigation Bar:**
-   - Saat pengguna belum login dan berada di layar Login (`!isLoggedIn`), **SEMBUNYIKAN sepenuhnya Bottom Navigation Bar**. Jangan ada ruang kosong maupun tab navbar yang terlihat.
-2. **Ikon Panah Kembali di Pojok Kanan Atas:**
-   - Di pojok kanan atas layar Login (dengan status bar padding yang aman), sediakan tombol ikon panah kembali (`Icons.AutoMirrored.Filled.ArrowForward` atau `Icons.Default.ArrowForward` / tombol `✕` / panah kembali bersih) yang saat diklik langsung mengarahkan pengguna kembali ke **Beranda Utama (`HomeScreen`)**.
-3. **Perbaiki Ikon Rubah & Posisi Teks `YURANIME`:**
-   - **Hapus Background Hitam:** Hilangkan background lingkaran hitam pada ikon rubah. Latar belakang ikon menjadi 100% transparan menyatu dengan poster overlay.
-   - **Perbesar Ukuran Ikon:** Gunakan ukuran ikon rubah putih `84.dp` (menggunakan `ic_yuranime_monochrome` berkualitas tinggi).
-   - **Geser Posisi ke Atas:** Posisikan keseluruhan grup (Ikon Rubah + Teks `YURANIME` + Subteks "Tempat Nonton Anime Subtitle Indonesia") di sekitar posisi 28% - 32% dari atas layar, menghasilkan komposisi visual yang seimbang dan tidak tenggelam ke tengah.
-4. **Perbaiki Kolase Poster Bergerak:**
-   - **Perlambat Kecepatan:** Kecepatan *auto-scroll* vertikal diperlambat secara signifikan agar pergerakan poster tenang, halus, dan sinematik.
-   - **Rapatkan Jarak Poster:** Jarak horizontal dan vertikal antar poster dirapatkan menggunakan `Arrangement.spacedBy(8.dp)`.
-   - **True Seamless Infinite Loop (Anti-Glitch):** Implementasikan infinite scroll menggunakan indeks modulo virtual berulang tanpa lompatan atau glitch saat loop berjalan.
-
----
-
-## 4. SPESIFIKASI FITUR 3: Pembuatan Halaman Profile Setelah Login
-
-Mengacu persis pada tangkapan layar desain `/storage/emulated/0/termux/design/reff/Screenshot_20261101_220757.jpg`.
-
-1. **Header Banner, Avatar, Nama & Level:**
-   - Bagian atas menampilkan **Cover/Banner Profil Landscape Anime** dengan gradasi halus menghitam ke warna background utama (`#0E0F12`) di batas bawah.
-   - Sisi kiri bawah banner: **Foto Profil Bulat** berukuran `78.dp` dengan border oranye tipis (`#F97316`) dan **badge ikon kamera biru kecil** (`#3B82F6`) di pojok kanan bawah avatar.
-   - Sisi kanan avatar: **Nama Pengguna** (font **SF Bold Putih** `20.sp`) diikuti **ikon pensil edit** di sebelahnya, serta teks status **`Lv. 1`** (warna abu-abu terang `#94A3B8`) tepat di bawah nama.
-2. **Baris Tombol Media Sosial (Scrollable Row):**
-   - Deretan kapsul (*pill buttons*) ber-border tipis dengan background `#161B22` transparan:
-     - **WhatsApp** (ikon & teks hijau `#25D366`)
-     - **Telegram** (ikon & teks biru `#38BDF8`)
-     - **Instagram** (ikon & teks pink kemerahan `#E1306C`)
-     - **TikTok** (ikon & teks putih bersih `#FFFFFF`)
-     - **Discord** (ikon & teks ungu kebiruan `#5865F2`)
-   - Setiap tombol dapat diklik untuk membuka tautan sosial media resmi Yuranime atau browser.
-3. **Daftar Menu Profil (Hanya Menu Pilihan Sesuai Permintaan):**
-   - **HAPUS / JANGAN TAMPILKAN:** `Berlangganan`, `Nonton Bareng`, `Squad`, `Giveaway`, dan `Event`.
-   - **TAMPILKAN 5 MENU UTAMA + LOGOUT:**
-     Desain menu menggunakan ikon dalam kotak membulat gelap (`#1A1C20`) di kiri, teks judul **SF SemiBold Putih** `15.sp` + deskripsi abu-abu di tengah, dan aksen/indikator di kanan:
-     1. **`Edit Profil`** (Ikon Pensil) : Sub-teks *"Ganti Foto atau Cover"* (kanan: chevron `>`). Membuka dialog interaktif untuk mengganti nama pengguna, foto avatar, atau banner cover profil secara langsung dan tersimpan di database lokal.
-     2. **`Unduh`** (Ikon Download) : Sub-teks *"Kelola konten yang diunduh"* (kanan: chevron `>`).
-     3. **`Papan Peringkat`** (Ikon Trophy) : Sub-teks *"Lihat peringkat XP bulanan"* (kanan: badge pill biru **`TOP 100`**).
-     4. **`Points & Rewards`** (Ikon Bintang) : Sub-teks *"Check-in harian & tukar poin"* (kanan: badge pill kuning emas **`★ 60`**).
-     5. **`Info`** (Ikon Info) : Sub-teks *"Simak Cerita Kami"* (kanan: chevron `>`).
-     6. **`Keluar dari Akun / Logout`** (Ikon Logout Merah) : Opsi keluar akun yang rapi di bagian bawah yang mengembalikan status sesi menjadi belum login dan berpindah ke layar Login.
-4. **Bottom Navigation Bar Tetap Ditampilkan:**
-   - Saat pengguna berada di `ProfileScreen` dalam keadaan sudah login, Bottom Navigation Bar tetap aktif di bagian bawah layar.
+1. **HAPUS Baris Tombol Media Sosial:**
+   - **Hapus sepenuhnya** baris scrollable tombol `WhatsApp`, `Telegram`, `Instagram`, `TikTok`, dan `Discord` dari `ProfileScreen`!
+2. **Header Kompak & Terpadu:**
+   - **Cover Banner:** Tampil di bagian atas dengan rasio proporsional, bergradasi halus menghitam ke warna background `#0E0F12`.
+   - **Avatar Bulat:** Diameter `76.dp` memuat foto asli dari Google/Firebase, dilengkapi border oranye tipis (`#FF5722`) dan badge kamera biru (`#3B82F6`) untuk edit foto.
+   - **Nama & Level Info:** Tepat di sebelah kanan avatar, menampilkan **Nama Pengguna** (SF Bold Putih `20.sp`), ikon edit pensil, badge status **`Lv. [Level]`**, serta bar progres XP tipis (`4.dp`) dengan indikator angka XP saat ini menuju level berikutnya.
+3. **Daftar Menu Rapat & Bersih (`Arrangement.spacedBy(8.dp)`):**
+   - Langsung menempel tepat di bawah header profil tanpa ruang kosong besar (`Spacer(12.dp)`):
+     - **`Edit Profil`** (*"Ganti Nama, Foto atau Cover"*) -> Navigasi ke Layar Edit Profil
+     - **`Unduh`** (*"Kelola konten yang diunduh"*) -> Navigasi ke Layar Unduh
+     - **`Papan Peringkat`** (*"Lihat peringkat XP bulanan"* — badge `TOP 100`) -> Navigasi ke Layar Papan Peringkat
+     - **`Points & Rewards`** (*"Check-in harian & tukar poin"* — badge `★ [Poin Real-time]`) -> Navigasi ke Layar Rewards
+     - **`Info`** (*"Simak Cerita Kami"*) -> Modal info aplikasi & lisensi
+     - **`Keluar Akun`** -> Logout bersih memanggil `FirebaseAuth.getInstance().signOut()` dan reset state auth ke layar login.
 
 ---
 
-## 5. SPESIFIKASI FITUR 4: Streaming Episode Selector & State Synchronization (Anti-Slop Design)
+## 4. SPESIFIKASI FITUR 3: Halaman Khusus Papan Peringkat (100% Mengacu Gambar Referensi)
 
-Komponen pemilihan episode horizontal yang diletakkan tepat di bawah kontainer Info Anime (`#12151C`) dan tepat di atas header `COVER & POSTER` pada `StreamingScreen`, dilengkapi pemisahan tegas antara logika pergantian episode dan pergantian resolusi video:
+Halaman `LeaderboardScreen` dibuka saat menu "Papan Peringkat" diklik, mengambil data peringkat XP seluruh pengguna dari koleksi `users` di Firebase secara *real-time*.
 
-### A. State Reset Pergantian Episode vs Pergantian Resolusi (Playback Lifecycle)
-1. **Pemisahan Logika Pergantian Resolusi (Episode Sama):**
-   - Saat pengguna mengganti resolusi video (misal dari 720p ke 480p atau sebaliknya pada episode yang sedang ditonton):
-     - Catat posisi terakhir pemutaran: `val savedPosition = exoPlayer.currentPosition`.
-     - Ganti URL media stream ke URL resolusi baru.
-     - Lakukan `exoPlayer.seekTo(savedPosition)` agar pemutaran video berlanjut persis di detik yang sama tanpa kembali ke awal.
-2. **Pemisahan Logika Pergantian Episode (Episode Berbeda / Klik Episode Lain / Auto-Next):**
-   - **Wajib Reset Posisi & Durasi ke `0L`:** `savedPosition = 0L` dan `uiState.currentPositionMs = 0L`, `uiState.durationMs = 0L`. Dilarang keras membawa posisi atau durasi episode lama ke episode baru.
-   - Segera hentikan pemutaran stream lama secara instan: `exoPlayer.stop()` dan `exoPlayer.clearMediaItems()`.
-   - Di `StreamingViewModel`, fungsi `selectEpisode(newEpisodeId, newEpisodeNumber)` secara reaktif:
-     1. Memperbarui `currentEpisodeId` dan `currentEpisodeNumber` sehingga judul info `Episode [Nomor]` seketika berganti tanpa delay.
-     2. Mengosongkan `selectedServer` lama agar ExoPlayer tidak terus memutar stream lama saat request jaringan sedang berlangsung.
-     3. Memanggil ulang API **Stream / Server Resolusi** khusus untuk `newEpisodeId`.
-     4. Memanggil ulang API **Komentar (`COMMENTS`)** dan jumlah *views* khusus untuk `newEpisodeId` agar data komentar dan statistik penonton 100% akurat sesuai episode baru.
-3. **ExoPlayer Lifecycle Keying di `CustomExoPlayerView`:**
-   - Gunakan `LaunchedEffect(currentEpisodeId, currentStreamUrl)` sebagai key sinkronisasi pemutaran.
-   - Deteksi apakah perubahan stream berasal dari resolusi pada episode yang sama (`isResolutionChangeOnly`) atau pergantian episode (`isNewEpisode`):
-     ```kotlin
-     exoPlayer.stop()
-     exoPlayer.clearMediaItems()
-     exoPlayer.setMediaItem(MediaItem.fromUri(currentStreamUrl))
-     exoPlayer.prepare()
-     exoPlayer.seekTo(if (isResolutionChangeOnly) savedPosition else 0L)
-     exoPlayer.playWhenReady = true
-     ```
-   - Dengan alur ini, saat pengguna berpindah dari Episode 12 ke Episode 11 (atau episode mana pun), video, durasi awal (`00:00`), judul `Episode [Nomor]`, jumlah views, dan daftar komentar di bawahnya 100% berganti ke episode yang baru diklik.
+### A. Area Podium Atas (`TOP 1`, `TOP 2`, `TOP 3`)
+- Mengacu persis pada komposisi gambar `/storage/emulated/0/termux/design/reff/4d7ec2d15d1d3b7dd4b9ab92096e7692.jpg`.
+- Latar belakang kosmik malam pekat bertabur bintang lembut (`#0A071B` / `#0D0A22`) dengan pendar cahaya halus di belakang podium.
+1. **Posisi Tengah-Atas (`TOP 1` - Juara 1):**
+   - Avatar bulat paling besar (`88.dp`) dibingkai dengan **ornamen sayap & lingkaran emas berkilau**, serta badge pelat logam **`TOP 1`** di bawah avatar.
+   - Di bawah badge terdapat panji/perisai perisai emas berujung lancip dengan gradasi warna **Emas-Oranye Cerah** (`#FFF1B8` -> `#F59E0B` -> `#D97706`).
+   - Di dalam perisai tercantum: **Nama Pengguna** (SF Bold) dan **Total Skor XP** (SF Bold tebal) di bawahnya, diakhiri dengan aksen belah ketupat emas berkilau di ujung lancip bawah.
+2. **Posisi Kiri (`TOP 2` - Juara 2):**
+   - Posisinya sedikit lebih rendah dari Top 1.
+   - Avatar bulat (`72.dp`) dibingkai dengan **ornamen sayap perak / biru-ungu**, badge pelat logam **`TOP 2`**.
+   - Panji perisai gradasi **Biru-Ungu / Perak** (`#EEF2FF` -> `#818CF8` -> `#6366F1`) memuat Nama Pengguna dan Total Skor XP.
+3. **Posisi Kanan (`TOP 3` - Juara 3):**
+   - Posisi sejajar dengan Top 2 di sisi kanan.
+   - Avatar bulat (`72.dp`) dibingkai dengan **ornamen sayap perunggu / coral-pink**, badge pelat logam **`TOP 3`**.
+   - Panji perisai gradasi **Coral-Pink / Rose** (`#FFE4E6` -> `#FB7185` -> `#E11D48`) memuat Nama Pengguna dan Total Skor XP.
 
-### B. Dual-Mode Episode Selector (Thumbnail Mode & Compact Number Mode) — Anti-Slop UI
-Mendukung 2 mode tampilan daftar episode yang bersih, proporsional, dan dapat diubah secara instan oleh pengguna:
+### B. Baris Header Tabel
+- Di bawah area podium terdapat bar horizontal transparan gelap dengan 3 kolom penanda:
+  - **Kiri:** `Peringkat` (SF Medium `#938CB7` `13.sp`)
+  - **Tengah:** `Pengguna` (SF Medium `#938CB7` `13.sp`)
+  - **Kanan:** `Total XP` diikuti ikon belah ketupat kecil **`?`** (yang ketika diklik memunculkan dialog panduan cara mendapatkan XP).
 
-1. **Baris Header `EPISODE` + Toggle Mode Tampilan + Inline Search:**
-   - Disusun dalam 1 baris header yang rapi, ergonomis, dan tidak berhimpitan:
-     - **Kiri:** Teks judul **`EPISODE`** (font **SF Bold** putih `14.sp`, letter-spacing `0.5.sp`) diikuti total episode (`• 12 Ep` warna abu-abu netral `#64748B`).
-     - **Tengah/Kanan:** Kolom pencarian ringkas (*inline search pill*, tinggi `30.dp`, latar `#14171F` tanpa border kaku) dengan placeholder `Cari ep..` (`12.sp`, warna `#64748B`) untuk melompat/memfilter nomor episode secara reaktif.
-     - **Paling Kanan:** Tombol ikon bersih (**Toggle View Mode**: ikon Thumbnail/Image Card vs ikon Number Grid/Pill) untuk beralih antara **Mode Gambar** dan **Mode Tanpa Gambar**.
-     - **Persistensi State:** Mode tampilan pilihan pengguna disimpan ke `SharedPreferences` (`"episode_selector_view_mode"`: `"THUMBNAIL"` vs `"NUMBER"`) sehingga preferensi pengguna selalu diingat saat aplikasi dibuka kembali.
-   - **Adaptive Range Selector (> 50 Episode):**
-     - Jika total episode `> 50`, tampilkan baris tab rentang tipis dan bersih (`1 - 100`, `101 - 200`, dst.) tepat di bawah header dengan chunking 100 episode per tab. Jika total episode `<= 50`, baris rentang disembunyikan.
-
-2. **Mode 1: Versi Dengan Gambar (Thumbnail Card Row — Clean & Anti-Slop):**
-   - Menggunakan `LazyRow` dengan `Arrangement.spacedBy(10.dp)` dan `PaddingValues(horizontal = 16.dp)`.
-   - **Dimensi & Rasio:** Kartu horizontal bersih dengan lebar proporsional sekitar `140.dp`–`150.dp`, gambar thumbnail rasio `16:9`, membulat halus `RoundedCornerShape(10.dp)`.
-   - **Fallback Placeholder:** Jika thumbnail episode kosong atau belum ter-render, tampilkan permukaan gelap `#14171F` dengan logo monokrom Yuranime (`ic_yuranime_monochrome`) di tengahnya.
-   - **Overlay Info Episode:** Lapisan gradasi gelap transparan tipis di sudut bawah thumbnail dengan teks **`Ep [Nomor]`** (font **SF Bold** putih `12.sp`).
-   - **Indikator Episode Aktif (Sedang Ditonton):**
-     - Garis tepi aksen tipis Oranye/Crimson Yuranime (`1.5.dp`, `#FF5722`).
-     - Badge kecil di pojok atas gambar dengan teks **`PLAYING`** atau ikon gelombang/play minimalis berlatar semi-transparan gelap oranye untuk mempertegas episode yang sedang aktif.
-
-3. **Mode 2: Versi Tanpa Gambar (Compact Number Pill Row):**
-   - Menggunakan `LazyRow` dengan `Arrangement.spacedBy(8.dp)` dan `PaddingValues(horizontal = 16.dp)`.
-   - Deretan tombol nomor episode ringkas: tinggi `40.dp`, lebar minimum `48.dp`, membulat `RoundedCornerShape(8.dp)`.
-   - **Episode Aktif:** Latar Oranye/Crimson Yuranime (`#FF5722`), teks nomor episode **SF Bold Putih (`13.sp`)**.
-   - **Episode Lainnya:** Latar gelap bersih (`#14171F` tanpa border tebal), teks nomor episode **SF SemiBold** abu-abu terang (`#CBD5E1`, `13.sp`).
-
-4. **Auto-Scroll Mulus (Smooth Auto-Scroll):**
-   - Baik pada Mode Gambar maupun Mode Tanpa Gambar, `LazyRow` otomatis melakukan `animateScrollToItem` ke episode yang sedang diputar ketika pertama kali dibuka atau saat pengguna berpindah episode.
+### C. Daftar Peringkat `4` sampai `100` (Kartu Ornamen Kosmik Gelap)
+- Menggunakan `LazyColumn` vertikal yang halus:
+- Setiap baris berupa kartu horizontal berwarna ungu-gelap kosmik (`#141026` / `#18132F`) dengan **aksen garis sudut emas tipis** di keempat pojoknya (`#EAB308` / `#FACC15`) dan ornamen mahkota sayap mini di bagian tengah garis atas.
+- **Sisi Kiri:** Bentuk **Belah Ketupat Putih Bersih (`◇`, rotasi 45°)** dengan angka peringkat tebal (`4`, `5`, `6`, dst.) di tengahnya.
+- **Sebelah Kanan Belah Ketupat:** **Avatar Bulat** pengguna (`46.dp`) dengan border halus.
+- **Tengah:** **Nama Pengguna** (font **SF Bold** putih `15.sp`).
+- **Kanan:** **Jumlah Skor XP** (font **SF Bold** warna emas terang `#FDE68A` `16.sp`).
+- **Sticky Bottom Bar (Peringkat Pengguna):** Di bagian paling bawah layar terdapat bar melayang yang menampilkan posisi peringkat, avatar, nama, dan XP milik pengguna yang sedang login saat ini.
 
 ---
 
-## 6. SPESIFIKASI FITUR 5: Verifikasi Build, Release & GitHub Actions
+## 5. SPESIFIKASI FITUR 4: Rombak Halaman Edit Profil, Points & Rewards, dan Unduh
 
-1. Kode ter-compile bersih tanpa error melalui Gradle.
-2. Commit dan push dilakukan dari direktori `/storage/emulated/0/termux/Workspace_uiApp/` ke repositori `dinzid04/DinzStream-App`.
-3. Pantau workflow GitHub Actions hingga berstatus **Success (Hijau)** dan rilis `.apk` terbaru siap diunduh.
+### A. Halaman `Edit Profil` (Real-Time Cloud Sync)
+- **Preview Cover Banner & Avatar:**
+  - Menampilkan preview banner cover di atas dan avatar profil bulat di kiri bawah.
+  - Masing-masing dilengkapi tombol kamera bersih untuk memilih foto dari galeri HP via `ActivityResultContracts.PickVisualMedia` atau memilih dari koleksi avatar/cover anime siap pakai.
+- **Formulir Bersih:**
+  - Input teks bersih untuk **Nama Tampilan (Display Name)** dan **Bio Singkat**.
+  - Tombol **`Simpan Perubahan`** bergaya iOS berlatar Yuranime Orange (`#FF5722`), memanggil `UserProfileChangeRequest` pada `FirebaseAuth` dan melakukan `updateDoc` pada dokumen Firestore `users/{uid}` secara *real-time*.
+
+### B. Halaman `Points & Rewards` (Daily Check-In & Tukar Hadiah)
+- **Header Saldo Poin:**
+  - Card bertema gelap dengan ikon bintang emas berkilau (`#FBBF24`) dan angka poin *real-time* dari Firebase.
+- **Kalender Check-In 7 Hari:**
+  - 7 kapsul hari bersih (`Hari 1` s/d `Hari 7`) dengan nominal reward (`+10`, `+15`, `+20`, `+25`, `+30`, `+40`, `+50`).
+  - Tombol aksi **`Klaim Check-In Hari Ini`** yang otomatis non-aktif jika sudah diklaim pada hari yang sama (tercatat di Firebase).
+- **Misi Harian & Penukaran:**
+  - Daftar misi harian bersih tanpa border kaku (*Tonton 1 Episode = +20 Poin*, *Beri Reaksi Komentar = +10 Poin*).
+  - Daftar item penukaran (*Badge Komentar Spesial*, *Bingkai Avatar Emas*, *Title Level Otaku Sepuh*) yang bisa ditukarkan dengan poin.
+
+### C. Halaman `Unduh` (Manajemen Konten Offline)
+- **Indikator Penyimpanan:**
+  - Bar tipis minimalis di bagian atas yang menampilkan penggunaan memori penyimpanan perangkat.
+- **Tab Filter:**
+  - Tab bersih: `Selesai` dan `Sedang Mengunduh`.
+- **Daftar Episode:**
+  - Thumbnail 16:9 di sisi kiri, judul anime, nomor episode, dan ukuran file di tengah, tombol putar langsung dan hapus di sisi kanan.
+  - *Empty State:* Menampilkan visual bersih dengan vektor `ic_yuranime_monochrome` dan teks proporsional yang mengarahkan penonton untuk mengunduh episode anime favorit.
+
+---
+
+## 6. Kepatuhan Standar Anti-Slop (Delivery Gate Checklist)
+
+- **R-01 & R-29 (Color Craft):** Tidak ada gradasi default biru-ungu AI generik. Warna emas dan kosmik ungu dirancang khusus sesuai identitas referensi podium.
+- **R-02 (Copywriting):** Tidak ada karakter em dash (`—`) pada teks UI. Menggunakan tanda titik dua (`:`), koma (`,`), atau kurung `()`.
+- **R-03 & R-39 (Mobile Interaction & Touch Targets):** Semua tombol dan item interaktif memiliki tinggi tap target minimum 44dp dan respons visual klik instan.
+- **R-17 & R-36 (Real Data):** Semua data XP, level, poin, dan profil berasal langsung dari Firestore `users/{uid}`, bukan angka dummy yang dibuat-buat.
+- **R-24 & R-26 (Interactive Completeness):** Setiap menu di profil memiliki layar tujuan yang aktif dan berfungsi nyata.
+- **R-27 (UI States):** Tersedia *loading shimmer/spinner*, *empty state*, dan *error recovery* pada semua pembacaan data Firebase.

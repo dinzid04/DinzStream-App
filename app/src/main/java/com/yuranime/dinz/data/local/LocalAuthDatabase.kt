@@ -140,6 +140,7 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
             put("timestamp", System.currentTimeMillis())
         }
         db.insertWithOnConflict("comment_reactions", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+        com.yuranime.dinz.data.firebase.FirebaseManager.addExpAndPoints(5L, 2L)
     }
 
     fun getReaction(commentId: String): String? {
@@ -164,6 +165,7 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
             put("parent_id", parentId)
         }
         db.insert("local_comments", null, cv)
+        com.yuranime.dinz.data.firebase.FirebaseManager.addExpAndPoints(10L, 5L)
 
         return EpisodeCommentItem(
             id = newId,
@@ -245,6 +247,7 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
             put("updated_at", System.currentTimeMillis())
         }
         db.insertWithOnConflict("watch_history", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+        com.yuranime.dinz.data.firebase.FirebaseManager.addExpAndPoints(20L, 10L)
     }
 
     fun getWatchHistory(): List<WatchHistoryItem> {

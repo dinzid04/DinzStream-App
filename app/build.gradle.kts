@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -10,9 +11,9 @@ android {
 
     val propVersionName = (project.findProperty("versionName") as? String)
         ?.removePrefix("v")?.removePrefix("V")
-        ?: "1.9.3"
+        ?: "1.9.4"
     val propVersionCode = (project.findProperty("versionCode") as? String)?.toIntOrNull()
-        ?: 9
+        ?: 10
 
     defaultConfig {
         applicationId = "com.yuranime.dinz"
@@ -101,6 +102,18 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // Firebase (Real-Time Auth & Cloud Firestore)
+    val firebaseBom = platform("com.google.firebase:firebase-bom:33.5.1")
+    implementation(firebaseBom)
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
+
+    // Google Sign-In & Credential Manager
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     // Debugging / Tooling
     debugImplementation("androidx.compose.ui:ui-tooling")
