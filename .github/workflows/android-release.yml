@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  APP_VERSION: "1.9.2"
+
 jobs:
   build:
     name: Build & Publish Release APK
@@ -31,56 +34,52 @@ jobs:
 
       - name: Build APK via Gradle
         run: |
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew assembleRelease -PversionName="${{ env.APP_VERSION }}-build-${{ github.run_number }}" -PversionCode="${{ github.run_number }}" --no-daemon --stacktrace
 
       - name: Prepare APK for Release
         run: |
           mkdir -p build-output
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk build-output/Yuranime-v1.9.1.apk
+            cp app/build/outputs/apk/release/app-release.apk build-output/Yuranime-v${{ env.APP_VERSION }}.apk
           elif [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
-            cp app/build/outputs/apk/debug/app-debug.apk build-output/Yuranime-v1.9.1.apk
+            cp app/build/outputs/apk/debug/app-debug.apk build-output/Yuranime-v${{ env.APP_VERSION }}.apk
           else
-            find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-output/Yuranime-v1.9.1.apk \;
+            find app/build/outputs/apk/ -name "*.apk" -exec cp {} build-output/Yuranime-v${{ env.APP_VERSION }}.apk \;
           fi
-          ls -lh build-output/Yuranime-v1.9.1.apk
+          ls -lh build-output/Yuranime-v${{ env.APP_VERSION }}.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Yuranime-APK
-          path: build-output/Yuranime-v1.9.1.apk
+          path: build-output/Yuranime-v${{ env.APP_VERSION }}.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.event_name != 'pull_request'
         with:
-          tag_name: "v1.9.1-build-${{ github.run_number }}"
-          name: "Yuranime v1.9.1 - In-App Update Notice, New Login Experience & Profile Screen (Build #${{ github.run_number }})"
+          tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
+          name: "Yuranime v${{ env.APP_VERSION }} - Horizontal Episode List + Search & Strict SemVer Update Checker (Build #${{ github.run_number }})"
           body: |
-            ## Yuranime Android App v1.9.1 Release
+            ## Yuranime Android App v1.9.2 Release
 
             ### Pembaruan Utama:
-            1. **In-App Update Notification Popup (iOS Blurred Style + Full GitHub README & Image Renderer):**
-               - Pengecekan otomatis versi semver saat aplikasi dibuka membandingkan versi lokal dengan rilis GitHub.
-               - Dialog popup bergaya iOS Dark Frosted Glassmorphism dengan overlay hitam semi-transparan (`#CC1C1C1E` / `#D9242426`), border putih tipis `0.5.dp`, dan tipografi SF Bold & SF SemiBold.
-               - Custom Markdown & GitHub README renderer yang merender gambar (`AsyncImage` dengan rounded corner `10.dp`), heading dengan aksen pembatas, bullet list titik bulat, blockquote dengan aksen oranye vertikal, format tebal, dan teks URL biru iOS (`#0A84FF`) yang bisa diklik.
-               - Tombol aksi penuh bergaya iOS "Update Sekarang" yang langsung mengunduh/membuka file APK terbaru.
-            2. **Perbaikan Total Halaman Login:**
-               - Bottom Navigation Bar disembunyikan sepenuhnya saat pengguna berada di halaman login.
-               - Tombol ikon panah kembali ke beranda di pojok kanan atas dengan jarak aman status bar.
-               - Ikon rubah diperbesar dan berlatar belakang 100% transparan (tanpa bulatan hitam) serta digeser ke posisi sekitar 28%-32% dari atas layar.
-               - Kolase poster bergerak lebih lambat, lebih rapat (`Arrangement.spacedBy(8.dp)`), dan True Seamless Infinite Loop (anti-glitch).
-            3. **Pembuatan Halaman Profile Setelah Login:**
-               - Header banner landscape anime dengan gradasi gelap menyatu ke latar utama (`#0E0F12`).
-               - Foto profil bulat dengan border oranye tipis dan badge kamera biru di pojok kanan bawah.
-               - Nama pengguna dengan ikon pensil edit serta teks level pengguna `Lv. 1`.
-               - Baris scrollable tombol media sosial: WhatsApp (hijau), Telegram (biru), Instagram (pink), TikTok (putih), Discord (ungu-kebiruan).
-               - 5 Menu profil bersih: Edit Profil (interaktif), Unduh, Papan Peringkat (TOP 100), Points & Rewards (★ 60), Info Cerita Kami (+ Cek Pembaruan), dan Keluar / Logout.
+            1. **Strict SemVer Update Checker (Anti False-Positive):**
+               - Sinkronisasi `versionName` dari hulu ke hilir dengan injeksi `-PversionName` pada kompilasi Gradle sesuai `tag_name` rilis GitHub.
+               - Pengecekan versi menggunakan perbandingan numerik SemVer segmen demi segmen (`remote > local`). Popup update dilarang muncul jika versi sama atau gagal memuat API.
+            2. **Section Daftar Episode Horizontal + Search di Halaman Streaming:**
+               - Header rapi judul EPISODE dengan total episode (`• N Ep`) dan kolom pencarian inline minimalis (`Cari ep..`).
+               - Adaptive range selector (`1 - 100`, `101 - 200`, dst.) otomatis muncul untuk anime berepisode panjang (> 50 episode) dan disembunyikan untuk anime pendek.
+               - Item episode horizontal `LazyRow` berukuran proporsional (tinggi 44dp, sudut membulat 10dp).
+               - Active state berlatar aksen Oranye/Crimson dengan teks SF Bold putih dan ikon playing minimalis, serta auto-scroll otomatis ke episode yang sedang ditonton.
+               - Pergantian episode instan dengan pembaruan stream, info anime, dan komentar secara mulus.
+            3. **In-App Update Notification Popup & Profile Screen:**
+               - Dialog pembaruan bergaya iOS dark frosted glassmorphism dan custom markdown renderer.
+               - Halaman Profil lengkap dengan edit avatar, banner, dan tautan komunitas.
           draft: false
           prerelease: false
           make_latest: true
           files: |
-            build-output/Yuranime-v1.9.1.apk
+            build-output/Yuranime-v${{ env.APP_VERSION }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,6 +37,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -62,6 +64,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sort
@@ -142,12 +145,14 @@ fun StreamingScreen(
     episodeId: String,
     movieId: String,
     onBackClick: () -> Unit,
+    onEpisodeChange: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: StreamingViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = context as? ComponentActivity
+    val episodeRowState = rememberLazyListState()
 
     LaunchedEffect(episodeId, movieId) {
         viewModel.loadStreaming(episodeId = episodeId, movieId = movieId)
@@ -480,6 +485,268 @@ fun StreamingScreen(
                                                     tint = Color(0xFF3B82F6),
                                                     modifier = Modifier.size(16.dp)
                                                 )
+                                            }
+                                        }
+                                    }
+
+                                    // Section: EPISODE SELECTOR & SEARCH INLINE (Between Anime Info Card & COVER & POSTER)
+                                    item(key = "episode_selector_section") {
+                                        val displayedEpisodes = remember(uiState.episodes, uiState.episodeSearchQuery) {
+                                            val q = uiState.episodeSearchQuery.trim()
+                                            if (q.isNotEmpty()) {
+                                                uiState.episodes.filter { ep ->
+                                                    (ep.index ?: "").contains(q) || (ep.title ?: "").contains(q, ignoreCase = true)
+                                                }
+                                            } else {
+                                                uiState.episodes
+                                            }
+                                        }
+
+                                        val activeEpId = uiState.episode?.id ?: episodeId
+                                        val activeEpIndex = uiState.episode?.index
+
+                                        // Auto-scroll LazyRow ke episode aktif
+                                        LaunchedEffect(activeEpId, activeEpIndex, displayedEpisodes.size) {
+                                            val activeIndex = displayedEpisodes.indexOfFirst {
+                                                it.id == activeEpId || (it.index != null && it.index == activeEpIndex)
+                                            }
+                                            if (activeIndex >= 0) {
+                                                episodeRowState.animateScrollToItem(activeIndex)
+                                            }
+                                        }
+
+                                        // Auto-scroll saat query search cocok dengan nomor episode
+                                        LaunchedEffect(uiState.episodeSearchQuery, displayedEpisodes.size) {
+                                            val q = uiState.episodeSearchQuery.trim()
+                                            if (q.isNotEmpty()) {
+                                                val matchIndex = displayedEpisodes.indexOfFirst { it.index == q }
+                                                if (matchIndex >= 0) {
+                                                    episodeRowState.animateScrollToItem(matchIndex)
+                                                }
+                                            }
+                                        }
+
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 4.dp, bottom = 4.dp)
+                                        ) {
+                                            // Header Bar: EPISODE • Total + Inline Search Pill
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                // Sisi Kiri: Judul EPISODE + Total
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = "EPISODE",
+                                                        color = ColorTextPrimary,
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        letterSpacing = 0.5.sp
+                                                    )
+                                                    val epCount = if (uiState.totalEpisodesCount > 0) uiState.totalEpisodesCount else uiState.episodes.size
+                                                    if (epCount > 0) {
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text(
+                                                            text = "• $epCount Ep",
+                                                            color = Color(0xFF64748B),
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.Normal
+                                                        )
+                                                    }
+                                                }
+
+                                                // Sisi Kanan: Inline Compact Search Pill (Tinggi 32dp, Background #161922)
+                                                Row(
+                                                    modifier = Modifier
+                                                        .height(32.dp)
+                                                        .width(120.dp)
+                                                        .clip(RoundedCornerShape(16.dp))
+                                                        .background(Color(0xFF161922))
+                                                        .padding(horizontal = 10.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Search,
+                                                        contentDescription = "Cari episode",
+                                                        tint = Color(0xFF64748B),
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    BasicTextField(
+                                                        value = uiState.episodeSearchQuery,
+                                                        onValueChange = { viewModel.setEpisodeSearchQuery(it) },
+                                                        modifier = Modifier.weight(1f),
+                                                        textStyle = TextStyle(
+                                                            color = Color.White,
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Medium
+                                                        ),
+                                                        singleLine = true,
+                                                        cursorBrush = SolidColor(Color(0xFFE11D48)),
+                                                        decorationBox = { innerTextField ->
+                                                            if (uiState.episodeSearchQuery.isEmpty()) {
+                                                                Text(
+                                                                    text = "Cari ep..",
+                                                                    color = Color(0xFF64748B),
+                                                                    fontSize = 12.sp
+                                                                )
+                                                            }
+                                                            innerTextField()
+                                                        }
+                                                    )
+                                                    if (uiState.episodeSearchQuery.isNotEmpty()) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Close,
+                                                            contentDescription = "Hapus pencarian",
+                                                            tint = Color(0xFF94A3B8),
+                                                            modifier = Modifier
+                                                                .size(13.dp)
+                                                                .clickable { viewModel.setEpisodeSearchQuery("") }
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            // Range Selector untuk anime panjang (> 50 episode)
+                                            if (uiState.totalEpisodesCount > 50) {
+                                                val chunks = remember(uiState.totalEpisodesCount) {
+                                                    val list = mutableListOf<Pair<Int, Int>>()
+                                                    var start = 1
+                                                    while (start <= uiState.totalEpisodesCount) {
+                                                        val end = minOf(start + 99, uiState.totalEpisodesCount)
+                                                        list.add(Pair(start, end))
+                                                        start += 100
+                                                    }
+                                                    list
+                                                }
+
+                                                LazyRow(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 4.dp),
+                                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    items(chunks) { chunk ->
+                                                        val isSelected = uiState.selectedRange?.first == chunk.first &&
+                                                                uiState.selectedRange?.second == chunk.second
+
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .height(26.dp)
+                                                                .clip(RoundedCornerShape(6.dp))
+                                                                .background(if (isSelected) Color(0xFF242836) else Color(0xFF12151C))
+                                                                .clickable {
+                                                                    viewModel.selectEpisodeRange(chunk.first, chunk.second)
+                                                                }
+                                                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                text = "${chunk.first} - ${chunk.second}",
+                                                                color = if (isSelected) Color.White else Color(0xFF64748B),
+                                                                fontSize = 11.sp,
+                                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // Daftar Episode Horizontal LazyRow (Anti-Slop Design)
+                                            if (uiState.isLoadingEpisodes && displayedEpisodes.isEmpty()) {
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(44.dp)
+                                                        .padding(horizontal = 16.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.Center
+                                                ) {
+                                                    CircularProgressIndicator(
+                                                        modifier = Modifier.size(20.dp),
+                                                        strokeWidth = 2.dp,
+                                                        color = Color(0xFFE11D48)
+                                                    )
+                                                }
+                                            } else if (displayedEpisodes.isEmpty()) {
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(44.dp)
+                                                        .padding(horizontal = 16.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.Center
+                                                ) {
+                                                    Text(
+                                                        text = if (uiState.episodeSearchQuery.isNotEmpty()) "Episode tidak ditemukan" else "Memuat episode...",
+                                                        color = Color(0xFF64748B),
+                                                        fontSize = 12.sp
+                                                    )
+                                                }
+                                            } else {
+                                                LazyRow(
+                                                    state = episodeRowState,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 6.dp),
+                                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    items(
+                                                        items = displayedEpisodes,
+                                                        key = { it.id ?: it.index ?: "" }
+                                                    ) { epItem ->
+                                                        val isActive = epItem.id == activeEpId ||
+                                                                (epItem.index != null && epItem.index == activeEpIndex)
+
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .height(44.dp)
+                                                                .defaultMinSize(minWidth = 52.dp)
+                                                                .clip(RoundedCornerShape(10.dp))
+                                                                .background(
+                                                                    if (isActive) Color(0xFFE11D48)
+                                                                    else Color(0xFF161922)
+                                                                )
+                                                                .clickable {
+                                                                    if (!isActive) {
+                                                                        val epId = epItem.id ?: ""
+                                                                        viewModel.playEpisode(epId)
+                                                                        onEpisodeChange?.invoke(epId)
+                                                                    }
+                                                                }
+                                                                .padding(horizontal = 14.dp),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Row(
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.Center
+                                                            ) {
+                                                                if (isActive) {
+                                                                    Icon(
+                                                                        imageVector = Icons.Default.PlayArrow,
+                                                                        contentDescription = "Playing",
+                                                                        tint = Color.White,
+                                                                        modifier = Modifier.size(13.dp)
+                                                                    )
+                                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                                }
+                                                                Text(
+                                                                    text = epItem.index ?: "•",
+                                                                    color = if (isActive) Color.White else Color(0xFFCBD5E1),
+                                                                    fontSize = 14.sp,
+                                                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                     }

@@ -8,12 +8,18 @@ android {
     namespace = "com.yuranime.dinz"
     compileSdk = 34
 
+    val propVersionName = (project.findProperty("versionName") as? String)
+        ?.removePrefix("v")?.removePrefix("V")
+        ?: "1.9.2"
+    val propVersionCode = (project.findProperty("versionCode") as? String)?.toIntOrNull()
+        ?: 8
+
     defaultConfig {
         applicationId = "com.yuranime.dinz"
         minSdk = 24
         targetSdk = 34
-        versionCode = 7
-        versionName = "1.9.1"
+        versionCode = propVersionCode
+        versionName = propVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

@@ -81,11 +81,11 @@ object UpdateChecker {
                 }
             }
 
-            val isNewer = isNewerVersion(currentVersionName, tagName)
+            val isNewer = isNewerVersion(remote = tagName, local = currentVersionName)
 
             AppUpdateInfo(
                 isUpdateAvailable = if (forceCheck) true else isNewer,
-                latestVersion = tagName.removePrefix("v").removePrefix("V"),
+                latestVersion = cleanVersion(tagName),
                 releaseTitle = releaseTitle,
                 releaseNotes = releaseBody,
                 downloadUrl = apkDownloadUrl,
@@ -115,57 +115,44 @@ object UpdateChecker {
         }
     }
 
+    fun cleanVersion(versionStr: String): String {
+        var clean = versionStr.trim()
+            .removePrefix("release-")
+            .removePrefix("Release-")
+            .removePrefix("v")
+            .removePrefix("V")
+        clean = clean.replace(Regex("(?i)[-_]build[-_]|[-_]b[-_]?"), ".")
+        return clean
+    }
+
+    fun parseVersionSegments(versionStr: String): List<Int> {
+        val cleaned = cleanVersion(versionStr)
+        if (cleaned.isBlank()) return emptyList()
+        return cleaned.split(".")
+            .mapNotNull { segment ->
+                segment.filter { it.isDigit() }.toIntOrNull()
+            }
+    }
+
     /**
-     * Membandingkan semver current vs latestTag
-     * Mendukung format semver seperti 1.9.0 vs v1.9.1, v1.9.0-build-17 vs 1.9.0, dsb.
+     * Membandingkan strict semantic versioning numerik segmen demi segmen:
+     * Menghitung apakah remoteVersion > localVersion.
+     * Return true HANYA jika remote secara numerik lebih tinggi dari local.
+     * Jika sama atau lebih rendah, atau gagal parsing, WAJIB return false.
      */
-    fun isNewerVersion(current: String, latest: String): Boolean {
-        if (latest.isBlank()) return false
-        val cleanCurrent = current.trim().removePrefix("v").removePrefix("V")
-        val cleanLatest = latest.trim().removePrefix("v").removePrefix("V")
+    fun isNewerVersion(remote: String, local: String): Boolean {
+        val remoteSegments = parseVersionSegments(remote)
+        val localSegments = parseVersionSegments(local)
 
-        if (cleanCurrent == cleanLatest) return false
+        if (remoteSegments.isEmpty() || localSegments.isEmpty()) return false
 
-        val currentSemVer = parseSemVer(cleanCurrent)
-        val latestSemVer = parseSemVer(cleanLatest)
-
-        return latestSemVer > currentSemVer
-    }
-
-    private data class ParsedVersion(
-        val major: Int,
-        val minor: Int,
-        val patch: Int,
-        val build: Int
-    ) : Comparable<ParsedVersion> {
-        override fun compareTo(other: ParsedVersion): Int {
-            if (this.major != other.major) return this.major.compareTo(other.major)
-            if (this.minor != other.minor) return this.minor.compareTo(other.minor)
-            if (this.patch != other.patch) return this.patch.compareTo(other.patch)
-            return this.build.compareTo(other.build)
+        val maxLen = maxOf(remoteSegments.size, localSegments.size)
+        for (i in 0 until maxLen) {
+            val r = remoteSegments.getOrElse(i) { 0 }
+            val l = localSegments.getOrElse(i) { 0 }
+            if (r > l) return true
+            if (r < l) return false
         }
-    }
-
-    private fun parseSemVer(ver: String): ParsedVersion {
-        var buildNumber = 0
-        var mainPart = ver
-
-        // Cek pola -build-17 atau .build.17 atau sejenisnya
-        if (ver.contains("-build-", ignoreCase = true)) {
-            val parts = ver.split("-build-", ignoreCase = true)
-            mainPart = parts[0]
-            buildNumber = parts.getOrNull(1)?.filter { it.isDigit() }?.toIntOrNull() ?: 0
-        } else if (ver.contains("-b", ignoreCase = true)) {
-            val parts = ver.split("-b", ignoreCase = true)
-            mainPart = parts[0]
-            buildNumber = parts.getOrNull(1)?.filter { it.isDigit() }?.toIntOrNull() ?: 0
-        }
-
-        val numbers = mainPart.split(".").mapNotNull { it.filter { ch -> ch.isDigit() }.toIntOrNull() }
-        val major = numbers.getOrNull(0) ?: 0
-        val minor = numbers.getOrNull(1) ?: 0
-        val patch = numbers.getOrNull(2) ?: 0
-
-        return ParsedVersion(major, minor, patch, buildNumber)
+        return false
     }
 }

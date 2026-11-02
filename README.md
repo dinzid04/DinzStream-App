@@ -6,27 +6,26 @@
 
 ---
 
-## Pembaruan Terbaru Versi 1.9.1
+## Pembaruan Terbaru Versi 1.9.2
 
 Aplikasi **Yuranime** kini hadir dengan pembaruan besar yang meningkatkan kenyamanan, estetika, dan stabilitas:
 
-### 1. In-App Update Notification Popup
-- **Pengecekan Otomatis:** Sistem mendeteksi versi SemVer terbaru secara otomatis saat aplikasi dibuka.
-- **Desain iOS Dark Frosted Glassmorphism:** Dialog pop-up elegan dengan overlay buram semi-transparan dan sudut membulat modern.
-- **Custom Markdown & Image Renderer:** Menampilkan catatan rilis lengkap beserta gambar pratinjau, teks kutipan beraksen oranye, dan tautan biru yang dapat diklik langsung.
-- **Tombol Aksi Cepat:** Unduh langsung file APK rilis terbaru melalui tombol **Update Sekarang**.
+### 1. Daftar Episode Horizontal & Search Inline di Halaman Streaming
+- **Header Ergonomis:** Teks judul EPISODE dengan jumlah total episode (`• N Ep`) dan input pencarian ringkas (`Cari ep..`).
+- **Pencarian Cepat & Auto-Scroll:** Mengetik nomor episode langsung memfilter dan menggulir daftar ke nomor tersebut.
+- **Adaptive Range Selector:** Pemilih rentang (`1 - 100`, `101 - 200`, dst.) otomatis muncul untuk anime panjang (> 50 episode) dan disembunyikan untuk anime pendek.
+- **LazyRow Modern (Anti-Slop):** Tombol episode proporsional (tinggi 44dp, sudut membulat 10dp). Episode yang sedang ditonton disorot warna Crimson/Oranye dengan ikon playing dan digulir otomatis ke layar pandang.
+- **Pergantian Episode Mulus:** Memuat stream dan memperbarui info episode seketika saat nomor episode ditekan.
 
 ---
 
-### 2. Tampilan Baru Halaman Login Sinematik
-- **Navigasi Bersih:** Bottom Navigation Bar disembunyikan sepenuhnya di layar Login.
-- **Tombol Kembali:** Ikon panah di pojok kanan atas untuk langsung kembali ke Beranda Utama.
-- **Ikon Rubah Transparan:** Logo serigala/rubah putih kini 100% transparan tanpa bulatan hitam dan diposisikan seimbang di bagian atas.
-- **Kolase Poster Bergerak:** Tiga kolom poster bergerak vertikal lebih perlahan, lebih rapat, dan bersiklus tak terbatas tanpa glitch.
+### 2. Strict SemVer Update Checker (Bebas False-Positive)
+- **Sinkronisasi Hulu ke Hilir:** Nilai `versionName` di Gradle disinkronkan dengan tag rilis GitHub Actions.
+- **Perbandingan Numerik Ketat:** Membandingkan versi segmen demi segmen (`remote > local`). Popup update tidak akan muncul jika versi sama atau saat gagal memuat API.
 
 ---
 
-### 3. Halaman Profil Eksklusif
+### 3. In-App Update Notification Popup & Profile Screen
 - **Header Landscape Anime:** Menampilkan banner anime dengan gradasi gelap menyatu ke latar utama.
 - **Avatar & Badge:** Foto profil bulat ber-border oranye dengan lencana kamera biru untuk kustomisasi instan.
 - **Akses Komunitas:** Deretan tombol kapsul media sosial resmi (**WhatsApp**, **Telegram**, **Instagram**, **TikTok**, dan **Discord**).

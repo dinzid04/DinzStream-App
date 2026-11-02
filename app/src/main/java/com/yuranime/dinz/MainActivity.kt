@@ -113,6 +113,9 @@ class MainActivity : ComponentActivity() {
                                     movieId = selectedStreamingMovieId ?: selectedAnimeId ?: "",
                                     onBackClick = {
                                         selectedStreamingEpisodeId = null
+                                    },
+                                    onEpisodeChange = { newEpId ->
+                                        selectedStreamingEpisodeId = newEpId
                                     }
                                 )
                             }
@@ -227,9 +230,11 @@ class MainActivity : ComponentActivity() {
                                             onCheckUpdateClick = {
                                                 scope.launch {
                                                     Toast.makeText(this@MainActivity, "Memeriksa pembaruan...", Toast.LENGTH_SHORT).show()
-                                                    val info = UpdateChecker.checkUpdate(BuildConfig.VERSION_NAME, forceCheck = true)
-                                                    if (info != null) {
+                                                    val info = UpdateChecker.checkUpdate(BuildConfig.VERSION_NAME, forceCheck = false)
+                                                    if (info != null && info.isUpdateAvailable) {
                                                         pendingUpdateInfo = info
+                                                    } else if (info != null) {
+                                                        Toast.makeText(this@MainActivity, "Aplikasi sudah dalam versi terbaru (${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
                                                     } else {
                                                         Toast.makeText(this@MainActivity, "Gagal memeriksa pembaruan", Toast.LENGTH_SHORT).show()
                                                     }

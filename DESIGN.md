@@ -20,19 +20,30 @@ Dokumen ini adalah acuan spesifikasi desain dan teknis aplikasi **Yuranime (`com
 
 ---
 
-## 2. SPESIFIKASI FITUR 1: In-App Update Notification Popup (iOS Blurred Style + Full GitHub README & Image Renderer)
+## 2. SPESIFIKASI FITUR 1: Strict SemVer Update Checker & In-App Update Dialog (Anti-False-Positive)
 
-Mengacu pada struktur referensi kartu `/storage/emulated/0/termux/design/reff/6a2395898afdd4a30a15119b92cca46c.jpg` dipadukan dengan gaya visual iOS Dark Glassmorphism.
+Mengacu pada arsitektur pembaruan aplikasi native yang bersih dan tahan terhadap false-positive rilis GitHub Actions:
 
-### A. Deteksi Versi Semver Otomatis (`UpdateChecker`)
-1. Mengambil data rilis terbaru dari GitHub API repositori `dinzid04/DinzStream-App`:
-   - Endpoint: `https://api.github.com/repos/dinzid04/DinzStream-App/releases/latest`
-   - Ambil `tag_name`, `name`, `body`, dan URL file `.apk` pada `assets`.
-2. Bandingkan versi yang terpasang (`BuildConfig.VERSION_NAME`, misal `1.9.0`) dengan versi di GitHub (`tag_name`, misal `v1.9.0-build-17` atau `v1.9.1` atau `v2.0.0`):
-   - Parsing semver (Major.Minor.Patch serta build counter).
-   - Jika versi GitHub lebih tinggi atau terdapat rilis baru, otomatis munculkan **Update Notification Dialog**.
+### A. Sinkronisasi Hulu ke Hilir (Gradle & GitHub Actions)
+1. **Injeksi Versi Dinamis:**
+   - `app/build.gradle.kts` mendukung properti `versionName` dan `versionCode` dari Gradle CLI (`-PversionName=...` dan `-PversionCode=...`), dengan fallback default yang valid (contoh: `versionName = "1.9.2"`).
+   - `.github/workflows/android-release.yml` menyuntikkan nilai versi rilis secara konsisten saat `./gradlew assembleRelease` sehingga `BuildConfig.VERSION_NAME` dalam file `.apk` yang dihasilkan 100% identik dengan `tag_name` rilis GitHub.
+2. **Pembersihan String Versi (Normalisasi):**
+   - Hapus semua awalan non-angka seperti `"v"`, `"V"`, `"release-"`, `"Release-"`.
+   - Normalisasikan pemisah build seperti `"-build-"` atau `"-b"` menjadi titik (`.`) atau pecah menjadi segmen angka murni (`major`, `minor`, `patch`, `build`).
 
-### B. Desain Popup Bergaya iOS Frosted Glassmorphism
+### B. Algoritma Strict SemVer Comparison (`isNewerVersion(remote, local)`)
+1. **Aturan Evaluasi Numerik Murni:**
+   - Tidak menggunakan perbandingan string mentah (`!=`) dan tidak membandingkan timestamp `published_at`.
+   - Mengonversi tiap segmen versi menjadi `Int` (contoh: `"1.9.2.19"` -> `[1, 9, 2, 19]`).
+   - Melakukan perbandingan segmen demi segmen dari kiri ke kanan (`major` -> `minor` -> `patch` -> `build`). Jika salah satu segmen tidak tersedia, gunakan nilai default `0`.
+   - Nilai `isNewerVersion(remote, local)` bernilai `true` **HANYA JIKA** remote secara numerik lebih besar dari local (`remote > local`).
+   - Jika remote sama dengan local (`remote == local`) atau remote lebih kecil, atau request API gagal/kosong, hasil perbandingan **WAJIB** `false`.
+2. **Popup Update Trigger:**
+   - Dialog pembaruan otomatis **HANYA BOLEH MUNCUL** saat `info != null && info.isUpdateAvailable == true`.
+   - Pada pengecekan manual di Profil, jika tidak ada versi baru, tampilkan toast informatif bahwa aplikasi sudah menggunakan versi terbaru, bukan memunculkan dialog pembaruan.
+
+### C. Desain Popup Bergaya iOS Frosted Glassmorphism
 1. **Dialog Overlay & Card:**
    - Card container berbentuk membulat elegan (`RoundedCornerShape(22.dp)`).
    - Latar belakang dark frosted glass (`#CC1C1C1E` / `#D9242426`) dengan border putih tipis `0.5.dp` (`#26FFFFFF`).
@@ -43,10 +54,10 @@ Mengacu pada struktur referensi kartu `/storage/emulated/0/termux/design/reff/6a
    - **Pembatas:** Garis horizontal tipis `0.5.dp` (`#26FFFFFF`) di atas tombol aksi.
    - **Tombol Aksi Bawah:** Tombol penuh bergaya iOS dengan teks **"Update Sekarang"** (SF Bold Putih), berlatar Crimson Red / iOS Blue (`#0A84FF`), yang membuka browser atau intent unduh file `.apk` terbaru secara langsung.
 
-### C. Custom Markdown & README Renderer (Wajib Render Gambar, Simbol & Link Biru)
+### D. Custom Markdown & README Renderer (Wajib Render Gambar, Simbol & Link Biru)
 1. **Render Gambar Otomatis:**
-   - Sintaks Markdown `![alt](url)` atau `<img src="url">` diproses dan di-render menjadi komponen `AsyncImage` Coil asli:
-   - Sudut gambar membulat `10.dp`, scale fit/crop rapi, dengan fallback placeholder `R.drawable.ic_yuranime_monochrome`.
+   - Sintaks Markdown `![alt](url)` atau `<img src="url">` diproses dan di-render menjadi komponen `AsyncImage` Coil asli.
+   - Sudut gambar membulat `10.dp`, scale fit/crop rapi, dengan fallback placeholder `ic_yuranime_monochrome`.
 2. **Konversi Simbol Markdown Menjadi Visual Rapi:**
    - `##` / `###` (Heading): Teks judul tebal (**SF Bold Putih** `15.sp` - `17.sp`) dengan garis aksen tipis di bawahnya.
    - `*` atau `-` (Bullet list): Baris item rapi dengan titik bulat kecil (`CircleShape` aksen merah/biru) di sebelah kiri dan teks rapi di kanan.
@@ -54,7 +65,7 @@ Mengacu pada struktur referensi kartu `/storage/emulated/0/termux/design/reff/6a
    - `**teks**`: Dirender tebal (**SF Bold Putih**).
    - `---` / `***`: Dirender sebagai `HorizontalDivider(thickness = 0.5.dp, color = Color(0x26FFFFFF))`.
 3. **Teks URL Berwarna Biru & Bisa Diklik:**
-   - Semua format URL (`https://...` atau `[teks](url)`) dirender dengan warna Biru iOS (`#0A84FF`), bergaris bawah halus, dan dapat diklik untuk membuka tautan via `Intent(Intent.ACTION_VIEW, Uri.parse(url))`.
+   - Semua format URL (`https://...` atau `[teks](url)`) dirender dengan warna Biru iOS (`#0A84FF`), bergaris bawah halus, dan dapat diklik untuk membuka tautan via browser.
 
 ---
 
@@ -108,7 +119,49 @@ Mengacu persis pada tangkapan layar desain `/storage/emulated/0/termux/design/re
 
 ---
 
-## 5. SPESIFIKASI FITUR 4: Verifikasi Build, Release & GitHub Actions
+## 5. SPESIFIKASI FITUR 4: Streaming Episode Selector & Search Inline (Anti-Slop Design)
+
+Komponen pemilihan episode horizontal yang diletakkan tepat di bawah kontainer Info Anime (`#12151C`) dan tepat di atas header `COVER & POSTER` pada `StreamingScreen`:
+
+### A. Header Baris & Kolom Search Episode Ergonomis
+1. **Header Kiri:**
+   - Label judul bagian **`EPISODE`** (font **SF Bold** putih `14.sp`–`15.sp`, letter-spacing `0.5.sp`, konsisten dengan header `COVER & POSTER`).
+   - Teks kecil jumlah total episode berwarna abu-abu netral (`#64748B`, contoh: `• 1180 Ep`).
+2. **Kolom Inline Search Kanan:**
+   - Pill pencarian kompak (*compact inline search pill*) dengan tinggi `32.dp`, sudut membulat `16.dp`, berlatar belakang gelap `#161922` tanpa border tebal.
+   - Ikon kaca pembesar minimalis `14.dp` berwarna `#64748B`.
+   - Placeholder teks `Cari ep..` berwarna `#64748B` (`12.sp`) dengan kursor aksen Crimson Red / Orange.
+   - Reaktif seketika: saat pengguna mengetik angka episode (misal `1150` atau `12`), daftar episode langsung memfilter item atau melompat (*auto-scroll*) tepat ke nomor episode tersebut.
+
+### B. Adaptive Range Selector untuk Anime Berepisode Panjang
+1. **Aturan Kondisional:**
+   - **Anime Panjang (> 50 episode):** Tampilkan baris tab rentang tipis dan bersih (`1 - 100`, `101 - 200`, dst. atau `Terbaru`) tepat di bawah header. Menggunakan chunking 100 episode per tab sehingga navigasi ribuan episode tetap super ringan, instan, dan bebas lag.
+   - **Anime Pendek (<= 50 episode):** Sembunyikan baris rentang sepenuhnya agar antarmuka tetap ringkas dan tidak memakan ruang layar secara berlebihan.
+2. **Gaya Visual Tab Rentang:**
+   - Kapsul tipis tinggi `26.dp`, `RoundedCornerShape(6.dp)`.
+   - Tab aktif berlatar `#242836` dengan teks SF SemiBold putih (`11.sp`).
+   - Tab non-aktif berlatar transparan/`#12151C` dengan teks `#64748B` (`11.sp`).
+
+### C. Desain Item Episode Geser Horizontal (LazyRow Anti-Slop)
+1. **Dimensi & Spacing:**
+   - Menggunakan `LazyRow` dengan `Arrangement.spacedBy(8.dp)` dan `PaddingValues(horizontal = 16.dp)`.
+   - Dimensi tombol episode: tinggi `44.dp` (memenuhi standar tap target aksesibilitas R-03), lebar minimum `52.dp` (menyesuaikan lebar digit nomor), dengan sudut membulat `RoundedCornerShape(10.dp)`.
+2. **State Visual:**
+   - **Active State (Episode yang Sedang Diputar):**
+     - Latar berwarna aksen **Oranye/Crimson Yuranime (`#FF5722` / `#E11D48`)**.
+     - Teks nomor episode **SF Bold Putih (`14.sp`)**.
+     - Indikator visual ikon bermain minimalis (`Icons.Default.PlayArrow` `14.dp`).
+   - **Inactive State (Episode Lainnya):**
+     - Latar permukaan gelap bersih (`#161922`, tanpa border tebal).
+     - Teks nomor episode **SF SemiBold** warna abu-abu terang (`#CBD5E1`, `14.sp`).
+3. **Auto-Scroll ke Episode Aktif:**
+   - Saat `StreamingScreen` pertama kali dimuat atau saat berganti episode, sistem menjalankan `LaunchedEffect(currentEpisodeId)` untuk otomatis menggeser (`animateScrollToItem`) `LazyRow` ke indeks episode aktif sehingga selalu berada di tengah area pandang pengguna.
+4. **Interaksi Pemutaran:**
+   - Saat pengguna mengklik salah satu tombol nomor episode, player langsung memuat stream episode yang dipilih tanpa reload layar penuh, memperbarui status episode saat ini, info anime, dan daftar komentar.
+
+---
+
+## 6. SPESIFIKASI FITUR 5: Verifikasi Build, Release & GitHub Actions
 
 1. Kode ter-compile bersih tanpa error melalui Gradle.
 2. Commit dan push dilakukan dari direktori `/storage/emulated/0/termux/Workspace_uiApp/` ke repositori `dinzid04/DinzStream-App`.
