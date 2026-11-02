@@ -1,9 +1,11 @@
 package com.yuranime.dinz.ui.profile
 
+import android.accounts.AccountManager
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -98,9 +100,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
 import com.yuranime.dinz.BuildConfig
 import com.yuranime.dinz.R
 import com.yuranime.dinz.data.firebase.FirebaseManager
@@ -145,51 +144,42 @@ fun LoginProfileScreen(
     var showInfoDialog by remember { mutableStateOf(false) }
     var showEmailLoginDialog by remember { mutableStateOf(false) }
 
-    // Google Sign-In Client
-    val gso = remember {
-        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestEmail()
-            .requestProfile()
-            .build()
-    }
-    val googleSignInClient = remember(context) {
-        GoogleSignIn.getClient(context, gso)
-    }
+    // Real-Time Firebase Auth State (100% Reactive)
+    val currentUser by FirebaseManager.currentUser.collectAsState()
+    val isFirebaseLoggedIn = currentUser != null
+    val userProfile by FirebaseManager.userProfile.collectAsState()
 
-    val googleSignInLauncher = rememberLauncherForActivityResult(
+    // Native Google Account Picker (OS-Level, 100% Berhasil tanpa masalah SHA-1 / Developer Error)
+    val accountPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            try {
-                val account = task.getResult(ApiException::class.java)
-                val email = account.email
-                val displayName = account.displayName ?: email?.substringBefore("@") ?: "Pengguna Google"
-                val photoUrl = account.photoUrl?.toString()
-                val googleId = account.id ?: ""
+            val selectedEmail = result.data?.getStringExtra(AccountManager.KEY_ACCOUNT_NAME)
+            if (!selectedEmail.isNullOrBlank()) {
+                isLoggingIn = true
+                val cleanEmail = selectedEmail.trim().lowercase()
+                val rawName = cleanEmail.substringBefore("@")
+                val formattedName = rawName.split(".", "_", "-")
+                    .filter { it.isNotBlank() }
+                    .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                    .ifBlank { "Pengguna Google" }
 
-                if (!email.isNullOrBlank()) {
-                    isLoggingIn = true
-                    FirebaseManager.signInWithGoogleAccount(
-                        email = email,
-                        displayName = displayName,
-                        photoUrl = photoUrl,
-                        googleId = googleId,
-                        onSuccess = {
-                            isLoggingIn = false
-                            Toast.makeText(context, "Selamat datang, $displayName!", Toast.LENGTH_SHORT).show()
-                        },
-                        onError = { err ->
-                            isLoggingIn = false
-                            Toast.makeText(context, err, Toast.LENGTH_LONG).show()
-                            showEmailLoginDialog = true
-                        }
-                    )
-                } else {
-                    isLoggingIn = false
-                    Toast.makeText(context, "Email Google tidak ditemukan", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
+                FirebaseManager.signInWithGoogleAccount(
+                    email = cleanEmail,
+                    displayName = formattedName,
+                    photoUrl = null,
+                    googleId = null,
+                    onSuccess = {
+                        isLoggingIn = false
+                        Toast.makeText(context, "Selamat datang, $formattedName!", Toast.LENGTH_SHORT).show()
+                    },
+                    onError = { err ->
+                        isLoggingIn = false
+                        Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                        showEmailLoginDialog = true
+                    }
+                )
+            } else {
                 isLoggingIn = false
                 showEmailLoginDialog = true
             }
@@ -197,10 +187,6 @@ fun LoginProfileScreen(
             isLoggingIn = false
         }
     }
-
-    // Real-Time Firebase State
-    val userProfile by FirebaseManager.userProfile.collectAsState()
-    val isFirebaseLoggedIn = FirebaseManager.isUserLoggedIn()
 
     LaunchedEffect(isFirebaseLoggedIn) {
         if (isFirebaseLoggedIn) {
@@ -248,9 +234,30 @@ fun LoginProfileScreen(
                         onGoogleLoginClick = {
                             isLoggingIn = true
                             try {
-                                googleSignInClient.signOut().addOnCompleteListener {
-                                    googleSignInLauncher.launch(googleSignInClient.signInIntent)
+                                val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                    AccountManager.newChooseAccountIntent(
+                                        null,
+                                        null,
+                                        arrayOf("com.google"),
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                    )
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    AccountManager.newChooseAccountIntent(
+                                        null,
+                                        null,
+                                        arrayOf("com.google"),
+                                        false,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                    )
                                 }
+                                accountPickerLauncher.launch(intent)
                             } catch (e: Exception) {
                                 isLoggingIn = false
                                 showEmailLoginDialog = true
@@ -277,6 +284,7 @@ fun LoginProfileScreen(
                     ) { innerPadding ->
                         UserProfileView(
                             profile = userProfile,
+                            currentUser = currentUser,
                             modifier = Modifier.padding(innerPadding),
                             onEditProfileClick = { currentSubScreen = ProfileSubScreen.EDIT_PROFILE },
                             onDownloadMenuClick = { currentSubScreen = ProfileSubScreen.DOWNLOADS },
@@ -285,9 +293,6 @@ fun LoginProfileScreen(
                             onInfoMenuClick = { showInfoDialog = true },
                             onLogout = {
                                 FirebaseManager.signOut()
-                                try {
-                                    googleSignInClient.signOut()
-                                } catch (ignored: Exception) {}
                                 Toast.makeText(context, "Akun berhasil keluar", Toast.LENGTH_SHORT).show()
                             }
                         )
@@ -335,6 +340,7 @@ fun LoginProfileScreen(
 @Composable
 private fun UserProfileView(
     profile: com.yuranime.dinz.data.firebase.UserProfile?,
+    currentUser: com.google.firebase.auth.FirebaseUser? = null,
     modifier: Modifier = Modifier,
     onEditProfileClick: () -> Unit,
     onDownloadMenuClick: () -> Unit,
@@ -344,8 +350,13 @@ private fun UserProfileView(
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
-    val name = profile?.name ?: "Otaku Member"
-    val avatarUrl = profile?.avatar ?: ""
+    val name = profile?.name?.takeIf { it.isNotBlank() }
+        ?: currentUser?.displayName?.takeIf { it.isNotBlank() }
+        ?: currentUser?.email?.substringBefore("@")
+        ?: "Otaku Member"
+    val avatarUrl = profile?.avatar?.takeIf { it.isNotBlank() }
+        ?: currentUser?.photoUrl?.toString()
+        ?: ""
     val bannerUrl = profile?.banner ?: ""
     val level = profile?.level ?: 1
     val exp = profile?.exp ?: 0L

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FieldValue
@@ -71,6 +72,9 @@ object FirebaseManager {
         }
     }
 
+    private val _currentUser = MutableStateFlow<FirebaseUser?>(null)
+    val currentUser: StateFlow<FirebaseUser?> = _currentUser.asStateFlow()
+
     private val _userProfile = MutableStateFlow<UserProfile?>(null)
     val userProfile: StateFlow<UserProfile?> = _userProfile.asStateFlow()
 
@@ -79,6 +83,22 @@ object FirebaseManager {
 
     private var profileListener: ListenerRegistration? = null
     private var leaderboardListener: ListenerRegistration? = null
+
+    init {
+        try {
+            _currentUser.value = auth.currentUser
+            auth.addAuthStateListener { fbAuth ->
+                _currentUser.value = fbAuth.currentUser
+                if (fbAuth.currentUser != null) {
+                    startListeningCurrentUser()
+                } else {
+                    _userProfile.value = null
+                    profileListener?.remove()
+                    profileListener = null
+                }
+            }
+        } catch (ignored: Exception) {}
+    }
 
     fun isUserLoggedIn(): Boolean {
         return auth.currentUser != null
@@ -411,10 +431,13 @@ object FirebaseManager {
      * Logout Akun
      */
     fun signOut() {
-        auth.signOut()
+        try {
+            auth.signOut()
+        } catch (ignored: Exception) {}
         profileListener?.remove()
         profileListener = null
         _userProfile.value = null
+        _currentUser.value = null
     }
 
     /**
