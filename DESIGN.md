@@ -119,45 +119,66 @@ Mengacu persis pada tangkapan layar desain `/storage/emulated/0/termux/design/re
 
 ---
 
-## 5. SPESIFIKASI FITUR 4: Streaming Episode Selector & Search Inline (Anti-Slop Design)
+## 5. SPESIFIKASI FITUR 4: Streaming Episode Selector & State Synchronization (Anti-Slop Design)
 
-Komponen pemilihan episode horizontal yang diletakkan tepat di bawah kontainer Info Anime (`#12151C`) dan tepat di atas header `COVER & POSTER` pada `StreamingScreen`:
+Komponen pemilihan episode horizontal yang diletakkan tepat di bawah kontainer Info Anime (`#12151C`) dan tepat di atas header `COVER & POSTER` pada `StreamingScreen`, dilengkapi pemisahan tegas antara logika pergantian episode dan pergantian resolusi video:
 
-### A. Header Baris & Kolom Search Episode Ergonomis
-1. **Header Kiri:**
-   - Label judul bagian **`EPISODE`** (font **SF Bold** putih `14.sp`–`15.sp`, letter-spacing `0.5.sp`, konsisten dengan header `COVER & POSTER`).
-   - Teks kecil jumlah total episode berwarna abu-abu netral (`#64748B`, contoh: `• 1180 Ep`).
-2. **Kolom Inline Search Kanan:**
-   - Pill pencarian kompak (*compact inline search pill*) dengan tinggi `32.dp`, sudut membulat `16.dp`, berlatar belakang gelap `#161922` tanpa border tebal.
-   - Ikon kaca pembesar minimalis `14.dp` berwarna `#64748B`.
-   - Placeholder teks `Cari ep..` berwarna `#64748B` (`12.sp`) dengan kursor aksen Crimson Red / Orange.
-   - Reaktif seketika: saat pengguna mengetik angka episode (misal `1150` atau `12`), daftar episode langsung memfilter item atau melompat (*auto-scroll*) tepat ke nomor episode tersebut.
+### A. State Reset Pergantian Episode vs Pergantian Resolusi (Playback Lifecycle)
+1. **Pemisahan Logika Pergantian Resolusi (Episode Sama):**
+   - Saat pengguna mengganti resolusi video (misal dari 720p ke 480p atau sebaliknya pada episode yang sedang ditonton):
+     - Catat posisi terakhir pemutaran: `val savedPosition = exoPlayer.currentPosition`.
+     - Ganti URL media stream ke URL resolusi baru.
+     - Lakukan `exoPlayer.seekTo(savedPosition)` agar pemutaran video berlanjut persis di detik yang sama tanpa kembali ke awal.
+2. **Pemisahan Logika Pergantian Episode (Episode Berbeda / Klik Episode Lain / Auto-Next):**
+   - **Wajib Reset Posisi & Durasi ke `0L`:** `savedPosition = 0L` dan `uiState.currentPositionMs = 0L`, `uiState.durationMs = 0L`. Dilarang keras membawa posisi atau durasi episode lama ke episode baru.
+   - Segera hentikan pemutaran stream lama secara instan: `exoPlayer.stop()` dan `exoPlayer.clearMediaItems()`.
+   - Di `StreamingViewModel`, fungsi `selectEpisode(newEpisodeId, newEpisodeNumber)` secara reaktif:
+     1. Memperbarui `currentEpisodeId` dan `currentEpisodeNumber` sehingga judul info `Episode [Nomor]` seketika berganti tanpa delay.
+     2. Mengosongkan `selectedServer` lama agar ExoPlayer tidak terus memutar stream lama saat request jaringan sedang berlangsung.
+     3. Memanggil ulang API **Stream / Server Resolusi** khusus untuk `newEpisodeId`.
+     4. Memanggil ulang API **Komentar (`COMMENTS`)** dan jumlah *views* khusus untuk `newEpisodeId` agar data komentar dan statistik penonton 100% akurat sesuai episode baru.
+3. **ExoPlayer Lifecycle Keying di `CustomExoPlayerView`:**
+   - Gunakan `LaunchedEffect(currentEpisodeId, currentStreamUrl)` sebagai key sinkronisasi pemutaran.
+   - Deteksi apakah perubahan stream berasal dari resolusi pada episode yang sama (`isResolutionChangeOnly`) atau pergantian episode (`isNewEpisode`):
+     ```kotlin
+     exoPlayer.stop()
+     exoPlayer.clearMediaItems()
+     exoPlayer.setMediaItem(MediaItem.fromUri(currentStreamUrl))
+     exoPlayer.prepare()
+     exoPlayer.seekTo(if (isResolutionChangeOnly) savedPosition else 0L)
+     exoPlayer.playWhenReady = true
+     ```
+   - Dengan alur ini, saat pengguna berpindah dari Episode 12 ke Episode 11 (atau episode mana pun), video, durasi awal (`00:00`), judul `Episode [Nomor]`, jumlah views, dan daftar komentar di bawahnya 100% berganti ke episode yang baru diklik.
 
-### B. Adaptive Range Selector untuk Anime Berepisode Panjang
-1. **Aturan Kondisional:**
-   - **Anime Panjang (> 50 episode):** Tampilkan baris tab rentang tipis dan bersih (`1 - 100`, `101 - 200`, dst. atau `Terbaru`) tepat di bawah header. Menggunakan chunking 100 episode per tab sehingga navigasi ribuan episode tetap super ringan, instan, dan bebas lag.
-   - **Anime Pendek (<= 50 episode):** Sembunyikan baris rentang sepenuhnya agar antarmuka tetap ringkas dan tidak memakan ruang layar secara berlebihan.
-2. **Gaya Visual Tab Rentang:**
-   - Kapsul tipis tinggi `26.dp`, `RoundedCornerShape(6.dp)`.
-   - Tab aktif berlatar `#242836` dengan teks SF SemiBold putih (`11.sp`).
-   - Tab non-aktif berlatar transparan/`#12151C` dengan teks `#64748B` (`11.sp`).
+### B. Dual-Mode Episode Selector (Thumbnail Mode & Compact Number Mode) — Anti-Slop UI
+Mendukung 2 mode tampilan daftar episode yang bersih, proporsional, dan dapat diubah secara instan oleh pengguna:
 
-### C. Desain Item Episode Geser Horizontal (LazyRow Anti-Slop)
-1. **Dimensi & Spacing:**
+1. **Baris Header `EPISODE` + Toggle Mode Tampilan + Inline Search:**
+   - Disusun dalam 1 baris header yang rapi, ergonomis, dan tidak berhimpitan:
+     - **Kiri:** Teks judul **`EPISODE`** (font **SF Bold** putih `14.sp`, letter-spacing `0.5.sp`) diikuti total episode (`• 12 Ep` warna abu-abu netral `#64748B`).
+     - **Tengah/Kanan:** Kolom pencarian ringkas (*inline search pill*, tinggi `30.dp`, latar `#14171F` tanpa border kaku) dengan placeholder `Cari ep..` (`12.sp`, warna `#64748B`) untuk melompat/memfilter nomor episode secara reaktif.
+     - **Paling Kanan:** Tombol ikon bersih (**Toggle View Mode**: ikon Thumbnail/Image Card vs ikon Number Grid/Pill) untuk beralih antara **Mode Gambar** dan **Mode Tanpa Gambar**.
+     - **Persistensi State:** Mode tampilan pilihan pengguna disimpan ke `SharedPreferences` (`"episode_selector_view_mode"`: `"THUMBNAIL"` vs `"NUMBER"`) sehingga preferensi pengguna selalu diingat saat aplikasi dibuka kembali.
+   - **Adaptive Range Selector (> 50 Episode):**
+     - Jika total episode `> 50`, tampilkan baris tab rentang tipis dan bersih (`1 - 100`, `101 - 200`, dst.) tepat di bawah header dengan chunking 100 episode per tab. Jika total episode `<= 50`, baris rentang disembunyikan.
+
+2. **Mode 1: Versi Dengan Gambar (Thumbnail Card Row — Clean & Anti-Slop):**
+   - Menggunakan `LazyRow` dengan `Arrangement.spacedBy(10.dp)` dan `PaddingValues(horizontal = 16.dp)`.
+   - **Dimensi & Rasio:** Kartu horizontal bersih dengan lebar proporsional sekitar `140.dp`–`150.dp`, gambar thumbnail rasio `16:9`, membulat halus `RoundedCornerShape(10.dp)`.
+   - **Fallback Placeholder:** Jika thumbnail episode kosong atau belum ter-render, tampilkan permukaan gelap `#14171F` dengan logo monokrom Yuranime (`ic_yuranime_monochrome`) di tengahnya.
+   - **Overlay Info Episode:** Lapisan gradasi gelap transparan tipis di sudut bawah thumbnail dengan teks **`Ep [Nomor]`** (font **SF Bold** putih `12.sp`).
+   - **Indikator Episode Aktif (Sedang Ditonton):**
+     - Garis tepi aksen tipis Oranye/Crimson Yuranime (`1.5.dp`, `#FF5722`).
+     - Badge kecil di pojok atas gambar dengan teks **`PLAYING`** atau ikon gelombang/play minimalis berlatar semi-transparan gelap oranye untuk mempertegas episode yang sedang aktif.
+
+3. **Mode 2: Versi Tanpa Gambar (Compact Number Pill Row):**
    - Menggunakan `LazyRow` dengan `Arrangement.spacedBy(8.dp)` dan `PaddingValues(horizontal = 16.dp)`.
-   - Dimensi tombol episode: tinggi `44.dp` (memenuhi standar tap target aksesibilitas R-03), lebar minimum `52.dp` (menyesuaikan lebar digit nomor), dengan sudut membulat `RoundedCornerShape(10.dp)`.
-2. **State Visual:**
-   - **Active State (Episode yang Sedang Diputar):**
-     - Latar berwarna aksen **Oranye/Crimson Yuranime (`#FF5722` / `#E11D48`)**.
-     - Teks nomor episode **SF Bold Putih (`14.sp`)**.
-     - Indikator visual ikon bermain minimalis (`Icons.Default.PlayArrow` `14.dp`).
-   - **Inactive State (Episode Lainnya):**
-     - Latar permukaan gelap bersih (`#161922`, tanpa border tebal).
-     - Teks nomor episode **SF SemiBold** warna abu-abu terang (`#CBD5E1`, `14.sp`).
-3. **Auto-Scroll ke Episode Aktif:**
-   - Saat `StreamingScreen` pertama kali dimuat atau saat berganti episode, sistem menjalankan `LaunchedEffect(currentEpisodeId)` untuk otomatis menggeser (`animateScrollToItem`) `LazyRow` ke indeks episode aktif sehingga selalu berada di tengah area pandang pengguna.
-4. **Interaksi Pemutaran:**
-   - Saat pengguna mengklik salah satu tombol nomor episode, player langsung memuat stream episode yang dipilih tanpa reload layar penuh, memperbarui status episode saat ini, info anime, dan daftar komentar.
+   - Deretan tombol nomor episode ringkas: tinggi `40.dp`, lebar minimum `48.dp`, membulat `RoundedCornerShape(8.dp)`.
+   - **Episode Aktif:** Latar Oranye/Crimson Yuranime (`#FF5722`), teks nomor episode **SF Bold Putih (`13.sp`)**.
+   - **Episode Lainnya:** Latar gelap bersih (`#14171F` tanpa border tebal), teks nomor episode **SF SemiBold** abu-abu terang (`#CBD5E1`, `13.sp`).
+
+4. **Auto-Scroll Mulus (Smooth Auto-Scroll):**
+   - Baik pada Mode Gambar maupun Mode Tanpa Gambar, `LazyRow` otomatis melakukan `animateScrollToItem` ke episode yang sedang diputar ketika pertama kali dibuka atau saat pengguna berpindah episode.
 
 ---
 

@@ -12,6 +12,11 @@ enum class SettingsSubMenu {
     SPEED
 }
 
+enum class EpisodeViewMode {
+    THUMBNAIL,
+    COMPACT
+}
+
 data class StreamingUiState(
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
@@ -24,6 +29,7 @@ data class StreamingUiState(
     val totalEpisodesCount: Int = 0,
     val selectedRange: Pair<Int, Int>? = null,
     val episodeSearchQuery: String = "",
+    val episodeViewMode: EpisodeViewMode = EpisodeViewMode.THUMBNAIL,
     val isLoadingEpisodes: Boolean = false,
     val settingsSubMenu: SettingsSubMenu = SettingsSubMenu.MAIN,
     val servers: List<ServerItem> = emptyList(),
@@ -52,4 +58,8 @@ data class StreamingUiState(
     val userRating: Int = 0,
     val showLoginPrompt: Boolean = false,
     val isCommentInputOpen: Boolean = false
-)
+) {
+    val currentEpisodeId: String get() = episodeId
+    val currentEpisodeNumber: String get() = episode?.index ?: "1"
+    val currentStreamUrl: String get() = selectedServer?.link.orEmpty()
+}

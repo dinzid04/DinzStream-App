@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "1.9.2"
+  APP_VERSION: "1.9.3"
 
 jobs:
   build:
@@ -59,23 +59,21 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Horizontal Episode List + Search & Strict SemVer Update Checker (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Dual-Mode Episode Selector & State Sync Fix (Build #${{ github.run_number }})"
           body: |
-            ## Yuranime Android App v1.9.2 Release
+            ## Yuranime Android App v1.9.3 Release
 
             ### Pembaruan Utama:
-            1. **Strict SemVer Update Checker (Anti False-Positive):**
-               - Sinkronisasi `versionName` dari hulu ke hilir dengan injeksi `-PversionName` pada kompilasi Gradle sesuai `tag_name` rilis GitHub.
-               - Pengecekan versi menggunakan perbandingan numerik SemVer segmen demi segmen (`remote > local`). Popup update dilarang muncul jika versi sama atau gagal memuat API.
-            2. **Section Daftar Episode Horizontal + Search di Halaman Streaming:**
-               - Header rapi judul EPISODE dengan total episode (`• N Ep`) dan kolom pencarian inline minimalis (`Cari ep..`).
-               - Adaptive range selector (`1 - 100`, `101 - 200`, dst.) otomatis muncul untuk anime berepisode panjang (> 50 episode) dan disembunyikan untuk anime pendek.
-               - Item episode horizontal `LazyRow` berukuran proporsional (tinggi 44dp, sudut membulat 10dp).
-               - Active state berlatar aksen Oranye/Crimson dengan teks SF Bold putih dan ikon playing minimalis, serta auto-scroll otomatis ke episode yang sedang ditonton.
-               - Pergantian episode instan dengan pembaruan stream, info anime, dan komentar secara mulus.
-            3. **In-App Update Notification Popup & Profile Screen:**
-               - Dialog pembaruan bergaya iOS dark frosted glassmorphism dan custom markdown renderer.
-               - Halaman Profil lengkap dengan edit avatar, banner, dan tautan komunitas.
+            1. **Perbaikan Bug Pergantian Episode di Halaman Streaming:**
+               - Pemisahan tegas logika **Ganti Resolusi** (mempertahankan posisi video dengan seek ke `savedPosition`) vs **Ganti Episode** (mereset durasi dan posisi ke `0L`, menghentikan pemutaran lama secara instan, dan memanggil API stream serta komentar untuk episode baru).
+               - Sinkronisasi reaktif ExoPlayer dengan key `(currentEpisodeId, currentStreamUrl)` sehingga durasi awal (`00:00`), video player, judul info `Episode [Nomor]`, jumlah views, dan daftar komentar 100% berganti seketika.
+            2. **Daftar Episode 2 Mode (Thumbnail Mode & Compact Number Mode) — Anti-Slop UI:**
+               - Header terpadu dengan judul **EPISODE**, total episode (`• N Ep`), kolom pencarian ringkas (`Cari ep..`), dan tombol toggle view mode yang persisten di `SharedPreferences`.
+               - **Mode 1 (Dengan Gambar):** Kartu horizontal thumbnail 16:9 bersih dengan fallback logo monokrom Yuranime, gradasi gelap bawah untuk teks nomor episode, dan indikator aktif badge `PLAYING` + garis tepi oranye Yuranime (`#FF5722`).
+               - **Mode 2 (Tanpa Gambar):** Deretan tombol nomor episode ringkas (tinggi 40dp, lebar min 48dp) berlatar oranye saat aktif dan latar gelap bersih saat non-aktif.
+               - Auto-scroll mulus ke episode aktif di kedua mode tampilan.
+            3. **Strict SemVer Update Checker & In-App Notice:**
+               - Sinkronisasi versi dinamis dari hulu ke hilir dengan SemVer comparison murni segmen demi segmen.
           draft: false
           prerelease: false
           make_latest: true

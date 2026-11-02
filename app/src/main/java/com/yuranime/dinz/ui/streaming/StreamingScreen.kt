@@ -53,8 +53,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
@@ -154,6 +156,18 @@ fun StreamingScreen(
     val activity = context as? ComponentActivity
     val episodeRowState = rememberLazyListState()
 
+    val prefs = remember { context.getSharedPreferences("yuranime_ui_prefs", android.content.Context.MODE_PRIVATE) }
+    LaunchedEffect(Unit) {
+        val savedMode = prefs.getString("episode_view_mode", null)
+            ?: prefs.getString("episode_selector_view_mode", EpisodeViewMode.THUMBNAIL.name)
+        val mode = try {
+            EpisodeViewMode.valueOf(savedMode ?: EpisodeViewMode.THUMBNAIL.name)
+        } catch (e: Exception) {
+            EpisodeViewMode.THUMBNAIL
+        }
+        viewModel.setEpisodeViewMode(mode)
+    }
+
     LaunchedEffect(episodeId, movieId) {
         viewModel.loadStreaming(episodeId = episodeId, movieId = movieId)
     }
@@ -243,11 +257,14 @@ fun StreamingScreen(
             .fillMaxSize()
             .background(ColorBackgroundPrimary)
     ) {
-        if (uiState.isLoading && uiState.selectedServer == null) {
+        val isInitialLoading = uiState.isLoading && uiState.selectedServer == null && uiState.episodes.isEmpty()
+        val isInitialError = uiState.errorMessage != null && uiState.selectedServer == null && uiState.episodes.isEmpty()
+
+        if (isInitialLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = ColorAccentPrimary, modifier = Modifier.size(40.dp))
             }
-        } else if (uiState.errorMessage != null && uiState.selectedServer == null) {
+        } else if (isInitialError) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -289,7 +306,8 @@ fun StreamingScreen(
                             } else {
                                 onBackClick()
                             }
-                        }
+                        },
+                        onEpisodeChange = onEpisodeChange
                     )
                 }
 
@@ -502,11 +520,12 @@ fun StreamingScreen(
                                             }
                                         }
 
-                                        val activeEpId = uiState.episode?.id ?: episodeId
+                                        val activeEpId = uiState.episodeId.ifBlank { uiState.episode?.id ?: episodeId }
                                         val activeEpIndex = uiState.episode?.index
+                                        val currentViewMode = uiState.episodeViewMode
 
-                                        // Auto-scroll LazyRow ke episode aktif
-                                        LaunchedEffect(activeEpId, activeEpIndex, displayedEpisodes.size) {
+                                        // Auto-scroll LazyRow ke episode aktif (berfungsi mulus di kedua mode)
+                                        LaunchedEffect(activeEpId, activeEpIndex, displayedEpisodes.size, currentViewMode) {
                                             val activeIndex = displayedEpisodes.indexOfFirst {
                                                 it.id == activeEpId || (it.index != null && it.index == activeEpIndex)
                                             }
@@ -531,7 +550,7 @@ fun StreamingScreen(
                                                 .fillMaxWidth()
                                                 .padding(top = 4.dp, bottom = 4.dp)
                                         ) {
-                                            // Header Bar: EPISODE • Total + Inline Search Pill
+                                            // Header Bar: EPISODE • Total + Inline Search Pill + Toggle View Mode (1 Baris Rapi)
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
@@ -560,53 +579,95 @@ fun StreamingScreen(
                                                     }
                                                 }
 
-                                                // Sisi Kanan: Inline Compact Search Pill (Tinggi 32dp, Background #161922)
+                                                // Sisi Kanan: Inline Search Pill + Toggle View Mode Button
                                                 Row(
-                                                    modifier = Modifier
-                                                        .height(32.dp)
-                                                        .width(120.dp)
-                                                        .clip(RoundedCornerShape(16.dp))
-                                                        .background(Color(0xFF161922))
-                                                        .padding(horizontal = 10.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                 ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Search,
-                                                        contentDescription = "Cari episode",
-                                                        tint = Color(0xFF64748B),
-                                                        modifier = Modifier.size(14.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(6.dp))
-                                                    BasicTextField(
-                                                        value = uiState.episodeSearchQuery,
-                                                        onValueChange = { viewModel.setEpisodeSearchQuery(it) },
-                                                        modifier = Modifier.weight(1f),
-                                                        textStyle = TextStyle(
-                                                            color = Color.White,
-                                                            fontSize = 12.sp,
-                                                            fontWeight = FontWeight.Medium
-                                                        ),
-                                                        singleLine = true,
-                                                        cursorBrush = SolidColor(Color(0xFFE11D48)),
-                                                        decorationBox = { innerTextField ->
-                                                            if (uiState.episodeSearchQuery.isEmpty()) {
-                                                                Text(
-                                                                    text = "Cari ep..",
-                                                                    color = Color(0xFF64748B),
-                                                                    fontSize = 12.sp
-                                                                )
-                                                            }
-                                                            innerTextField()
-                                                        }
-                                                    )
-                                                    if (uiState.episodeSearchQuery.isNotEmpty()) {
+                                                    // Kolom Pencarian Ringkas (Tinggi 30dp, Latar #14171F tanpa border kaku)
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .height(30.dp)
+                                                            .width(115.dp)
+                                                            .clip(RoundedCornerShape(15.dp))
+                                                            .background(Color(0xFF14171F))
+                                                            .padding(horizontal = 8.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
                                                         Icon(
-                                                            imageVector = Icons.Default.Close,
-                                                            contentDescription = "Hapus pencarian",
-                                                            tint = Color(0xFF94A3B8),
-                                                            modifier = Modifier
-                                                                .size(13.dp)
-                                                                .clickable { viewModel.setEpisodeSearchQuery("") }
+                                                            imageVector = Icons.Default.Search,
+                                                            contentDescription = "Cari episode",
+                                                            tint = Color(0xFF64748B),
+                                                            modifier = Modifier.size(13.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        BasicTextField(
+                                                            value = uiState.episodeSearchQuery,
+                                                            onValueChange = { viewModel.setEpisodeSearchQuery(it) },
+                                                            modifier = Modifier.weight(1f),
+                                                            textStyle = TextStyle(
+                                                                color = Color.White,
+                                                                fontSize = 11.sp,
+                                                                fontWeight = FontWeight.Medium
+                                                            ),
+                                                            singleLine = true,
+                                                            cursorBrush = SolidColor(Color(0xFFFF5722)),
+                                                            decorationBox = { innerTextField ->
+                                                                if (uiState.episodeSearchQuery.isEmpty()) {
+                                                                    Text(
+                                                                        text = "Cari ep..",
+                                                                        color = Color(0xFF64748B),
+                                                                        fontSize = 11.sp
+                                                                    )
+                                                                }
+                                                                innerTextField()
+                                                            }
+                                                        )
+                                                        if (uiState.episodeSearchQuery.isNotEmpty()) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Close,
+                                                                contentDescription = "Hapus pencarian",
+                                                                tint = Color(0xFF94A3B8),
+                                                                modifier = Modifier
+                                                                    .size(12.dp)
+                                                                    .clickable { viewModel.setEpisodeSearchQuery("") }
+                                                            )
+                                                        }
+                                                    }
+
+                                                    // Tombol Ikon Bersih: Toggle View Mode (Thumbnail Card vs Number Pill)
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(30.dp)
+                                                            .clip(RoundedCornerShape(8.dp))
+                                                            .background(Color(0xFF14171F))
+                                                            .clickable {
+                                                                val newMode = if (currentViewMode == EpisodeViewMode.THUMBNAIL) {
+                                                                    EpisodeViewMode.COMPACT
+                                                                } else {
+                                                                    EpisodeViewMode.THUMBNAIL
+                                                                }
+                                                                viewModel.setEpisodeViewMode(newMode)
+                                                                prefs.edit()
+                                                                    .putString("episode_view_mode", newMode.name)
+                                                                    .putString("episode_selector_view_mode", newMode.name)
+                                                                    .apply()
+                                                            },
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = if (currentViewMode == EpisodeViewMode.THUMBNAIL) {
+                                                                Icons.Default.FormatListNumbered
+                                                            } else {
+                                                                Icons.Default.Image
+                                                            },
+                                                            contentDescription = if (currentViewMode == EpisodeViewMode.THUMBNAIL) {
+                                                                "Beralih ke Mode Nomor"
+                                                            } else {
+                                                                "Beralih ke Mode Gambar"
+                                                            },
+                                                            tint = if (currentViewMode == EpisodeViewMode.THUMBNAIL) Color(0xFFCBD5E1) else Color(0xFFFF5722),
+                                                            modifier = Modifier.size(16.dp)
                                                         )
                                                     }
                                                 }
@@ -658,12 +719,12 @@ fun StreamingScreen(
                                                 }
                                             }
 
-                                            // Daftar Episode Horizontal LazyRow (Anti-Slop Design)
+                                            // Daftar Episode Horizontal LazyRow (Anti-Slop Design - Dual Mode)
                                             if (uiState.isLoadingEpisodes && displayedEpisodes.isEmpty()) {
                                                 Row(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
-                                                        .height(44.dp)
+                                                        .height(if (currentViewMode == EpisodeViewMode.THUMBNAIL) 84.dp else 40.dp)
                                                         .padding(horizontal = 16.dp),
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.Center
@@ -671,14 +732,14 @@ fun StreamingScreen(
                                                     CircularProgressIndicator(
                                                         modifier = Modifier.size(20.dp),
                                                         strokeWidth = 2.dp,
-                                                        color = Color(0xFFE11D48)
+                                                        color = Color(0xFFFF5722)
                                                     )
                                                 }
                                             } else if (displayedEpisodes.isEmpty()) {
                                                 Row(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
-                                                        .height(44.dp)
+                                                        .height(if (currentViewMode == EpisodeViewMode.THUMBNAIL) 84.dp else 40.dp)
                                                         .padding(horizontal = 16.dp),
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.Center
@@ -689,7 +750,127 @@ fun StreamingScreen(
                                                         fontSize = 12.sp
                                                     )
                                                 }
+                                            } else if (currentViewMode == EpisodeViewMode.THUMBNAIL) {
+                                                // Mode 1: Versi Dengan Gambar (Thumbnail Card Row — Clean & Anti-Slop)
+                                                LazyRow(
+                                                    state = episodeRowState,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 6.dp),
+                                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                                ) {
+                                                    items(
+                                                        items = displayedEpisodes,
+                                                        key = { it.id ?: it.index ?: "" }
+                                                    ) { epItem ->
+                                                        val isActive = epItem.id == activeEpId ||
+                                                                (epItem.index != null && epItem.index == activeEpIndex)
+
+                                                        val thumbnailModel = epItem.getEffectiveImage().ifBlank { null }
+                                                            ?: uiState.movieDetail?.movie?.getEffectiveCover()?.ifBlank { null }
+                                                            ?: uiState.movieDetail?.movie?.getEffectivePoster()?.ifBlank { null }
+
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .width(146.dp)
+                                                                .aspectRatio(16f / 9f)
+                                                                .clip(RoundedCornerShape(10.dp))
+                                                                .background(Color(0xFF14171F))
+                                                                .then(
+                                                                    if (isActive) {
+                                                                        Modifier.border(
+                                                                            width = 1.5.dp,
+                                                                            color = Color(0xFFFF5722),
+                                                                            shape = RoundedCornerShape(10.dp)
+                                                                        )
+                                                                    } else Modifier
+                                                                )
+                                                                .clickable {
+                                                                    if (!isActive) {
+                                                                        val epId = epItem.id ?: ""
+                                                                        val epIndex = epItem.index
+                                                                        viewModel.selectEpisode(epId, epIndex)
+                                                                        onEpisodeChange?.invoke(epId)
+                                                                    }
+                                                                }
+                                                        ) {
+                                                            // Gambar Thumbnail Episode
+                                                            AsyncImage(
+                                                                model = ImageRequest.Builder(LocalContext.current)
+                                                                    .data(thumbnailModel)
+                                                                    .crossfade(true)
+                                                                    .placeholder(R.drawable.placeholder_yuranime_wide)
+                                                                    .error(R.drawable.placeholder_yuranime_wide)
+                                                                    .build(),
+                                                                contentDescription = "Episode ${epItem.index}",
+                                                                modifier = Modifier.fillMaxSize(),
+                                                                contentScale = ContentScale.Crop
+                                                            )
+
+                                                            // Gradasi Gelap Tipis di Bawah Gambar untuk Teks Ep [Nomor]
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .height(38.dp)
+                                                                    .align(Alignment.BottomCenter)
+                                                                    .background(
+                                                                        Brush.verticalGradient(
+                                                                            colors = listOf(
+                                                                                Color.Transparent,
+                                                                                Color(0xB3000000),
+                                                                                Color(0xE6000000)
+                                                                            )
+                                                                        )
+                                                                    )
+                                                                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                                                                contentAlignment = Alignment.BottomStart
+                                                            ) {
+                                                                Text(
+                                                                    text = "Ep ${epItem.index ?: ""}",
+                                                                    color = Color.White,
+                                                                    fontSize = 12.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    maxLines = 1,
+                                                                    overflow = TextOverflow.Ellipsis
+                                                                )
+                                                            }
+
+                                                            // Indikator Episode Aktif: Badge PLAYING di Pojok Atas
+                                                            if (isActive) {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .align(Alignment.TopStart)
+                                                                        .padding(6.dp)
+                                                                        .clip(RoundedCornerShape(4.dp))
+                                                                        .background(Color(0xEEFF5722))
+                                                                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                                                                ) {
+                                                                    Row(
+                                                                        verticalAlignment = Alignment.CenterVertically,
+                                                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                                                    ) {
+                                                                        Icon(
+                                                                            imageVector = Icons.Default.PlayArrow,
+                                                                            contentDescription = "Playing",
+                                                                            tint = Color.White,
+                                                                            modifier = Modifier.size(10.dp)
+                                                                        )
+                                                                        Text(
+                                                                            text = "PLAYING",
+                                                                            color = Color.White,
+                                                                            fontSize = 9.sp,
+                                                                            fontWeight = FontWeight.Bold,
+                                                                            letterSpacing = 0.5.sp
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                             } else {
+                                                // Mode 2: Versi Tanpa Gambar (Compact Number Pill Row — Clean & Anti-Slop)
                                                 LazyRow(
                                                     state = episodeRowState,
                                                     modifier = Modifier
@@ -707,21 +888,22 @@ fun StreamingScreen(
 
                                                         Box(
                                                             modifier = Modifier
-                                                                .height(44.dp)
-                                                                .defaultMinSize(minWidth = 52.dp)
-                                                                .clip(RoundedCornerShape(10.dp))
+                                                                .height(40.dp)
+                                                                .defaultMinSize(minWidth = 48.dp)
+                                                                .clip(RoundedCornerShape(8.dp))
                                                                 .background(
-                                                                    if (isActive) Color(0xFFE11D48)
-                                                                    else Color(0xFF161922)
+                                                                    if (isActive) Color(0xFFFF5722)
+                                                                    else Color(0xFF14171F)
                                                                 )
                                                                 .clickable {
                                                                     if (!isActive) {
                                                                         val epId = epItem.id ?: ""
-                                                                        viewModel.playEpisode(epId)
+                                                                        val epIndex = epItem.index
+                                                                        viewModel.selectEpisode(epId, epIndex)
                                                                         onEpisodeChange?.invoke(epId)
                                                                     }
                                                                 }
-                                                                .padding(horizontal = 14.dp),
+                                                                .padding(horizontal = 12.dp),
                                                             contentAlignment = Alignment.Center
                                                         ) {
                                                             Row(
@@ -733,14 +915,14 @@ fun StreamingScreen(
                                                                         imageVector = Icons.Default.PlayArrow,
                                                                         contentDescription = "Playing",
                                                                         tint = Color.White,
-                                                                        modifier = Modifier.size(13.dp)
+                                                                        modifier = Modifier.size(12.dp)
                                                                     )
-                                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                                    Spacer(modifier = Modifier.width(3.dp))
                                                                 }
                                                                 Text(
                                                                     text = epItem.index ?: "•",
                                                                     color = if (isActive) Color.White else Color(0xFFCBD5E1),
-                                                                    fontSize = 14.sp,
+                                                                    fontSize = 13.sp,
                                                                     fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold
                                                                 )
                                                             }
@@ -990,7 +1172,8 @@ private fun CustomExoPlayerView(
     server: ServerItem?,
     uiState: StreamingUiState,
     viewModel: StreamingViewModel,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onEpisodeChange: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     var showControls by remember { mutableStateOf(true) }
@@ -1015,7 +1198,19 @@ private fun CustomExoPlayerView(
                 if (playbackState == Player.STATE_READY) {
                     viewModel.updatePosition(exoPlayer.currentPosition, exoPlayer.duration)
                 } else if (playbackState == Player.STATE_ENDED && uiState.autoNextEpisode) {
-                    // Auto next episode if available
+                    val nextEp = uiState.episodeNext ?: run {
+                        val currentIdx = uiState.episode?.index?.toIntOrNull()
+                        if (currentIdx != null) {
+                            uiState.episodes.firstOrNull { it.index == (currentIdx + 1).toString() }
+                        } else null
+                    }
+                    val nextId = nextEp?.id
+                    if (!nextId.isNullOrBlank()) {
+                        exoPlayer.stop()
+                        exoPlayer.clearMediaItems()
+                        viewModel.selectEpisode(nextId, nextEp.index)
+                        onEpisodeChange?.invoke(nextId)
+                    }
                 }
             }
         }
@@ -1026,18 +1221,30 @@ private fun CustomExoPlayerView(
         }
     }
 
-    // Load media URL on server change with position synchronization
-    LaunchedEffect(server?.link) {
-        val link = server?.link
-        if (!link.isNullOrBlank()) {
-            val preservedPos = uiState.currentPositionMs
-            val mediaItem = MediaItem.fromUri(link)
-            exoPlayer.setMediaItem(mediaItem)
+    // Memisahkan Logika "Ganti Episode" vs "Ganti Resolusi"
+    var lastLoadedEpisodeId by remember { mutableStateOf<String?>(null) }
+    val currentEpisodeId = uiState.episodeId
+    val currentStreamUrl = server?.link.orEmpty()
+
+    LaunchedEffect(currentEpisodeId, currentStreamUrl) {
+        if (currentStreamUrl.isNotBlank()) {
+            val isResolutionChangeOnly = (lastLoadedEpisodeId != null && lastLoadedEpisodeId == currentEpisodeId)
+            val savedPosition = if (isResolutionChangeOnly) exoPlayer.currentPosition else 0L
+
+            exoPlayer.stop()
+            exoPlayer.clearMediaItems()
+            exoPlayer.setMediaItem(MediaItem.fromUri(currentStreamUrl))
             exoPlayer.prepare()
-            if (preservedPos > 0) {
-                exoPlayer.seekTo(preservedPos)
+            exoPlayer.seekTo(if (isResolutionChangeOnly) savedPosition else 0L)
+            exoPlayer.playWhenReady = true
+
+            lastLoadedEpisodeId = currentEpisodeId
+        } else {
+            if (lastLoadedEpisodeId != null && lastLoadedEpisodeId != currentEpisodeId) {
+                exoPlayer.stop()
+                exoPlayer.clearMediaItems()
+                viewModel.updatePosition(0L, 0L)
             }
-            exoPlayer.play()
         }
     }
 
@@ -1194,23 +1401,36 @@ private fun CustomExoPlayerView(
                     }
 
                     // Center Play / Pause Big Button with Pure White Glassmorphism (NO GREEN)
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(Color(0x33FFFFFF))
-                            .border(1.5.dp, Color(0x66FFFFFF), CircleShape)
-                            .clickable {
-                                if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = "Play/Pause",
-                            tint = Color.White,
-                            modifier = Modifier.size(34.dp)
-                        )
+                    if (uiState.isLoading || server == null) {
+                        Box(
+                            modifier = Modifier.size(56.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(36.dp),
+                                strokeWidth = 3.dp,
+                                color = Color(0xFFFF5722)
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(Color(0x33FFFFFF))
+                                .border(1.5.dp, Color(0x66FFFFFF), CircleShape)
+                                .clickable {
+                                    if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = "Play/Pause",
+                                tint = Color.White,
+                                modifier = Modifier.size(34.dp)
+                            )
+                        }
                     }
 
                     // Forward 10s

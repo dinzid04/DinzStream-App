@@ -10,9 +10,9 @@ android {
 
     val propVersionName = (project.findProperty("versionName") as? String)
         ?.removePrefix("v")?.removePrefix("V")
-        ?: "1.9.2"
+        ?: "1.9.3"
     val propVersionCode = (project.findProperty("versionCode") as? String)?.toIntOrNull()
-        ?: 8
+        ?: 9
 
     defaultConfig {
         applicationId = "com.yuranime.dinz"

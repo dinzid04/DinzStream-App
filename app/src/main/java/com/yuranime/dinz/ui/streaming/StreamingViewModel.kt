@@ -6,6 +6,7 @@ import com.yuranime.dinz.data.model.EpisodeCommentItem
 import com.yuranime.dinz.data.model.EpisodeItem
 import com.yuranime.dinz.data.model.ServerItem
 import com.yuranime.dinz.data.repository.AnimeRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,11 +23,20 @@ class StreamingViewModel(
 
     private var cachedMovieId: String? = null
     private val episodesPageCache = mutableMapOf<Int, List<EpisodeItem>>()
+    private var episodeJob: Job? = null
 
     fun loadStreaming(episodeId: String, movieId: String) {
-        if (_uiState.value.episodeId == episodeId && !_uiState.value.isLoading && _uiState.value.selectedServer != null) {
+        if (_uiState.value.episodeId == episodeId && (_uiState.value.selectedServer != null || _uiState.value.isLoading)) {
             return
         }
+
+        val effectiveMovieId = movieId.ifBlank { _uiState.value.movieId.ifBlank { _uiState.value.episode?.idMovie ?: "" } }
+        if (effectiveMovieId.isNotBlank() && effectiveMovieId == cachedMovieId && _uiState.value.episodes.isNotEmpty()) {
+            selectEpisode(newEpisodeId = episodeId)
+            return
+        }
+
+        episodeJob?.cancel()
 
         _uiState.update {
             it.copy(
@@ -44,7 +54,7 @@ class StreamingViewModel(
             )
         }
 
-        viewModelScope.launch {
+        episodeJob = viewModelScope.launch {
             val streamResult = repository.getEpisodeStream(episodeId)
             if (streamResult.isFailure) {
                 _uiState.update {
@@ -74,22 +84,22 @@ class StreamingViewModel(
             }
 
             // Fetch movie detail, comments, covers/posters, and episodes in parallel
-            val effectiveMovieId = movieId.ifBlank { streamData?.episode?.idMovie ?: "" }
-            if (effectiveMovieId.isNotBlank() && effectiveMovieId != cachedMovieId) {
-                cachedMovieId = effectiveMovieId
+            val resolvedMovieId = effectiveMovieId.ifBlank { streamData?.episode?.idMovie ?: "" }
+            if (resolvedMovieId.isNotBlank() && resolvedMovieId != cachedMovieId) {
+                cachedMovieId = resolvedMovieId
                 episodesPageCache.clear()
             }
 
             val movieDetailDeferred = async {
-                if (effectiveMovieId.isNotBlank()) repository.getMovieDetail(effectiveMovieId)
+                if (resolvedMovieId.isNotBlank()) repository.getMovieDetail(resolvedMovieId)
                 else Result.success(null)
             }
             val commentsDeferred = async { repository.getEpisodeComments(episodeId, page = 0, sort = "new") }
-            val postersDeferred = async { if (effectiveMovieId.isNotBlank()) repository.getMoviePosters(effectiveMovieId) else Result.success(emptyList()) }
-            val coversDeferred = async { if (effectiveMovieId.isNotBlank()) repository.getMovieCovers(effectiveMovieId) else Result.success(emptyList()) }
+            val postersDeferred = async { if (resolvedMovieId.isNotBlank()) repository.getMoviePosters(resolvedMovieId) else Result.success(emptyList()) }
+            val coversDeferred = async { if (resolvedMovieId.isNotBlank()) repository.getMovieCovers(resolvedMovieId) else Result.success(emptyList()) }
             val episodesPage0Deferred = async {
-                if (effectiveMovieId.isNotBlank() && !episodesPageCache.containsKey(0)) {
-                    repository.getMovieEpisodes(effectiveMovieId, page = 0)
+                if (resolvedMovieId.isNotBlank() && !episodesPageCache.containsKey(0)) {
+                    repository.getMovieEpisodes(resolvedMovieId, page = 0)
                 } else {
                     Result.success(episodesPageCache[0] ?: emptyList())
                 }
@@ -112,7 +122,7 @@ class StreamingViewModel(
 
             if (maxEpNum <= 50) {
                 if (page0Episodes.size >= 30 && !episodesPageCache.containsKey(1)) {
-                    val p1Result = repository.getMovieEpisodes(effectiveMovieId, page = 1)
+                    val p1Result = repository.getMovieEpisodes(resolvedMovieId, page = 1)
                     val p1 = p1Result.getOrDefault(emptyList())
                     if (p1.isNotEmpty()) {
                         episodesPageCache[1] = p1
@@ -137,7 +147,7 @@ class StreamingViewModel(
                 val chunkStart = (((currentEpNum - 1) / 100) * 100 + 1).coerceAtLeast(1)
                 val chunkEnd = minOf(chunkStart + 99, maxEpNum)
 
-                ensureRangeEpisodesLoaded(effectiveMovieId, chunkStart, chunkEnd, maxEpNum)
+                ensureRangeEpisodesLoaded(resolvedMovieId, chunkStart, chunkEnd, maxEpNum)
 
                 _uiState.update {
                     it.copy(
@@ -153,6 +163,91 @@ class StreamingViewModel(
         }
     }
 
+    /**
+     * Reaktif memilih episode baru:
+     * 1. Mengubah state currentEpisodeId dan currentEpisodeNumber secara instan.
+     * 2. Mereset posisi durasi ke 0L dan mengosongkan selectedServer agar player tidak memutar stream lama.
+     * 3. Memanggil ulang API Stream/Server Resolusi untuk newEpisodeId.
+     * 4. Memanggil ulang API Komentar dan views untuk newEpisodeId.
+     */
+    fun selectEpisode(newEpisodeId: String, newEpisodeNumber: String? = null) {
+        if (_uiState.value.episodeId == newEpisodeId && !_uiState.value.isLoading && _uiState.value.selectedServer != null) {
+            return
+        }
+
+        episodeJob?.cancel()
+
+        val existingEp = _uiState.value.episodes.firstOrNull { it.id == newEpisodeId }
+            ?: _uiState.value.episodes.firstOrNull { newEpisodeNumber != null && it.index == newEpisodeNumber }
+
+        val targetEpNumber = newEpisodeNumber ?: existingEp?.index ?: _uiState.value.episode?.index
+
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                errorMessage = null,
+                episodeId = newEpisodeId,
+                episode = existingEp ?: EpisodeItem(
+                    id = newEpisodeId,
+                    index = targetEpNumber,
+                    title = existingEp?.title ?: "Episode ${targetEpNumber ?: ""}",
+                    views = existingEp?.views,
+                    idMovie = it.movieId
+                ),
+                selectedServer = null, // Segera hentikan pemutaran stream lama!
+                servers = emptyList(),
+                currentPositionMs = 0L,
+                durationMs = 0L,
+                isPlaying = false,
+                comments = emptyList(),
+                activeCommentForReplies = null
+            )
+        }
+
+        episodeJob = viewModelScope.launch {
+            val streamDeferred = async { repository.getEpisodeStream(newEpisodeId) }
+            val commentsDeferred = async { repository.getEpisodeComments(newEpisodeId, page = 0, sort = "new") }
+
+            val streamResult = streamDeferred.await()
+            val commentsResult = commentsDeferred.await()
+
+            if (streamResult.isFailure) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = streamResult.exceptionOrNull()?.message ?: "Gagal memuat stream episode"
+                    )
+                }
+                return@launch
+            }
+
+            val streamData = streamResult.getOrNull()
+            val servers = streamData?.servers ?: emptyList()
+            val defaultServer = servers.firstOrNull { it.quality == "720p" }
+                ?: servers.firstOrNull { it.quality == "480p" }
+                ?: servers.firstOrNull()
+
+            val comments = commentsResult.getOrDefault(emptyList())
+
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    episode = streamData?.episode ?: existingEp ?: it.episode,
+                    episodeNext = streamData?.episodeNext,
+                    servers = servers,
+                    selectedServer = defaultServer,
+                    comments = comments,
+                    currentPositionMs = 0L,
+                    durationMs = 0L
+                )
+            }
+        }
+    }
+
+    fun setEpisodeViewMode(mode: EpisodeViewMode) {
+        _uiState.update { it.copy(episodeViewMode = mode) }
+    }
+
     fun selectServer(server: ServerItem) {
         // Duration synchronization: preserves currentPositionMs!
         _uiState.update {
@@ -164,6 +259,9 @@ class StreamingViewModel(
     }
 
     fun updatePosition(positionMs: Long, durationMs: Long) {
+        if (_uiState.value.isLoading || _uiState.value.selectedServer == null) {
+            return
+        }
         _uiState.update {
             it.copy(
                 currentPositionMs = positionMs,
@@ -383,7 +481,7 @@ class StreamingViewModel(
     }
 
     fun playEpisode(newEpisodeId: String) {
-        val currentMovieId = _uiState.value.movieId.ifBlank { _uiState.value.episode?.idMovie ?: "" }
-        loadStreaming(episodeId = newEpisodeId, movieId = currentMovieId)
+        val existingEp = _uiState.value.episodes.firstOrNull { it.id == newEpisodeId }
+        selectEpisode(newEpisodeId = newEpisodeId, newEpisodeNumber = existingEp?.index)
     }
 }
