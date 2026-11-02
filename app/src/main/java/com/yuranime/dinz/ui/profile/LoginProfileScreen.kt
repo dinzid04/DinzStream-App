@@ -6,6 +6,8 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -52,13 +54,18 @@ import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -80,6 +87,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -90,6 +98,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import com.yuranime.dinz.BuildConfig
 import com.yuranime.dinz.R
 import com.yuranime.dinz.data.firebase.FirebaseManager
@@ -132,6 +143,60 @@ fun LoginProfileScreen(
     var currentSubScreen by remember { mutableStateOf(ProfileSubScreen.MAIN) }
     var isLoggingIn by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
+    var showEmailLoginDialog by remember { mutableStateOf(false) }
+
+    // Google Sign-In Client
+    val gso = remember {
+        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .requestProfile()
+            .build()
+    }
+    val googleSignInClient = remember(context) {
+        GoogleSignIn.getClient(context, gso)
+    }
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)
+                val email = account.email
+                val displayName = account.displayName ?: email?.substringBefore("@") ?: "Pengguna Google"
+                val photoUrl = account.photoUrl?.toString()
+                val googleId = account.id ?: ""
+
+                if (!email.isNullOrBlank()) {
+                    isLoggingIn = true
+                    FirebaseManager.signInWithGoogleAccount(
+                        email = email,
+                        displayName = displayName,
+                        photoUrl = photoUrl,
+                        googleId = googleId,
+                        onSuccess = {
+                            isLoggingIn = false
+                            Toast.makeText(context, "Selamat datang, $displayName!", Toast.LENGTH_SHORT).show()
+                        },
+                        onError = { err ->
+                            isLoggingIn = false
+                            Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                            showEmailLoginDialog = true
+                        }
+                    )
+                } else {
+                    isLoggingIn = false
+                    Toast.makeText(context, "Email Google tidak ditemukan", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                isLoggingIn = false
+                showEmailLoginDialog = true
+            }
+        } else {
+            isLoggingIn = false
+        }
+    }
 
     // Real-Time Firebase State
     val userProfile by FirebaseManager.userProfile.collectAsState()
@@ -181,22 +246,18 @@ fun LoginProfileScreen(
                         isLoggingIn = isLoggingIn,
                         onBackToHomeClick = { onTabSelected(NavTab.HOME) },
                         onGoogleLoginClick = {
-                            if (activity != null) {
-                                isLoggingIn = true
-                                FirebaseManager.signInWithGoogleProvider(
-                                    activity = activity,
-                                    onSuccess = {
-                                        isLoggingIn = false
-                                        Toast.makeText(context, "Berhasil masuk dengan Google!", Toast.LENGTH_SHORT).show()
-                                    },
-                                    onError = { err ->
-                                        isLoggingIn = false
-                                        Toast.makeText(context, err, Toast.LENGTH_LONG).show()
-                                    }
-                                )
-                            } else {
-                                Toast.makeText(context, "Gagal memulai sesi Google", Toast.LENGTH_SHORT).show()
+                            isLoggingIn = true
+                            try {
+                                googleSignInClient.signOut().addOnCompleteListener {
+                                    googleSignInLauncher.launch(googleSignInClient.signInIntent)
+                                }
+                            } catch (e: Exception) {
+                                isLoggingIn = false
+                                showEmailLoginDialog = true
                             }
+                        },
+                        onEmailLoginClick = {
+                            showEmailLoginDialog = true
                         },
                         onGuestLoginClick = {
                             onTabSelected(NavTab.HOME)
@@ -224,6 +285,9 @@ fun LoginProfileScreen(
                             onInfoMenuClick = { showInfoDialog = true },
                             onLogout = {
                                 FirebaseManager.signOut()
+                                try {
+                                    googleSignInClient.signOut()
+                                } catch (ignored: Exception) {}
                                 Toast.makeText(context, "Akun berhasil keluar", Toast.LENGTH_SHORT).show()
                             }
                         )
@@ -231,6 +295,31 @@ fun LoginProfileScreen(
                 }
             }
         }
+    }
+
+    if (showEmailLoginDialog) {
+        EmailLoginDialog(
+            onDismiss = { showEmailLoginDialog = false },
+            onSubmit = { email, displayName, password ->
+                isLoggingIn = true
+                FirebaseManager.signInWithGoogleAccount(
+                    email = email,
+                    displayName = displayName,
+                    photoUrl = null,
+                    googleId = null,
+                    passwordOverride = password,
+                    onSuccess = {
+                        isLoggingIn = false
+                        showEmailLoginDialog = false
+                        Toast.makeText(context, "Selamat datang, $displayName!", Toast.LENGTH_SHORT).show()
+                    },
+                    onError = { err ->
+                        isLoggingIn = false
+                        Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                    }
+                )
+            }
+        )
     }
 
     if (showInfoDialog) {
@@ -698,6 +787,7 @@ private fun LoginView(
     isLoggingIn: Boolean,
     onBackToHomeClick: () -> Unit,
     onGoogleLoginClick: () -> Unit,
+    onEmailLoginClick: () -> Unit,
     onGuestLoginClick: () -> Unit
 ) {
     Box(
@@ -832,6 +922,28 @@ private fun LoginView(
                         )
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Tombol Alternatif "Masuk dengan Email / Akun Dinz"
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1E1B2E))
+                    .border(1.dp, Color(0x338B5CF6), CircleShape)
+                    .clickable(enabled = !isLoggingIn) { onEmailLoginClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Masuk dengan Email / Akun Dinz",
+                    color = Color(0xFFE2E8F0),
+                    fontSize = 14.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = SfProFontFamily
+                )
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -1113,6 +1225,186 @@ private fun AppInfoModal(onDismiss: () -> Unit) {
                         fontWeight = FontWeight.Bold,
                         fontFamily = SfProFontFamily
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Dialog Masuk Akun / Fallback jika Google Play Services gagal
+ */
+@Composable
+private fun EmailLoginDialog(
+    onDismiss: () -> Unit,
+    onSubmit: (email: String, displayName: String, password: String?) -> Unit
+) {
+    var email by remember { mutableStateOf("") }
+    var displayName by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var isSubmitting by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFF14131D))
+                .border(1.dp, Color(0x338B5CF6), RoundedCornerShape(20.dp))
+                .padding(24.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Masuk Akun Yuranime",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "Gunakan email Google atau akun web DinzStream kamu",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 12.5.sp,
+                    fontFamily = SfProFontFamily,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Alamat Email", fontSize = 13.sp) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFF8B5CF6),
+                        unfocusedBorderColor = Color(0x33FFFFFF),
+                        focusedLabelColor = Color(0xFFC084FC),
+                        unfocusedLabelColor = Color(0xFF94A3B8),
+                        cursorColor = Color(0xFF8B5CF6)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = displayName,
+                    onValueChange = { displayName = it },
+                    label = { Text("Nama Tampilan (Opsional)", fontSize = 13.sp) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFF8B5CF6),
+                        unfocusedBorderColor = Color(0x33FFFFFF),
+                        focusedLabelColor = Color(0xFFC084FC),
+                        unfocusedLabelColor = Color(0xFF94A3B8),
+                        cursorColor = Color(0xFF8B5CF6)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Kata Sandi (Opsional jika sudah punya)", fontSize = 13.sp) },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = Color(0xFF8B5CF6),
+                        unfocusedBorderColor = Color(0x33FFFFFF),
+                        focusedLabelColor = Color(0xFFC084FC),
+                        unfocusedLabelColor = Color(0xFF94A3B8),
+                        cursorColor = Color(0xFF8B5CF6)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = errorMessage ?: "",
+                        color = Color(0xFFEF4444),
+                        fontSize = 12.sp,
+                        fontFamily = SfProFontFamily,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                    ) {
+                        Text(
+                            text = "Batal",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 14.sp,
+                            fontFamily = SfProFontFamily
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            if (email.isBlank() || !email.contains("@")) {
+                                errorMessage = "Harap masukkan alamat email yang valid"
+                                return@Button
+                            }
+                            isSubmitting = true
+                            errorMessage = null
+                            val effectiveName = displayName.ifBlank { email.substringBefore("@") }
+                            val effectivePass = password.ifBlank { null }
+                            onSubmit(email.trim(), effectiveName, effectivePass)
+                        },
+                        enabled = !isSubmitting,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF8B5CF6)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .weight(1.5f)
+                            .height(48.dp)
+                    ) {
+                        if (isSubmitting) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text(
+                                text = "Masuk Sekarang",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = SfProFontFamily
+                            )
+                        }
+                    }
                 }
             }
         }

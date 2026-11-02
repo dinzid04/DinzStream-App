@@ -8,7 +8,7 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:400464992596:android:68fde66c88d351699610c1",
+        "mobilesdk_app_id": "1:400464992596:web:68fde66c88d351699610c1",
         "android_client_info": {
           "package_name": "com.yuranime.dinz"
         }

@@ -17,7 +17,7 @@ class YuranimeApp : Application(), ImageLoaderFactory {
         } catch (e: Exception) {
             try {
                 val options = com.google.firebase.FirebaseOptions.Builder()
-                    .setApplicationId("1:400464992596:android:68fde66c88d351699610c1")
+                    .setApplicationId("1:400464992596:web:68fde66c88d351699610c1")
                     .setApiKey("AIzaSyAPZsUFl1RoV3bfMWWOsJ0M9yt_YPqrRSg")
                     .setProjectId("dinz-ai-gemini-copy")
                     .setStorageBucket("dinz-ai-gemini-copy.firebasestorage.app")
