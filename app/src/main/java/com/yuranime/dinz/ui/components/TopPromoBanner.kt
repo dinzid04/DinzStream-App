@@ -388,6 +388,7 @@ fun YuranimeHeroSlider(
         }
     }
 }
+}
 
 // Backward-compatibility alias
 @Composable
