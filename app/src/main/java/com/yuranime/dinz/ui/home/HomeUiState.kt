@@ -37,6 +37,10 @@ data class HomeUiState(
     val waitingAnimeList: List<AnimeItem> = emptyList(),
     val popularAnimeList: List<AnimeItem> = emptyList(),
     val manreList: List<AnimeItem> = emptyList(),
+    // Birthday Today Section (Otakotaku Scraper)
+    val birthdayToday: com.yuranime.dinz.data.api.BirthdayTodayData? = null,
+    val isBirthdayLoading: Boolean = false,
+    val birthdayError: String? = null,
     // Horizontal row pagination state
     val horizontalPageMap: Map<HomeSectionType, Int> = emptyMap(),
     val isLoadingSection: Map<HomeSectionType, Boolean> = emptyMap(),

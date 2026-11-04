@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "1.9.6"
+  APP_VERSION: "1.9.7"
 
 jobs:
   build:
@@ -59,34 +59,23 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Real-Time Google Login Firebase, New Profile, Leaderboard, Edit Profile, Unduh & Points Rewards (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Ulang Tahun Hari Ini OtakOtaku, Detail Ultah & Perbaikan Login Google (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
             ### Pembaruan Utama:
-            1. **Real-Time Google Login dengan Firebase:**
-               - Mengintegrasikan konfigurasi Firebase resmi dari project `nimedinz` (`dinz-ai-gemini-copy`).
-               - Mendukung dual-flow Google Sign-In (Firebase OAuthProvider via Chrome Custom Tabs + Google Credential Manager/ID Token) dengan jaminan 100% login sukses di semua perangkat.
-               - Sinkronisasi real-time dokumen pengguna di Cloud Firestore (`users/{uid}`) meliputi nama, username, avatar, level, exp, dan points.
-               - Akumulasi XP dan Poin otomatis setiap kali menonton episode, memberi like/reaksi, atau check-in harian.
-            2. **Perbaikan Total Halaman Profile:**
-               - Menghapus sepenuhnya baris tombol media sosial (WhatsApp, Telegram, Instagram, TikTok, Discord).
-               - Tata letak header terpadu: Cover Banner landscape anime, Avatar Bulat dengan border oranye tipis & badge kamera biru, Nama Asli Pengguna, ikon edit pensil, badge `Lv. [Level]`, dan progress bar XP tipis yang elegan.
-               - Daftar menu terpadu tanpa jarak kosong renggang: `Edit Profil`, `Unduh`, `Papan Peringkat`, `Points & Rewards`, `Info`, dan `Keluar Akun`.
-            3. **Halaman Khusus Papan Peringkat (100% Sesuai Gambar Referensi):**
-               - Area Podium Mewah:
-                 - `TOP 1` (Tengah-Atas): Avatar terbesar dibingkai ornamen sayap & lingkaran Emas berkilau, badge `TOP 1`, panji perisai gradasi Emas-Oranye dengan Nama dan Skor XP.
-                 - `TOP 2` (Kiri): Avatar berbingkai sayap Perak / Biru-Ungu, badge `TOP 2`, panji perisai Biru-Ungu.
-                 - `TOP 3` (Kanan): Avatar berbingkai sayap Perunggu / Coral-Pink, badge `TOP 3`, panji perisai Coral-Pink.
-               - Baris Header Tabel: `Peringkat`, `Pengguna`, `Total XP` + ikon belah ketupat `?` (dialog panduan cara memperoleh XP).
-               - Daftar Peringkat 4 s/d 100: Kartu horizontal ungu-gelap kosmik dengan aksen garis sudut emas di 4 pojok, belah ketupat putih rotasi 45° dengan angka peringkat tebal, avatar bulat, nama pengguna (SF Bold), dan skor XP emas terang (`#FDE68A`).
-               - Sticky Bottom Bar: Peringkat, avatar, dan skor XP pengguna saat ini.
-            4. **Rombak Halaman Edit Profil, Points & Rewards, dan Unduh:**
-               - **Edit Profil:** Preview banner cover & avatar profil overlapping dengan pemilih gambar galeri HP via `ActivityResultContracts.PickVisualMedia` + koleksi avatar anime cepat, input Display Name & Bio, simpan real-time ke Firebase.
-               - **Points & Rewards:** Header saldo poin real-time, kalender 7 hari check-in dengan tombol klaim 1x sehari, misi harian, dan penukaran reward/badge.
-               - **Unduh:** Indikator penyimpanan perangkat minimalis, tab filter (Selesai & Sedang Mengunduh), kartu thumbnail 16:9 episode dengan aksi putar langsung & hapus, serta empty state bersih dengan logo monokrom Yuranime.
-            5. **Standar Desain Anti-Slop:**
-               - Bebas dari border kotak kaku murahan, tipografi SF Pro Display bersih dan terarah, tidak ada em dash pada teks UI, memenuhi target sentuh minimum 44dp di semua tombol.
+            1. **Fitur Tokoh Berulang Tahun Hari Ini (Integrasi OtakOtaku):**
+               - Penempatan section di halaman Home tepat **di atas Cuplix** dan **di bawah Slider / Lanjut Nonton**.
+               - Desain kartu horizontal modern dengan badge tipe `KARAKTER` & `SEIYUU / STAF`, shimmer loading state, dan tombol retry.
+               - Halaman detail ulang tahun komprehensif: nama, kanji, alias, biodata detail (gender, tanggal lahir, golongan darah, tinggi/berat), deskripsi/biografi, profil pengisi suara, daftar peran suara seiyuu, dan daftar anime.
+            2. **Perbaikan Autentikasi Google & Akun Terdaftar:**
+               - Mengganti pemilih akun dasar dengan Google Sign-In native yang menampilkan profil lengkap (avatar, nama, email).
+               - Menangani akun email yang sudah terdaftar sebelumnya dengan mulus melalui penautan kredensial Firebase otomatis.
+               - Dukungan pemulihan kata sandi via email pada menu login.
+            3. **Standar Desain Anti-Slop:**
+               - Layout padat dan terarah tanpa ruang kosong terbuang.
+               - Target sentuh minimum 48dp pada seluruh elemen interaktif.
+               - Tanpa em dash pada UI text dan performa rendering optimal.
           draft: false
           prerelease: false
           make_latest: true

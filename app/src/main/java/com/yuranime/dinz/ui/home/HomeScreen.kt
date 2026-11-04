@@ -81,7 +81,8 @@ fun HomeScreen(
     onTabSelected: (NavTab) -> Unit = {},
     onAnimeClick: (id: String) -> Unit = {},
     onEpisodeClick: (episodeId: String, movieId: String) -> Unit = { _, _ -> },
-    onCuplixClick: (CuplixItem) -> Unit = {}
+    onCuplixClick: (CuplixItem) -> Unit = {},
+    onBirthdayClick: (com.yuranime.dinz.data.api.BirthdayCharacterItem) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -212,6 +213,18 @@ fun HomeScreen(
                                     }
                                 }
                             }
+                        }
+
+                        // 2.5 Section "Ulang Tahun Hari Ini" (Di atas cuplix, di bawah slider / lanjut nonton)
+                        item(key = "section_birthday_today") {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            com.yuranime.dinz.ui.components.BirthdayTodaySection(
+                                birthdayData = uiState.birthdayToday,
+                                isLoading = uiState.isBirthdayLoading,
+                                errorMessage = uiState.birthdayError,
+                                onRetry = { viewModel.loadBirthdayToday(forceRefresh = true) },
+                                onItemClick = onBirthdayClick
+                            )
                         }
 
                         // 3. Section "Cuplix" (Horizontal row of circular items)

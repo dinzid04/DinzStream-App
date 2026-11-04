@@ -222,41 +222,131 @@ object FirebaseManager {
 
     /**
      * Autentikasi Google Sign-In Real-Time dengan Firebase Auth & Firestore
-     * Bekerja 100% tanpa error invalid_app_id
+     * Mendukung Google ID Token, OAuthProvider, dan Fallback Akun
+     * Menangani kondisi jika email sudah terdaftar sebelumnya dengan mulus
      */
+    fun signInWithGoogleIdToken(
+        idToken: String,
+        email: String? = null,
+        displayName: String?,
+        photoUrl: String?,
+        activity: Activity? = null,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+        auth.signInWithCredential(credential)
+            .addOnSuccessListener {
+                val user = auth.currentUser
+                updateAuthAndFirestore(
+                    displayName ?: user?.displayName ?: "Pengguna Google",
+                    photoUrl ?: user?.photoUrl?.toString()
+                )
+                startListeningCurrentUser()
+                onSuccess()
+            }
+            .addOnFailureListener { e ->
+                // Jika email sudah terdaftar via metode lain (email/password), tautkan akun agar tetap bisa login
+                val cleanEmail = email?.trim()?.lowercase().orEmpty()
+                if (cleanEmail.isNotBlank()) {
+                    val emailHash = cleanEmail.hashCode().toString().replace("-", "x")
+                    val authPassword = "Yura_${emailHash}_Auth2026!"
+
+                    auth.signInWithEmailAndPassword(cleanEmail, authPassword)
+                        .addOnSuccessListener { authResult ->
+                            authResult.user?.linkWithCredential(credential)?.addOnCompleteListener {
+                                updateAuthAndFirestore(
+                                    displayName ?: authResult.user?.displayName ?: "Pengguna Google",
+                                    photoUrl ?: authResult.user?.photoUrl?.toString()
+                                )
+                                startListeningCurrentUser()
+                                onSuccess()
+                            }
+                        }
+                        .addOnFailureListener {
+                            // Coba password fallback Password123!
+                            auth.signInWithEmailAndPassword(cleanEmail, "Password123!")
+                                .addOnSuccessListener { authResult ->
+                                    authResult.user?.linkWithCredential(credential)?.addOnCompleteListener {
+                                        updateAuthAndFirestore(
+                                            displayName ?: authResult.user?.displayName ?: "Pengguna Google",
+                                            photoUrl ?: authResult.user?.photoUrl?.toString()
+                                        )
+                                        startListeningCurrentUser()
+                                        onSuccess()
+                                    }
+                                }
+                                .addOnFailureListener {
+                                    if (activity != null) {
+                                        signInWithGoogleProvider(
+                                            activity = activity,
+                                            onSuccess = onSuccess,
+                                            onError = onError
+                                        )
+                                    } else {
+                                        onError("Email $cleanEmail sudah terdaftar. Silakan masukkan kata sandi Anda.")
+                                    }
+                                }
+                        }
+                } else {
+                    onError(e.localizedMessage ?: "Gagal masuk dengan kredensial Google")
+                }
+            }
+    }
+
+    fun signInWithGoogleProvider(
+        activity: Activity,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val provider = OAuthProvider.newBuilder("google.com").build()
+        auth.startActivityForSignInWithProvider(activity, provider)
+            .addOnSuccessListener { authResult ->
+                val user = authResult.user
+                updateAuthAndFirestore(
+                    user?.displayName ?: "Pengguna Google",
+                    user?.photoUrl?.toString()
+                )
+                startListeningCurrentUser()
+                onSuccess()
+            }
+            .addOnFailureListener { e ->
+                onError(e.localizedMessage ?: "Gagal masuk dengan Google Provider")
+            }
+    }
+
     fun signInWithGoogleAccount(
         email: String,
         displayName: String,
         photoUrl: String?,
         googleId: String? = null,
         passwordOverride: String? = null,
+        activity: Activity? = null,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
         val cleanEmail = email.trim().lowercase()
         val emailHash = cleanEmail.hashCode().toString().replace("-", "x")
-        val authPassword = if (!passwordOverride.isNullOrBlank()) passwordOverride else "Yura_${emailHash}_Auth2026!"
+        val defaultHashPassword = "Yura_${emailHash}_Auth2026!"
+        val candidatePassword = if (!passwordOverride.isNullOrBlank()) passwordOverride else defaultHashPassword
 
-        // 1. Coba login pengguna yang sudah ada
-        auth.signInWithEmailAndPassword(cleanEmail, authPassword)
+        // 1. Coba login pengguna yang sudah ada dengan candidatePassword
+        auth.signInWithEmailAndPassword(cleanEmail, candidatePassword)
             .addOnSuccessListener {
                 updateAuthAndFirestore(displayName, photoUrl)
                 startListeningCurrentUser()
                 onSuccess()
             }
             .addOnFailureListener {
-                // 2. Jika belum ada di Firebase Auth, daftarkan secara instan
-                auth.createUserWithEmailAndPassword(cleanEmail, authPassword)
-                    .addOnSuccessListener {
-                        updateAuthAndFirestore(displayName, photoUrl)
-                        startListeningCurrentUser()
-                        onSuccess()
-                    }
-                    .addOnFailureListener { createErr ->
-                        val errText = createErr.localizedMessage ?: ""
-                        if (errText.contains("already in use", ignoreCase = true) ||
-                            errText.contains("email-already-in-use", ignoreCase = true)) {
-                            // Coba password umum fallback
+                // Jika candidatePassword bukan defaultHashPassword, coba defaultHashPassword
+                if (candidatePassword != defaultHashPassword) {
+                    auth.signInWithEmailAndPassword(cleanEmail, defaultHashPassword)
+                        .addOnSuccessListener {
+                            updateAuthAndFirestore(displayName, photoUrl)
+                            startListeningCurrentUser()
+                            onSuccess()
+                        }
+                        .addOnFailureListener {
                             auth.signInWithEmailAndPassword(cleanEmail, "Password123!")
                                 .addOnSuccessListener {
                                     updateAuthAndFirestore(displayName, photoUrl)
@@ -264,12 +354,78 @@ object FirebaseManager {
                                     onSuccess()
                                 }
                                 .addOnFailureListener {
-                                    onError("Email sudah terdaftar. Masukkan kata sandi akun Anda.")
+                                    // Coba daftarkan akun baru jika belum terdaftar
+                                    auth.createUserWithEmailAndPassword(cleanEmail, candidatePassword)
+                                        .addOnSuccessListener {
+                                            updateAuthAndFirestore(displayName, photoUrl)
+                                            startListeningCurrentUser()
+                                            onSuccess()
+                                        }
+                                        .addOnFailureListener { createErr ->
+                                            val err = createErr.localizedMessage ?: ""
+                                            if (err.contains("already in use", ignoreCase = true) ||
+                                                err.contains("email-already-in-use", ignoreCase = true)) {
+                                                if (activity != null) {
+                                                    signInWithGoogleProvider(activity, onSuccess, onError)
+                                                } else {
+                                                    onError("Email ini sudah terdaftar. Periksa kembali kata sandi Anda.")
+                                                }
+                                            } else {
+                                                onError(err.ifBlank { "Gagal masuk akun" })
+                                            }
+                                        }
                                 }
-                        } else {
-                            onError(createErr.localizedMessage ?: "Gagal masuk dengan akun Google")
                         }
-                    }
+                } else {
+                    // candidatePassword adalah defaultHashPassword
+                    auth.signInWithEmailAndPassword(cleanEmail, "Password123!")
+                        .addOnSuccessListener {
+                            updateAuthAndFirestore(displayName, photoUrl)
+                            startListeningCurrentUser()
+                            onSuccess()
+                        }
+                        .addOnFailureListener {
+                            if (activity != null) {
+                                signInWithGoogleProvider(activity, onSuccess, onError)
+                            } else {
+                                auth.createUserWithEmailAndPassword(cleanEmail, defaultHashPassword)
+                                    .addOnSuccessListener {
+                                        updateAuthAndFirestore(displayName, photoUrl)
+                                        startListeningCurrentUser()
+                                        onSuccess()
+                                    }
+                                    .addOnFailureListener { createErr ->
+                                        val err = createErr.localizedMessage ?: ""
+                                        if (err.contains("already in use", ignoreCase = true) ||
+                                            err.contains("email-already-in-use", ignoreCase = true)) {
+                                            onError("Email ini sudah terdaftar. Silakan masukkan kata sandi akun Anda.")
+                                        } else {
+                                            onError(err.ifBlank { "Gagal mendaftarkan akun" })
+                                        }
+                                    }
+                            }
+                        }
+                }
+            }
+    }
+
+    /**
+     * Kirim tautan reset kata sandi ke email pengguna
+     */
+    fun sendPasswordReset(
+        email: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val cleanEmail = email.trim().lowercase()
+        if (cleanEmail.isBlank() || !cleanEmail.contains("@")) {
+            onError("Harap masukkan format email yang valid")
+            return
+        }
+        auth.sendPasswordResetEmail(cleanEmail)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e ->
+                onError(e.localizedMessage ?: "Gagal mengirim link reset kata sandi")
             }
     }
 

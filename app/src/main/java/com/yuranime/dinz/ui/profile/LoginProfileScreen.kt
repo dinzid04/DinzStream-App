@@ -1,12 +1,16 @@
 package com.yuranime.dinz.ui.profile
 
-import android.accounts.AccountManager
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -149,29 +153,61 @@ fun LoginProfileScreen(
     val isFirebaseLoggedIn = currentUser != null
     val userProfile by FirebaseManager.userProfile.collectAsState()
 
-    // Native Google Account Picker (OS-Level, 100% Berhasil tanpa masalah SHA-1 / Developer Error)
-    val accountPickerLauncher = rememberLauncherForActivityResult(
+    // Google Sign-In Client (Menampilkan Dialog Pemilih Akun Google Lengkap dengan Avatar, Nama & Email)
+    val gso = remember {
+        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken("400464992596-68fde66c88d351699610c1.apps.googleusercontent.com")
+            .requestEmail()
+            .requestProfile()
+            .build()
+    }
+    val googleSignInClient = remember(context) {
+        GoogleSignIn.getClient(context, gso)
+    }
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            val selectedEmail = result.data?.getStringExtra(AccountManager.KEY_ACCOUNT_NAME)
-            if (!selectedEmail.isNullOrBlank()) {
-                isLoggingIn = true
-                val cleanEmail = selectedEmail.trim().lowercase()
-                val rawName = cleanEmail.substringBefore("@")
-                val formattedName = rawName.split(".", "_", "-")
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            val idToken = account?.idToken
+            val email = account?.email.orEmpty().trim().lowercase()
+            val displayName = account?.displayName?.takeIf { it.isNotBlank() }
+                ?: email.substringBefore("@").split(".", "_", "-")
                     .filter { it.isNotBlank() }
                     .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
                     .ifBlank { "Pengguna Google" }
+            val photoUrl = account?.photoUrl?.toString()
 
-                FirebaseManager.signInWithGoogleAccount(
-                    email = cleanEmail,
-                    displayName = formattedName,
-                    photoUrl = null,
-                    googleId = null,
+            if (!idToken.isNullOrBlank()) {
+                isLoggingIn = true
+                FirebaseManager.signInWithGoogleIdToken(
+                    idToken = idToken,
+                    email = email,
+                    displayName = displayName,
+                    photoUrl = photoUrl,
+                    activity = activity,
                     onSuccess = {
                         isLoggingIn = false
-                        Toast.makeText(context, "Selamat datang, $formattedName!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Selamat datang, $displayName!", Toast.LENGTH_SHORT).show()
+                    },
+                    onError = { err ->
+                        isLoggingIn = false
+                        Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                        showEmailLoginDialog = true
+                    }
+                )
+            } else if (email.isNotBlank()) {
+                isLoggingIn = true
+                FirebaseManager.signInWithGoogleAccount(
+                    email = email,
+                    displayName = displayName,
+                    photoUrl = photoUrl,
+                    activity = activity,
+                    onSuccess = {
+                        isLoggingIn = false
+                        Toast.makeText(context, "Selamat datang, $displayName!", Toast.LENGTH_SHORT).show()
                     },
                     onError = { err ->
                         isLoggingIn = false
@@ -181,10 +217,44 @@ fun LoginProfileScreen(
                 )
             } else {
                 isLoggingIn = false
+            }
+        } catch (e: ApiException) {
+            // Jika Play Services error (misalnya kode 10 karena SHA-1 mismatch debug),
+            // fallback langsung ke OAuthProvider yang membuka Google Sign-In web autentikasi
+            if (activity != null) {
+                isLoggingIn = true
+                FirebaseManager.signInWithGoogleProvider(
+                    activity = activity,
+                    onSuccess = {
+                        isLoggingIn = false
+                        Toast.makeText(context, "Selamat datang di Yuranime!", Toast.LENGTH_SHORT).show()
+                    },
+                    onError = { err ->
+                        isLoggingIn = false
+                        Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                        showEmailLoginDialog = true
+                    }
+                )
+            } else {
+                isLoggingIn = false
                 showEmailLoginDialog = true
             }
-        } else {
+        } catch (e: Exception) {
             isLoggingIn = false
+            if (activity != null) {
+                FirebaseManager.signInWithGoogleProvider(
+                    activity = activity,
+                    onSuccess = {
+                        Toast.makeText(context, "Selamat datang di Yuranime!", Toast.LENGTH_SHORT).show()
+                    },
+                    onError = { err ->
+                        Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                        showEmailLoginDialog = true
+                    }
+                )
+            } else {
+                showEmailLoginDialog = true
+            }
         }
     }
 
@@ -234,33 +304,28 @@ fun LoginProfileScreen(
                         onGoogleLoginClick = {
                             isLoggingIn = true
                             try {
-                                val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                    AccountManager.newChooseAccountIntent(
-                                        null,
-                                        null,
-                                        arrayOf("com.google"),
-                                        null,
-                                        null,
-                                        null,
-                                        null
+                                googleSignInClient.signOut().addOnCompleteListener {
+                                    val signInIntent = googleSignInClient.signInIntent
+                                    googleSignInLauncher.launch(signInIntent)
+                                }
+                            } catch (e: Exception) {
+                                if (activity != null) {
+                                    FirebaseManager.signInWithGoogleProvider(
+                                        activity = activity,
+                                        onSuccess = {
+                                            isLoggingIn = false
+                                            Toast.makeText(context, "Selamat datang di Yuranime!", Toast.LENGTH_SHORT).show()
+                                        },
+                                        onError = { err ->
+                                            isLoggingIn = false
+                                            Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                                            showEmailLoginDialog = true
+                                        }
                                     )
                                 } else {
-                                    @Suppress("DEPRECATION")
-                                    AccountManager.newChooseAccountIntent(
-                                        null,
-                                        null,
-                                        arrayOf("com.google"),
-                                        false,
-                                        null,
-                                        null,
-                                        null,
-                                        null
-                                    )
+                                    isLoggingIn = false
+                                    showEmailLoginDialog = true
                                 }
-                                accountPickerLauncher.launch(intent)
-                            } catch (e: Exception) {
-                                isLoggingIn = false
-                                showEmailLoginDialog = true
                             }
                         },
                         onEmailLoginClick = {
@@ -313,6 +378,7 @@ fun LoginProfileScreen(
                     photoUrl = null,
                     googleId = null,
                     passwordOverride = password,
+                    activity = activity,
                     onSuccess = {
                         isLoggingIn = false
                         showEmailLoginDialog = false
@@ -320,6 +386,17 @@ fun LoginProfileScreen(
                     },
                     onError = { err ->
                         isLoggingIn = false
+                        Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                    }
+                )
+            },
+            onForgotPassword = { emailToReset ->
+                FirebaseManager.sendPasswordReset(
+                    email = emailToReset,
+                    onSuccess = {
+                        Toast.makeText(context, "Link reset kata sandi telah dikirim ke $emailToReset", Toast.LENGTH_LONG).show()
+                    },
+                    onError = { err ->
                         Toast.makeText(context, err, Toast.LENGTH_LONG).show()
                     }
                 )
@@ -1248,13 +1325,15 @@ private fun AppInfoModal(onDismiss: () -> Unit) {
 @Composable
 private fun EmailLoginDialog(
     onDismiss: () -> Unit,
-    onSubmit: (email: String, displayName: String, password: String?) -> Unit
+    onSubmit: (email: String, displayName: String, password: String?) -> Unit,
+    onForgotPassword: (email: String) -> Unit = {}
 ) {
     var email by remember { mutableStateOf("") }
     var displayName by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var infoMessage by remember { mutableStateOf<String?>(null) }
 
     Dialog(onDismissRequest = onDismiss) {
         Box(
@@ -1348,8 +1427,35 @@ private fun EmailLoginDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Text(
+                        text = "Lupa kata sandi?",
+                        color = Color(0xFFC084FC),
+                        fontSize = 12.sp,
+                        fontFamily = SfProFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .clickable {
+                                if (email.isBlank() || !email.contains("@")) {
+                                    errorMessage = "Isi email di atas terlebih dahulu untuk meminta link reset"
+                                    infoMessage = null
+                                } else {
+                                    errorMessage = null
+                                    infoMessage = "Tautan reset dikirim ke ${email.trim()}"
+                                    onForgotPassword(email.trim())
+                                }
+                            }
+                            .padding(vertical = 4.dp, horizontal = 2.dp)
+                    )
+                }
+
                 if (errorMessage != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = errorMessage ?: "",
                         color = Color(0xFFEF4444),
@@ -1359,7 +1465,18 @@ private fun EmailLoginDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                if (infoMessage != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = infoMessage ?: "",
+                        color = Color(0xFF10B981),
+                        fontSize = 12.sp,
+                        fontFamily = SfProFontFamily,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

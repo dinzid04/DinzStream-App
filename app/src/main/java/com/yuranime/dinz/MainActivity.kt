@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity() {
                     var selectedStreamingEpisodeId by remember { mutableStateOf<String?>(null) }
                     var selectedStreamingMovieId by remember { mutableStateOf<String?>(null) }
                     var selectedCuplixItem by remember { mutableStateOf<CuplixItem?>(null) }
+                    var selectedBirthdayItem by remember { mutableStateOf<com.yuranime.dinz.data.api.BirthdayCharacterItem?>(null) }
                     var currentTab by remember { mutableStateOf(NavTab.HOME) }
                     var pendingUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
 
@@ -90,6 +91,31 @@ class MainActivity : ComponentActivity() {
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         when {
+                            selectedBirthdayItem != null -> {
+                                key(selectedBirthdayItem?.detailUrl) {
+                                    com.yuranime.dinz.ui.detail.BirthdayDetailScreen(
+                                        item = selectedBirthdayItem!!,
+                                        onBackClick = { selectedBirthdayItem = null },
+                                        onNavigateToDetailUrl = { newUrl ->
+                                            val idMatch = Regex("""/(character|people)/view/(\d+)/([^/?#\s]+)""").find(newUrl)
+                                            val kind = if (newUrl.contains("/people/view/")) "seiyuu_staff" else "character"
+                                            val id = idMatch?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
+                                            val slug = idMatch?.groupValues?.getOrNull(3).orEmpty()
+                                            selectedBirthdayItem = com.yuranime.dinz.data.api.BirthdayCharacterItem(
+                                                id = id,
+                                                slug = slug,
+                                                type = kind,
+                                                name = slug.replace("-", " "),
+                                                nameKanji = "",
+                                                nameEn = "",
+                                                imageUrl = "",
+                                                thumbnailUrl = "",
+                                                detailUrl = newUrl
+                                            )
+                                        }
+                                    )
+                                }
+                            }
                             selectedCuplixItem != null -> {
                                 key(selectedCuplixItem?.id) {
                                     CuplixViewScreen(
@@ -161,6 +187,9 @@ class MainActivity : ComponentActivity() {
                                             },
                                             onCuplixClick = { cuplixItem ->
                                                 selectedCuplixItem = cuplixItem
+                                            },
+                                            onBirthdayClick = { bItem ->
+                                                selectedBirthdayItem = bItem
                                             },
                                             viewModel = homeViewModel
                                         )

@@ -22,6 +22,30 @@ class HomeViewModel(
 
     init {
         loadHomeData()
+        loadBirthdayToday()
+    }
+
+    fun loadBirthdayToday(forceRefresh: Boolean = false) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBirthdayLoading = true, birthdayError = null) }
+            val result = com.yuranime.dinz.data.api.OtakOtakuScraper.getTodayBirthdays(forceRefresh = forceRefresh)
+            if (result.isSuccess) {
+                _uiState.update {
+                    it.copy(
+                        birthdayToday = result.getOrNull(),
+                        isBirthdayLoading = false,
+                        birthdayError = null
+                    )
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        isBirthdayLoading = false,
+                        birthdayError = result.exceptionOrNull()?.localizedMessage ?: "Gagal memuat ulang tahun"
+                    )
+                }
+            }
+        }
     }
 
     fun refreshWatchHistory(context: Context) {
