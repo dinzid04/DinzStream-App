@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "1.9.7"
+  APP_VERSION: "1.9.8"
 
 jobs:
   build:
@@ -59,23 +59,30 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Ulang Tahun Hari Ini OtakOtaku, Detail Ultah & Perbaikan Login Google (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Desain Presisi Ultah Hari Ini, 2 Mode Hero Slider & Halaman Pengaturan (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
             ### Pembaruan Utama:
-            1. **Fitur Tokoh Berulang Tahun Hari Ini (Integrasi OtakOtaku):**
-               - Penempatan section di halaman Home tepat **di atas Cuplix** dan **di bawah Slider / Lanjut Nonton**.
-               - Desain kartu horizontal modern dengan badge tipe `KARAKTER` & `SEIYUU / STAF`, shimmer loading state, dan tombol retry.
-               - Halaman detail ulang tahun komprehensif: nama, kanji, alias, biodata detail (gender, tanggal lahir, golongan darah, tinggi/berat), deskripsi/biografi, profil pengisi suara, daftar peran suara seiyuu, dan daftar anime.
-            2. **Perbaikan Autentikasi Google & Akun Terdaftar:**
-               - Mengganti pemilih akun dasar dengan Google Sign-In native yang menampilkan profil lengkap (avatar, nama, email).
-               - Menangani akun email yang sudah terdaftar sebelumnya dengan mulus melalui penautan kredensial Firebase otomatis.
-               - Dukungan pemulihan kata sandi via email pada menu login.
-            3. **Standar Desain Anti-Slop:**
-               - Layout padat dan terarah tanpa ruang kosong terbuang.
-               - Target sentuh minimum 48dp pada seluruh elemen interaktif.
-               - Tanpa em dash pada UI text dan performa rendering optimal.
+            1. **Desain Presisi Ulang Tahun Hari Ini (Home & Detail Karakter 100% Sesuai Referensi):**
+               - **Home Section:** Header teks `Ulang Tahun Hari Ini • [Tanggal]` dengan tombol navigasi lingkaran gelap. Kartu potret (115dp, rasio 2:3, radius 12dp, tanpa border) dengan gradasi bawah halus, tanggal oranye `#FF5722` SF SemiBold, dan nama putih SF Bold.
+               - **Detail Karakter (`CharacterDetailScreen`):** Backdrop gradasi gelap menyatu ke latar `#0B0B0B`, tombol kembali bulat 40dp, foto profil potret (135dp, rasio 2:3 tanpa border), label abu-abu `#94A3B8` sejajar foto.
+               - **Deskripsi & Biodata:** Deskripsi nyaman dengan tombol lipat/buka `Selengkapnya... ⌄` oranye. Biodata tersusun dalam 2 kolom bersih tanpa kotak/border garis.
+               - **Seiyuu & Daftar Anime:** Avatar seiyuu bulat (54dp) dengan label `Bahasa: Jepang` oranye. Daftar anime bersih dengan thumbnail persegi membulat (56x56dp), peran karakter oranye, status, dan navigasi langsung ke detail anime.
+
+            2. **2 Mode Tampilan Hero Slider Beranda:**
+               - **Mode 1 - Default Slider (Bawaan):** Mempertahankan tampilan slider dengan kartu poster di pojok kiri bawah, sinopsis, tombol `TONTON SEKARANG`, dan indikator slide.
+               - **Mode 2 - Clean Cover Slider:** Tampilan bersih sesuai gambar referensi dengan cover layar penuh tanpa poster kecil di kiri bawah, tipografi judul all-caps `Yuranime-logo-font.ttf`, sinopsis singkat, tombol kapsul putar merah `▶ TONTON SEKARANG`, indikator titik pagination, dan ikon pencarian di kanan atas banner.
+
+            3. **Halaman Pengaturan (`SettingsScreen`) & Penyimpanan Preferensi:**
+               - Akses menu `Pengaturan` dari halaman Profil dan tombol cepat.
+               - Pilihan radio interaktif untuk beralih mode slider Beranda yang tersimpan permanen di `SharedPreferences` / `AppPreferences`.
+               - Pengaturan putar otomatis episode berikutnya, fitur bersihkan cache gambar, dan cek pembaruan aplikasi.
+
+            4. **Kepatuhan Desain Anti-Slop:**
+               - Menggunakan warna kanvas presisi (`#0B0B0B`), permukaan profil (`#0E0F12`), dan kartu (`#161820`).
+               - Bebas garis border norak dan ruang kosong terbuang.
+               - Target sentuh minimum 48dp dan tidak ada karakter em dash pada UI text.
           draft: false
           prerelease: false
           make_latest: true

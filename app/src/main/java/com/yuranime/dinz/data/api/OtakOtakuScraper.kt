@@ -24,7 +24,8 @@ data class BirthdayCharacterItem(
     val nameEn: String,
     val imageUrl: String,
     val thumbnailUrl: String,
-    val detailUrl: String
+    val detailUrl: String,
+    val birthDate: String = ""
 ) {
     val isSeiyuu: Boolean
         get() = type == "seiyuu_staff" || detailUrl.contains("/people/view/")
@@ -235,6 +236,20 @@ object OtakOtakuScraper {
             val enName = lang?.english?.ifBlank { null } ?: displayName
             val fullImg = lang?.fullImage?.ifBlank { null } ?: toFullResImage(thumb)
 
+            val shortDate = run {
+                val src = if (dateId.isNotBlank()) dateId else dateEn
+                val parts = src.split(" ").filter { it.isNotBlank() }
+                if (parts.size >= 2) {
+                    val d = parts[0].padStart(2, '0')
+                    val m = parts[1].take(3)
+                    "$d $m"
+                } else if (src.isNotBlank()) {
+                    src
+                } else {
+                    java.text.SimpleDateFormat("dd MMM", java.util.Locale("id", "ID")).format(java.util.Date())
+                }
+            }
+
             items.add(
                 BirthdayCharacterItem(
                     id = parsedId,
@@ -245,7 +260,8 @@ object OtakOtakuScraper {
                     nameEn = enName,
                     imageUrl = fullImg,
                     thumbnailUrl = thumb,
-                    detailUrl = link
+                    detailUrl = link,
+                    birthDate = shortDate
                 )
             )
         }

@@ -25,6 +25,7 @@ class YuranimeApp : Application(), ImageLoaderFactory {
                 com.google.firebase.FirebaseApp.initializeApp(this, options)
             } catch (ignored: Exception) {}
         }
+        com.yuranime.dinz.data.local.AppPreferences.init(this)
     }
 
     override fun newImageLoader(): ImageLoader {

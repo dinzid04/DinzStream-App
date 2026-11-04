@@ -156,7 +156,106 @@ Halaman `LeaderboardScreen` dibuka saat menu "Papan Peringkat" diklik, mengambil
 
 ---
 
-## 6. Kepatuhan Standar Anti-Slop (Delivery Gate Checklist)
+## 7. SPESIFIKASI FITUR 5: Implementasi Presisi `Ulang Tahun Hari Ini` di Home & Halaman Detail Karakter (100% Sesuai Gambar Referensi)
+
+Berdasarkan analisis visual mendalam terhadap gambar referensi `/storage/emulated/0/termux/design/reff/file_00000000d52c8211a7e0a165e64eec65.png`:
+
+### A. Section `Ulang Tahun Hari Ini` di Halaman Home (Sisi Kiri Referensi)
+1. **Header Section:**
+   - **Kiri:** Teks **`Ulang Tahun Hari Ini`** (**SF Pro Display Bold**, warna Putih `#FFFFFF`, ukuran `18.sp`) berdampingan dengan penanda titik bullet dan tanggal hari ini ` • 4 Nov` (atau format dinamis, **SF Pro Medium**, warna abu-abu `#94A3B8`, ukuran `14.sp`).
+   - **Kanan:** Tombol bulat gelap (`size = 32.dp`, warna latar `#1A1D26`, shape `CircleShape`) memuat ikon panah chevron kanan (`>`) berwarna `#94A3B8`.
+2. **Kartu Karakter Ulang Tahun (`LazyRow`):**
+   - **Dimensi & Bentuk:** Kartu vertikal ramping dengan rasio poster 2:3 (`width = 115.dp`, `aspectRatio(2f/3f)`, `RoundedCornerShape(12.dp)`). **Tanpa border kaku atau stroke garis**.
+   - **Gambar:** Foto karakter mengisi penuh seluruh kartu (`Modifier.fillMaxSize()`, `ContentScale.Crop`).
+   - **Gradient & Teks:** Diberikan overlay gradasi vertikal halus di bagian bawah di dalam kartu (`Brush.verticalGradient` transparan ke `#E6000000` / `#F0000000` mulai dari 50% tinggi kartu).
+   - **Overlay Teks Pojok Kiri Bawah (Di Dalam Kartu):**
+     - **Baris 1:** Tanggal ulang tahun berwarna **Oranye Yuranime (`#FF5722`)**, font **SF SemiBold** `11.sp` (contoh: `04 Nov`, `05 Nov`).
+     - **Baris 2:** Nama Karakter berwarna **Putih Bersih (`#FFFFFF`)**, font **SF Bold** `13.sp`, 1 baris dengan `TextOverflow.Ellipsis` (contoh: `Kyouka Izumi`, `Hibiya Amamiya`, `Mizusu Togashi`, `Subaru Oki...`).
+
+### B. Halaman Detail Karakter (`BirthdayDetailScreen` / `CharacterDetailScreen` - Sisi Kanan Referensi)
+1. **Header Hero & Backdrop:**
+   - Tombol kembali bulat gelap (`Size = 40.dp`, icon `ArrowBack`, padding dari status bar) di pojok kiri atas.
+   - Backdrop gambar karakter melebar di bagian atas layar dengan gradasi vertikal gelap lembut yang menyatu transparan ke warna latar murni `#0B0B0B`.
+2. **Baris Profil Utama (Row Sejajar):**
+   - **Kiri:** Foto karakter vertikal potret (`width = 135.dp`, `aspectRatio(2f/3f)`, `RoundedCornerShape(12.dp)`). **Tanpa border**.
+   - **Kanan (Kolom Rata Kiri, Vertikal Sejajar Poster):**
+     - Label abu-abu (`#94A3B8`, `12.sp`) `Nama Karakter` -> di bawahnya teks nama **SF Bold** putih `22.sp` (`Kyouka Izumi`).
+     - Label abu-abu (`#94A3B8`, `12.sp`) `Nama Jepang` -> di bawahnya teks kanji **SF Bold** putih `16.sp` (`泉 鏡花`).
+     - Label abu-abu (`#94A3B8`, `12.sp`) `Alias` -> di bawahnya teks alias **SF Bold** putih `15.sp` (`Little Princes`).
+3. **Bagian `Deskripsi`:**
+   - Label abu-abu (`#94A3B8`, `13.sp`, **SF Medium**) bertuliskan `Deskripsi`.
+   - Di bawahnya paragraf teks sinopsis/biografi (warna `#E2E8F0`, `14.sp`, line height proporsional `20.sp`) **tanpa kotak border pembungkus**.
+   - Di bawah teks terdapat tombol aksi teks **`Selengkapnya...`** berwarna **Oranye (`#FF5722`, 13.sp, SF SemiBold)** dengan ikon chevron bawah (`⌄`) untuk ekspansi/kolaps teks lengkap.
+4. **Bagian `Biodata` (Grid 2 Kolom Bersih Tanpa Kotak Border):**
+   - Judul section: **`Biodata`** (**SF Bold**, putih, `17.sp`).
+   - Tersusun dalam 2 kolom bersih berdampingan (`Row` dengan 2 `Column(weight = 1f)`):
+     - **Kolom Kiri:**
+       - Label `Tanggal Lahir` (`#94A3B8`, `12.sp`) -> Nilai **`04 November`** (Putih **SF Bold** `15.sp`)
+       - Spacer `12.dp`
+       - Label `Tinggi Badan` (`#94A3B8`, `12.sp`) -> Nilai **`148 cm`** (Putih **SF Bold** `15.sp`)
+       - Spacer `12.dp`
+       - Label `Golongan Darah` (`#94A3B8`, `12.sp`) -> Nilai **`B`** (Putih **SF Bold** `15.sp`)
+     - **Kolom Kanan:**
+       - Label `Jenis Kelamin` (`#94A3B8`, `12.sp`) -> Nilai **`Perempuan`** (Putih **SF Bold** `15.sp`)
+       - Spacer `12.dp`
+       - Label `Berat Badan` (`#94A3B8`, `12.sp`) -> Nilai **`40 kg`** (Putih **SF Bold** `15.sp`)
+5. **Bagian `Pengisi Suara (Seiyuu)`:**
+   - Judul section: **`Pengisi Suara (Seiyuu)`** (**SF Bold**, putih, `17.sp`).
+   - Baris profil seiyuu bersih (`Row`, alignment center, **tanpa kotak card border**):
+     - **Kiri:** Foto bulat Seiyuu (`size = 54.dp`, `CircleShape`, `ContentScale.Crop`).
+     - **Kanan:** Nama Seiyuu (**SF Bold**, putih, `16.sp`, contoh: `Sumire Morohoshi`), dan tepat di bawahnya label bahasa **`Bahasa: Jepang`** berwarna **Oranye (`#FF5722`, 13.sp, SF Medium)**.
+6. **Bagian `Daftar Anime Terkait`:**
+   - Judul section: **`Daftar Anime Terkait`** (**SF Bold**, putih, `17.sp`).
+   - Daftar item anime vertikal bersih tanpa border box (`Arrangement.spacedBy(14.dp)`):
+     - **Kiri:** Gambar thumbnail anime persegi membulat (`56.dp x 56.dp`, `RoundedCornerShape(10.dp)`, `ContentScale.Crop`).
+     - **Tengah (Column weight = 1f):**
+       - Judul Anime (**SF Bold**, putih, `15.sp`, 1 baris `TextOverflow.Ellipsis`).
+       - Baris bawah: Teks peran oranye **`Karakter Pendukung`** / **`Karakter Utama`** (`#FF5722`, `13.sp`, **SF Medium**) + spasi + status rilis abu-abu **`Selesai Tayang`** (`#94A3B8`, `13.sp`).
+     - **Kanan:** Ikon panah tipis chevron kanan (`>`, warna `#94A3B8`, `size = 18.dp`). Saat diklik, membuka detail anime `AnimeDetailScreen` via ID yang cocok.
+
+---
+
+## 8. SPESIFIKASI FITUR 6: 2 Mode Tampilan Hero Slider di Halaman Home
+
+Aplikasi mendukung 2 mode tata letak Slider Home yang dapat dipilih pengguna:
+
+### A. Mode 1 — Default Slider (Tampilan Bawaan dengan Poster di Kiri Bawah)
+- **Status:** **DEFAULT** aktif saat aplikasi pertama kali diinstal.
+- **Komposisi:**
+  - Background banner cover anime landscape 16:9 di bagian atas.
+  - Kartu poster vertikal potret di pojok kiri bawah (`width = 84.dp`, `aspectRatio = 2f/3f`).
+  - Di sebelah kanan poster: Judul anime, sinopsis ringkas, tombol `TONTON SEKARANG`, dan pagination dots.
+
+### B. Mode 2 — Clean Cover Slider (Tampilan Baru Sesuai Sisi Kiri Referensi)
+- **Status:** Diaktifkan melalui halaman Pengaturan.
+- **Komposisi:**
+  - Header Atas: Logo animasi Yuranime di kiri, ikon pencarian (`🔍`) bersih di pojok kanan atas banner.
+  - **Sembunyikan kartu poster kecil di kiri bawah!**
+  - Gambar cover penuh dengan gradasi hitam halus di bagian bawah yang menyatu ke kanvas `#0B0B0B`.
+  - Tata letak rata kiri di bagian bawah cover:
+    1. **Judul Anime** (menggunakan font `Yuranime-logo-font.ttf` / all-caps bold putih, maks 2 baris).
+    2. **Sinopsis Singkat** (maks 2 baris `TextOverflow.Ellipsis`, warna `#CBD5E1`, font SF Regular `13.sp`).
+    3. Baris Aksi Bawah: Tombol kapsul merah-oranye **`▶ TONTON SEKARANG`** (`background = Color(0xFFFF2A55)` atau `#FF3366`, `RoundedCornerShape(24.dp)`, padding vertikal `10.dp`, horizontal `18.dp`) di sebelah kiri, dan pagination dots di sebelah kanan.
+
+---
+
+## 9. SPESIFIKASI FITUR 7: Halaman Pengaturan (`SettingsScreen`) & Penyimpanan Preferensi
+
+1. **Akses Pengaturan:**
+   - Menu **`Pengaturan`** di `ProfileScreen` dengan ikon gerigi (`Icons.Default.Settings`) dan sub-teks deskriptif *"Atur tampilan slider & preferensi aplikasi"*.
+2. **Penyimpanan State:**
+   - Disimpan secara lokal dan persisten menggunakan `SharedPreferences` (atau `AppPreferences` singleton) dengan key `KEY_HOME_SLIDER_MODE`:
+     - Value `0` / `"DEFAULT"`: Mode 1 (Slider dengan Poster).
+     - Value `1` / `"CLEAN_COVER"`: Mode 2 (Slider Tanpa Poster / Clean Cover).
+3. **Komponen Pengaturan:**
+   - Pilihan Tampilan Slider: Radio item atau Switch toggle yang elegan bergaya iOS dark mode.
+   - Pilihan Pemutaran: Toggle Auto Next Episode (default On).
+   - Pemeliharaan: Tombol "Bersihkan Cache Gambar & Data Sementara" dengan konfirmasi instan.
+   - Info Versi Aplikasi: Teks versi SemVer dan tombol "Periksa Pembaruan".
+
+---
+
+## 10. Kepatuhan Standar Anti-Slop (Delivery Gate Checklist)
 
 - **R-01 & R-29 (Color Craft):** Tidak ada gradasi default biru-ungu AI generik. Warna emas dan kosmik ungu dirancang khusus sesuai identitas referensi podium.
 - **R-02 (Copywriting):** Tidak ada karakter em dash (`—`) pada teks UI. Menggunakan tanda titik dua (`:`), koma (`,`), atau kurung `()`.

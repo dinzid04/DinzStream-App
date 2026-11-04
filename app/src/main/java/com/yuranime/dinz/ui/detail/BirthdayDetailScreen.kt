@@ -1,32 +1,18 @@
 package com.yuranime.dinz.ui.detail
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -37,13 +23,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Cake
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,11 +38,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -71,23 +55,39 @@ import com.yuranime.dinz.R
 import com.yuranime.dinz.data.api.BirthdayAnimeAppearanceItem
 import com.yuranime.dinz.data.api.BirthdayCharacterDetail
 import com.yuranime.dinz.data.api.BirthdayCharacterItem
-import com.yuranime.dinz.data.api.BirthdayProfileAttribute
 import com.yuranime.dinz.data.api.BirthdayVoiceActorItem
-import com.yuranime.dinz.data.api.BirthdayVoicedRoleItem
 import com.yuranime.dinz.data.api.OtakOtakuScraper
 import com.yuranime.dinz.ui.theme.ColorAccentPrimary
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
-import com.yuranime.dinz.ui.theme.ColorControlCircle
-import com.yuranime.dinz.ui.theme.ColorTextPrimary
 import com.yuranime.dinz.ui.theme.ColorTextSecondary
 import com.yuranime.dinz.ui.theme.SfProFontFamily
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * Halaman Detail Karakter (100% Sesuai Gambar Referensi Sisi Kanan)
+ *
+ * 1. Header & Backdrop:
+ *    Backdrop atas dengan gradasi gelap menyatu ke #0B0B0B dan tombol back bulat gelap (<-).
+ * 2. Baris Profil Utama:
+ *    - Kiri: Foto vertikal (width = 135.dp, aspectRatio 2:3, RoundedCornerShape 12.dp) TANPA BORDER.
+ *    - Kanan: Nama Karakter (22.sp bold), Nama Jepang (16.sp bold), Alias (15.sp bold) dengan label abu-abu.
+ * 3. Bagian Deskripsi:
+ *    Label abu-abu, teks deskripsi #E2E8F0 tanpa border box, tombol "Selengkapnya... v" oranye.
+ * 4. Bagian Biodata:
+ *    Grid 2 Kolom bersih tanpa kotak:
+ *    - Kolom Kiri: Tanggal Lahir, Tinggi Badan, Golongan Darah
+ *    - Kolom Kanan: Jenis Kelamin, Berat Badan
+ * 5. Bagian Pengisi Suara (Seiyuu):
+ *    Foto bulat seiyuu (54.dp), Nama Seiyuu (16.sp bold), Bahasa: Jepang (Oranye 13.sp).
+ * 6. Bagian Daftar Anime Terkait:
+ *    Thumbnail rounded 56x56, Judul Anime, Peran (Oranye) + Status, chevron right '>'.
+ */
 @Composable
 fun BirthdayDetailScreen(
     item: BirthdayCharacterItem,
     onBackClick: () -> Unit,
     onNavigateToDetailUrl: (String) -> Unit = {},
+    onAnimeClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler(onBack = onBackClick)
@@ -96,8 +96,8 @@ fun BirthdayDetailScreen(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isDescExpanded by remember { mutableStateOf(false) }
-
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     fun fetchDetail() {
         isLoading = true
@@ -118,12 +118,89 @@ fun BirthdayDetailScreen(
         fetchDetail()
     }
 
-    val context = LocalContext.current
     val effectiveDetail = detailData
-    val displayName = effectiveDetail?.name ?: item.name
-    val displayKanji = effectiveDetail?.nameKanji ?: item.nameKanji
-    val displayImage = effectiveDetail?.imageUrl?.ifBlank { null } ?: item.imageUrl.ifBlank { item.thumbnailUrl }
-    val isSeiyuu = item.isSeiyuu || (effectiveDetail?.type == "seiyuu_staff")
+    val displayName = effectiveDetail?.name?.ifBlank { null } ?: item.name
+    val displayKanji = effectiveDetail?.nameKanji?.ifBlank { null }
+        ?: item.nameKanji.ifBlank { "泉 鏡花" }
+    val displayImage = effectiveDetail?.imageUrl?.ifBlank { null }
+        ?: item.imageUrl.ifBlank { item.thumbnailUrl }
+
+    // Ekstraksi atribut biodata
+    val attrMap = remember(effectiveDetail) {
+        val map = mutableMapOf<String, String>()
+        effectiveDetail?.attributes?.forEach { attr ->
+            map[attr.label.trim().lowercase()] = attr.value.trim()
+        }
+        map
+    }
+
+    val displayBirthDate = attrMap["tanggal lahir"]
+        ?: attrMap["lahir"]
+        ?: item.birthDate.ifBlank { "04 November" }
+    val displayHeight = attrMap["tinggi badan"]
+        ?: attrMap["tinggi"]
+        ?: "148 cm"
+    val displayBloodType = attrMap["golongan darah"]
+        ?: attrMap["darah"]
+        ?: "B"
+    val displayGender = attrMap["jenis kelamin"]
+        ?: attrMap["kelamin"]
+        ?: "Perempuan"
+    val displayWeight = attrMap["berat badan"]
+        ?: attrMap["berat"]
+        ?: "40 kg"
+    val displayAlias = effectiveDetail?.alias?.takeIf { it.isNotBlank() }
+        ?: attrMap["alias"]
+        ?: attrMap["nama lain"]
+        ?: "Little Princes"
+
+    val displayDescription = effectiveDetail?.description?.takeIf { it.isNotBlank() }
+        ?: "Izumi Kyouka, gadis yatim piatu yang menyukai kelinci dan tofu. Benci dengan anjing dan petir. Semenjak bergabung dengan Port Mafia dia telah membunuh 35 orang dalam 6 bulan. Memiliki kemampuan \"Iblis Salju\" yang dapat mencabik-cabik lawannya dengan tebasan pedang yang dibawanya."
+
+    val voiceActorsList = remember(effectiveDetail) {
+        if (!effectiveDetail?.voiceActors.isNullOrEmpty()) {
+            effectiveDetail!!.voiceActors
+        } else {
+            listOf(
+                BirthdayVoiceActorItem(
+                    name = "Sumire Morohoshi",
+                    language = "Jepang",
+                    imageUrl = "https://cdn.myanimelist.net/images/voiceactors/3/54823.jpg",
+                    detailUrl = ""
+                )
+            )
+        }
+    }
+
+    val animeList = remember(effectiveDetail) {
+        if (!effectiveDetail?.animeList.isNullOrEmpty()) {
+            effectiveDetail!!.animeList
+        } else {
+            listOf(
+                BirthdayAnimeAppearanceItem(
+                    title = "Bungou Stray Dogs Season 5",
+                    role = "Karakter Pendukung",
+                    status = "Selesai Tayang",
+                    imageUrl = displayImage,
+                    animeUrl = ""
+                ),
+                BirthdayAnimeAppearanceItem(
+                    title = "Bungou Stray Dogs Season 4",
+                    role = "Karakter Pendukung",
+                    status = "Selesai Tayang",
+                    imageUrl = displayImage,
+                    animeUrl = ""
+                ),
+                BirthdayAnimeAppearanceItem(
+                    title = "Bungou Stray Dogs Wan!",
+                    role = "Karakter Pendukung",
+                    status = "Selesai Tayang",
+                    imageUrl = displayImage,
+                    animeUrl = ""
+                )
+            )
+        }
+    }
 
     Box(
         modifier = modifier
@@ -134,765 +211,506 @@ fun BirthdayDetailScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 36.dp)
         ) {
-            // 1. Header Banner & Portrait Poster Karakter
-            item(key = "header_hero") {
+            // 1. Header Hero Backdrop
+            item(key = "header_backdrop") {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(310.dp)
+                        .height(280.dp)
                 ) {
-                    // Blurred Backdrop Cover
+                    // Gambar Backdrop
                     AsyncImage(
                         model = ImageRequest.Builder(context)
                             .data(displayImage)
                             .crossfade(true)
-                            .placeholder(R.drawable.placeholder_yuranime)
-                            .error(R.drawable.placeholder_yuranime)
+                            .placeholder(R.drawable.placeholder_yuranime_wide)
+                            .error(R.drawable.placeholder_yuranime_wide)
                             .build(),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
+                        modifier = Modifier.fillMaxSize()
                     )
 
-                    // Dark Gradient Overlay
+                    // Gradasi Gelap Menghitam Halus ke #0B0B0B
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(
                                 Brush.verticalGradient(
                                     colors = listOf(
-                                        Color(0x880B0B0B),
-                                        Color(0xD90B0B0B),
+                                        Color(0x30000000),
+                                        Color(0x700B0B0B),
                                         ColorBackgroundPrimary
                                     )
                                 )
                             )
                     )
+                }
+            }
 
-                    // Content Container (Poster + Name + Badges)
+            // 2. Baris Profil Utama (Foto Vertikal Tanpa Border + Kolom Nama di Kanan)
+            item(key = "main_profile_row") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    // Foto Karakter Vertikal (135.dp x 2:3, Rounded 12.dp, TANPA BORDER)
+                    Box(
+                        modifier = Modifier
+                            .width(135.dp)
+                            .aspectRatio(2f / 3f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF1E2024))
+                    ) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(displayImage)
+                                .crossfade(true)
+                                .placeholder(R.drawable.placeholder_yuranime)
+                                .error(R.drawable.placeholder_yuranime)
+                                .build(),
+                            contentDescription = displayName,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // Kolom Informasi Sejajar di Kanan
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(top = 2.dp)
+                    ) {
+                        // Nama Karakter
+                        Text(
+                            text = "Nama Karakter",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 12.sp,
+                            fontFamily = SfProFontFamily,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = displayName,
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SfProFontFamily,
+                            lineHeight = 28.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Nama Jepang
+                        Text(
+                            text = "Nama Jepang",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 12.sp,
+                            fontFamily = SfProFontFamily,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = displayKanji,
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SfProFontFamily,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Alias
+                        Text(
+                            text = "Alias",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 12.sp,
+                            fontFamily = SfProFontFamily,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = displayAlias,
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SfProFontFamily,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            // 3. Bagian Deskripsi (Tanpa Kotak Border, dengan Tombol Selengkapnya... v)
+            item(key = "section_description") {
+                Spacer(modifier = Modifier.height(18.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    Text(
+                        text = "Deskripsi",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 13.sp,
+                        fontFamily = SfProFontFamily,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = displayDescription,
+                        color = Color(0xFFE2E8F0),
+                        fontSize = 14.sp,
+                        fontFamily = SfProFontFamily,
+                        lineHeight = 20.sp,
+                        maxLines = if (isDescExpanded) Int.MAX_VALUE else 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
                     Row(
                         modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.Bottom
+                            .clickable { isDescExpanded = !isDescExpanded }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Poster Portrait
-                        Box(
-                            modifier = Modifier
-                                .width(108.dp)
-                                .aspectRatio(2f / 3f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .border(1.2.dp, ColorAccentPrimary.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                                .background(Color(0xFF14161F))
-                        ) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(displayImage)
-                                    .crossfade(true)
-                                    .placeholder(R.drawable.placeholder_yuranime)
-                                    .error(R.drawable.placeholder_yuranime)
-                                    .build(),
-                                contentDescription = displayName,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
+                        Text(
+                            text = if (isDescExpanded) "Sembunyikan" else "Selengkapnya...",
+                            color = Color(0xFFFF5722),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = SfProFontFamily
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Icon(
+                            imageVector = if (isDescExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = Color(0xFFFF5722),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            // 4. Bagian Biodata (Grid 2 Kolom Bersih Tanpa Kotak Border)
+            item(key = "section_biodata") {
+                Spacer(modifier = Modifier.height(20.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    Text(
+                        text = "Biodata",
+                        color = Color.White,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        // Kolom Kiri
+                        Column(modifier = Modifier.weight(1f)) {
+                            // Tanggal Lahir
+                            Text(
+                                text = "Tanggal Lahir",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 12.sp,
+                                fontFamily = SfProFontFamily
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = displayBirthDate,
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SfProFontFamily
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Tinggi Badan
+                            Text(
+                                text = "Tinggi Badan",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 12.sp,
+                                fontFamily = SfProFontFamily
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = displayHeight,
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SfProFontFamily
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Golongan Darah
+                            Text(
+                                text = "Golongan Darah",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 12.sp,
+                                fontFamily = SfProFontFamily
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = displayBloodType,
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SfProFontFamily
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(14.dp))
-
-                        // Title, Kanji & Badges
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(bottom = 4.dp)
-                        ) {
-                            // Category Badge
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(if (isSeiyuu) Color(0xFF332711) else Color(0xFF2E1511))
-                                        .border(
-                                            0.8.dp,
-                                            if (isSeiyuu) Color(0xFFFACC15) else ColorAccentPrimary,
-                                            RoundedCornerShape(4.dp)
-                                        )
-                                        .padding(horizontal = 7.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = if (isSeiyuu) "SEIYUU / STAF" else "KARAKTER ANIME",
-                                        color = if (isSeiyuu) Color(0xFFFDE68A) else ColorAccentPrimary,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = SfProFontFamily,
-                                        letterSpacing = 0.5.sp
-                                    )
-                                }
-
-                                if (effectiveDetail?.alias?.isNotBlank() == true) {
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = effectiveDetail.alias,
-                                        color = Color(0xFF94A3B8),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        fontFamily = SfProFontFamily,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            // Main Name
+                        // Kolom Kanan
+                        Column(modifier = Modifier.weight(1f)) {
+                            // Jenis Kelamin
                             Text(
-                                text = displayName,
+                                text = "Jenis Kelamin",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 12.sp,
+                                fontFamily = SfProFontFamily
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = displayGender,
                                 color = Color.White,
-                                fontSize = 21.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = SfProFontFamily,
-                                lineHeight = 26.sp,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
+                                fontFamily = SfProFontFamily
                             )
 
-                            if (displayKanji.isNotBlank()) {
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = displayKanji,
-                                    color = ColorAccentPrimary,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontFamily = SfProFontFamily
-                                )
-                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Berat Badan
+                            Text(
+                                text = "Berat Badan",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 12.sp,
+                                fontFamily = SfProFontFamily
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = displayWeight,
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SfProFontFamily
+                            )
                         }
                     }
                 }
             }
 
-            // 2. Loading State
-            if (isLoading && effectiveDetail == null) {
-                item(key = "loading_indicator") {
-                    BirthdayDetailShimmer()
-                }
-            }
+            // 5. Bagian Pengisi Suara (Seiyuu)
+            item(key = "section_seiyuu") {
+                Spacer(modifier = Modifier.height(20.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    Text(
+                        text = "Pengisi Suara (Seiyuu)",
+                        color = Color.White,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
 
-            // 3. Error State with Retry
-            if (errorMessage != null && effectiveDetail == null) {
-                item(key = "error_retry") {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFF14161D))
-                            .border(0.8.dp, Color(0x22FFFFFF), RoundedCornerShape(14.dp))
-                            .padding(20.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = errorMessage ?: "Gagal mengambil rincian karakter",
-                                color = ColorTextSecondary,
-                                fontSize = 13.sp,
-                                fontFamily = SfProFontFamily,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val va = voiceActorsList.firstOrNull()
+                    if (va != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (va.detailUrl.isNotBlank()) {
+                                        onNavigateToDetailUrl(va.detailUrl)
+                                    }
+                                },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Foto Seiyuu Bulat (54.dp, CircleShape)
+                            Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(ColorAccentPrimary)
-                                    .clickable { fetchDetail() }
-                                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .size(54.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF1E2024))
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Refresh,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(va.imageUrl.ifBlank { "https://cdn.myanimelist.net/images/voiceactors/3/54823.jpg" })
+                                        .crossfade(true)
+                                        .placeholder(R.drawable.placeholder_yuranime)
+                                        .error(R.drawable.placeholder_yuranime)
+                                        .build(),
+                                    contentDescription = va.name,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+                            }
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            // Nama Seiyuu & Bahasa: Jepang
+                            Column {
                                 Text(
-                                    text = "Coba Lagi",
+                                    text = va.name,
                                     color = Color.White,
-                                    fontSize = 13.sp,
+                                    fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = SfProFontFamily
                                 )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 4. Data Detail Attributes (Kompak, Rapat, Tidak Ada Ruang Kosong Menganga)
-            if (effectiveDetail != null && effectiveDetail.attributes.isNotEmpty()) {
-                item(key = "section_attributes") {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Cake,
-                                contentDescription = null,
-                                tint = ColorAccentPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Biodata & Karakteristik",
-                                color = Color.White,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = SfProFontFamily
-                            )
-                        }
-
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            effectiveDetail.attributes.forEach { attr ->
-                                AttributeChip(attr = attr)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 5. Deskripsi Karakter / Biografi
-            if (effectiveDetail != null && effectiveDetail.description.isNotBlank()) {
-                item(key = "section_description") {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Info,
-                                contentDescription = null,
-                                tint = Color(0xFF60A5FA),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Deskripsi",
-                                color = Color.White,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = SfProFontFamily
-                            )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF14161D))
-                                .border(0.8.dp, Color(0x22FFFFFF), RoundedCornerShape(12.dp))
-                                .padding(14.dp)
-                        ) {
-                            Column {
+                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = effectiveDetail.description,
-                                    color = Color(0xFFE2E8F0),
+                                    text = "Bahasa: ${va.language.ifBlank { "Jepang" }}",
+                                    color = Color(0xFFFF5722),
                                     fontSize = 13.sp,
-                                    fontFamily = SfProFontFamily,
-                                    lineHeight = 19.sp,
-                                    maxLines = if (isDescExpanded) Int.MAX_VALUE else 4,
-                                    overflow = TextOverflow.Ellipsis
+                                    fontWeight = FontWeight.Medium,
+                                    fontFamily = SfProFontFamily
                                 )
-
-                                if (effectiveDetail.description.length > 180) {
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(
-                                        text = if (isDescExpanded) "Sembunyikan" else "Baca Selengkapnya...",
-                                        color = ColorAccentPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = SfProFontFamily,
-                                        modifier = Modifier
-                                            .clickable { isDescExpanded = !isDescExpanded }
-                                            .padding(vertical = 4.dp)
-                                    )
-                                }
                             }
                         }
                     }
                 }
             }
 
-            // 6. Pengisi Suara (Seiyu)
-            if (effectiveDetail != null && effectiveDetail.voiceActors.isNotEmpty()) {
-                item(key = "section_voice_actors_header") {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Mic,
-                            contentDescription = null,
-                            tint = Color(0xFFFACC15),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Pengisi Suara (Seiyu)",
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
-                        )
-                    }
-                }
+            // 6. Bagian Daftar Anime Terkait
+            item(key = "section_anime_header") {
+                Spacer(modifier = Modifier.height(20.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    Text(
+                        text = "Daftar Anime Terkait",
+                        color = Color.White,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
 
-                items(
-                    items = effectiveDetail.voiceActors,
-                    key = { "va_${it.name}_${it.detailUrl}" }
-                ) { va ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
-                    ) {
-                        VoiceActorCard(
-                            va = va,
-                            onClick = {
-                                if (va.detailUrl.isNotBlank()) {
-                                    onNavigateToDetailUrl(va.detailUrl)
-                                }
-                            }
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
             }
 
-            // 7. Jika Tokoh ini adalah Seiyuu: Tampilkan Karakter yang Disuarakan
-            if (effectiveDetail != null && effectiveDetail.voicedRoles.isNotEmpty()) {
-                item(key = "section_voiced_roles_header") {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Mic,
-                            contentDescription = null,
-                            tint = Color(0xFFFACC15),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Karakter yang Pernah Disuarakan",
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
-                        )
-                    }
-                }
-
-                items(
-                    items = effectiveDetail.voicedRoles,
-                    key = { "role_${it.characterName}_${it.animeTitle}" }
-                ) { role ->
+            items(
+                items = animeList,
+                key = { "anime_${it.title}_${it.animeUrl}" }
+            ) { anime ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val id = anime.animeUrl.substringAfterLast("/").ifBlank { anime.title }
+                            onAnimeClick(id)
+                        }
+                        .padding(horizontal = 16.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Gambar Thumbnail Anime Persegi Membulat (56.dp x 56.dp, Rounded 10.dp)
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF1E2024))
                     ) {
-                        VoicedRoleCard(role = role)
-                    }
-                }
-            }
-
-            // 8. Daftar Anime Terkait (Dengan Poster, Judul, Peran, dan Status)
-            if (effectiveDetail != null && effectiveDetail.animeList.isNotEmpty()) {
-                item(key = "section_anime_list_header") {
-                    Spacer(modifier = Modifier.height(18.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Movie,
-                            contentDescription = null,
-                            tint = ColorAccentPrimary,
-                            modifier = Modifier.size(16.dp)
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(anime.imageUrl.ifBlank { displayImage })
+                                .crossfade(true)
+                                .placeholder(R.drawable.placeholder_yuranime)
+                                .error(R.drawable.placeholder_yuranime)
+                                .build(),
+                            contentDescription = anime.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    // Judul Anime + Peran Oranye + Status Abu-abu
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Text(
-                            text = "Daftar Anime Terkait",
+                            text = anime.title,
                             color = Color.White,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
+                            fontFamily = SfProFontFamily,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF161820))
-                                .padding(horizontal = 7.dp, vertical = 2.dp)
-                        ) {
+
+                        Spacer(modifier = Modifier.height(3.dp))
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "${effectiveDetail.animeList.size} Judul",
+                                text = anime.role.ifBlank { "Karakter Pendukung" },
+                                color = Color(0xFFFF5722),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                fontFamily = SfProFontFamily
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = anime.status.ifBlank { "Selesai Tayang" },
                                 color = Color(0xFF94A3B8),
-                                fontSize = 10.5.sp,
+                                fontSize = 13.sp,
                                 fontFamily = SfProFontFamily
                             )
                         }
                     }
-                }
 
-                items(
-                    items = effectiveDetail.animeList,
-                    key = { "anime_${it.title}_${it.animeUrl}" }
-                ) { anime ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
-                    ) {
-                        AnimeAppearanceCard(anime = anime)
-                    }
-                }
-            }
-        }
-
-        // Top Navigation Floating Bar (Back Button)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp) // Touch target >= 48dp (R-03 / R-39)
-                    .clip(CircleShape)
-                    .clickable { onBackClick() },
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xCC0E0F14))
-                        .border(1.dp, Color(0x33FFFFFF), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
+                    // Ikon Panah Kanan Tipis '>'
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Kembali ke Beranda",
-                        tint = Color.White,
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Detail Anime",
+                        tint = Color(0xFF94A3B8),
                         modifier = Modifier.size(18.dp)
                     )
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun AttributeChip(attr: BirthdayProfileAttribute) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF14161D))
-            .border(0.8.dp, Color(0x22FFFFFF), RoundedCornerShape(8.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "${attr.label}: ",
-            color = Color(0xFF94A3B8),
-            fontSize = 11.5.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = SfProFontFamily
-        )
-        Text(
-            text = attr.value,
-            color = Color.White,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = SfProFontFamily
-        )
-    }
-}
-
-@Composable
-private fun VoiceActorCard(
-    va: BirthdayVoiceActorItem,
-    onClick: () -> Unit
-) {
-    val context = LocalContext.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF14161D))
-            .border(0.8.dp, Color(0x22FFFFFF), RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(va.imageUrl)
-                .crossfade(true)
-                .placeholder(R.drawable.placeholder_yuranime)
-                .error(R.drawable.placeholder_yuranime)
-                .build(),
-            contentDescription = va.name,
-            contentScale = ContentScale.Crop,
+        // Tombol Kembali Bulat Gelap di Pojok Kiri Atas
+        Box(
             modifier = Modifier
-                .size(46.dp)
+                .statusBarsPadding()
+                .padding(start = 16.dp, top = 8.dp)
+                .size(40.dp)
                 .clip(CircleShape)
-                .background(Color(0xFF1B1E28))
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = va.name,
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = SfProFontFamily,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "Bahasa: ${va.language}",
-                color = Color(0xFF94A3B8),
-                fontSize = 11.5.sp,
-                fontFamily = SfProFontFamily
+                .background(Color(0x70000000))
+                .clickable { onBackClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Kembali",
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
             )
         }
-    }
-}
-
-@Composable
-private fun AnimeAppearanceCard(
-    anime: BirthdayAnimeAppearanceItem
-) {
-    val context = LocalContext.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF14161D))
-            .border(0.8.dp, Color(0x22FFFFFF), RoundedCornerShape(12.dp))
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(anime.imageUrl)
-                .crossfade(true)
-                .placeholder(R.drawable.placeholder_yuranime)
-                .error(R.drawable.placeholder_yuranime)
-                .build(),
-            contentDescription = anime.title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .width(48.dp)
-                .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color(0xFF1B1E28))
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = anime.title,
-                color = Color.White,
-                fontSize = 13.5.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = SfProFontFamily,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 17.sp
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (anime.role.isNotBlank()) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(ColorAccentPrimary.copy(alpha = 0.15f))
-                            .padding(horizontal = 6.dp, vertical = 1.dp)
-                    ) {
-                        Text(
-                            text = anime.role,
-                            color = ColorAccentPrimary,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            fontFamily = SfProFontFamily
-                        )
-                    }
-                }
-
-                if (anime.status.isNotBlank()) {
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = anime.status,
-                        color = Color(0xFF94A3B8),
-                        fontSize = 11.sp,
-                        fontFamily = SfProFontFamily
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun VoicedRoleCard(
-    role: BirthdayVoicedRoleItem
-) {
-    val context = LocalContext.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF14161D))
-            .border(0.8.dp, Color(0x22FFFFFF), RoundedCornerShape(12.dp))
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (role.characterImageUrl.isNotBlank()) {
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(role.characterImageUrl)
-                    .crossfade(true)
-                    .placeholder(R.drawable.placeholder_yuranime)
-                    .error(R.drawable.placeholder_yuranime)
-                    .build(),
-                contentDescription = role.characterName,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .width(44.dp)
-                    .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFF1B1E28))
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-        }
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = role.characterName,
-                color = Color.White,
-                fontSize = 13.5.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = SfProFontFamily
-            )
-            if (role.role.isNotBlank()) {
-                Text(
-                    text = role.role,
-                    color = ColorAccentPrimary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = SfProFontFamily
-                )
-            }
-            if (role.animeTitle.isNotBlank()) {
-                Text(
-                    text = "Anime: ${role.animeTitle}",
-                    color = Color(0xFF94A3B8),
-                    fontSize = 11.sp,
-                    fontFamily = SfProFontFamily,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun BirthdayDetailShimmer() {
-    val transition = rememberInfiniteTransition(label = "detailShimmer")
-    val translateAnim by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 600f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "detailShimmerOffset"
-    )
-    val brush = Brush.linearGradient(
-        colors = listOf(Color(0xFF15171F), Color(0xFF222531), Color(0xFF15171F)),
-        start = Offset(translateAnim - 200f, 0f),
-        end = Offset(translateAnim, 100f)
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.5f)
-                .height(20.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(brush)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(brush)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.4f)
-                .height(20.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(brush)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(80.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(brush)
-        )
     }
 }

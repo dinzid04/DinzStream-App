@@ -112,6 +112,10 @@ class MainActivity : ComponentActivity() {
                                                 thumbnailUrl = "",
                                                 detailUrl = newUrl
                                             )
+                                        },
+                                        onAnimeClick = { animeTitleOrId ->
+                                            selectedAnimeId = animeTitleOrId
+                                            selectedBirthdayItem = null
                                         }
                                     )
                                 }

@@ -59,6 +59,7 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -113,6 +114,7 @@ import com.yuranime.dinz.ui.leaderboard.LeaderboardScreen
 import com.yuranime.dinz.ui.profile.subscreens.DownloadsScreen
 import com.yuranime.dinz.ui.profile.subscreens.EditProfileScreen
 import com.yuranime.dinz.ui.profile.subscreens.PointsRewardsScreen
+import com.yuranime.dinz.ui.profile.subscreens.SettingsScreen
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import com.yuranime.dinz.ui.theme.YuranimeLogoFontFamily
 
@@ -121,7 +123,8 @@ enum class ProfileSubScreen {
     EDIT_PROFILE,
     LEADERBOARD,
     POINTS_REWARDS,
-    DOWNLOADS
+    DOWNLOADS,
+    SETTINGS
 }
 
 enum class TrailingType {
@@ -295,12 +298,19 @@ fun LoginProfileScreen(
                     onBackClick = { currentSubScreen = ProfileSubScreen.MAIN }
                 )
             }
+            ProfileSubScreen.SETTINGS -> {
+                SettingsScreen(
+                    onBackClick = { currentSubScreen = ProfileSubScreen.MAIN },
+                    onCheckUpdateClick = onCheckUpdateClick
+                )
+            }
             ProfileSubScreen.MAIN -> {
                 if (!isFirebaseLoggedIn) {
                     // LAYAR LOGIN (BottomNavBar 100% Tersembunyi)
                     LoginView(
                         isLoggingIn = isLoggingIn,
                         onBackToHomeClick = { onTabSelected(NavTab.HOME) },
+                        onSettingsClick = { currentSubScreen = ProfileSubScreen.SETTINGS },
                         onGoogleLoginClick = {
                             isLoggingIn = true
                             try {
@@ -355,6 +365,7 @@ fun LoginProfileScreen(
                             onDownloadMenuClick = { currentSubScreen = ProfileSubScreen.DOWNLOADS },
                             onLeaderboardMenuClick = { currentSubScreen = ProfileSubScreen.LEADERBOARD },
                             onRewardsMenuClick = { currentSubScreen = ProfileSubScreen.POINTS_REWARDS },
+                            onSettingsMenuClick = { currentSubScreen = ProfileSubScreen.SETTINGS },
                             onInfoMenuClick = { showInfoDialog = true },
                             onLogout = {
                                 FirebaseManager.signOut()
@@ -423,6 +434,7 @@ private fun UserProfileView(
     onDownloadMenuClick: () -> Unit,
     onLeaderboardMenuClick: () -> Unit,
     onRewardsMenuClick: () -> Unit,
+    onSettingsMenuClick: () -> Unit,
     onInfoMenuClick: () -> Unit,
     onLogout: () -> Unit
 ) {
@@ -671,7 +683,17 @@ private fun UserProfileView(
                     onClick = onRewardsMenuClick
                 )
 
-                // 5. Info - Sub-teks: "Simak Cerita Kami"
+                // 5. Pengaturan - Sub-teks: "Atur tampilan slider & preferensi aplikasi"
+                ProfileMenuItem(
+                    icon = Icons.Default.Settings,
+                    iconTint = Color(0xFF94A3B8),
+                    title = "Pengaturan",
+                    subtitle = "Atur tampilan slider & preferensi aplikasi",
+                    trailingType = TrailingType.CHEVRON,
+                    onClick = onSettingsMenuClick
+                )
+
+                // 6. Info - Sub-teks: "Simak Cerita Kami"
                 ProfileMenuItem(
                     icon = Icons.Default.Info,
                     iconTint = Color(0xFF94A3B8),
@@ -874,6 +896,7 @@ private fun ProfileMenuItem(
 private fun LoginView(
     isLoggingIn: Boolean,
     onBackToHomeClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
     onGoogleLoginClick: () -> Unit,
     onEmailLoginClick: () -> Unit,
     onGuestLoginClick: () -> Unit
@@ -902,14 +925,34 @@ private fun LoginView(
                 )
         )
 
-        // 3. Tombol Panah Kembali di Pojok Kanan Atas
-        Box(
+        // 3. Tombol Aksi di Pojok Kanan Atas (Pengaturan & Kembali)
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
                 .padding(top = 12.dp, end = 16.dp),
-            contentAlignment = Alignment.TopEnd
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x55000000))
+                    .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                    .clickable { onSettingsClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Pengaturan",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
             Box(
                 modifier = Modifier
                     .size(40.dp)

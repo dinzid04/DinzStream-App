@@ -23,9 +23,11 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,6 +37,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -52,6 +55,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.yuranime.dinz.R
+import com.yuranime.dinz.data.local.AppPreferences
+import com.yuranime.dinz.data.local.HomeSliderMode
 import com.yuranime.dinz.data.model.AnimeItem
 import com.yuranime.dinz.data.model.CuplixItem
 import com.yuranime.dinz.ui.components.AnimeVerticalCard
@@ -85,6 +90,7 @@ fun HomeScreen(
     onBirthdayClick: (com.yuranime.dinz.data.api.BirthdayCharacterItem) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val sliderMode by AppPreferences.sliderMode.collectAsState()
     val context = LocalContext.current
 
     // Refresh watch history from local database
@@ -173,14 +179,38 @@ fun HomeScreen(
                             Box(modifier = Modifier.fillMaxWidth()) {
                                 YuranimeHeroSlider(
                                     items = sliderAnimeList,
+                                    sliderMode = sliderMode,
                                     onAnimeClick = onAnimeClick
                                 )
-                                YuranimeAnimatedLogo(
+                                Row(
                                     modifier = Modifier
+                                        .fillMaxWidth()
                                         .statusBarsPadding()
-                                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                                        .align(Alignment.TopStart)
-                                )
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    YuranimeAnimatedLogo()
+
+                                    if (sliderMode == HomeSliderMode.CLEAN_COVER) {
+                                        // Ikon Pencarian Bersih di Pojok Kanan Atas
+                                        Box(
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0x33000000))
+                                                .clickable { onTabSelected(NavTab.CARI) },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Search,
+                                                contentDescription = "Cari Anime",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
 
