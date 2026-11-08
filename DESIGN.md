@@ -646,8 +646,8 @@ Berdasarkan 3 gambar referensi `Screenshot_20261108_145758_ANIMEIN.jpg`, `145804
    - Hapus pembungkus proxy mati `cf1.dinzid.my.id/?url=`.
    - Upgrade otomatis protokol `http://` ke `https://` untuk mencegah redirect 301.
    - Normalisasi URL relatif (`//`, `/`, atau tanpa protokol) ke `https://xyz-api.animein.net/` dan bersihkan duplikasi slash pada path.
-   - Tambahkan alias Gson (`alternate`) dan fallback rantai `.takeIf { it.isNotBlank() }` pada `imagePoster`, `imageCover`, `poster`, dan `urlThumbnail` di seluruh model data.
-   - Hasil: Seluruh gambar AnimeIn (Hero Slider, Cuplix, Episode Baru, Sedang Hangat, Jat For Yu, Paling Dinanti, Jadwal, Detail Anime) DAN Komik muncul 100% secara bersamaan.
+   - Hindari konflik alias `@SerializedName` pada model Gson (seperti duplicate key `poster` pada `AnimeItem` yang dapat memicu `IllegalArgumentException`) dengan memisahkan deklarasi field secara bersih (`imagePoster`, `imageCover`, `poster`) dan mengandalkan fallback cerdas di level Kotlin (`getEffectivePoster()` dan `getEffectiveCover()` menggunakan `.takeIf { it.isNotBlank() }`).
+   - Hasil: Seluruh gambar AnimeIn (Hero Slider, Cuplix, Episode Baru, Sedang Hangat, Jat For Yu, Paling Dinanti, Jadwal, Detail Anime) DAN Komik muncul 100% secara bersamaan tanpa error deserialization "Gagal Memuat Konten".
 
 ### B. Fitur On/Off Efek "Liquid Glass" pada Floating Bottom Navbar
 1. **Default Berdasarkan Versi Android (`Build.VERSION.SDK_INT`):**

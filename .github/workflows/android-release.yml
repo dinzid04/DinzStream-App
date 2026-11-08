@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "2.1.2"
+  APP_VERSION: "2.1.3"
 
 jobs:
   build:
@@ -63,24 +63,24 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Fix 100% AnimeIn Images & Navbar Liquid Glass Toggle (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Fix 'Gagal Memuat Konten' & 100% AnimeIn + Komik Images (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
             ### Pembaruan & Perbaikan Utama:
-            1. **Perbaikan Total Seluruh Gambar AnimeIn (Hero Slider, Cuplix, Episode Baru, Sedang Hangat, Jat For Yu, Paling Dinanti, Jadwal & Detail):**
-               - Memperbaiki bug Cloudflare WAF 403 Forbidden pada CDN AnimeIn (`api.animein.net`, `xyz-api.animein.net`, `animein.net`): menghapus header browser `Mozilla/5.0` dan `x-proxy-secret` dari request download aset gambar, menggantikannya dengan User-Agent standar OkHttp (`okhttp/4.12.0`) tanpa header Referer asing.
-               - Menginisialisasi Coil ImageLoader global (`Coil.setImageLoader(this)`) pada saat `Application.onCreate()` dan memperbarui direktori disk cache ke `image_cache_v3` untuk membersihkan cache 403 sebelumnya.
-               - Menambahkan mapping fallback cerdas `.takeIf { it.isNotBlank() }` serta alias Gson (`alternate`) pada model data `AnimeItem`, `CuplixItem`, `MovieDetail`, `SeasonItem`, dan `EpisodeItem` sehingga seluruh aset gambar poster, cover, dan thumbnail muncul 100% bersamaan dengan gambar komik.
+            1. **Perbaikan Error 'Gagal Memuat Konten' (Gson Deserialization Crash):**
+               - Menghapus deklarasi kunci duplikat pada `@SerializedName` model data `AnimeItem` yang memicu `IllegalArgumentException: class com.yuranime.dinz.data.model.AnimeItem declares multiple JSON fields named poster`.
+               - Seluruh endpoint API AnimeIn (`getHomeData`, `getHomeNewTitles`, `getHomeRandom`, `searchMovies`, `getCuplixFeed`) kini ter-parse 100% bersih dan konten beranda langsung muncul tanpa error.
 
-            2. **Fitur On/Off Efek Liquid Glass pada Floating Bottom Navbar:**
-               - Sistem deteksi default otomatis sesuai versi OS Android (`Build.VERSION.SDK_INT`):
-                 - Android 13+ (API 33+ / TIRAMISU): Default **ON (`true`)**.
-                 - Android 12- (API 32 ke bawah): Default **OFF (`false`)**.
-               - Bentuk, posisi mengambang (*floating*), ukuran, padding, dan tata letak tab aktif (Ikon + Judul) & inaktif (Ikon saja) tetap 100% identik baik saat ON maupun OFF.
-               - Saat ON: Efek optik *Liquid Glass* penuh (live backdrop refraction, lensing edge, chromatic dispersion, frosted glass shader).
-               - Saat OFF: Perhitungan shader dan penangkapan layer dimatikan untuk performa sangat ringan dan hemat baterai, digantikan permukaan gelap semi-transparan yang bersih dan elegan (`#D912141A` luar dan `#26FFFFFF` aktif dengan border `#33FFFFFF`).
-               - Toggle switch real-time di `SettingsScreen` (Pengaturan) bagian `NAVIGASI & TAMPILAN` ("Efek Liquid Glass Navbar").
+            2. **Perbaikan Total Seluruh Gambar AnimeIn (Hero Slider, Cuplix, Episode Baru, Sedang Hangat, Jat For Yu, Paling Dinanti, Jadwal & Detail):**
+               - Memperbaiki penanganan User-Agent pada Coil OkHttpClient: request gambar AnimeIn dikirimkan dengan User-Agent standar OkHttp (`okhttp/4.12.0`) tanpa header Referer asing, meloloskan tantangan bot Cloudflare WAF dengan status 200 OK.
+               - Gambar komik tetap dikirim dengan `Referer: https://app.shinigami.asia/` dan User-Agent browser sehingga gambar anime dan komik tampil 100% secara bersamaan.
+               - Mengaktifkan fallback gambar berantai cerdas (`imagePoster?.takeIf { it.isNotBlank() } ?: poster?.takeIf { it.isNotBlank() } ?: imageCover`) dan normalisasi path URL.
+
+            3. **Fitur On/Off Efek Liquid Glass pada Floating Bottom Navbar:**
+               - Deteksi default otomatis: Android 13+ (API 33+) default **ON (`true`)**, Android 12- (API 32-) default **OFF (`false`)**.
+               - Desain kapsul mengambang (floating) dan struktur tab aktif/inaktif tetap 100% identik.
+               - Toggle switch real-time di `SettingsScreen` (Pengaturan) bagian `NAVIGASI & TAMPILAN`.
           draft: false
           prerelease: false
           make_latest: true
