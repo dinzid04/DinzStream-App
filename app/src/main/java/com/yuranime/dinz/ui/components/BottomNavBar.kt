@@ -106,12 +106,7 @@ fun BottomNavBar(
         // Kapsul Utama Liquid Glass (Floating Pill)
         Box(
             modifier = Modifier
-                .shadow(
-                    elevation = 20.dp,
-                    shape = CircleShape,
-                    spotColor = Color(0x99000000),
-                    ambientColor = Color(0x4D000000)
-                )
+                .shadow(20.dp, CircleShape)
                 .clip(CircleShape)
                 .background(Color(0xEB11141B))
                 // Lapisan Pembiasan Kaca Cair (Fresnel Rim Specular + Chromatic Dispersion Edge)
@@ -175,11 +170,7 @@ fun BottomNavBar(
                                         stiffness = Spring.StiffnessMediumLow
                                     )
                                 )
-                                .shadow(
-                                    elevation = 8.dp,
-                                    shape = RoundedCornerShape(24.dp),
-                                    spotColor = Color(0x66FF5722)
-                                )
+                                .shadow(8.dp, RoundedCornerShape(24.dp))
                                 .clip(RoundedCornerShape(24.dp))
                                 // Lensa Liquid Glass dengan aksen oranye Yuranime
                                 .background(

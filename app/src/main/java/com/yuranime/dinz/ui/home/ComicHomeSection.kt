@@ -225,7 +225,7 @@ fun ComicGridCard(
                             }
 
                             // Kanan: Waktu rilis relatif
-                            val timeStr = chapter.timeAgo.ifBlank { "Baru" }
+                            val timeStr = chapter.releaseTime.ifBlank { chapter.releaseDate ?: "Baru" }
                             Text(
                                 text = timeStr,
                                 color = Color(0xFF64748B),
