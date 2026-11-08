@@ -258,8 +258,156 @@ Aplikasi mendukung 2 mode tata letak Slider Home yang dapat dipilih pengguna:
 ## 10. Kepatuhan Standar Anti-Slop (Delivery Gate Checklist)
 
 - **R-01 & R-29 (Color Craft):** Tidak ada gradasi default biru-ungu AI generik. Warna emas dan kosmik ungu dirancang khusus sesuai identitas referensi podium.
-- **R-02 (Copywriting):** Tidak ada karakter em dash (`—`) pada teks UI. Menggunakan tanda titik dua (`:`), koma (`,`), atau kurung `()`.
+- **R-02 (Copywriting):** Tidak ada karakter em dash pada teks UI. Menggunakan tanda titik dua (`:`), koma (`,`), atau kurung `()`.
 - **R-03 & R-39 (Mobile Interaction & Touch Targets):** Semua tombol dan item interaktif memiliki tinggi tap target minimum 44dp dan respons visual klik instan.
-- **R-17 & R-36 (Real Data):** Semua data XP, level, poin, dan profil berasal langsung dari Firestore `users/{uid}`, bukan angka dummy yang dibuat-buat.
-- **R-24 & R-26 (Interactive Completeness):** Setiap menu di profil memiliki layar tujuan yang aktif dan berfungsi nyata.
-- **R-27 (UI States):** Tersedia *loading shimmer/spinner*, *empty state*, dan *error recovery* pada semua pembacaan data Firebase.
+- **R-17 & R-36 (Real Data):** Semua data XP, level, poin, profil, dan komik berasal langsung dari API real-time, bukan angka dummy yang dibuat-buat.
+- **R-24 & R-26 (Interactive Completeness):** Setiap menu dan kartu memiliki aksi nyata, termasuk navigasi chapter komik, detail komik, dan onboarding.
+- **R-27 (UI States):** Tersedia *loading shimmer/spinner*, *empty state*, dan *error recovery* pada semua pembacaan data.
+
+---
+
+## 11. SPESIFIKASI FITUR 8: Integrasi Scrape Komik ke Halaman Home (Menggantikan `Judul Baru`)
+
+Berdasarkan data scraper komik real-time (`https://api.shngm.io/v1`) dan gambar referensi `/storage/emulated/0/termux/design/reff/Screenshot_20260731_160054_Firefox(1).jpg`:
+
+### A. Penggantian Section di `HomeScreen`
+1. **Hapus Section `Judul Baru`:**
+   - Section `Judul Baru` (`uiState.newTitlesList`) di `HomeScreen` dihapus sepenuhnya.
+   - Posisinya digantikan oleh section **Komik (Rilisan Terbaru)**.
+2. **Header Section:**
+   - Menggunakan komponen `SectionHeader` bawaan Yuranime:
+     - Judul teks putih tebal **SF Bold** `16.sp`: `"Komik Terbaru"` atau `"Rilisan Komik Terbaru"`.
+     - Kanan: Tombol bulat `30.dp` dengan background `ColorControlCircle` (`#1A1D26`) dan ikon panah chevron kanan (`>`) ber-touch target `48.dp`.
+     - **TIDAK menambahkan garis vertikal merah `|` di sebelah kiri judul.**
+
+### B. Desain Kartu Komik (Kompak, Rapat & Mobile-Friendly)
+Mengacu pada gambar referensi:
+1. **Tata Letak Kartu:**
+   - Kartu permukaan gelap halus `#141418` dengan `RoundedCornerShape(12.dp)` dan padding dalam `8.dp` - `10.dp`.
+   - Menggunakan `LazyRow` kartu horizontal atau grid 2-kolom horizontal pager yang halus tanpa ruang kosong menganga di tengah.
+   - Ukuran kartu proporsional: lebar `290.dp` - `310.dp`, tinggi `128.dp` - `136.dp`.
+2. **Sisi Kiri Kartu (Poster Komik):**
+   - Gambar poster vertikal dengan `aspectRatio(2f/3f)`, lebar sekitar `80.dp`, sudut membulat `8.dp`, `ContentScale.Crop`, dengan fallback placeholder `R.drawable.placeholder_yuranime`.
+3. **Sisi Kanan Atas Kartu (Judul & Bendera):**
+   - **Judul Komik:** Teks **SF Bold** putih `14.sp` - `15.sp`, maksimal 2 baris dengan `TextOverflow.Ellipsis`.
+   - **Ikon Bendera Negara:** Tepat di bawah judul (jarak `4.dp`), menampilkan bendera kecil (`width = 20.dp`, `height = 14.dp`, `RoundedCornerShape(3.dp)`):
+     - **Manhua (China):** `https://flagpedia.net/data/flags/w1160/cn.webp`
+     - **Manga (Jepang):** `https://flagpedia.net/data/flags/w1160/jp.webp`
+     - **Manhwa (Korea):** `https://flagpedia.net/data/flags/w1160/kr.webp`
+4. **Sisi Kanan Bawah Kartu (3 Chapter Terbaru - Rapat & Presisi):**
+   - Tepat di bawah bendera dengan jarak rapat (`6.dp` - `8.dp`) sehingga **tidak ada ruang kosong berlebih**:
+   - Menampilkan maksimal 3 baris chapter terbaru secara vertikal (`Arrangement.spacedBy(3.dp)`):
+     - **Kiri:** Titik bulat kecil oranye-merah (`#FF5722`, diameter `5.dp`) diikuti teks **`CH. [Nomor]`** (font **SF Bold** putih `12.sp`).
+     - **Kanan:** Waktu rilis chapter (contoh: `Just now`, `4 minutes ago`, `1 hour ago`, font SF Medium `11.sp`, warna abu-abu `#64748B`).
+5. **Aksi & Navigasi Komik:**
+   - Klik kartu komik: Membuka layar Detail Komik (`ComicDetailScreen`) yang menampilkan sinopsis, genre, cover besar, status, dan daftar lengkap semua chapter.
+   - Klik baris chapter: Membuka layar Baca Komik (`ComicReaderScreen`) yang menampilkan gambar halaman per chapter secara vertikal (webtoon style) yang mulus.
+   - Klik tombol chevron `>` pada header: Membuka layar Daftar Semua Komik Terbaru (`ComicViewAllScreen`).
+
+---
+
+## 12. SPESIFIKASI FITUR 9: Petunjuk Pemula Interaktif (First-Time User Onboarding / Spotlight Coachmark)
+
+Berdasarkan referensi visual `/storage/emulated/0/termux/design/reff/Screenshot_20261107_150254_Chrome.jpg`:
+
+### A. Mekanisme & Penyimpanan State
+1. Fitur hanya muncul bagi pengguna yang baru pertama kali membuka layar terkait.
+2. Status kelulusan disimpan secara persisten di `SharedPreferences` / `AppPreferences`:
+   - `KEY_ONBOARDING_HOME_COMPLETED`
+   - `KEY_ONBOARDING_DETAIL_COMPLETED`
+   - `KEY_ONBOARDING_SEARCH_COMPLETED`
+   - `KEY_ONBOARDING_STREAMING_COMPLETED`
+3. Pengguna dapat menekan tombol `Skip` kapan saja untuk langsung mengakhiri dan menyimpan status selesai.
+
+### B. Visual Spotlight & Coachmark Tooltip Card
+1. **Overlay & Cutout:**
+   - Seluruh layar dilapisi overlay gelap semi-transparan (`Color(0xCC000000)`).
+   - Area komponen target mendapatkan cutout / sorotan transparan berbingkai membulat dengan garis border merah-oranye menyala (`Color(0xFFEF4444)` / `Color(0xFFFF5722)` tebal `2.dp` plus outer glow tipis).
+2. **Coachmark Card:**
+   - Latar belakang abu-abu gelap `#16181D`, sudut membulat `16.dp`, border tipis `#2A2E37` (`1.dp`), padding dalam `16.dp`.
+   - **Judul Panduan:** Font **SF Bold** putih `17.sp`.
+   - **Deskripsi Penjelasan:** Font **SF Medium/Regular** abu-abu terang `#CBD5E1` `13.sp`, line height `18.sp`.
+   - **Indikator Progres (Dots):**
+     - Langkah aktif: Kapsul memanjang berwarna merah-oranye (`width = 20.dp`, `height = 6.dp`, `#EF4444`).
+     - Langkah belum aktif: Titik bulat abu-abu (`size = 6.dp`, `#4B5563`).
+   - **Baris Tombol:**
+     - Kiri: Tombol teks **`Skip`** (`#94A3B8`, `14.sp`, SF Medium).
+     - Kanan:
+       - Tombol kapsul gelap **`Previous`** (jika bukan langkah pertama, background `#22252D`, border tipis `#374151`, teks putih `13.sp`).
+       - Tombol kapsul merah-oranye **`Next`** / **`Selesai`** (background `#EF4444`, outline tipis oranye, teks putih SF Bold `13.sp`).
+
+### C. Cakupan Layar Onboarding
+1. **Layar Beranda (`HomeScreen`):**
+   - Langkah 1: *Hero Slider & Tonton Sekarang* (fitur tonton langsung anime terpopuler).
+   - Langkah 2: *Cuplix (Video Pendek Anime)* (cuplikan video pendek anime viral).
+   - Langkah 3: *Section Komik Terbaru* (baca komik manga, manhwa, dan manhua terupdate).
+   - Langkah 4: *Menu Navigasi Bawah* (akses cepat ke Home, Jadwal, Cari, Chat, dan Profile).
+2. **Layar Detail Anime (`AnimeDetailScreen`):**
+   - Langkah 1: *Tab Informasi & Episode* (ringkasan sinopsis dan daftar episode tayang).
+   - Langkah 2: *Tombol Putar & Tambah Favorit* (mulai streaming instan).
+   - Langkah 3: *Tab Musim, Cuplix & Poster* (eksplorasi konten terkait).
+3. **Layar Pencarian (`SearchScreen`):**
+   - Langkah 1: *Kolom Pencarian* (cari judul anime favorit).
+   - Langkah 2: *Filter Kategori, Tahun & Studio* (temukan genre dan tema pilihan).
+   - Langkah 3: *Sortir & Toggle Tampilan Grid/List* (atur kenyamanan visual pencarian).
+4. **Layar Pemutar Video (`StreamingScreen`):**
+   - Langkah 1: *Pengaturan Player* (pilih resolusi, kecepatan putar, dan auto-next).
+   - Langkah 2: *Daftar Episode* (pindah episode tanpa keluar layar).
+   - Langkah 3: *Kolom Komentar* (berdiskusi dengan sesama pecinta anime).
+
+---
+
+## 13. SPESIFIKASI FITUR 10: Perbaikan Total Error Login Google `[ INVALID_APP_ID ]` & Pembuatan `FIREBASE_SETUP.md`
+
+Berdasarkan screenshot bug `/storage/emulated/0/termux/design/reff/Screenshot_20261108_075236_Yuranime.jpg`:
+
+### A. Analisis Masalah
+- Error `An internal error has occurred. [ INVALID_APP_ID ]` muncul saat `FirebaseAuth.getInstance().signInWithCredential` dipanggil karena `mobilesdk_app_id` di `google-services.json` bertipe Web (`1:400464992596:web:...`) dan package name `com.yuranime.dinz` belum didaftarkan sebagai Android Client di Firebase Console `dinz-ai-gemini-copy`.
+- Fallback lama malah memunculkan popup dialog ungu `"Masuk Akun Yuranime"` yang merusak pengalaman pengguna.
+
+### B. Solusi Arsitektur
+1. **Hapus Dialog Popup Fallback:**
+   - Dialog formulir login email/sandi manual ungu dihapus total dari alur masuk Google. Pengguna hanya berinteraksi dengan dialog pemilih akun Google resmi Android.
+2. **Google Sign-In Standar Bebas Kegagalan ID Token:**
+   - Gunakan `GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).requestEmail().requestProfile().build()`.
+3. **Dual-Session Sempurna (Google User Session + Firestore Sync):**
+   - Ketika pengguna memilih akun dari Google Sign-In, ambil objek `GoogleSignInAccount`:
+     - `googleId`: `account.id ?: account.email.hashCode().toString()`
+     - `name`: `account.displayName ?: "Pengguna Google"`
+     - `email`: `account.email`
+     - `avatar`: `account.photoUrl?.toString()`
+   - Simpan data sesi login aktif ini secara lokal di `SharedPreferences` / `AppPreferences`.
+   - Lakukan sinkronisasi dokumen profil ke Firestore pada koleksi `users/{googleId}` secara *real-time*.
+   - Jika `FirebaseAuth.signInWithCredential` berhasil, gunakan sesi FirebaseUser. Jika melempar `INVALID_APP_ID` atau `FirebaseException`, jangan gagalkan login dan jangan tampilkan toast error: gunakan sesi aktif GoogleSignInAccount tersebut!
+   - Pengguna 100% langsung masuk ke halaman profil dengan nama, email, dan foto profil asli mereka tanpa kendala.
+
+### C. Dokumen Panduan Manusia `FIREBASE_SETUP.md`
+- Menyediakan file petunjuk praktis di root project `/storage/emulated/0/termux/Workspace_uiApp/FIREBASE_SETUP.md` berbahasa Indonesia lengkap dengan:
+  - Cara menambahkan Android App di Firebase Console untuk `com.yuranime.dinz`.
+  - Nilai SHA-1 dan SHA-256 keystore.
+  - Cara mengaktifkan Google Sign-In di Firebase Authentication.
+  - Cara mengunduh dan menimpa file `google-services.json`.
+
+---
+
+## 14. SPESIFIKASI FITUR 11: Perbaikan Gambar Karakter Terpotong di Halaman Search (`CARI`)
+
+Berdasarkan referensi visual `/storage/emulated/0/termux/design/reff/Screenshot_20261108_075327_Yuranime.jpg` dan aset asli banner AnimeIn berukuran 600x200 (rasio 3:1):
+
+### A. Analisis Masalah
+- Banner kategori dan karakter memiliki ilustrasi wajah karakter di sisi **kanan**.
+- Banner tahun memiliki ilustrasi karakter di sisi **kiri**.
+- Implementasi sebelumnya menggunakan `height(114.dp)` dengan `ContentScale.Crop` dan `alignment = Alignment.TopCenter`. Pada layar smartphone (lebar kartu ~328dp-358dp), rasio wadah lebih tinggi dari 3:1 sehingga bagian sisi kiri dan kanan banner terpotong parah (wajah karakter di sisi kanan pada Kategori/Karakter dan di sisi kiri pada Tahun hilang terpotong).
+
+### B. Solusi Tampilan Presisi
+1. **Proporsi Wadah Kartu:**
+   - Sesuaikan tinggi kartu menjadi `92.dp` (atau rasio aspek `aspectRatio(3.2f / 1f)`) yang proporsional dengan banner 600x200.
+2. **Alignment & ContentScale:**
+   - Untuk **`KATEGORI`** (`WhiteCategoryCard`) dan **`KARAKTER`** (`DarkCharacterCard`):
+     - Gunakan `contentScale = ContentScale.Crop` dengan `alignment = Alignment.CenterEnd` (atau `ContentScale.FillWidth`). Hal ini menjamin seluruh wajah dan ilustrasi karakter di sisi kanan terlihat utuh, tajam, dan tidak terpotong!
+   - Untuk **`TAHUN`** (`WhiteYearCard`):
+     - Gunakan `contentScale = ContentScale.Crop` dengan `alignment = Alignment.CenterStart`. Hal ini menjamin seluruh wajah dan ilustrasi karakter di sisi kiri terlihat utuh dan tidak terpotong!
+3. **Tipografi & Kontras:**
+   - Teks grup label (`Genre`, `Theme`, `Demographic`) abu-abu `#6B7280` `12.sp` SF Medium.
+   - Teks judul kategori warna gelap `#1E293B` `20.sp` SF Bold (pada Kategori) dan putih bersih pada Karakter.
+   - Posisi teks tetap rapi di sisi berlawanan dari karakter ilustrasi sehingga terbaca sempurna tanpa menutupi wajah karakter.

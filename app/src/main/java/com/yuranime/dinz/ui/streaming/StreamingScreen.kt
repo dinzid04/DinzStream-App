@@ -1161,6 +1161,51 @@ fun StreamingScreen(
                 }
             }
         }
+
+        // Spotlight Coachmark Onboarding for StreamingScreen
+        var showStreamingOnboarding by remember {
+            mutableStateOf(!com.yuranime.dinz.data.local.AppPreferences.isStreamingOnboardingCompleted(context))
+        }
+        val streamingSteps = remember {
+            listOf(
+                com.yuranime.dinz.ui.components.CoachmarkStep(
+                    title = "Pengaturan Pemutar Video",
+                    description = "Sentuh ikon gerigi untuk mengganti resolusi video (360p s/d 1080p), kecepatan pemutaran, server cadangan, atau auto-next.",
+                    relativeLeft = 0.70f,
+                    relativeTop = 0.04f,
+                    relativeWidth = 0.26f,
+                    relativeHeight = 0.08f,
+                    cornerRadiusDp = 12f
+                ),
+                com.yuranime.dinz.ui.components.CoachmarkStep(
+                    title = "Daftar Episode Tayang",
+                    description = "Pindah ke episode berikutnya atau episode sebelumnya dengan cepat tanpa harus keluar dari layar pemutar video.",
+                    relativeLeft = 0.04f,
+                    relativeTop = 0.38f,
+                    relativeWidth = 0.92f,
+                    relativeHeight = 0.22f,
+                    cornerRadiusDp = 14f
+                ),
+                com.yuranime.dinz.ui.components.CoachmarkStep(
+                    title = "Ruang Komentar & Reaksi",
+                    description = "Tulis komentar, berikan reaksi, dan diskusikan jalan cerita episode ini bersama sesama pecinta anime di seluruh Indonesia.",
+                    relativeLeft = 0.04f,
+                    relativeTop = 0.65f,
+                    relativeWidth = 0.92f,
+                    relativeHeight = 0.25f,
+                    cornerRadiusDp = 14f
+                )
+            )
+        }
+
+        com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay(
+            steps = streamingSteps,
+            isVisible = showStreamingOnboarding && !isFullscreen,
+            onDismiss = {
+                showStreamingOnboarding = false
+                com.yuranime.dinz.data.local.AppPreferences.setStreamingOnboardingCompleted(context, true)
+            }
+        )
     }
 }
 

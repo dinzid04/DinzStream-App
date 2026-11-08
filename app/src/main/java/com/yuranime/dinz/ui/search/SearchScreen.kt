@@ -339,6 +339,51 @@ fun SearchScreen(
                     }
                 }
             }
+
+            // Spotlight Coachmark Onboarding for SearchScreen
+            var showSearchOnboarding by remember {
+                mutableStateOf(!com.yuranime.dinz.data.local.AppPreferences.isSearchOnboardingCompleted(context))
+            }
+            val searchSteps = remember {
+                listOf(
+                    com.yuranime.dinz.ui.components.CoachmarkStep(
+                        title = "Kolom Pencarian Pintar",
+                        description = "Ketik judul anime, judul alternatif, atau nama karakter untuk menemukan tontonanmu secara instan.",
+                        relativeLeft = 0.04f,
+                        relativeTop = 0.01f,
+                        relativeWidth = 0.92f,
+                        relativeHeight = 0.08f,
+                        cornerRadiusDp = 12f
+                    ),
+                    com.yuranime.dinz.ui.components.CoachmarkStep(
+                        title = "Filter Kategori, Tahun & Studio",
+                        description = "Temukan anime berdasarkan kategori tema, tahun rilis, hingga studio animasi favorit seperti MAPPA atau Ufotable.",
+                        relativeLeft = 0.04f,
+                        relativeTop = 0.12f,
+                        relativeWidth = 0.92f,
+                        relativeHeight = 0.40f,
+                        cornerRadiusDp = 14f
+                    ),
+                    com.yuranime.dinz.ui.components.CoachmarkStep(
+                        title = "Sortir & Mode Tampilan Grid/List",
+                        description = "Atur urutan rekomendasi berdasarkan penonton terbanyak, serta ganti tampilan antara grid 3-kolom atau daftar vertikal.",
+                        relativeLeft = 0.04f,
+                        relativeTop = 0.58f,
+                        relativeWidth = 0.92f,
+                        relativeHeight = 0.12f,
+                        cornerRadiusDp = 12f
+                    )
+                )
+            }
+
+            com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay(
+                steps = searchSteps,
+                isVisible = showSearchOnboarding && uiState.selectedSubPage == null,
+                onDismiss = {
+                    showSearchOnboarding = false
+                    com.yuranime.dinz.data.local.AppPreferences.setSearchOnboardingCompleted(context, true)
+                }
+            )
         }
     }
 }
@@ -827,11 +872,11 @@ private fun WhiteCategoryCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(114.dp)
+            .height(92.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
     ) {
-        // Full background image from API (TopCenter to prevent cropping character heads)
+        // Full background image from API (CenterEnd to prevent cropping character face on right)
         if (imageUrl.isNotBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
@@ -842,7 +887,7 @@ private fun WhiteCategoryCard(
                     .build(),
                 contentDescription = name,
                 contentScale = ContentScale.Crop,
-                alignment = Alignment.TopCenter,
+                alignment = Alignment.CenterEnd,
                 modifier = Modifier.fillMaxSize()
             )
         } else {
@@ -870,7 +915,7 @@ private fun WhiteCategoryCard(
             Text(
                 text = name,
                 color = Color(0xFF222222),
-                fontSize = 22.sp,
+                fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = SfProFontFamily
             )
@@ -887,11 +932,11 @@ private fun WhiteYearCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(114.dp)
+            .height(92.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
     ) {
-        // Full background image from API (TopCenter alignment)
+        // Full background image from API (CenterStart to prevent cropping character face on left)
         if (imageUrl.isNotBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
@@ -902,7 +947,7 @@ private fun WhiteYearCard(
                     .build(),
                 contentDescription = year,
                 contentScale = ContentScale.Crop,
-                alignment = Alignment.TopCenter,
+                alignment = Alignment.CenterStart,
                 modifier = Modifier.fillMaxSize()
             )
         } else {
@@ -937,7 +982,7 @@ private fun DarkCharacterCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(114.dp)
+            .height(92.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(cardBg)
             .clickable(onClick = onClick)
@@ -948,7 +993,7 @@ private fun DarkCharacterCard(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .fillMaxHeight()
-                    .width(165.dp)
+                    .width(175.dp)
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
@@ -959,7 +1004,7 @@ private fun DarkCharacterCard(
                         .build(),
                     contentDescription = name,
                     contentScale = ContentScale.Crop,
-                    alignment = Alignment.TopCenter,
+                    alignment = Alignment.CenterEnd,
                     modifier = Modifier.fillMaxSize()
                 )
                 // Gradient mask overlay: solid #18202C on left to transparent on right

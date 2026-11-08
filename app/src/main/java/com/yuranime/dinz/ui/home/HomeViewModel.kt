@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.model.ContinueWatchingItem
 import com.yuranime.dinz.data.repository.AnimeRepository
+import com.yuranime.dinz.data.repository.ComicRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +15,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class HomeViewModel(
-    private val repository: AnimeRepository = AnimeRepository()
+    private val repository: AnimeRepository = AnimeRepository(),
+    private val comicRepository: ComicRepository = ComicRepository()
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -23,6 +25,21 @@ class HomeViewModel(
     init {
         loadHomeData()
         loadBirthdayToday()
+        loadComics()
+    }
+
+    fun loadComics(forceRefresh: Boolean = false) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isComicsLoading = true) }
+            val result = comicRepository.getLatestComics(page = 1, pageSize = 12, forceRefresh = forceRefresh)
+            val list = result.getOrDefault(emptyList())
+            _uiState.update {
+                it.copy(
+                    comicsList = list,
+                    isComicsLoading = false
+                )
+            }
+        }
     }
 
     fun loadBirthdayToday(forceRefresh: Boolean = false) {
@@ -77,17 +94,20 @@ class HomeViewModel(
             val cuplixDeferred = async { repository.getRandomizedCuplixFeed(limit = 25, source = AnimeRepository.CuplixPageSource.HOME) }
             val newTitlesDeferred = async { repository.getHomeNewTitles() }
             val randomDeferred = async { repository.getHomeRandom() }
+            val comicsDeferred = async { comicRepository.getLatestComics(page = 1, pageSize = 12) }
 
             val homeResult = homeDeferred.await()
             val cuplixResult = cuplixDeferred.await()
             val newTitlesResult = newTitlesDeferred.await()
             val randomResult = randomDeferred.await()
+            val comicsResult = comicsDeferred.await()
 
             if (homeResult.isSuccess) {
                 val data = homeResult.getOrNull()
                 val cuplixItems = cuplixResult.getOrDefault(emptyList())
                 val newTitles = newTitlesResult.getOrNull()?.ifEmpty { null } ?: data?.movies ?: emptyList()
                 val randomItems = randomResult.getOrNull()?.ifEmpty { null } ?: data?.hotAnime ?: emptyList()
+                val comicsItems = comicsResult.getOrDefault(emptyList())
 
                 _uiState.update { current ->
                     current.copy(
@@ -98,6 +118,7 @@ class HomeViewModel(
                         newEpisodesList = data?.newEpisodes ?: emptyList(),
                         hotAnimeList = data?.hotAnime ?: emptyList(),
                         newTitlesList = newTitles,
+                        comicsList = if (comicsItems.isNotEmpty()) comicsItems else current.comicsList,
                         todayScheduleList = data?.todayAnime ?: emptyList(),
                         jatForYuList = randomItems,
                         waitingAnimeList = data?.waitingAnime ?: emptyList(),

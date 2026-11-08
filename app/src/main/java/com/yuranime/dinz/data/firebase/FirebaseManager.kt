@@ -76,6 +76,9 @@ object FirebaseManager {
     private val _currentUser = MutableStateFlow<FirebaseUser?>(null)
     val currentUser: StateFlow<FirebaseUser?> = _currentUser.asStateFlow()
 
+    private val _googleSession = MutableStateFlow<com.yuranime.dinz.data.local.SavedGoogleUserSession?>(null)
+    val googleSession: StateFlow<com.yuranime.dinz.data.local.SavedGoogleUserSession?> = _googleSession.asStateFlow()
+
     private val _userProfile = MutableStateFlow<UserProfile?>(null)
     val userProfile: StateFlow<UserProfile?> = _userProfile.asStateFlow()
 
@@ -92,7 +95,7 @@ object FirebaseManager {
                 _currentUser.value = fbAuth.currentUser
                 if (fbAuth.currentUser != null) {
                     startListeningCurrentUser()
-                } else {
+                } else if (_googleSession.value == null) {
                     _userProfile.value = null
                     profileListener?.remove()
                     profileListener = null
@@ -102,11 +105,140 @@ object FirebaseManager {
     }
 
     fun isUserLoggedIn(): Boolean {
-        return auth.currentUser != null
+        return auth.currentUser != null || _googleSession.value != null
+    }
+
+    fun isGoogleSessionActive(): Boolean {
+        return _googleSession.value != null
     }
 
     fun getCurrentUid(): String? {
-        return auth.currentUser?.uid
+        return auth.currentUser?.uid ?: _googleSession.value?.id
+    }
+
+    fun initSession(context: Context) {
+        val saved = com.yuranime.dinz.data.local.AppPreferences.getSavedGoogleSession(context)
+        if (saved != null) {
+            _googleSession.value = saved
+            if (_userProfile.value == null) {
+                _userProfile.value = UserProfile(
+                    uid = saved.id,
+                    name = saved.name,
+                    username = "@${saved.email.substringBefore("@").ifBlank { "user" }}",
+                    email = saved.email,
+                    avatar = saved.photoUrl.orEmpty(),
+                    level = 1,
+                    exp = 0L,
+                    points = 100L
+                )
+            }
+            startListeningFirestoreUser(saved.id, saved.name, saved.email, saved.photoUrl)
+        }
+    }
+
+    fun onGoogleAccountSelected(
+        uid: String,
+        name: String,
+        email: String,
+        avatar: String?,
+        idToken: String?
+    ) {
+        val session = com.yuranime.dinz.data.local.SavedGoogleUserSession(
+            id = uid,
+            name = name,
+            email = email,
+            photoUrl = avatar
+        )
+        _googleSession.value = session
+
+        _userProfile.value = UserProfile(
+            uid = uid,
+            name = name,
+            username = "@${email.substringBefore("@").ifBlank { "user" }}",
+            email = email,
+            avatar = avatar.orEmpty(),
+            level = 1,
+            exp = 0L,
+            points = 100L
+        )
+
+        // Try Firebase Auth in background, but silently ignore INVALID_APP_ID / FirebaseException
+        if (!idToken.isNullOrBlank()) {
+            try {
+                val credential = GoogleAuthProvider.getCredential(idToken, null)
+                auth.signInWithCredential(credential)
+                    .addOnSuccessListener {
+                        val fbUser = auth.currentUser
+                        updateAuthAndFirestore(
+                            name.ifBlank { fbUser?.displayName ?: "Pengguna Google" },
+                            avatar ?: fbUser?.photoUrl?.toString()
+                        )
+                    }
+                    .addOnFailureListener {
+                        // Gracefully ignored, Google session is active!
+                    }
+            } catch (ignored: Exception) {}
+        }
+
+        // Direct real-time sync with Firestore users/{uid}
+        startListeningFirestoreUser(uid, name, email, avatar)
+    }
+
+    fun startListeningFirestoreUser(
+        uid: String,
+        name: String,
+        email: String,
+        avatar: String?
+    ) {
+        val docRef = firestore.collection("users").document(uid)
+
+        val initialData = hashMapOf<String, Any>(
+            "uid" to uid,
+            "name" to name,
+            "username" to "@${email.substringBefore("@").ifBlank { "user" }}",
+            "email" to email,
+            "avatar" to (avatar.orEmpty()),
+            "lastActive" to FieldValue.serverTimestamp()
+        )
+        docRef.set(initialData, SetOptions.merge())
+
+        profileListener?.remove()
+        profileListener = docRef.addSnapshotListener { snapshot, error ->
+            if (error != null) return@addSnapshotListener
+            if (snapshot != null && snapshot.exists()) {
+                val data = snapshot.data ?: emptyMap()
+                val expVal = (data["exp"] as? Number)?.toLong() ?: 0L
+                val calculatedLevel = ((expVal / 1000L) + 1L).toInt().coerceAtLeast(1)
+
+                _userProfile.value = UserProfile(
+                    uid = uid,
+                    name = (data["name"] as? String)?.takeIf { it.isNotBlank() } ?: name,
+                    username = (data["username"] as? String) ?: "@${email.substringBefore("@").ifBlank { "user" }}",
+                    email = (data["email"] as? String) ?: email,
+                    avatar = (data["avatar"] as? String)?.takeIf { it.isNotBlank() } ?: (avatar.orEmpty()),
+                    banner = (data["banner"] as? String) ?: "",
+                    bio = (data["bio"] as? String) ?: "Pecinta anime sejati",
+                    level = calculatedLevel,
+                    exp = expVal,
+                    points = (data["points"] as? Number)?.toLong() ?: 100L,
+                    lastCheckInDate = (data["lastCheckInDate"] as? String) ?: "",
+                    checkInStreak = (data["checkInStreak"] as? Number)?.toInt() ?: 0
+                )
+            }
+        }
+    }
+
+    fun signOut(context: Context? = null) {
+        try {
+            auth.signOut()
+        } catch (ignored: Exception) {}
+        _googleSession.value = null
+        _userProfile.value = null
+        if (context != null) {
+            com.yuranime.dinz.data.local.AppPreferences.clearGoogleSession(context)
+        }
+        profileListener?.remove()
+        profileListener = null
     }
 
     /**

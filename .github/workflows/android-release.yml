@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "1.9.8"
+  APP_VERSION: "1.9.9"
 
 jobs:
   build:
@@ -31,6 +31,10 @@ jobs:
 
       - name: Grant Execute Permission to Gradlew
         run: chmod +x ./gradlew
+
+      - name: Inspect Keystore Fingerprints
+        run: |
+          ./gradlew signingReport --no-daemon || true
 
       - name: Build APK via Gradle
         run: |
@@ -59,30 +63,35 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Desain Presisi Ultah Hari Ini, 2 Mode Hero Slider & Halaman Pengaturan (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Integrasi Komik Real-Time, Spotlight Onboarding, Perbaikan Login Google & Banner Search (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
             ### Pembaruan Utama:
-            1. **Desain Presisi Ulang Tahun Hari Ini (Home & Detail Karakter 100% Sesuai Referensi):**
-               - **Home Section:** Header teks `Ulang Tahun Hari Ini • [Tanggal]` dengan tombol navigasi lingkaran gelap. Kartu potret (115dp, rasio 2:3, radius 12dp, tanpa border) dengan gradasi bawah halus, tanggal oranye `#FF5722` SF SemiBold, dan nama putih SF Bold.
-               - **Detail Karakter (`CharacterDetailScreen`):** Backdrop gradasi gelap menyatu ke latar `#0B0B0B`, tombol kembali bulat 40dp, foto profil potret (135dp, rasio 2:3 tanpa border), label abu-abu `#94A3B8` sejajar foto.
-               - **Deskripsi & Biodata:** Deskripsi nyaman dengan tombol lipat/buka `Selengkapnya... ⌄` oranye. Biodata tersusun dalam 2 kolom bersih tanpa kotak/border garis.
-               - **Seiyuu & Daftar Anime:** Avatar seiyuu bulat (54dp) dengan label `Bahasa: Jepang` oranye. Daftar anime bersih dengan thumbnail persegi membulat (56x56dp), peran karakter oranye, status, dan navigasi langsung ke detail anime.
+            1. **Integrasi Scrape Komik Real-Time di Halaman Home:**
+               - Menggantikan section `Judul Baru` dengan **Komik Terbaru** bersumber langsung dari scraper shngm/komikid.
+               - Header asli Yuranime dengan teks putih tebal SF Bold dan tombol bulat chevron kanan tanpa garis merah kaku.
+               - Kartu komik permukaan gelap halus `#141418` (radius 12dp) dengan poster vertikal 2:3, judul tebal SF Bold, bendera negara asal (Manhua China, Manga Jepang, Manhwa Korea), dan 3 chapter terbaru rapat presisi (titik oranye `#FF5722` + waktu rilis relatif).
+               - Halaman detail komik lengkap (`ComicDetailScreen`) dan pembaca gambar chapter webtoon vertikal (`ComicReaderScreen`).
 
-            2. **2 Mode Tampilan Hero Slider Beranda:**
-               - **Mode 1 - Default Slider (Bawaan):** Mempertahankan tampilan slider dengan kartu poster di pojok kiri bawah, sinopsis, tombol `TONTON SEKARANG`, dan indikator slide.
-               - **Mode 2 - Clean Cover Slider:** Tampilan bersih sesuai gambar referensi dengan cover layar penuh tanpa poster kecil di kiri bawah, tipografi judul all-caps `Yuranime-logo-font.ttf`, sinopsis singkat, tombol kapsul putar merah `▶ TONTON SEKARANG`, indikator titik pagination, dan ikon pencarian di kanan atas banner.
+            2. **Fitur Petunjuk Pemula Interaktif (Spotlight Coachmark):**
+               - Panduan interaktif visual bagi pengguna baru dengan overlay semi-transparan `#CC000000` dan sorotan berbingkai border menyala merah-oranye `#EF4444` / `#FF5722`.
+               - Kartu petunjuk (#16181D, border #2A2E37, radius 16dp) dengan judul SF Bold, penjelasan ramah pemula, indikator titik progres kapsul, tombol `Skip`, `Previous`, dan `Next / Selesai`.
+               - Mencakup halaman Home, Detail Anime, Search (Cari), dan Pemutar Video Streaming.
 
-            3. **Halaman Pengaturan (`SettingsScreen`) & Penyimpanan Preferensi:**
-               - Akses menu `Pengaturan` dari halaman Profil dan tombol cepat.
-               - Pilihan radio interaktif untuk beralih mode slider Beranda yang tersimpan permanen di `SharedPreferences` / `AppPreferences`.
-               - Pengaturan putar otomatis episode berikutnya, fitur bersihkan cache gambar, dan cek pembaruan aplikasi.
+            3. **Perbaikan Total Login Google & Panduan `FIREBASE_SETUP.md`:**
+               - Menghapus dialog popup fallback ungu; pengguna login langsung dengan akun Google asli mereka.
+               - Mengatasi exception `[ INVALID_APP_ID ]` dengan dual-session cerdas yang langsung menyimpan sesi `GoogleSignInAccount` dan menyinkronkan dokumen profil ke Firestore `users/{googleId}` secara real-time tanpa error toast.
+               - Menyertakan dokumen panduan `FIREBASE_SETUP.md` di root project lengkap dengan nilai SHA-1, SHA-256, dan langkah penambahan aplikasi di Firebase Console.
 
-            4. **Kepatuhan Desain Anti-Slop:**
-               - Menggunakan warna kanvas presisi (`#0B0B0B`), permukaan profil (`#0E0F12`), dan kartu (`#161820`).
-               - Bebas garis border norak dan ruang kosong terbuang.
-               - Target sentuh minimum 48dp dan tidak ada karakter em dash pada UI text.
+            4. **Perbaikan Gambar Banner Karakter di Halaman Search (`CARI`):**
+               - Menyesuaikan proporsi tinggi kartu ke 92dp sesuai rasio banner asli 3:1 (600x200).
+               - Mengatur alignment `CenterEnd` untuk `KATEGORI` dan `KARAKTER` sehingga wajah karakter di sisi kanan terlihat utuh dan jelas tanpa terpotong.
+               - Mengatur alignment `CenterStart` untuk `TAHUN` sehingga ilustrasi karakter di sisi kiri terlihat utuh dan tidak terpotong.
+
+            5. **Kepatuhan Desain Anti-Slop (Delivery Gate):**
+               - Bebas gradasi biru-ungu generik dan bebas karakter em dash pada teks UI.
+               - Target sentuh minimum 44dp-48dp dan UI states lengkap.
           draft: false
           prerelease: false
           make_latest: true

@@ -1,6 +1,7 @@
 package com.yuranime.dinz.ui.home
 
 import com.yuranime.dinz.data.model.AnimeItem
+import com.yuranime.dinz.data.model.ComicItem
 import com.yuranime.dinz.data.model.ContinueWatchingItem
 import com.yuranime.dinz.data.model.CuplixItem
 import com.yuranime.dinz.data.model.SliderItem
@@ -32,6 +33,9 @@ data class HomeUiState(
     val newEpisodesList: List<AnimeItem> = emptyList(),
     val hotAnimeList: List<AnimeItem> = emptyList(),
     val newTitlesList: List<AnimeItem> = emptyList(),
+    // Komik Rilisan Terbaru Section (Scraped Real-Time)
+    val comicsList: List<ComicItem> = emptyList(),
+    val isComicsLoading: Boolean = false,
     val todayScheduleList: List<AnimeItem> = emptyList(),
     val jatForYuList: List<AnimeItem> = emptyList(),
     val waitingAnimeList: List<AnimeItem> = emptyList(),
@@ -47,3 +51,4 @@ data class HomeUiState(
     // Active full vertical sub-page state for chevron '>'
     val activeSectionDetail: HomeSectionDetailState? = null
 )
+

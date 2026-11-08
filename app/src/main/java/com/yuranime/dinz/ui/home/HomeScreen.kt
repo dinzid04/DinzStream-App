@@ -87,7 +87,10 @@ fun HomeScreen(
     onAnimeClick: (id: String) -> Unit = {},
     onEpisodeClick: (episodeId: String, movieId: String) -> Unit = { _, _ -> },
     onCuplixClick: (CuplixItem) -> Unit = {},
-    onBirthdayClick: (com.yuranime.dinz.data.api.BirthdayCharacterItem) -> Unit = {}
+    onBirthdayClick: (com.yuranime.dinz.data.api.BirthdayCharacterItem) -> Unit = {},
+    onComicClick: (comicId: String) -> Unit = {},
+    onComicChapterClick: (chapterId: String) -> Unit = {},
+    onOpenAllComics: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sliderMode by AppPreferences.sliderMode.collectAsState()
@@ -337,31 +340,20 @@ fun HomeScreen(
                             }
                         }
 
-                        // 6. Section "Judul Baru" (2:3 Vertical Cards)
-                        if (uiState.newTitlesList.isNotEmpty()) {
-                            item(key = "section_new_titles") {
+                        // 6. Section Komik Rilisan Terbaru (Menggantikan Judul Baru)
+                        if (uiState.comicsList.isNotEmpty()) {
+                            item(key = "section_comics") {
                                 Spacer(modifier = Modifier.height(18.dp))
                                 SectionHeader(
-                                    title = "Judul Baru",
-                                    onChevronClick = { viewModel.openSectionDetail(HomeSectionType.NEW_TITLES) }
+                                    title = "Komik Terbaru",
+                                    onChevronClick = onOpenAllComics
                                 )
-                                LazyRow(
-                                    state = newTitlesListState,
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    items(
-                                        items = uiState.newTitlesList,
-                                        key = { "new_title_" + (it.id ?: it.hashCode().toString()) }
-                                    ) { anime ->
-                                        val singleGenre = anime.getDisplayGenre().split(",").firstOrNull()?.trim() ?: "Action"
-                                        AnimeVerticalCard(
-                                            anime = anime,
-                                            overrideSubtitle = singleGenre,
-                                            onClick = { anime.id?.let { onAnimeClick(it) } }
-                                        )
-                                    }
-                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                ComicLatestSection(
+                                    comics = uiState.comicsList,
+                                    onComicClick = onComicClick,
+                                    onChapterClick = onComicChapterClick
+                                )
                             }
                         }
 
@@ -480,6 +472,61 @@ fun HomeScreen(
                     }
                 }
             }
+
+            // Spotlight Coachmark Onboarding for HomeScreen
+            var showHomeOnboarding by remember {
+                mutableStateOf(!AppPreferences.isHomeOnboardingCompleted(context))
+            }
+            val homeSteps = remember {
+                listOf(
+                    com.yuranime.dinz.ui.components.CoachmarkStep(
+                        title = "Hero Slider & Tonton Sekarang",
+                        description = "Temukan anime terbaru dan terpopuler pilihan hari ini. Tekan tombol Tonton Sekarang untuk langsung mulai streaming tanpa jeda.",
+                        relativeLeft = 0.04f,
+                        relativeTop = 0.06f,
+                        relativeWidth = 0.92f,
+                        relativeHeight = 0.38f,
+                        cornerRadiusDp = 16f
+                    ),
+                    com.yuranime.dinz.ui.components.CoachmarkStep(
+                        title = "Cuplix (Video Pendek Anime)",
+                        description = "Tonton cuplikan momen seru, adegan lucu, dan pertarungan epik anime favorit dalam format video pendek vertikal yang adiktif.",
+                        relativeLeft = 0.04f,
+                        relativeTop = 0.45f,
+                        relativeWidth = 0.92f,
+                        relativeHeight = 0.12f,
+                        cornerRadiusDp = 14f
+                    ),
+                    com.yuranime.dinz.ui.components.CoachmarkStep(
+                        title = "Komik Rilisan Terbaru",
+                        description = "Baca update chapter terbaru dari ratusan judul Manga, Manhwa, dan Manhua terpopuler dengan bendera asal negara dan rilis waktu nyata.",
+                        relativeLeft = 0.04f,
+                        relativeTop = 0.58f,
+                        relativeWidth = 0.92f,
+                        relativeHeight = 0.22f,
+                        cornerRadiusDp = 14f
+                    ),
+                    com.yuranime.dinz.ui.components.CoachmarkStep(
+                        title = "Menu Navigasi Cepat",
+                        description = "Jelajahi jadwal rilis mingguan, cari genre & studio anime, ikuti chat komunitas, atau kelola unduhan & poin di profil kamu.",
+                        relativeLeft = 0.03f,
+                        relativeTop = 0.90f,
+                        relativeWidth = 0.94f,
+                        relativeHeight = 0.08f,
+                        cornerRadiusDp = 20f,
+                        isBottomNavTarget = true
+                    )
+                )
+            }
+
+            com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay(
+                steps = homeSteps,
+                isVisible = showHomeOnboarding && uiState.activeSectionDetail == null,
+                onDismiss = {
+                    showHomeOnboarding = false
+                    AppPreferences.setHomeOnboardingCompleted(context, true)
+                }
+            )
         }
     }
 }

@@ -275,6 +275,51 @@ fun AnimeDetailScreen(
                 onDismiss = { viewModel.closeFullScreenImage() }
             )
         }
+
+        // 5. Spotlight Coachmark Onboarding for AnimeDetailScreen
+        var showDetailOnboarding by remember {
+            mutableStateOf(!com.yuranime.dinz.data.local.AppPreferences.isDetailOnboardingCompleted(context))
+        }
+        val detailSteps = remember {
+            listOf(
+                com.yuranime.dinz.ui.components.CoachmarkStep(
+                    title = "Informasi & Daftar Episode",
+                    description = "Lihat sinopsis lengkap, skor rating, genre, dan pilih nomor episode yang ingin kamu tonton langsung.",
+                    relativeLeft = 0.04f,
+                    relativeTop = 0.38f,
+                    relativeWidth = 0.92f,
+                    relativeHeight = 0.25f,
+                    cornerRadiusDp = 14f
+                ),
+                com.yuranime.dinz.ui.components.CoachmarkStep(
+                    title = "Tombol Putar Cepat & Favorit",
+                    description = "Mulai streaming instan dari episode terakhir yang kamu tonton atau bookmark ke daftar favoritmu.",
+                    relativeLeft = 0.04f,
+                    relativeTop = 0.22f,
+                    relativeWidth = 0.92f,
+                    relativeHeight = 0.12f,
+                    cornerRadiusDp = 14f
+                ),
+                com.yuranime.dinz.ui.components.CoachmarkStep(
+                    title = "Tab Season, Cuplix & Poster",
+                    description = "Ganti musim tayang, tonton video pendek cuplix dari anime ini, atau unduh poster resolusi tinggi.",
+                    relativeLeft = 0.04f,
+                    relativeTop = 0.65f,
+                    relativeWidth = 0.92f,
+                    relativeHeight = 0.22f,
+                    cornerRadiusDp = 14f
+                )
+            )
+        }
+
+        com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay(
+            steps = detailSteps,
+            isVisible = showDetailOnboarding && uiState.movieDetail != null,
+            onDismiss = {
+                showDetailOnboarding = false
+                com.yuranime.dinz.data.local.AppPreferences.setDetailOnboardingCompleted(context, true)
+            }
+        )
     }
 }
 

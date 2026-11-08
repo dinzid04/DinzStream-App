@@ -74,6 +74,9 @@ class MainActivity : ComponentActivity() {
                     var selectedStreamingMovieId by remember { mutableStateOf<String?>(null) }
                     var selectedCuplixItem by remember { mutableStateOf<CuplixItem?>(null) }
                     var selectedBirthdayItem by remember { mutableStateOf<com.yuranime.dinz.data.api.BirthdayCharacterItem?>(null) }
+                    var selectedComicChapterId by remember { mutableStateOf<String?>(null) }
+                    var selectedComicId by remember { mutableStateOf<String?>(null) }
+                    var showAllComics by remember { mutableStateOf(false) }
                     var currentTab by remember { mutableStateOf(NavTab.HOME) }
                     var pendingUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
 
@@ -91,6 +94,30 @@ class MainActivity : ComponentActivity() {
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         when {
+                            selectedComicChapterId != null -> {
+                                key(selectedComicChapterId) {
+                                    com.yuranime.dinz.ui.comic.ComicReaderScreen(
+                                        chapterId = selectedComicChapterId!!,
+                                        comicId = selectedComicId,
+                                        onBackClick = { selectedComicChapterId = null }
+                                    )
+                                }
+                            }
+                            selectedComicId != null -> {
+                                key(selectedComicId) {
+                                    com.yuranime.dinz.ui.comic.ComicDetailScreen(
+                                        comicId = selectedComicId!!,
+                                        onBackClick = { selectedComicId = null },
+                                        onChapterClick = { chId -> selectedComicChapterId = chId }
+                                    )
+                                }
+                            }
+                            showAllComics -> {
+                                com.yuranime.dinz.ui.comic.ComicViewAllScreen(
+                                    onBackClick = { showAllComics = false },
+                                    onComicClick = { cId -> selectedComicId = cId }
+                                )
+                            }
                             selectedBirthdayItem != null -> {
                                 key(selectedBirthdayItem?.detailUrl) {
                                     com.yuranime.dinz.ui.detail.BirthdayDetailScreen(
@@ -194,6 +221,15 @@ class MainActivity : ComponentActivity() {
                                             },
                                             onBirthdayClick = { bItem ->
                                                 selectedBirthdayItem = bItem
+                                            },
+                                            onComicClick = { cId ->
+                                                selectedComicId = cId
+                                            },
+                                            onComicChapterClick = { chId ->
+                                                selectedComicChapterId = chId
+                                            },
+                                            onOpenAllComics = {
+                                                showAllComics = true
                                             },
                                             viewModel = homeViewModel
                                         )

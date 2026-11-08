@@ -149,17 +149,21 @@ fun LoginProfileScreen(
     var currentSubScreen by remember { mutableStateOf(ProfileSubScreen.MAIN) }
     var isLoggingIn by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
-    var showEmailLoginDialog by remember { mutableStateOf(false) }
 
-    // Real-Time Firebase Auth State (100% Reactive)
+    // Inisialisasi sesi login tersimpan dari preferensi lokal
+    LaunchedEffect(Unit) {
+        FirebaseManager.initSession(context)
+    }
+
+    // Real-Time Auth / Google Session State
     val currentUser by FirebaseManager.currentUser.collectAsState()
-    val isFirebaseLoggedIn = currentUser != null
+    val googleSession by FirebaseManager.googleSession.collectAsState()
+    val isUserLoggedIn = currentUser != null || googleSession != null
     val userProfile by FirebaseManager.userProfile.collectAsState()
 
-    // Google Sign-In Client (Menampilkan Dialog Pemilih Akun Google Lengkap dengan Avatar, Nama & Email)
+    // Google Sign-In Client (Standar Resmi Android)
     val gso = remember {
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken("400464992596-68fde66c88d351699610c1.apps.googleusercontent.com")
             .requestEmail()
             .requestProfile()
             .build()
@@ -174,95 +178,44 @@ fun LoginProfileScreen(
         val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
         try {
             val account = task.getResult(ApiException::class.java)
-            val idToken = account?.idToken
-            val email = account?.email.orEmpty().trim().lowercase()
-            val displayName = account?.displayName?.takeIf { it.isNotBlank() }
-                ?: email.substringBefore("@").split(".", "_", "-")
-                    .filter { it.isNotBlank() }
-                    .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
-                    .ifBlank { "Pengguna Google" }
-            val photoUrl = account?.photoUrl?.toString()
+            if (account != null) {
+                isLoggingIn = true
+                val googleId = account.id ?: account.email.orEmpty().hashCode().toString().replace("-", "x")
+                val email = account.email.orEmpty().trim().lowercase()
+                val displayName = account.displayName?.takeIf { it.isNotBlank() }
+                    ?: email.substringBefore("@").split(".", "_", "-")
+                        .filter { it.isNotBlank() }
+                        .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                        .ifBlank { "Pengguna Google" }
+                val photoUrl = account.photoUrl?.toString()
 
-            if (!idToken.isNullOrBlank()) {
-                isLoggingIn = true
-                FirebaseManager.signInWithGoogleIdToken(
-                    idToken = idToken,
+                // Simpan sebagai sesi login aktif yang sah di aplikasi
+                AppPreferences.saveGoogleSession(context, googleId, displayName, email, photoUrl)
+
+                // Aktifkan profil dan sinkronkan dokumen user ke Firestore real-time
+                FirebaseManager.onGoogleAccountSelected(
+                    uid = googleId,
+                    name = displayName,
                     email = email,
-                    displayName = displayName,
-                    photoUrl = photoUrl,
-                    activity = activity,
-                    onSuccess = {
-                        isLoggingIn = false
-                        Toast.makeText(context, "Selamat datang, $displayName!", Toast.LENGTH_SHORT).show()
-                    },
-                    onError = { err ->
-                        isLoggingIn = false
-                        Toast.makeText(context, err, Toast.LENGTH_LONG).show()
-                        showEmailLoginDialog = true
-                    }
+                    avatar = photoUrl,
+                    idToken = account.idToken
                 )
-            } else if (email.isNotBlank()) {
-                isLoggingIn = true
-                FirebaseManager.signInWithGoogleAccount(
-                    email = email,
-                    displayName = displayName,
-                    photoUrl = photoUrl,
-                    activity = activity,
-                    onSuccess = {
-                        isLoggingIn = false
-                        Toast.makeText(context, "Selamat datang, $displayName!", Toast.LENGTH_SHORT).show()
-                    },
-                    onError = { err ->
-                        isLoggingIn = false
-                        Toast.makeText(context, err, Toast.LENGTH_LONG).show()
-                        showEmailLoginDialog = true
-                    }
-                )
+
+                isLoggingIn = false
+                Toast.makeText(context, "Selamat datang, $displayName!", Toast.LENGTH_SHORT).show()
             } else {
                 isLoggingIn = false
-            }
-        } catch (e: ApiException) {
-            // Jika Play Services error (misalnya kode 10 karena SHA-1 mismatch debug),
-            // fallback langsung ke OAuthProvider yang membuka Google Sign-In web autentikasi
-            if (activity != null) {
-                isLoggingIn = true
-                FirebaseManager.signInWithGoogleProvider(
-                    activity = activity,
-                    onSuccess = {
-                        isLoggingIn = false
-                        Toast.makeText(context, "Selamat datang di Yuranime!", Toast.LENGTH_SHORT).show()
-                    },
-                    onError = { err ->
-                        isLoggingIn = false
-                        Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
-                        showEmailLoginDialog = true
-                    }
-                )
-            } else {
-                isLoggingIn = false
-                showEmailLoginDialog = true
             }
         } catch (e: Exception) {
             isLoggingIn = false
-            if (activity != null) {
-                FirebaseManager.signInWithGoogleProvider(
-                    activity = activity,
-                    onSuccess = {
-                        Toast.makeText(context, "Selamat datang di Yuranime!", Toast.LENGTH_SHORT).show()
-                    },
-                    onError = { err ->
-                        Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
-                        showEmailLoginDialog = true
-                    }
-                )
-            } else {
-                showEmailLoginDialog = true
-            }
         }
     }
 
-    LaunchedEffect(isFirebaseLoggedIn) {
-        if (isFirebaseLoggedIn) {
+    LaunchedEffect(isUserLoggedIn) {
+        if (isUserLoggedIn) {
+            FirebaseManager.startListeningCurrentUser(context)
+        }
+    }
             FirebaseManager.startListeningCurrentUser(context)
         }
     }
@@ -305,7 +258,7 @@ fun LoginProfileScreen(
                 )
             }
             ProfileSubScreen.MAIN -> {
-                if (!isFirebaseLoggedIn) {
+                if (!isUserLoggedIn) {
                     // LAYAR LOGIN (BottomNavBar 100% Tersembunyi)
                     LoginView(
                         isLoggingIn = isLoggingIn,
@@ -319,27 +272,19 @@ fun LoginProfileScreen(
                                     googleSignInLauncher.launch(signInIntent)
                                 }
                             } catch (e: Exception) {
-                                if (activity != null) {
-                                    FirebaseManager.signInWithGoogleProvider(
-                                        activity = activity,
-                                        onSuccess = {
-                                            isLoggingIn = false
-                                            Toast.makeText(context, "Selamat datang di Yuranime!", Toast.LENGTH_SHORT).show()
-                                        },
-                                        onError = { err ->
-                                            isLoggingIn = false
-                                            Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
-                                            showEmailLoginDialog = true
-                                        }
-                                    )
-                                } else {
-                                    isLoggingIn = false
-                                    showEmailLoginDialog = true
-                                }
+                                isLoggingIn = false
                             }
                         },
                         onEmailLoginClick = {
-                            showEmailLoginDialog = true
+                            isLoggingIn = true
+                            try {
+                                googleSignInClient.signOut().addOnCompleteListener {
+                                    val signInIntent = googleSignInClient.signInIntent
+                                    googleSignInLauncher.launch(signInIntent)
+                                }
+                            } catch (e: Exception) {
+                                isLoggingIn = false
+                            }
                         },
                         onGuestLoginClick = {
                             onTabSelected(NavTab.HOME)
@@ -368,7 +313,7 @@ fun LoginProfileScreen(
                             onSettingsMenuClick = { currentSubScreen = ProfileSubScreen.SETTINGS },
                             onInfoMenuClick = { showInfoDialog = true },
                             onLogout = {
-                                FirebaseManager.signOut()
+                                FirebaseManager.signOut(context)
                                 Toast.makeText(context, "Akun berhasil keluar", Toast.LENGTH_SHORT).show()
                             }
                         )
@@ -376,43 +321,6 @@ fun LoginProfileScreen(
                 }
             }
         }
-    }
-
-    if (showEmailLoginDialog) {
-        EmailLoginDialog(
-            onDismiss = { showEmailLoginDialog = false },
-            onSubmit = { email, displayName, password ->
-                isLoggingIn = true
-                FirebaseManager.signInWithGoogleAccount(
-                    email = email,
-                    displayName = displayName,
-                    photoUrl = null,
-                    googleId = null,
-                    passwordOverride = password,
-                    activity = activity,
-                    onSuccess = {
-                        isLoggingIn = false
-                        showEmailLoginDialog = false
-                        Toast.makeText(context, "Selamat datang, $displayName!", Toast.LENGTH_SHORT).show()
-                    },
-                    onError = { err ->
-                        isLoggingIn = false
-                        Toast.makeText(context, err, Toast.LENGTH_LONG).show()
-                    }
-                )
-            },
-            onForgotPassword = { emailToReset ->
-                FirebaseManager.sendPasswordReset(
-                    email = emailToReset,
-                    onSuccess = {
-                        Toast.makeText(context, "Link reset kata sandi telah dikirim ke $emailToReset", Toast.LENGTH_LONG).show()
-                    },
-                    onError = { err ->
-                        Toast.makeText(context, err, Toast.LENGTH_LONG).show()
-                    }
-                )
-            }
-        )
     }
 
     if (showInfoDialog) {
@@ -1356,226 +1264,6 @@ private fun AppInfoModal(onDismiss: () -> Unit) {
                         fontWeight = FontWeight.Bold,
                         fontFamily = SfProFontFamily
                     )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Dialog Masuk Akun / Fallback jika Google Play Services gagal
- */
-@Composable
-private fun EmailLoginDialog(
-    onDismiss: () -> Unit,
-    onSubmit: (email: String, displayName: String, password: String?) -> Unit,
-    onForgotPassword: (email: String) -> Unit = {}
-) {
-    var email by remember { mutableStateOf("") }
-    var displayName by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var isSubmitting by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var infoMessage by remember { mutableStateOf<String?>(null) }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color(0xFF14131D))
-                .border(1.dp, Color(0x338B5CF6), RoundedCornerShape(20.dp))
-                .padding(24.dp)
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Masuk Akun Yuranime",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = "Gunakan email Google atau akun web DinzStream kamu",
-                    color = Color(0xFF94A3B8),
-                    fontSize = 12.5.sp,
-                    fontFamily = SfProFontFamily,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text("Alamat Email", fontSize = 13.sp) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFF8B5CF6),
-                        unfocusedBorderColor = Color(0x33FFFFFF),
-                        focusedLabelColor = Color(0xFFC084FC),
-                        unfocusedLabelColor = Color(0xFF94A3B8),
-                        cursorColor = Color(0xFF8B5CF6)
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = displayName,
-                    onValueChange = { displayName = it },
-                    label = { Text("Nama Tampilan (Opsional)", fontSize = 13.sp) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFF8B5CF6),
-                        unfocusedBorderColor = Color(0x33FFFFFF),
-                        focusedLabelColor = Color(0xFFC084FC),
-                        unfocusedLabelColor = Color(0xFF94A3B8),
-                        cursorColor = Color(0xFF8B5CF6)
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Kata Sandi (Opsional jika sudah punya)", fontSize = 13.sp) },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFF8B5CF6),
-                        unfocusedBorderColor = Color(0x33FFFFFF),
-                        focusedLabelColor = Color(0xFFC084FC),
-                        unfocusedLabelColor = Color(0xFF94A3B8),
-                        cursorColor = Color(0xFF8B5CF6)
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    Text(
-                        text = "Lupa kata sandi?",
-                        color = Color(0xFFC084FC),
-                        fontSize = 12.sp,
-                        fontFamily = SfProFontFamily,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier
-                            .clickable {
-                                if (email.isBlank() || !email.contains("@")) {
-                                    errorMessage = "Isi email di atas terlebih dahulu untuk meminta link reset"
-                                    infoMessage = null
-                                } else {
-                                    errorMessage = null
-                                    infoMessage = "Tautan reset dikirim ke ${email.trim()}"
-                                    onForgotPassword(email.trim())
-                                }
-                            }
-                            .padding(vertical = 4.dp, horizontal = 2.dp)
-                    )
-                }
-
-                if (errorMessage != null) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = errorMessage ?: "",
-                        color = Color(0xFFEF4444),
-                        fontSize = 12.sp,
-                        fontFamily = SfProFontFamily,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                if (infoMessage != null) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = infoMessage ?: "",
-                        color = Color(0xFF10B981),
-                        fontSize = 12.sp,
-                        fontFamily = SfProFontFamily,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    TextButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                    ) {
-                        Text(
-                            text = "Batal",
-                            color = Color(0xFF94A3B8),
-                            fontSize = 14.sp,
-                            fontFamily = SfProFontFamily
-                        )
-                    }
-
-                    Button(
-                        onClick = {
-                            if (email.isBlank() || !email.contains("@")) {
-                                errorMessage = "Harap masukkan alamat email yang valid"
-                                return@Button
-                            }
-                            isSubmitting = true
-                            errorMessage = null
-                            val effectiveName = displayName.ifBlank { email.substringBefore("@") }
-                            val effectivePass = password.ifBlank { null }
-                            onSubmit(email.trim(), effectiveName, effectivePass)
-                        },
-                        enabled = !isSubmitting,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF8B5CF6)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .weight(1.5f)
-                            .height(48.dp)
-                    ) {
-                        if (isSubmitting) {
-                            CircularProgressIndicator(
-                                color = Color.White,
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Text(
-                                text = "Masuk Sekarang",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                fontFamily = SfProFontFamily
-                            )
-                        }
-                    }
                 }
             }
         }
