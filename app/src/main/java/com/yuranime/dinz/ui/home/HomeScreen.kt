@@ -501,42 +501,6 @@ fun HomeScreen(
                     }
                 }
             }
-
-            // Spotlight Coachmark Onboarding for HomeScreen
-            var showHomeOnboarding by remember {
-                mutableStateOf(!AppPreferences.isHomeOnboardingCompleted(context))
-            }
-            val homeSteps = remember {
-                listOf(
-                    CoachmarkStep(
-                        id = "home_slider",
-                        title = "Hero Slider & Tonton Sekarang",
-                        description = "Temukan anime terbaru dan terpopuler pilihan hari ini. Tekan tombol Tonton Sekarang untuk langsung mulai streaming tanpa jeda.",
-                        cornerRadiusDp = 16f,
-                        scrollToIndex = 0
-                    ),
-                    CoachmarkStep(
-                        id = "home_cuplix",
-                        title = "Cuplix (Video Pendek Anime)",
-                        description = "Tonton cuplikan momen seru, adegan lucu, dan pertarungan epik anime favorit dalam format video pendek vertikal yang adiktif.",
-                        cornerRadiusDp = 14f,
-                        scrollToIndex = 2
-                    ),
-                    CoachmarkStep(
-                        id = "home_komik",
-                        title = "Komik Rilisan Terbaru",
-                        description = "Baca update chapter terbaru dari ratusan judul Manga, Manhwa, dan Manhua terpopuler dengan bendera asal negara dan rilis waktu nyata.",
-                        cornerRadiusDp = 14f,
-                        scrollToIndex = 5
-                    ),
-                    CoachmarkStep(
-                        id = "home_navbar",
-                        title = "Menu Navigasi Cepat",
-                        description = "Jelajahi jadwal rilis mingguan, cari genre & studio anime, ikuti chat komunitas, atau kelola unduhan & poin di profil kamu.",
-                        cornerRadiusDp = 24f
-                    )
-                )
-            }
         }
 
         // Floating Clear Liquid Glass Navbar (Mengambang murni 100% di atas konten)
@@ -548,6 +512,42 @@ fun HomeScreen(
                 .align(Alignment.BottomCenter)
                 .onboardingTarget("home_navbar", targetBounds)
         )
+
+        // Spotlight Coachmark Onboarding for HomeScreen
+        var showHomeOnboarding by remember {
+            mutableStateOf(!AppPreferences.isHomeOnboardingCompleted(context))
+        }
+        val homeSteps = remember {
+            listOf(
+                CoachmarkStep(
+                    id = "home_slider",
+                    title = "Hero Slider & Tonton Sekarang",
+                    description = "Temukan anime terbaru dan terpopuler pilihan hari ini. Tekan tombol Tonton Sekarang untuk langsung mulai streaming tanpa jeda.",
+                    cornerRadiusDp = 16f,
+                    scrollToIndex = 0
+                ),
+                CoachmarkStep(
+                    id = "home_cuplix",
+                    title = "Cuplix (Video Pendek Anime)",
+                    description = "Tonton cuplikan momen seru, adegan lucu, dan pertarungan epik anime favorit dalam format video pendek vertikal yang adiktif.",
+                    cornerRadiusDp = 14f,
+                    scrollToIndex = 2
+                ),
+                CoachmarkStep(
+                    id = "home_komik",
+                    title = "Komik Rilisan Terbaru",
+                    description = "Baca update chapter terbaru dari ratusan judul Manga, Manhwa, dan Manhua terpopuler dengan bendera asal negara dan rilis waktu nyata.",
+                    cornerRadiusDp = 14f,
+                    scrollToIndex = 5
+                ),
+                CoachmarkStep(
+                    id = "home_navbar",
+                    title = "Menu Navigasi Cepat",
+                    description = "Jelajahi jadwal rilis mingguan, cari genre & studio anime, ikuti chat komunitas, atau kelola unduhan & poin di profil kamu.",
+                    cornerRadiusDp = 24f
+                )
+            )
+        }
 
         SpotlightCoachmarkOverlay(
             steps = homeSteps,
