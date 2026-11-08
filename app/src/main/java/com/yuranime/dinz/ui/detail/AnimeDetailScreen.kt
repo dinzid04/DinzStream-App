@@ -52,12 +52,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -82,6 +84,9 @@ import com.yuranime.dinz.data.model.CuplixItem
 import com.yuranime.dinz.data.model.EpisodeItem
 import com.yuranime.dinz.data.model.MovieDetail
 import com.yuranime.dinz.data.model.SeasonItem
+import com.yuranime.dinz.ui.components.CoachmarkStep
+import com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay
+import com.yuranime.dinz.ui.components.onboardingTarget
 import com.yuranime.dinz.ui.theme.ColorAccentPrimary
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
 import com.yuranime.dinz.ui.theme.ColorMetricFavorites
@@ -101,6 +106,7 @@ fun AnimeDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val targetBounds = remember { mutableStateMapOf<String, Rect>() }
 
     LaunchedEffect(movieId) {
         viewModel.loadAnimeDetail(movieId)
@@ -176,6 +182,7 @@ fun AnimeDetailScreen(
                         movie = movie,
                         latestEpisode = uiState.latestEpisode,
                         isFavorite = uiState.isFavorite,
+                        targetBounds = targetBounds,
                         onBackClick = onBackClick,
                         onFavoriteClick = { viewModel.toggleFavorite() },
                         onShareClick = {
@@ -200,6 +207,9 @@ fun AnimeDetailScreen(
                         containerColor = ColorBackgroundPrimary,
                         contentColor = ColorAccentPrimary,
                         edgePadding = 16.dp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onboardingTarget("detail_tabs", targetBounds),
                         indicator = { tabPositions ->
                             if (uiState.selectedTab.ordinal < tabPositions.size) {
                                 Box(
@@ -284,39 +294,25 @@ fun AnimeDetailScreen(
         }
         val detailSteps = remember {
             listOf(
-                com.yuranime.dinz.ui.components.CoachmarkStep(
-                    title = "Informasi & Daftar Episode",
-                    description = "Lihat sinopsis lengkap, skor rating, genre, dan pilih nomor episode yang ingin kamu tonton langsung.",
-                    relativeLeft = 0.04f,
-                    relativeTop = 0.38f,
-                    relativeWidth = 0.92f,
-                    relativeHeight = 0.25f,
-                    cornerRadiusDp = 14f
-                ),
-                com.yuranime.dinz.ui.components.CoachmarkStep(
+                CoachmarkStep(
+                    id = "detail_play_fav",
                     title = "Tombol Putar Cepat & Favorit",
                     description = "Mulai streaming instan dari episode terakhir yang kamu tonton atau bookmark ke daftar favoritmu.",
-                    relativeLeft = 0.04f,
-                    relativeTop = 0.22f,
-                    relativeWidth = 0.92f,
-                    relativeHeight = 0.12f,
                     cornerRadiusDp = 14f
                 ),
-                com.yuranime.dinz.ui.components.CoachmarkStep(
-                    title = "Tab Season, Cuplix & Poster",
-                    description = "Ganti musim tayang, tonton video pendek cuplix dari anime ini, atau unduh poster resolusi tinggi.",
-                    relativeLeft = 0.04f,
-                    relativeTop = 0.65f,
-                    relativeWidth = 0.92f,
-                    relativeHeight = 0.22f,
-                    cornerRadiusDp = 14f
+                CoachmarkStep(
+                    id = "detail_tabs",
+                    title = "Informasi & Tab Lengkap",
+                    description = "Pilih tab INFO untuk sinopsis, EPISODE untuk daftar episode tayang, atau tab SEASON, CUPLIX, dan POSTER untuk konten lainnya.",
+                    cornerRadiusDp = 12f
                 )
             )
         }
 
-        com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay(
+        SpotlightCoachmarkOverlay(
             steps = detailSteps,
             isVisible = showDetailOnboarding && uiState.movieDetail != null,
+            targetBounds = targetBounds,
             onDismiss = {
                 showDetailOnboarding = false
                 com.yuranime.dinz.data.local.AppPreferences.setDetailOnboardingCompleted(context, true)
@@ -335,7 +331,8 @@ private fun HeroCoverHeader(
     onBackClick: () -> Unit,
     onFavoriteClick: () -> Unit,
     onShareClick: () -> Unit,
-    onPlayClick: () -> Unit
+    onPlayClick: () -> Unit,
+    targetBounds: MutableMap<String, Rect>? = null
 ) {
     Box(
         modifier = Modifier
@@ -523,6 +520,10 @@ private fun HeroCoverHeader(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
+                    .then(
+                        if (targetBounds != null) Modifier.onboardingTarget("detail_play_fav", targetBounds)
+                        else Modifier
+                    )
                     .clickable { onPlayClick() }
                     .padding(4.dp)
             ) {

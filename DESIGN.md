@@ -411,3 +411,107 @@ Berdasarkan referensi visual `/storage/emulated/0/termux/design/reff/Screenshot_
    - Teks grup label (`Genre`, `Theme`, `Demographic`) abu-abu `#6B7280` `12.sp` SF Medium.
    - Teks judul kategori warna gelap `#1E293B` `20.sp` SF Bold (pada Kategori) dan putih bersih pada Karakter.
    - Posisi teks tetap rapi di sisi berlawanan dari karakter ilustrasi sehingga terbaca sempurna tanpa menutupi wajah karakter.
+
+---
+
+## 15. SPESIFIKASI FITUR 12: Redesign Floating Bottom Navigation Bar "Liquid Glass" (Adaptasi quickLiquid)
+
+Mengacu pada repositori `amarnath3003/quickLiquid` dan rekaman referensi `/storage/emulated/0/termux/design/reff/VID-20261108-WA0016.mp4`:
+
+### A. Tata Letak & Perilaku Navigasi (Floating Pill + Active Label Only)
+1. **Wadah Mengambang (Floating Bar):**
+   - Mengambang di atas konten dengan jarak `padding(horizontal = 20.dp, bottom = 20.dp)` dan `navigationBarsPadding()`.
+   - Bentuk kapsul penuh membulat (`RoundedCornerShape(50)` / `CircleShape`), tinggi `64.dp`.
+2. **Item Navigasi (Active = Icon + Judul, Inactive = Icon Saja):**
+   - **Tab Aktif (Active Tab):**
+     - Dibungkus kapsul lensa Liquid Glass yang menonjol di dalam bar navigasi.
+     - Menampilkan baris horizontal (`Row`): Ikon Filled (Solid) di kiri + Teks Judul Halaman di kanan (`Home`, `Jadwal`, `Cari`, `Chat`, `Profile`) dengan font **SF Bold** `13.sp` putih `#FFFFFF`.
+     - Animasi dinamis: Memanjang dan menyusut menggunakan `AnimatedVisibility` serta `animateContentSize(spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))` untuk efek *spring physics / squash and stretch*.
+   - **Tab Tidak Aktif (Inactive Tabs):**
+     - **Hanya menampilkan Ikon Outline saja** tanpa teks judul sama sekali.
+     - Warna ikon abu-abu kebiruan `#8E95A5`, ukuran `22.dp`, dengan area sentuh minimum `48.dp` memenuhi aturan aksesibilitas R-03.
+
+### B. Implementasi Optik "Liquid Glass"
+1. **Translucent Dark Base & Refractive Bezel:**
+   - Permukaan dasar kaca cair gelap transparan `Color(0xD90E1116)`.
+   - Rim highlight fresnel specular di bibir atas-kiri dengan gradasi `Brush.verticalGradient(listOf(Color(0x59FFFFFF), Color(0x14FFFFFF)))`.
+   - Efek pembiasan tepi lensa (*refractive edge*) di mana bagian tengah kapsul bening dan tepi membiaskan konten.
+   - Pada Android 13+ (API 33+) memanfaatkan runtime shader/render effect, serta fallback multi-layer canvas specular highlight yang efisien untuk versi Android sebelumnya.
+
+---
+
+## 16. SPESIFIKASI FITUR 13: Perbaikan Total Sistem Koordinat Spotlight Onboarding (Dynamic Measurement)
+
+Berdasarkan analisis screenshot bug `/storage/emulated/0/termux/design/reff/Screenshot_20261108_112037_Yuranime.jpg` hingga `112107`:
+
+### A. Larangan Hardcoded Offset & Sistem Pengukuran Real-Time
+1. **Dilarang keras memakai offset tebakan / persentase layar statis!**
+2. **State Map & Modifier Target:**
+   - Dibuat state map `val targetBounds = remember { mutableStateMapOf<String, Rect>() }`.
+   - Dibuat modifier extension `Modifier.onboardingTarget(id: String, targetBounds: MutableMap<String, Rect>)` yang mengukur `coordinates.boundsInRoot()` secara presisi begitu komponen ter-attach ke layout tree.
+3. **Pemasangan Target di Setiap Layar:**
+   - **HomeScreen:**
+     - `"home_slider"` pada Hero Slider.
+     - `"home_cuplix"` pada section Cuplix.
+     - `"home_komik"` pada section Komik Terbaru.
+     - `"home_navbar"` pada Liquid Glass Bottom Navbar.
+   - **AnimeDetailScreen:**
+     - `"detail_play_fav"` pada baris tombol Play dan Favorite.
+     - `"detail_tabs"` pada deretan Tab Navigation (INFO, EPISODE, SEASON, CUPLIX, POSTER, COVER).
+   - **StreamingScreen:**
+     - `"stream_player_settings"` pada Video Player / Ikon Gerigi kontrol.
+     - `"stream_episodes"` pada Pemilih Episode.
+     - `"stream_comments"` pada area Komentar.
+   - **SearchScreen:**
+     - `"search_input"` pada kolom input pencarian judul.
+     - `"search_categories"` pada kontainer filter Kategori, Tahun, dan Studio.
+
+### B. Auto-Scroll LazyList Sebelum Sorotan Ditampilkan
+1. Untuk target yang posisinya berada di bawah viewport (seperti `"home_komik"` di HomeScreen), aplikasi memanggil `lazyListState.animateScrollToItem(targetIndex)` terlebih dahulu.
+2. Menunggu animasi scroll selesai (`delay(150)`), kemudian membaca nilai `targetBounds[id]` terbaru sehingga kotak sorotan merah membungkus 100% tepat pada elemen fisiknya.
+
+### C. Posisi Tooltip Card Dinamis
+1. Jika elemen target berada di paruh atas layar (`targetRect.center.y < screenHeight / 2`):
+   - Tempatkan Tooltip Card tepat di bawah elemen target (`targetRect.bottom + 16.dp`).
+2. Jika elemen target berada di paruh bawah layar:
+   - Tempatkan Tooltip Card tepat di atas elemen target (`targetRect.top - cardHeight - 16.dp`).
+   - Mencegah tooltip card menutupi elemen yang sedang disorot.
+
+---
+
+## 17. SPESIFIKASI FITUR 14: Tata Letak Komik Terbaru Grid 2 Kolom (Total 8 Poster, Tanpa Slider)
+
+Berdasarkan referensi visual `/storage/emulated/0/termux/design/reff/Screenshot_20261108_112400_Yuranime.jpg`:
+
+### A. Rombak Struktur dari Slider Menjadi Grid Vertikal
+1. Hapus `LazyRow` / slider horizontal pada `Komik Terbaru`.
+2. Ambil tepat 8 judul komik terbaru (`comics.take(8)`).
+3. Susun menjadi 4 baris ke bawah menggunakan `Column(verticalArrangement = Arrangement.spacedBy(10.dp))`.
+4. Setiap baris berisi 2 kartu komik berdampingan dengan `Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp))` di mana setiap kartu menggunakan `Modifier.weight(1f)`.
+
+### B. Desain Kartu Komik Padat & Tanpa Overlay Belakang
+1. **Sisi Kiri (Poster Komik):**
+   - Lebar poster tetap `62.dp`, rasio `aspectRatio(2f/3f)`, sudut `RoundedCornerShape(6.dp)`, `ContentScale.Crop`.
+   - **DILARANG menambahkan overlay warna atau gradasi gelap di belakang atau di atas poster komik!** Poster harus tampil bersih dan murni.
+2. **Sisi Kanan (`Modifier.weight(1f)`):**
+   - **Judul Komik:** Font **SF Bold** putih `12.sp`, `maxLines = 2`, `overflow = TextOverflow.Ellipsis`, line height `14.sp`.
+   - **Bendera Negara:** Berukuran `16.dp x 11.dp` tepat di bawah judul (China untuk Manhua, Jepang untuk Manga, Korea untuk Manhwa).
+   - **3 Chapter Terbaru (Rapat Presisi):** Jarak `4.dp` di bawah bendera, 3 baris chapter:
+     - Kiri: Titik bulat oranye kecil `#FF5722` + `CH. [Nomor]` (font **SF Bold** putih `10.sp`).
+     - Kanan: Waktu rilis singkat (`9.sp` warna abu-abu `#64748B`, `maxLines = 1`).
+
+---
+
+## 18. SPESIFIKASI FITUR 15: Perbaikan Gambar Kategori & Tahun di SearchScreen (Anti-Zoom Glitch)
+
+### A. Analisis Masalah
+- Ketika layar tidak di-scroll, Coil ImageRequest yang menggunakan `crossfade(true)` dan kalkulasi dimensi dinamis mengalami penyesuaian ukuran ulang saat recomposition/layout settling, menyebabkan gambar seolah "nge-zoom" atau melompat secara tiba-tiba.
+
+### B. Solusi Kunci Dimensi & Decode Size
+1. Hapus semua modifier skala dinamis atau penyesuaian ukuran yang terikat state scroll.
+2. Konfigurasi `ImageRequest` pada `AsyncImage` di `WhiteCategoryCard`, `WhiteYearCard`, dan `DarkCharacterCard`:
+   - `.size(coil.size.Size.ORIGINAL)`
+   - `.crossfade(false)`
+3. Kunci tinggi wadah kartu secara statis: `Modifier.fillMaxWidth().height(90.dp).clip(RoundedCornerShape(12.dp))`.
+4. Gunakan `contentScale = ContentScale.FillHeight` (atau `ContentScale.Fit` dengan `Alignment.CenterEnd` untuk Kategori/Karakter dan `Alignment.CenterStart` untuk Tahun).
+5. Gambar tidak akan pernah meloncat atau nge-zoom saat diam maupun saat di-scroll.

@@ -92,12 +92,14 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -126,10 +128,13 @@ import coil.decode.ImageDecoderDecoder
 import coil.request.ImageRequest
 import com.yuranime.dinz.R
 import com.yuranime.dinz.data.local.LocalAuthDatabase
-import java.util.Locale
 import com.yuranime.dinz.data.model.CommunityMediaItem
 import com.yuranime.dinz.data.model.EpisodeCommentItem
 import com.yuranime.dinz.data.model.ServerItem
+import com.yuranime.dinz.ui.components.CoachmarkStep
+import com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay
+import com.yuranime.dinz.ui.components.onboardingTarget
+import java.util.Locale
 import com.yuranime.dinz.ui.theme.ColorAccentPrimary
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
 import com.yuranime.dinz.ui.theme.ColorMetricFavorites
@@ -155,6 +160,7 @@ fun StreamingScreen(
     val context = LocalContext.current
     val activity = context as? ComponentActivity
     val episodeRowState = rememberLazyListState()
+    val targetBounds = remember { mutableStateMapOf<String, Rect>() }
 
     val prefs = remember { context.getSharedPreferences("yuranime_ui_prefs", android.content.Context.MODE_PRIVATE) }
     LaunchedEffect(Unit) {
@@ -295,6 +301,7 @@ fun StreamingScreen(
                             else Modifier.aspectRatio(16f / 9f)
                         )
                         .background(Color.Black)
+                        .onboardingTarget("stream_player_settings", targetBounds)
                 ) {
                     CustomExoPlayerView(
                         server = uiState.selectedServer,
@@ -548,6 +555,7 @@ fun StreamingScreen(
                                         Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .onboardingTarget("stream_episodes", targetBounds)
                                                 .padding(top = 4.dp, bottom = 4.dp)
                                         ) {
                                             // Header Bar: EPISODE • Total + Inline Search Pill + Toggle View Mode (1 Baris Rapi)
@@ -1013,28 +1021,34 @@ fun StreamingScreen(
 
                                     // Section: COMMENTS (X)
                                     item(key = "comments_header") {
-                                        Spacer(modifier = Modifier.height(20.dp))
-                                        Row(
+                                        Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(horizontal = 16.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
+                                                .onboardingTarget("stream_comments", targetBounds)
                                         ) {
-                                            Text(
-                                                text = "COMMENTS (${uiState.comments.size})",
-                                                color = ColorTextPrimary,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Default.Sort,
-                                                contentDescription = "Sort",
-                                                tint = ColorTextSecondary,
-                                                modifier = Modifier.size(18.dp)
-                                            )
+                                            Spacer(modifier = Modifier.height(20.dp))
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 16.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "COMMENTS (${uiState.comments.size})",
+                                                    color = ColorTextPrimary,
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Icon(
+                                                    imageVector = Icons.Default.Sort,
+                                                    contentDescription = "Sort",
+                                                    tint = ColorTextSecondary,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(10.dp))
                                         }
-                                        Spacer(modifier = Modifier.height(10.dp))
                                     }
 
                                     // Comments Items
@@ -1168,39 +1182,31 @@ fun StreamingScreen(
         }
         val streamingSteps = remember {
             listOf(
-                com.yuranime.dinz.ui.components.CoachmarkStep(
+                CoachmarkStep(
+                    id = "stream_player_settings",
                     title = "Pengaturan Pemutar Video",
                     description = "Sentuh ikon gerigi untuk mengganti resolusi video (360p s/d 1080p), kecepatan pemutaran, server cadangan, atau auto-next.",
-                    relativeLeft = 0.70f,
-                    relativeTop = 0.04f,
-                    relativeWidth = 0.26f,
-                    relativeHeight = 0.08f,
                     cornerRadiusDp = 12f
                 ),
-                com.yuranime.dinz.ui.components.CoachmarkStep(
+                CoachmarkStep(
+                    id = "stream_episodes",
                     title = "Daftar Episode Tayang",
                     description = "Pindah ke episode berikutnya atau episode sebelumnya dengan cepat tanpa harus keluar dari layar pemutar video.",
-                    relativeLeft = 0.04f,
-                    relativeTop = 0.38f,
-                    relativeWidth = 0.92f,
-                    relativeHeight = 0.22f,
                     cornerRadiusDp = 14f
                 ),
-                com.yuranime.dinz.ui.components.CoachmarkStep(
+                CoachmarkStep(
+                    id = "stream_comments",
                     title = "Ruang Komentar & Reaksi",
                     description = "Tulis komentar, berikan reaksi, dan diskusikan jalan cerita episode ini bersama sesama pecinta anime di seluruh Indonesia.",
-                    relativeLeft = 0.04f,
-                    relativeTop = 0.65f,
-                    relativeWidth = 0.92f,
-                    relativeHeight = 0.25f,
                     cornerRadiusDp = 14f
                 )
             )
         }
 
-        com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay(
+        SpotlightCoachmarkOverlay(
             steps = streamingSteps,
             isVisible = showStreamingOnboarding && !uiState.isFullScreen,
+            targetBounds = targetBounds,
             onDismiss = {
                 showStreamingOnboarding = false
                 com.yuranime.dinz.data.local.AppPreferences.setStreamingOnboardingCompleted(context, true)

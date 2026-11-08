@@ -54,12 +54,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -84,8 +86,11 @@ import com.yuranime.dinz.data.model.ExploreGenreItem
 import com.yuranime.dinz.data.model.ExploreYearItem
 import com.yuranime.dinz.ui.components.AnimeVerticalCard
 import com.yuranime.dinz.ui.components.BottomNavBar
+import com.yuranime.dinz.ui.components.CoachmarkStep
 import com.yuranime.dinz.ui.components.CuplixAvatarItem
 import com.yuranime.dinz.ui.components.NavTab
+import com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay
+import com.yuranime.dinz.ui.components.onboardingTarget
 import com.yuranime.dinz.ui.theme.ColorAccentPrimary
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
 import com.yuranime.dinz.ui.theme.ColorMetricFavorites
@@ -109,6 +114,7 @@ fun SearchScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
+    val targetBounds = remember { mutableStateMapOf<String, Rect>() }
 
     BackHandler(enabled = uiState.selectedSubPage != null || uiState.isSearchActive) {
         if (uiState.selectedSubPage != null) {
@@ -185,6 +191,7 @@ fun SearchScreen(
                                 .clip(RoundedCornerShape(22.dp))
                                 .background(Color(0xFF161922))
                                 .border(width = 1.dp, color = Color(0x33FFFFFF), shape = RoundedCornerShape(22.dp))
+                                .onboardingTarget("search_input", targetBounds)
                                 .padding(horizontal = 14.dp),
                             contentAlignment = Alignment.CenterStart
                         ) {
@@ -266,7 +273,9 @@ fun SearchScreen(
                         PullToRefreshBox(
                             isRefreshing = uiState.isRefreshing,
                             onRefresh = { viewModel.refreshExploreData() },
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .onboardingTarget("search_categories", targetBounds)
                         ) {
                             ExploreDefaultContent(
                                 genres = uiState.genres,
@@ -349,39 +358,25 @@ fun SearchScreen(
             }
             val searchSteps = remember {
                 listOf(
-                    com.yuranime.dinz.ui.components.CoachmarkStep(
+                    CoachmarkStep(
+                        id = "search_input",
                         title = "Kolom Pencarian Pintar",
                         description = "Ketik judul anime, judul alternatif, atau nama karakter untuk menemukan tontonanmu secara instan.",
-                        relativeLeft = 0.04f,
-                        relativeTop = 0.01f,
-                        relativeWidth = 0.92f,
-                        relativeHeight = 0.08f,
-                        cornerRadiusDp = 12f
+                        cornerRadiusDp = 22f
                     ),
-                    com.yuranime.dinz.ui.components.CoachmarkStep(
+                    CoachmarkStep(
+                        id = "search_categories",
                         title = "Filter Kategori, Tahun & Studio",
                         description = "Temukan anime berdasarkan kategori tema, tahun rilis, hingga studio animasi favorit seperti MAPPA atau Ufotable.",
-                        relativeLeft = 0.04f,
-                        relativeTop = 0.12f,
-                        relativeWidth = 0.92f,
-                        relativeHeight = 0.40f,
                         cornerRadiusDp = 14f
-                    ),
-                    com.yuranime.dinz.ui.components.CoachmarkStep(
-                        title = "Sortir & Mode Tampilan Grid/List",
-                        description = "Atur urutan rekomendasi berdasarkan penonton terbanyak, serta ganti tampilan antara grid 3-kolom atau daftar vertikal.",
-                        relativeLeft = 0.04f,
-                        relativeTop = 0.58f,
-                        relativeWidth = 0.92f,
-                        relativeHeight = 0.12f,
-                        cornerRadiusDp = 12f
                     )
                 )
             }
 
-            com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay(
+            SpotlightCoachmarkOverlay(
                 steps = searchSteps,
                 isVisible = showSearchOnboarding && uiState.selectedSubPage == null,
+                targetBounds = targetBounds,
                 onDismiss = {
                     showSearchOnboarding = false
                     com.yuranime.dinz.data.local.AppPreferences.setSearchOnboardingCompleted(context, true)
@@ -875,7 +870,7 @@ private fun WhiteCategoryCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(92.dp)
+            .height(90.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
     ) {
@@ -884,12 +879,13 @@ private fun WhiteCategoryCard(
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(imageUrl)
-                    .crossfade(true)
+                    .size(coil.size.Size.ORIGINAL)
+                    .crossfade(false)
                     .placeholder(R.drawable.placeholder_yuranime_wide)
                     .error(R.drawable.placeholder_yuranime_wide)
                     .build(),
                 contentDescription = name,
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.FillHeight,
                 alignment = Alignment.CenterEnd,
                 modifier = Modifier.fillMaxSize()
             )
@@ -935,7 +931,7 @@ private fun WhiteYearCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(92.dp)
+            .height(90.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
     ) {
@@ -944,12 +940,13 @@ private fun WhiteYearCard(
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(imageUrl)
-                    .crossfade(true)
+                    .size(coil.size.Size.ORIGINAL)
+                    .crossfade(false)
                     .placeholder(R.drawable.placeholder_yuranime_wide)
                     .error(R.drawable.placeholder_yuranime_wide)
                     .build(),
                 contentDescription = year,
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.FillHeight,
                 alignment = Alignment.CenterStart,
                 modifier = Modifier.fillMaxSize()
             )
@@ -985,7 +982,7 @@ private fun DarkCharacterCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(92.dp)
+            .height(90.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(cardBg)
             .clickable(onClick = onClick)
@@ -1001,12 +998,13 @@ private fun DarkCharacterCard(
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(imageUrl)
-                        .crossfade(true)
+                        .size(coil.size.Size.ORIGINAL)
+                        .crossfade(false)
                         .placeholder(R.drawable.placeholder_yuranime)
                         .error(R.drawable.placeholder_yuranime)
                         .build(),
                     contentDescription = name,
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.FillHeight,
                     alignment = Alignment.CenterEnd,
                     modifier = Modifier.fillMaxSize()
                 )

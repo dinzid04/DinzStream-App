@@ -39,13 +39,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -65,6 +68,7 @@ import com.yuranime.dinz.data.model.CuplixItem
 import com.yuranime.dinz.ui.components.AnimeVerticalCard
 import com.yuranime.dinz.ui.components.AnimeWideCard
 import com.yuranime.dinz.ui.components.BottomNavBar
+import com.yuranime.dinz.ui.components.CoachmarkStep
 import com.yuranime.dinz.ui.components.ContinueWatchingCard
 import com.yuranime.dinz.ui.components.CuplixAvatarItem
 import com.yuranime.dinz.ui.components.HomeErrorState
@@ -72,8 +76,10 @@ import com.yuranime.dinz.ui.components.HomeShimmerLoading
 import com.yuranime.dinz.ui.components.NavTab
 import com.yuranime.dinz.ui.components.PopularLeaderboardCard
 import com.yuranime.dinz.ui.components.SectionHeader
+import com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay
 import com.yuranime.dinz.ui.components.YuranimeAnimatedLogo
 import com.yuranime.dinz.ui.components.YuranimeHeroSlider
+import com.yuranime.dinz.ui.components.onboardingTarget
 import com.yuranime.dinz.ui.theme.ColorAccentPrimary
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
 import com.yuranime.dinz.ui.theme.ColorMetricFavorites
@@ -146,13 +152,18 @@ fun HomeScreen(
         return
     }
 
+    val targetBounds = remember { mutableStateMapOf<String, Rect>() }
+    val coroutineScope = rememberCoroutineScope()
+    val homeLazyListState = rememberLazyListState()
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = ColorBackgroundPrimary,
         bottomBar = {
             BottomNavBar(
                 selectedTab = selectedTab,
-                onTabSelected = onTabSelected
+                onTabSelected = onTabSelected,
+                modifier = Modifier.onboardingTarget("home_navbar", targetBounds)
             )
         }
     ) { innerPadding ->
@@ -176,13 +187,18 @@ fun HomeScreen(
 
                 else -> {
                     LazyColumn(
+                        state = homeLazyListState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
                         // 1. Top Hero Slider Gaya Yuranime (Data dari Jadwal Hari Ini)
                         item(key = "piupiu_hero_slider") {
                             val sliderAnimeList = uiState.todayScheduleList.ifEmpty { uiState.newEpisodesList }
-                            Box(modifier = Modifier.fillMaxWidth()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onboardingTarget("home_slider", targetBounds)
+                            ) {
                                 YuranimeHeroSlider(
                                     items = sliderAnimeList,
                                     sliderMode = sliderMode,
@@ -266,25 +282,31 @@ fun HomeScreen(
                         // 3. Section "Cuplix" (Horizontal row of circular items)
                         if (uiState.cuplixList.isNotEmpty()) {
                             item(key = "section_cuplix") {
-                                Spacer(modifier = Modifier.height(14.dp))
-                                SectionHeader(
-                                    title = "Cuplix",
-                                    showChevron = false
-                                )
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 12.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .onboardingTarget("home_cuplix", targetBounds)
                                 ) {
-                                    items(
-                                        items = uiState.cuplixList,
-                                        key = { it.id ?: it.hashCode().toString() }
-                                    ) { cuplixItem ->
-                                        CuplixAvatarItem(
-                                            item = cuplixItem,
-                                            onClick = {
-                                                onCuplixClick(cuplixItem)
-                                            }
-                                        )
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    SectionHeader(
+                                        title = "Cuplix",
+                                        showChevron = false
+                                    )
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 12.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        items(
+                                            items = uiState.cuplixList,
+                                            key = { it.id ?: it.hashCode().toString() }
+                                        ) { cuplixItem ->
+                                            CuplixAvatarItem(
+                                                item = cuplixItem,
+                                                onClick = {
+                                                    onCuplixClick(cuplixItem)
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -346,17 +368,23 @@ fun HomeScreen(
                         // 6. Section Komik Rilisan Terbaru (Menggantikan Judul Baru)
                         if (uiState.comicsList.isNotEmpty()) {
                             item(key = "section_comics") {
-                                Spacer(modifier = Modifier.height(18.dp))
-                                SectionHeader(
-                                    title = "Komik Terbaru",
-                                    onChevronClick = onOpenAllComics
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                ComicLatestSection(
-                                    comics = uiState.comicsList,
-                                    onComicClick = onComicClick,
-                                    onChapterClick = onComicChapterClick
-                                )
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .onboardingTarget("home_komik", targetBounds)
+                                ) {
+                                    Spacer(modifier = Modifier.height(18.dp))
+                                    SectionHeader(
+                                        title = "Komik Terbaru",
+                                        onChevronClick = onOpenAllComics
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    ComicLatestSection(
+                                        comics = uiState.comicsList,
+                                        onComicClick = onComicClick,
+                                        onChapterClick = onComicChapterClick
+                                    )
+                                }
                             }
                         }
 
@@ -482,52 +510,51 @@ fun HomeScreen(
             }
             val homeSteps = remember {
                 listOf(
-                    com.yuranime.dinz.ui.components.CoachmarkStep(
+                    CoachmarkStep(
+                        id = "home_slider",
                         title = "Hero Slider & Tonton Sekarang",
                         description = "Temukan anime terbaru dan terpopuler pilihan hari ini. Tekan tombol Tonton Sekarang untuk langsung mulai streaming tanpa jeda.",
-                        relativeLeft = 0.04f,
-                        relativeTop = 0.06f,
-                        relativeWidth = 0.92f,
-                        relativeHeight = 0.38f,
-                        cornerRadiusDp = 16f
+                        cornerRadiusDp = 16f,
+                        scrollToIndex = 0
                     ),
-                    com.yuranime.dinz.ui.components.CoachmarkStep(
+                    CoachmarkStep(
+                        id = "home_cuplix",
                         title = "Cuplix (Video Pendek Anime)",
                         description = "Tonton cuplikan momen seru, adegan lucu, dan pertarungan epik anime favorit dalam format video pendek vertikal yang adiktif.",
-                        relativeLeft = 0.04f,
-                        relativeTop = 0.45f,
-                        relativeWidth = 0.92f,
-                        relativeHeight = 0.12f,
-                        cornerRadiusDp = 14f
+                        cornerRadiusDp = 14f,
+                        scrollToIndex = 2
                     ),
-                    com.yuranime.dinz.ui.components.CoachmarkStep(
+                    CoachmarkStep(
+                        id = "home_komik",
                         title = "Komik Rilisan Terbaru",
                         description = "Baca update chapter terbaru dari ratusan judul Manga, Manhwa, dan Manhua terpopuler dengan bendera asal negara dan rilis waktu nyata.",
-                        relativeLeft = 0.04f,
-                        relativeTop = 0.58f,
-                        relativeWidth = 0.92f,
-                        relativeHeight = 0.22f,
-                        cornerRadiusDp = 14f
+                        cornerRadiusDp = 14f,
+                        scrollToIndex = 5
                     ),
-                    com.yuranime.dinz.ui.components.CoachmarkStep(
+                    CoachmarkStep(
+                        id = "home_navbar",
                         title = "Menu Navigasi Cepat",
                         description = "Jelajahi jadwal rilis mingguan, cari genre & studio anime, ikuti chat komunitas, atau kelola unduhan & poin di profil kamu.",
-                        relativeLeft = 0.03f,
-                        relativeTop = 0.90f,
-                        relativeWidth = 0.94f,
-                        relativeHeight = 0.08f,
-                        cornerRadiusDp = 20f,
-                        isBottomNavTarget = true
+                        cornerRadiusDp = 24f
                     )
                 )
             }
 
-            com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay(
+            SpotlightCoachmarkOverlay(
                 steps = homeSteps,
                 isVisible = showHomeOnboarding && uiState.activeSectionDetail == null,
                 onDismiss = {
                     showHomeOnboarding = false
                     AppPreferences.setHomeOnboardingCompleted(context, true)
+                },
+                targetBounds = targetBounds,
+                onStepChanged = { step ->
+                    step.scrollToIndex?.let { targetIdx ->
+                        coroutineScope.launch {
+                            homeLazyListState.animateScrollToItem(targetIdx)
+                            kotlinx.coroutines.delay(150)
+                        }
+                    }
                 }
             )
         }
