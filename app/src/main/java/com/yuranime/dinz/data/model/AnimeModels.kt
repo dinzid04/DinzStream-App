@@ -13,10 +13,14 @@ fun normalizeImageUrl(url: String?): String {
         trimmed = "https://xyz-api.animein.net/$trimmed"
     }
 
+    if (trimmed.startsWith("http://")) {
+        trimmed = "https://" + trimmed.removePrefix("http://")
+    }
+
     return if (trimmed.startsWith("https://")) {
-        "https://" + trimmed.removePrefix("https://").replace(Regex("/+"), "/")
-    } else if (trimmed.startsWith("http://")) {
-        "http://" + trimmed.removePrefix("http://").replace(Regex("/+"), "/")
+        val pathWithoutProto = trimmed.removePrefix("https://")
+        val cleanPath = pathWithoutProto.split('/').filter { it.isNotEmpty() }.joinToString("/")
+        "https://$cleanPath"
     } else {
         trimmed
     }
@@ -55,8 +59,8 @@ data class SliderItem(
 data class AnimeItem(
     @SerializedName("id") val id: String? = null,
     @SerializedName("title") val title: String? = null,
-    @SerializedName("image_poster") val imagePoster: String? = null,
-    @SerializedName("image_cover") val imageCover: String? = null,
+    @SerializedName(value = "image_poster", alternate = ["poster", "image"]) val imagePoster: String? = null,
+    @SerializedName(value = "image_cover", alternate = ["cover", "backdrop"]) val imageCover: String? = null,
     @SerializedName("poster") val poster: String? = null,
     @SerializedName("index") val index: String? = null,
     @SerializedName("views") val views: String? = null,
@@ -77,12 +81,18 @@ data class AnimeItem(
     }
 
     fun getEffectivePoster(): String {
-        val raw = imagePoster ?: poster ?: imageCover ?: ""
+        val raw = imagePoster?.takeIf { it.isNotBlank() }
+            ?: poster?.takeIf { it.isNotBlank() }
+            ?: imageCover?.takeIf { it.isNotBlank() }
+            ?: ""
         return normalizeImageUrl(raw)
     }
 
     fun getEffectiveCover(): String {
-        val raw = imageCover ?: imagePoster ?: poster ?: ""
+        val raw = imageCover?.takeIf { it.isNotBlank() }
+            ?: imagePoster?.takeIf { it.isNotBlank() }
+            ?: poster?.takeIf { it.isNotBlank() }
+            ?: ""
         return normalizeImageUrl(raw)
     }
 }
@@ -102,12 +112,12 @@ data class CuplixData(
 data class CuplixItem(
     @SerializedName("id") val id: String? = null,
     @SerializedName("caption") val caption: String? = null,
-    @SerializedName("url_thumbnail") val urlThumbnail: String? = null,
+    @SerializedName(value = "url_thumbnail", alternate = ["thumbnail", "image", "thumb"]) val urlThumbnail: String? = null,
     @SerializedName("id_episode") val idEpisode: String? = null,
     @SerializedName("id_movie") val idMovie: String? = null,
     @SerializedName("anime") val anime: String? = null,
     @SerializedName("episode") val episode: String? = null,
-    @SerializedName("poster") val poster: String? = null,
+    @SerializedName(value = "poster", alternate = ["image_poster", "cover"]) val poster: String? = null,
     @SerializedName(value = "count_views", alternate = ["views", "view", "total_views", "count_view"]) val countViews: String? = null,
     @SerializedName(value = "count_likes", alternate = ["likes", "like", "total_likes", "count_like"]) val countLikes: String? = null,
     @SerializedName(value = "count_comments", alternate = ["comments", "comment", "total_comments", "count_comment"]) val countComments: String? = null,
@@ -118,12 +128,16 @@ data class CuplixItem(
     @SerializedName(value = "is_like", alternate = ["is_liked", "liked"]) val isLike: String? = null
 ) {
     fun getEffectiveThumbnail(): String {
-        val raw = urlThumbnail ?: poster ?: ""
+        val raw = urlThumbnail?.takeIf { it.isNotBlank() }
+            ?: poster?.takeIf { it.isNotBlank() }
+            ?: ""
         return normalizeImageUrl(raw)
     }
 
     fun getEffectivePoster(): String {
-        val raw = poster ?: urlThumbnail ?: ""
+        val raw = poster?.takeIf { it.isNotBlank() }
+            ?: urlThumbnail?.takeIf { it.isNotBlank() }
+            ?: ""
         return normalizeImageUrl(raw)
     }
 
@@ -166,8 +180,8 @@ data class MovieDetail(
     @SerializedName("title") val title: String? = null,
     @SerializedName("synopsis") val synopsis: String? = null,
     @SerializedName("synonyms") val synonyms: String? = null,
-    @SerializedName("image_poster") val imagePoster: String? = null,
-    @SerializedName("image_cover") val imageCover: String? = null,
+    @SerializedName(value = "image_poster", alternate = ["poster", "image"]) val imagePoster: String? = null,
+    @SerializedName(value = "image_cover", alternate = ["cover", "backdrop"]) val imageCover: String? = null,
     @SerializedName("type") val type: String? = null,
     @SerializedName("year") val year: String? = null,
     @SerializedName("day") val day: String? = null,
@@ -196,8 +210,8 @@ data class MovieDetail(
         }
     }
 
-    fun getEffectivePoster(): String = normalizeImageUrl(imagePoster ?: imageCover ?: "")
-    fun getEffectiveCover(): String = normalizeImageUrl(imageCover ?: imagePoster ?: "")
+    fun getEffectivePoster(): String = normalizeImageUrl(imagePoster?.takeIf { it.isNotBlank() } ?: imageCover ?: "")
+    fun getEffectiveCover(): String = normalizeImageUrl(imageCover?.takeIf { it.isNotBlank() } ?: imagePoster ?: "")
 }
 
 data class EpisodeListResponse(
@@ -217,7 +231,7 @@ data class EpisodeItem(
     @SerializedName("views") val views: String? = null,
     @SerializedName("id_movie") val idMovie: String? = null,
     @SerializedName("key_time") val keyTime: String? = null,
-    @SerializedName("image") val image: String? = null,
+    @SerializedName(value = "image", alternate = ["thumbnail", "poster"]) val image: String? = null,
     @SerializedName("is_new") val isNew: String? = null
 ) {
     fun getEffectiveImage(): String = normalizeImageUrl(image ?: "")
@@ -229,15 +243,15 @@ data class SeasonItem(
     @SerializedName("season") val season: String? = null,
     @SerializedName("views") val views: String? = null,
     @SerializedName("favorites") val favorites: String? = null,
-    @SerializedName("image_cover") val imageCover: String? = null,
-    @SerializedName("image_poster") val imagePoster: String? = null,
+    @SerializedName(value = "image_cover", alternate = ["cover", "backdrop"]) val imageCover: String? = null,
+    @SerializedName(value = "image_poster", alternate = ["poster", "image"]) val imagePoster: String? = null,
     @SerializedName("studio") val studio: String? = null,
     @SerializedName("aired_start") val airedStart: String? = null,
     @SerializedName("aired_end") val airedEnd: String? = null,
     @SerializedName("status") val status: String? = null
 ) {
-    fun getEffectiveCover(): String = normalizeImageUrl(imageCover ?: imagePoster ?: "")
-    fun getEffectivePoster(): String = normalizeImageUrl(imagePoster ?: imageCover ?: "")
+    fun getEffectiveCover(): String = normalizeImageUrl(imageCover?.takeIf { it.isNotBlank() } ?: imagePoster ?: "")
+    fun getEffectivePoster(): String = normalizeImageUrl(imagePoster?.takeIf { it.isNotBlank() } ?: imageCover ?: "")
 }
 
 data class CommunityPosterResponse(

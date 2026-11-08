@@ -634,15 +634,19 @@ Berdasarkan 3 gambar referensi `Screenshot_20261108_145758_ANIMEIN.jpg`, `145804
 ## 24. SPESIFIKASI FITUR 21: Isolasi Header Domain Gambar (Fix Gambar AnimeIn 100%) & On/Off Efek Liquid Glass Navbar (Auto Sesuai Versi Android)
 
 ### A. Isolasi Header Interceptor Berdasarkan Domain/Host pada Coil ImageLoader
-1. **Penyebab Bug:** Header `Referer` komik (`https://app.shinigami.asia/`) dan proxy lama `cf1.dinzid.my.id` yang tidak aktif menyebabkan CDN AnimeIn mengembalikan status `HTTP 403 / 530`.
+1. **Penyebab Bug:**
+   - CDN AnimeIn (`api.animein.net`, `xyz-api.animein.net`) dilindungi Cloudflare WAF. Jika request aset gambar mengirim `User-Agent: Mozilla/5.0...` (browser UA) atau header `x-proxy-secret` tanpa validasi JS challenge, Cloudflare menganggapnya sebagai bot dan memblokir dengan `HTTP 403 Forbidden` (`cf-mitigated: challenge`).
+   - Selain itu, header `Referer` komik (`https://app.shinigami.asia/`) dan proxy lama `cf1.dinzid.my.id` yang tidak aktif menyebabkan CDN menolak request (`HTTP 403 / 530`).
 2. **Solusi Interceptor Domain-Isolated:**
    - Di dalam `YuranimeApp.kt` (`newImageLoader()`):
-     - Jika `host` berasal dari domain komik (`shngm`, `shinigami`, `komik`): tambahkan header `Referer: https://app.shinigami.asia/` dan `User-Agent` browser Chrome Android.
-     - Jika `host` berasal dari domain AnimeIn (`animein`, `xyz-api`): hapus header `Referer` (`removeHeader("Referer")`) dan kirim header resmi AnimeIn (`User-Agent` ANIMEIN/5.2.2 + `x-proxy-secret: animein-secure-proxy-key-123`).
-     - Domain lainnya: hapus header `Referer` asing.
-3. **Normalisasi URL Gambar AnimeIn (`normalizeImageUrl`):**
+     - Jika `host` berasal dari domain komik (`shngm`, `shinigami`, `komik`): kirim header `Referer: https://app.shinigami.asia/` dan `User-Agent` browser Chrome Android.
+     - Jika `host` berasal dari domain AnimeIn atau domain lainnya: hapus header `Referer` (`removeHeader("Referer")`), hapus `x-proxy-secret`, dan gunakan User-Agent standar OkHttp (`okhttp/4.12.0`) sehingga Cloudflare WAF meloloskan request gambar secara native tanpa challenge (200 OK).
+   - Inisialisasi Coil ImageLoader global (`Coil.setImageLoader(this)`) pada saat `Application.onCreate()`, serta gunakan cache disk baru `image_cache_v3` untuk membersihkan cache 403 sebelumnya.
+3. **Normalisasi URL Gambar AnimeIn & Fallback Cerdas:**
    - Hapus pembungkus proxy mati `cf1.dinzid.my.id/?url=`.
-   - Normalisasi URL relatif (`//`, `/`, atau tanpa protokol) ke `https://xyz-api.animein.net/` dan bersihkan double slashes (`//assets_xyz/` -> `/assets_xyz/`).
+   - Upgrade otomatis protokol `http://` ke `https://` untuk mencegah redirect 301.
+   - Normalisasi URL relatif (`//`, `/`, atau tanpa protokol) ke `https://xyz-api.animein.net/` dan bersihkan duplikasi slash pada path.
+   - Tambahkan alias Gson (`alternate`) dan fallback rantai `.takeIf { it.isNotBlank() }` pada `imagePoster`, `imageCover`, `poster`, dan `urlThumbnail` di seluruh model data.
    - Hasil: Seluruh gambar AnimeIn (Hero Slider, Cuplix, Episode Baru, Sedang Hangat, Jat For Yu, Paling Dinanti, Jadwal, Detail Anime) DAN Komik muncul 100% secara bersamaan.
 
 ### B. Fitur On/Off Efek "Liquid Glass" pada Floating Bottom Navbar

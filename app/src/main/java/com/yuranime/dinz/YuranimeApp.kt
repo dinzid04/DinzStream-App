@@ -29,6 +29,9 @@ class YuranimeApp : Application(), ImageLoaderFactory {
             } catch (ignored: Exception) {}
         }
         com.yuranime.dinz.data.local.AppPreferences.init(this)
+        try {
+            coil.Coil.setImageLoader(this)
+        } catch (ignored: Exception) {}
     }
 
     override fun newImageLoader(): ImageLoader {
@@ -44,9 +47,6 @@ class YuranimeApp : Application(), ImageLoaderFactory {
                     host.contains("shinigami") ||
                     host.contains("komik")
 
-                val isAnimeInDomain = host.contains("animein") ||
-                    host.contains("xyz-api")
-
                 if (isComicDomain) {
                     requestBuilder
                         .header("Referer", "https://app.shinigami.asia/")
@@ -54,16 +54,11 @@ class YuranimeApp : Application(), ImageLoaderFactory {
                             "User-Agent",
                             "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
                         )
-                } else if (isAnimeInDomain) {
+                } else {
                     requestBuilder
                         .removeHeader("Referer")
-                        .header(
-                            "User-Agent",
-                            "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36 ANIMEIN/5.2.2"
-                        )
-                        .header("x-proxy-secret", "animein-secure-proxy-key-123")
-                } else {
-                    requestBuilder.removeHeader("Referer")
+                        .removeHeader("x-proxy-secret")
+                        .header("User-Agent", "okhttp/4.12.0")
                 }
 
                 chain.proceed(requestBuilder.build())
@@ -86,8 +81,8 @@ class YuranimeApp : Application(), ImageLoaderFactory {
             }
             .diskCache {
                 DiskCache.Builder()
-                    .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(100L * 1024 * 1024)
+                    .directory(cacheDir.resolve("image_cache_v3"))
+                    .maxSizeBytes(150L * 1024 * 1024)
                     .build()
             }
             .crossfade(true)
