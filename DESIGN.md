@@ -628,3 +628,36 @@ Berdasarkan 3 gambar referensi `Screenshot_20261108_145758_ANIMEIN.jpg`, `145804
 
 1. Ubah tampilan `ContinueWatchingCard` di `HomeScreen` dari poster vertikal (`2:3`) menjadi **Cover Horizontal (`16:9`, lebar `185.dp`, sudut `8.dp`)**.
 2. Simpan dan gunakan gambar cover horizontal (`getEffectiveCover()` / thumbnail episode) saat merekam riwayat tontonan di `StreamingScreen` dan `HomeViewModel`.
+
+---
+
+## 24. SPESIFIKASI FITUR 21: Isolasi Header Domain Gambar (Fix Gambar AnimeIn 100%) & On/Off Efek Liquid Glass Navbar (Auto Sesuai Versi Android)
+
+### A. Isolasi Header Interceptor Berdasarkan Domain/Host pada Coil ImageLoader
+1. **Penyebab Bug:** Header `Referer` komik (`https://app.shinigami.asia/`) dan proxy lama `cf1.dinzid.my.id` yang tidak aktif menyebabkan CDN AnimeIn mengembalikan status `HTTP 403 / 530`.
+2. **Solusi Interceptor Domain-Isolated:**
+   - Di dalam `YuranimeApp.kt` (`newImageLoader()`):
+     - Jika `host` berasal dari domain komik (`shngm`, `shinigami`, `komik`): tambahkan header `Referer: https://app.shinigami.asia/` dan `User-Agent` browser Chrome Android.
+     - Jika `host` berasal dari domain AnimeIn (`animein`, `xyz-api`): hapus header `Referer` (`removeHeader("Referer")`) dan kirim header resmi AnimeIn (`User-Agent` ANIMEIN/5.2.2 + `x-proxy-secret: animein-secure-proxy-key-123`).
+     - Domain lainnya: hapus header `Referer` asing.
+3. **Normalisasi URL Gambar AnimeIn (`normalizeImageUrl`):**
+   - Hapus pembungkus proxy mati `cf1.dinzid.my.id/?url=`.
+   - Normalisasi URL relatif (`//`, `/`, atau tanpa protokol) ke `https://xyz-api.animein.net/` dan bersihkan double slashes (`//assets_xyz/` -> `/assets_xyz/`).
+   - Hasil: Seluruh gambar AnimeIn (Hero Slider, Cuplix, Episode Baru, Sedang Hangat, Jat For Yu, Paling Dinanti, Jadwal, Detail Anime) DAN Komik muncul 100% secara bersamaan.
+
+### B. Fitur On/Off Efek "Liquid Glass" pada Floating Bottom Navbar
+1. **Default Berdasarkan Versi Android (`Build.VERSION.SDK_INT`):**
+   - **Android 13 ke atas (API 33+ / TIRAMISU):** Default **ON (`true`)**.
+   - **Android 12 ke bawah (API 32 ke bawah / <= S_V2):** Default **OFF (`false`)**.
+   - Preferensi disimpan persisten di `AppPreferences` (`KEY_LIQUID_GLASS = "key_liquid_glass_navbar"`).
+2. **Tampilan Saat ON vs OFF (Tata Letak Identik 100%):**
+   - Bentuk kapsul mengambang (*floating pill*), ukuran, padding bawah (`navigationBarsPadding() + 20.dp`), dan animasi tab aktif/inaktif tetap sama persis.
+   - **Saat ON (`isLiquidGlassEnabled == true`):**
+     - Efek optik *Liquid Glass* penuh: AGSL `RuntimeShader` pembiasan *live backdrop* Snell refraction, *chromatic dispersion* tepi lensa (cyan/warm), dan *Fresnel specular rim* `1.dp`.
+     - Kapsul tab aktif menggunakan lensa kaca putih bening dengan border gradasi kaca.
+   - **Saat OFF (`isLiquidGlassEnabled == false`):**
+     - Matikan komputasi shader/pembiasan dan rekam backdrop layar untuk menghemat daya GPU.
+     - Kapsul luar menggunakan permukaan gelap semi-transparan bersih (`#D912141A`) dengan border tipis elegan (`#33FFFFFF`).
+     - Kapsul tab aktif menggunakan permukaan semi-transparan ringan (`#26FFFFFF`) dengan border tipis (`#33FFFFFF`), tetap menampilkan Ikon Putih Solid + Teks Judul Putih SF Bold.
+3. **Toggle Switch di `SettingsScreen`:**
+   - Opsi switch *"Efek Liquid Glass Navbar"* di bagian `NAVIGASI & TAMPILAN` dengan deskripsi *"Aktifkan efek kaca cair pada navigasi bawah (Otomatis aktif di Android 13+)"* yang bereaksi real-time tanpa perlu restart aplikasi.

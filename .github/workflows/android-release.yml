@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "2.1.0"
+  APP_VERSION: "2.1.1"
 
 jobs:
   build:
@@ -63,33 +63,23 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Pure Clear Liquid Glass Navbar, Comic Detail Vortex, 10-Komik Clean Grid & Unified Search Cards (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Fix AnimeIn & Komik Images 100%, Navbar Liquid Glass On/Off Toggle (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
             ### Pembaruan & Perbaikan Utama:
-            1. **Floating Bottom Navbar Murni & Clear Liquid Glass (`quickLiquid` AGSL):**
-               - Dilepaskan sepenuhnya dari `Scaffold(bottomBar)` sehingga tidak ada lagi blok hitam di bawah kapsul dan konten halaman mengalir penuh 100% di belakang kaca navbar.
-               - Menggunakan `GraphicsLayer` + AGSL `RuntimeShader` (Android 13+) dengan *clear center*, *refractive lensing edge*, *chromatic dispersion*, dan *fresnel specular rim* putih `1.dp`.
-               - Kapsul tab aktif kini menggunakan lensa kaca bening putih bersih (tanpa warna coklat/merah keruh) dengan Ikon Putih Solid + Teks Judul Putih SF Bold, sedangkan tab tidak aktif hanya menampilkan Ikon Outline.
+            1. **Perbaikan Gambar AnimeIn & Komik Muncul 100% Bersamaan:**
+               - Mengisolasi header interceptor di dalam OkHttpClient Coil ImageLoader berdasarkan host/domain URL request. Domain komik mendapatkan header `Referer` (`https://app.shinigami.asia/`) dan `User-Agent` browser, sedangkan domain AnimeIn (`animein.net`, `xyz-api.animein.net`) tidak menerima header Referer komik dan menggunakan `User-Agent` serta `x-proxy-secret` resmi AnimeIn.
+               - Menghapus proxy mati `cf1.dinzid.my.id/?url=` pada fungsi `normalizeImageUrl` dan membersihkan normalisasi URL gambar AnimeIn sehingga seluruh gambar di Hero Slider, Cuplix, Episode Baru, Sedang Hangat, Jat For Yu, Paling Dinanti, Jadwal, dan Detail Anime tampil 100% lancar bersamaan dengan Komik Terbaru.
 
-            2. **Perbaikan Section `Komik Terbaru` di Home (Tanpa Kotak Overlay, 10 Item, Fix Poster & 3 Chapter Sejajar):**
-               - Menghapus kotak/border abu-abu (`#141418`) di belakang setiap item komik sehingga poster dan teks tampil bersih langsung di atas latar utama (`#0B0B0B`).
-               - Menampilkan 10 komik terbaru (5 baris x 2 kolom).
-               - Memperbaiki pemuatan gambar poster komik dengan fallback `cover_image_url` dan header HTTP (`User-Agent` & `Referer`).
-               - Mengunci tinggi judul menjadi 2 baris (`minLines = 2, maxLines = 2`) dan menjamin 3 chapter terbaru selalu tampil utuh serta sejajar rata horizontal antara kolom kiri dan kanan.
-
-            3. **Perbaikan Kartu `KATEGORI` & `TAHUN` di Halaman Cari (`CARI`) Tanpa Pembatas Warna:**
-               - Mengekstrak warna latar piksel tepi gambar secara otomatis (`getPixel`) sebagai warna latar penuh kartu disertai *smooth horizontal gradient blend*, sehingga kartu menyatu penuh dari kiri ke kanan tanpa garis pembatas warna kaku.
-
-            4. **Halaman Detail Komik Baru (`ComicDetailScreen` Gaya `Vortex`):**
-               - Hero cover besar di bagian atas (tembus status bar) dengan tombol kembali, favorit, judul besar, jumlah views, dan jumlah suka sesuai hasil scrape.
-               - Header tab melengkung (*curved arc header*) dengan 2 tab saja: `INFO` dan `CHAPTER` (tanpa `CAST` dan tanpa `Choice Mode`) disertai indikator garis bawah oranye (`#FF5722`).
-               - Tab `INFO` menampilkan poster vertikal di kiri, `Title`, `Status` (oranye), `Type` + bendera negara, serta `Sinopsis`, `Kategori`, `Aired Start`, `Aired End`, dan `Author` dari hasil scrape.
-               - Tab `CHAPTER` dilengkapi kolom pencarian chapter real-time dan daftar chapter vertikal dengan thumbnail persegi membulat, nomor `#01`, judul chapter, tanggal rilis, jumlah views, dan panah kanan `>` tanpa gembok.
-
-            5. **Kartu `Lanjut Nonton` (Watch History) Horizontal Cover (`16:9`):**
-               - Mengubah tampilan riwayat tontonan di halaman Home dari poster vertikal menjadi cover horizontal (`16:9`).
+            2. **Fitur On/Off Efek Liquid Glass pada Floating Bottom Navbar:**
+               - Sistem deteksi default otomatis sesuai versi OS Android (`Build.VERSION.SDK_INT`):
+                 - Android 13+ (API 33+ / TIRAMISU): Default **ON (`true`)**.
+                 - Android 12- (API 32 ke bawah): Default **OFF (`false`)**.
+               - Bentuk, posisi mengambang (*floating*), ukuran, padding, dan tata letak tab aktif (Ikon + Judul) & inaktif (Ikon saja) tetap 100% identik baik saat ON maupun OFF.
+               - Saat ON: Efek optik *Liquid Glass* penuh (live backdrop refraction, lensing edge, chromatic dispersion, frosted glass shader).
+               - Saat OFF: Perhitungan shader dan penangkapan layer dimatikan untuk performa sangat ringan dan hemat baterai, digantikan permukaan gelap semi-transparan yang bersih dan elegan (`#D912141A` luar dan `#26FFFFFF` aktif dengan border `#33FFFFFF`).
+               - Toggle switch real-time baru di `SettingsScreen` (Pengaturan) bagian `NAVIGASI & TAMPILAN` ("Efek Liquid Glass Navbar").
           draft: false
           prerelease: false
           make_latest: true

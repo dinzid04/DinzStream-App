@@ -33,6 +33,7 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +51,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.yuranime.dinz.R
+import com.yuranime.dinz.data.local.AppPreferences
 import com.yuranime.dinz.data.model.AnimeItem
 import com.yuranime.dinz.data.model.CuplixItem
 import com.yuranime.dinz.ui.components.BottomNavBar
@@ -74,6 +76,7 @@ fun JadwalScreen(
     onCuplixClick: (CuplixItem) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isLiquidGlass by AppPreferences.liquidGlassEnabled.collectAsState()
     val backdropLayer = rememberGraphicsLayer()
 
     Box(
@@ -84,7 +87,7 @@ fun JadwalScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .liquidGlassBackdrop(backdropLayer)
+                .liquidGlassBackdrop(backdropLayer, enabled = isLiquidGlass)
                 .background(ColorBackgroundPrimary)
                 .statusBarsPadding()
         ) {
@@ -198,6 +201,7 @@ fun JadwalScreen(
             selectedTab = selectedTab,
             onTabSelected = onTabSelected,
             backdropLayer = backdropLayer,
+            isLiquidGlassEnabled = isLiquidGlass,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
     }

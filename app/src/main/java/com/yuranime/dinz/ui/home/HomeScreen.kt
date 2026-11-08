@@ -106,6 +106,7 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sliderMode by AppPreferences.sliderMode.collectAsState()
+    val isLiquidGlass by AppPreferences.liquidGlassEnabled.collectAsState()
     val context = LocalContext.current
 
     // Refresh watch history from local database
@@ -168,7 +169,7 @@ fun HomeScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .liquidGlassBackdrop(backdropLayer)
+                .liquidGlassBackdrop(backdropLayer, enabled = isLiquidGlass)
                 .background(ColorBackgroundPrimary)
         ) {
             when {
@@ -508,6 +509,7 @@ fun HomeScreen(
             selectedTab = selectedTab,
             onTabSelected = onTabSelected,
             backdropLayer = backdropLayer,
+            isLiquidGlassEnabled = isLiquidGlass,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .onboardingTarget("home_navbar", targetBounds)

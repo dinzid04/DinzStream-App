@@ -42,6 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,6 +71,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yuranime.dinz.data.local.AppPreferences
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import org.intellij.lang.annotations.Language
 
@@ -98,11 +100,15 @@ enum class NavTab(
  * yang berada tepat di bawah [BottomNavBar] dapat dibiaskan secara real-time
  * oleh lensa Clear Liquid Glass.
  */
-fun Modifier.liquidGlassBackdrop(layer: GraphicsLayer): Modifier = this.drawWithContent {
-    layer.record {
-        this@drawWithContent.drawContent()
+fun Modifier.liquidGlassBackdrop(layer: GraphicsLayer, enabled: Boolean = true): Modifier = if (enabled) {
+    this.drawWithContent {
+        layer.record {
+            this@drawWithContent.drawContent()
+        }
+        drawLayer(layer)
     }
-    drawLayer(layer)
+} else {
+    this
 }
 
 /**
@@ -181,7 +187,8 @@ fun BottomNavBar(
     selectedTab: NavTab,
     onTabSelected: (NavTab) -> Unit,
     modifier: Modifier = Modifier,
-    backdropLayer: GraphicsLayer? = null
+    backdropLayer: GraphicsLayer? = null,
+    isLiquidGlassEnabled: Boolean = AppPreferences.liquidGlassEnabled.collectAsState().value
 ) {
     var pillOffsetInRoot by remember { mutableStateOf(Offset.Zero) }
     var pillSize by remember { mutableStateOf(IntSize.Zero) }
@@ -193,16 +200,14 @@ fun BottomNavBar(
             .padding(start = 24.dp, end = 24.dp, bottom = 20.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Kapsul Utama Clear Liquid Glass (Floating Pill)
-        Box(
-            modifier = Modifier
+        val outerPillModifier = if (isLiquidGlassEnabled) {
+            Modifier
                 .onGloballyPositioned { coords ->
                     pillOffsetInRoot = coords.positionInRoot()
                     pillSize = coords.size
                 }
                 .shadow(16.dp, CircleShape, clip = false)
                 .clip(CircleShape)
-                // Lapisan dasar kaca bening (Clear Glass) jika backdropLayer belum terekam
                 .background(Color(0x3310131A))
                 .drawBehind {
                     val strokeWidth = 1.dp.toPx()
@@ -257,9 +262,21 @@ fun BottomNavBar(
                         style = Stroke(width = strokeWidth)
                     )
                 }
-        ) {
+        } else {
+            Modifier
+                .shadow(12.dp, CircleShape, clip = false)
+                .clip(CircleShape)
+                .background(Color(0xD912141A))
+                .border(
+                    width = 1.dp,
+                    color = Color(0x33FFFFFF),
+                    shape = CircleShape
+                )
+        }
+
+        Box(modifier = outerPillModifier) {
             // Live Refracted Backdrop Layer (Android 13+ AGSL RuntimeShader / Clear Glass Backdrop)
-            if (backdropLayer != null && pillSize.width > 0 && pillSize.height > 0) {
+            if (isLiquidGlassEnabled && backdropLayer != null && pillSize.width > 0 && pillSize.height > 0) {
                 val agslRenderEffect = remember(pillSize) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         try {
@@ -327,44 +344,58 @@ fun BottomNavBar(
                     val interactionSource = remember { MutableInteractionSource() }
 
                     if (isSelected) {
-                        // TAB AKTIF: Lensa Kapsul Clear Liquid Glass (Bening Kaca Putih, TANPA Warna Coklat/Merah Keruh!)
-                        Box(
-                            modifier = Modifier
-                                .height(44.dp)
-                                .animateContentSize(
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioLowBouncy,
-                                        stiffness = Spring.StiffnessMediumLow
-                                    )
+                        val activeTabModifier = Modifier
+                            .height(44.dp)
+                            .animateContentSize(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioLowBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
                                 )
-                                .clip(RoundedCornerShape(22.dp))
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color(0x38FFFFFF),
-                                            Color(0x18FFFFFF),
-                                            Color(0x28FFFFFF)
+                            )
+                            .clip(RoundedCornerShape(22.dp))
+                            .then(
+                                if (isLiquidGlassEnabled) {
+                                    Modifier
+                                        .background(
+                                            Brush.verticalGradient(
+                                                colors = listOf(
+                                                    Color(0x38FFFFFF),
+                                                    Color(0x18FFFFFF),
+                                                    Color(0x28FFFFFF)
+                                                )
+                                            )
                                         )
-                                    )
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(
-                                            Color(0xA6FFFFFF),
-                                            Color(0x33FFFFFF),
-                                            Color(0x66FFFFFF)
-                                        ),
-                                        start = Offset(0f, 0f),
-                                        end = Offset(160f, 90f)
-                                    ),
-                                    shape = RoundedCornerShape(22.dp)
-                                )
-                                .clickable(
-                                    interactionSource = interactionSource,
-                                    indication = ripple(bounded = true, color = Color.White)
-                                ) { onTabSelected(tab) }
-                                .padding(horizontal = 15.dp, vertical = 9.dp),
+                                        .border(
+                                            width = 1.dp,
+                                            brush = Brush.linearGradient(
+                                                colors = listOf(
+                                                    Color(0xA6FFFFFF),
+                                                    Color(0x33FFFFFF),
+                                                    Color(0x66FFFFFF)
+                                                ),
+                                                start = Offset(0f, 0f),
+                                                end = Offset(160f, 90f)
+                                            ),
+                                            shape = RoundedCornerShape(22.dp)
+                                        )
+                                } else {
+                                    Modifier
+                                        .background(Color(0x26FFFFFF))
+                                        .border(
+                                            width = 1.dp,
+                                            color = Color(0x33FFFFFF),
+                                            shape = RoundedCornerShape(22.dp)
+                                        )
+                                }
+                            )
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = ripple(bounded = true, color = Color.White)
+                            ) { onTabSelected(tab) }
+                            .padding(horizontal = 15.dp, vertical = 9.dp)
+
+                        Box(
+                            modifier = activeTabModifier,
                             contentAlignment = Alignment.Center
                         ) {
                             Row(

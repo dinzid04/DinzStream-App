@@ -4,18 +4,22 @@ import com.google.gson.annotations.SerializedName
 
 fun normalizeImageUrl(url: String?): String {
     if (url.isNullOrBlank()) return ""
-    val trimmed = url.trim()
-    val direct = if (trimmed.startsWith("//")) {
-        "https:$trimmed"
+    var trimmed = url.trim()
+    if (trimmed.startsWith("//")) {
+        trimmed = "https:$trimmed"
     } else if (trimmed.startsWith("/")) {
-        "https://xyz-api.animein.net$trimmed"
+        trimmed = "https://xyz-api.animein.net$trimmed"
+    } else if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+        trimmed = "https://xyz-api.animein.net/$trimmed"
+    }
+
+    return if (trimmed.startsWith("https://")) {
+        "https://" + trimmed.removePrefix("https://").replace(Regex("/+"), "/")
+    } else if (trimmed.startsWith("http://")) {
+        "http://" + trimmed.removePrefix("http://").replace(Regex("/+"), "/")
     } else {
         trimmed
     }
-
-    return if (direct.startsWith("http")) {
-        "https://cf1.dinzid.my.id/?url=" + java.net.URLEncoder.encode(direct, "UTF-8")
-    } else direct
 }
 
 // ==================== HOME MODELS ====================
@@ -44,7 +48,9 @@ data class SliderItem(
     @SerializedName("image") val image: String? = null,
     @SerializedName("link") val link: String? = null,
     @SerializedName("synopsis") val synopsis: String? = null
-)
+) {
+    fun getEffectiveImage(): String = normalizeImageUrl(image)
+}
 
 data class AnimeItem(
     @SerializedName("id") val id: String? = null,

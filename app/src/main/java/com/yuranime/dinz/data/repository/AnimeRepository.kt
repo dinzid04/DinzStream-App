@@ -289,28 +289,28 @@ class AnimeRepository(
                 id = "m1",
                 title = "Di Sela-Sela Kuliah",
                 genre = "Comedy",
-                imagePoster = "https://cf1.dinzid.my.id/?url=https%3A%2F%2Fxyz-api.animein.net%2Fassets_xyz%2Fimages%2Fcomic%2F1.jpg",
+                imagePoster = "https://xyz-api.animein.net/assets_xyz/images/comic/1.jpg",
                 views = "285"
             ),
             AnimeItem(
                 id = "m2",
                 title = "Kakak Rental PS",
                 genre = "Romance",
-                imagePoster = "https://cf1.dinzid.my.id/?url=https%3A%2F%2Fxyz-api.animein.net%2Fassets_xyz%2Fimages%2Fcomic%2F2.jpg",
+                imagePoster = "https://xyz-api.animein.net/assets_xyz/images/comic/2.jpg",
                 views = "19.360"
             ),
             AnimeItem(
                 id = "m3",
                 title = "Beyond Talent",
                 genre = "Action",
-                imagePoster = "https://cf1.dinzid.my.id/?url=https%3A%2F%2Fxyz-api.animein.net%2Fassets_xyz%2Fimages%2Fcomic%2F3.jpg",
+                imagePoster = "https://xyz-api.animein.net/assets_xyz/images/comic/3.jpg",
                 views = "826"
             ),
             AnimeItem(
                 id = "m4",
                 title = "Vortex",
                 genre = "Action",
-                imagePoster = "https://cf1.dinzid.my.id/?url=https%3A%2F%2Fxyz-api.animein.net%2Fassets_xyz%2Fimages%2Fcomic%2F4.jpg",
+                imagePoster = "https://xyz-api.animein.net/assets_xyz/images/comic/4.jpg",
                 views = "1.424"
             )
         )

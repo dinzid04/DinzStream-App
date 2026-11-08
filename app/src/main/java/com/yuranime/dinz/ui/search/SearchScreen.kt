@@ -52,6 +52,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -114,6 +115,7 @@ fun SearchScreen(
     onCuplixClick: (CuplixItem) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isLiquidGlass by com.yuranime.dinz.data.local.AppPreferences.liquidGlassEnabled.collectAsState()
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
     val targetBounds = remember { mutableStateMapOf<String, Rect>() }
@@ -135,7 +137,7 @@ fun SearchScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .liquidGlassBackdrop(backdropLayer)
+                .liquidGlassBackdrop(backdropLayer, enabled = isLiquidGlass)
                 .background(ColorBackgroundPrimary)
                 .statusBarsPadding()
         ) {
@@ -388,6 +390,7 @@ fun SearchScreen(
             selectedTab = selectedTab,
             onTabSelected = onTabSelected,
             backdropLayer = backdropLayer,
+            isLiquidGlassEnabled = isLiquidGlass,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
     }

@@ -152,6 +152,7 @@ fun LoginProfileScreen(
     var currentSubScreen by remember { mutableStateOf(ProfileSubScreen.MAIN) }
     var isLoggingIn by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
+    val isLiquidGlass by AppPreferences.liquidGlassEnabled.collectAsState()
 
     // Inisialisasi sesi login tersimpan dari preferensi lokal
     LaunchedEffect(Unit) {
@@ -303,7 +304,7 @@ fun LoginProfileScreen(
                             currentUser = currentUser,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .liquidGlassBackdrop(backdropLayer),
+                                .liquidGlassBackdrop(backdropLayer, enabled = isLiquidGlass),
                             onEditProfileClick = { currentSubScreen = ProfileSubScreen.EDIT_PROFILE },
                             onDownloadMenuClick = { currentSubScreen = ProfileSubScreen.DOWNLOADS },
                             onLeaderboardMenuClick = { currentSubScreen = ProfileSubScreen.LEADERBOARD },
@@ -320,6 +321,7 @@ fun LoginProfileScreen(
                             selectedTab = selectedTab,
                             onTabSelected = onTabSelected,
                             backdropLayer = backdropLayer,
+                            isLiquidGlassEnabled = isLiquidGlass,
                             modifier = Modifier.align(Alignment.BottomCenter)
                         )
                     }

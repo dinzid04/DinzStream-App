@@ -1,6 +1,7 @@
 package com.yuranime.dinz.data.local
 
 import android.content.Context
+import android.os.Build
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +22,7 @@ object AppPreferences {
     private const val PREFS_NAME = "yuranime_app_prefs"
     private const val KEY_SLIDER_MODE = "key_home_slider_mode"
     private const val KEY_AUTO_NEXT = "key_auto_next_episode"
+    private const val KEY_LIQUID_GLASS = "key_liquid_glass_navbar"
 
     // Onboarding Coachmark Keys
     private const val KEY_ONBOARDING_HOME = "key_onboarding_home_completed"
@@ -34,17 +36,25 @@ object AppPreferences {
     private const val KEY_GOOGLE_EMAIL = "key_google_session_email"
     private const val KEY_GOOGLE_AVATAR = "key_google_session_avatar"
 
+    private fun isLiquidGlassDefault(): Boolean {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    }
+
     private val _sliderMode = MutableStateFlow(HomeSliderMode.DEFAULT)
     val sliderMode: StateFlow<HomeSliderMode> = _sliderMode.asStateFlow()
 
     private val _autoNext = MutableStateFlow(true)
     val autoNext: StateFlow<Boolean> = _autoNext.asStateFlow()
 
+    private val _liquidGlassEnabled = MutableStateFlow(isLiquidGlassDefault())
+    val liquidGlassEnabled: StateFlow<Boolean> = _liquidGlassEnabled.asStateFlow()
+
     fun init(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val modeId = prefs.getInt(KEY_SLIDER_MODE, HomeSliderMode.DEFAULT.id)
         _sliderMode.value = if (modeId == HomeSliderMode.CLEAN_COVER.id) HomeSliderMode.CLEAN_COVER else HomeSliderMode.DEFAULT
         _autoNext.value = prefs.getBoolean(KEY_AUTO_NEXT, true)
+        _liquidGlassEnabled.value = prefs.getBoolean(KEY_LIQUID_GLASS, isLiquidGlassDefault())
     }
 
     fun setSliderMode(context: Context, mode: HomeSliderMode) {
@@ -60,6 +70,14 @@ object AppPreferences {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_AUTO_NEXT, enabled)
+            .apply()
+    }
+
+    fun setLiquidGlassEnabled(context: Context, enabled: Boolean) {
+        _liquidGlassEnabled.value = enabled
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_LIQUID_GLASS, enabled)
             .apply()
     }
 

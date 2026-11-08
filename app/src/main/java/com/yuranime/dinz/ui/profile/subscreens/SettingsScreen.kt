@@ -63,6 +63,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val currentSliderMode by AppPreferences.sliderMode.collectAsState()
+    val liquidGlassEnabled by AppPreferences.liquidGlassEnabled.collectAsState()
     val autoNextEnabled by AppPreferences.autoNext.collectAsState()
 
     Box(
@@ -156,7 +157,69 @@ fun SettingsScreen(
                     }
                 }
 
-                // SECTION 2: PEMUTARAN VIDEO
+                // SECTION 2: NAVIGASI & TAMPILAN
+                item {
+                    Text(
+                        text = "NAVIGASI & TAMPILAN",
+                        color = Color(0xFFFF5722),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily,
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFF161820))
+                            .border(0.7.dp, Color(0x22FFFFFF), RoundedCornerShape(14.dp))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Efek Liquid Glass Navbar",
+                                    color = Color.White,
+                                    fontSize = 14.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = SfProFontFamily
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Aktifkan efek kaca cair pada navigasi bawah (Otomatis aktif di Android 13+)",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 12.sp,
+                                    fontFamily = SfProFontFamily,
+                                    lineHeight = 16.sp
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Switch(
+                                checked = liquidGlassEnabled,
+                                onCheckedChange = { isChecked ->
+                                    AppPreferences.setLiquidGlassEnabled(context, isChecked)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Color(0xFFFF5722),
+                                    uncheckedThumbColor = Color(0xFF94A3B8),
+                                    uncheckedTrackColor = Color(0xFF222530)
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // SECTION 3: PEMUTARAN VIDEO
                 item {
                     Text(
                         text = "PEMUTARAN VIDEO",
