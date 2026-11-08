@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +55,7 @@ import com.yuranime.dinz.data.model.CuplixItem
 import com.yuranime.dinz.ui.components.BottomNavBar
 import com.yuranime.dinz.ui.components.CuplixAvatarItem
 import com.yuranime.dinz.ui.components.NavTab
+import com.yuranime.dinz.ui.components.liquidGlassBackdrop
 import com.yuranime.dinz.ui.theme.ColorAccentPrimary
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
 import com.yuranime.dinz.ui.theme.ColorMetricFavorites
@@ -72,22 +74,19 @@ fun JadwalScreen(
     onCuplixClick: (CuplixItem) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val backdropLayer = rememberGraphicsLayer()
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = ColorBackgroundPrimary,
-        bottomBar = {
-            BottomNavBar(
-                selectedTab = selectedTab,
-                onTabSelected = onTabSelected
-            )
-        }
-    ) { innerPadding ->
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(ColorBackgroundPrimary)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .liquidGlassBackdrop(backdropLayer)
                 .background(ColorBackgroundPrimary)
+                .statusBarsPadding()
         ) {
             // Days Tab Row (SEN, SEL, RAB, KAM, JUM, SAB, MIN)
             val days = ScheduleDay.entries
@@ -177,7 +176,7 @@ fun JadwalScreen(
                     else -> {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 24.dp),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 115.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             items(
@@ -194,6 +193,13 @@ fun JadwalScreen(
                 }
             }
         }
+
+        BottomNavBar(
+            selectedTab = selectedTab,
+            onTabSelected = onTabSelected,
+            backdropLayer = backdropLayer,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 

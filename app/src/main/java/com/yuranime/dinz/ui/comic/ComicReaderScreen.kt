@@ -170,7 +170,11 @@ fun ComicReaderScreen(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(imageUrl)
                             .crossfade(true)
-                            .addHeader("Referer", "https://shinigami.io")
+                            .addHeader(
+                                "User-Agent",
+                                "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+                            )
+                            .addHeader("Referer", "https://app.shinigami.asia/")
                             .build(),
                         contentDescription = "Halaman ${index + 1}",
                         contentScale = ContentScale.FillWidth,

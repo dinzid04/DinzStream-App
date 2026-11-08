@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -80,6 +81,7 @@ import com.yuranime.dinz.ui.components.SectionHeader
 import com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay
 import com.yuranime.dinz.ui.components.YuranimeAnimatedLogo
 import com.yuranime.dinz.ui.components.YuranimeHeroSlider
+import com.yuranime.dinz.ui.components.liquidGlassBackdrop
 import com.yuranime.dinz.ui.components.onboardingTarget
 import com.yuranime.dinz.ui.theme.ColorAccentPrimary
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
@@ -156,22 +158,17 @@ fun HomeScreen(
     val targetBounds = remember { mutableStateMapOf<String, Rect>() }
     val coroutineScope = rememberCoroutineScope()
     val homeLazyListState = rememberLazyListState()
+    val backdropLayer = rememberGraphicsLayer()
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = ColorBackgroundPrimary,
-        bottomBar = {
-            BottomNavBar(
-                selectedTab = selectedTab,
-                onTabSelected = onTabSelected,
-                modifier = Modifier.onboardingTarget("home_navbar", targetBounds)
-            )
-        }
-    ) { innerPadding ->
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(ColorBackgroundPrimary)
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = innerPadding.calculateBottomPadding())
+                .liquidGlassBackdrop(backdropLayer)
                 .background(ColorBackgroundPrimary)
         ) {
             when {
@@ -190,7 +187,7 @@ fun HomeScreen(
                     LazyColumn(
                         state = homeLazyListState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 24.dp)
+                        contentPadding = PaddingValues(bottom = 115.dp)
                     ) {
                         // 1. Top Hero Slider Gaya Yuranime (Data dari Jadwal Hari Ini)
                         item(key = "piupiu_hero_slider") {
@@ -540,25 +537,35 @@ fun HomeScreen(
                     )
                 )
             }
+        }
 
-            SpotlightCoachmarkOverlay(
-                steps = homeSteps,
-                isVisible = showHomeOnboarding && uiState.activeSectionDetail == null,
-                onDismiss = {
-                    showHomeOnboarding = false
-                    AppPreferences.setHomeOnboardingCompleted(context, true)
-                },
-                targetBounds = targetBounds,
-                onStepChanged = { step ->
-                    step.scrollToIndex?.let { targetIdx ->
-                        coroutineScope.launch {
-                            homeLazyListState.animateScrollToItem(targetIdx)
-                            kotlinx.coroutines.delay(150)
-                        }
+        // Floating Clear Liquid Glass Navbar (Mengambang murni 100% di atas konten)
+        BottomNavBar(
+            selectedTab = selectedTab,
+            onTabSelected = onTabSelected,
+            backdropLayer = backdropLayer,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .onboardingTarget("home_navbar", targetBounds)
+        )
+
+        SpotlightCoachmarkOverlay(
+            steps = homeSteps,
+            isVisible = showHomeOnboarding && uiState.activeSectionDetail == null,
+            onDismiss = {
+                showHomeOnboarding = false
+                AppPreferences.setHomeOnboardingCompleted(context, true)
+            },
+            targetBounds = targetBounds,
+            onStepChanged = { step ->
+                step.scrollToIndex?.let { targetIdx ->
+                    coroutineScope.launch {
+                        homeLazyListState.animateScrollToItem(targetIdx)
+                        kotlinx.coroutines.delay(150)
                     }
                 }
-            )
-        }
+            }
+        )
     }
 }
 

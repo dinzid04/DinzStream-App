@@ -512,6 +512,119 @@ Berdasarkan referensi visual `/storage/emulated/0/termux/design/reff/Screenshot_
 2. Konfigurasi `ImageRequest` pada `AsyncImage` di `WhiteCategoryCard`, `WhiteYearCard`, dan `DarkCharacterCard`:
    - `.size(coil.size.Size.ORIGINAL)`
    - `.crossfade(false)`
-3. Kunci tinggi wadah kartu secara statis: `Modifier.fillMaxWidth().height(90.dp).clip(RoundedCornerShape(12.dp))`.
-4. Gunakan `contentScale = ContentScale.FillHeight` (atau `ContentScale.Fit` dengan `Alignment.CenterEnd` untuk Kategori/Karakter dan `Alignment.CenterStart` untuk Tahun).
+3. Kunci tinggi wadah kartu secara statis: `Modifier.fillMaxWidth().height(92.dp).clip(RoundedCornerShape(12.dp))`.
+4. Gunakan `contentScale = ContentScale.FillHeight` (dengan `Alignment.CenterEnd` untuk Kategori/Karakter dan `Alignment.CenterStart` untuk Tahun).
 5. Gambar tidak akan pernah meloncat atau nge-zoom saat diam maupun saat di-scroll.
+
+---
+
+## 19. SPESIFIKASI FITUR 16: Rombak Total Floating Bottom Navbar (100% Mengambang di Atas Konten & Clear Liquid Glass AGSL)
+
+Berdasarkan evaluasi `Screenshot_20261108_135755_Yuranime.jpg` dan referensi video `VID-20261108-WA0016.mp4` (`amarnath3003/quickLiquid`):
+
+### A. Lepaskan dari `Scaffold(bottomBar)` Berlatar Hitam
+1. **DILARANG** meletakkan `BottomNavBar` di dalam slot `Scaffold(bottomBar = ...)` yang memotong area bawah konten (`innerPadding.calculateBottomPadding()`), karena menyebabkan blok hitam pekat di bawah kapsul navbar.
+2. Pada `HomeScreen`, `JadwalScreen`, `SearchScreen`, dan `LoginProfileScreen`, gunakan `Box(modifier = Modifier.fillMaxSize())`:
+   - Konten utama (`LazyColumn` / `Column`) menggunakan `Modifier.fillMaxSize()` dengan `contentPadding = PaddingValues(bottom = 110.dp)` agar daftar konten mengalir 100% sampai ke tepi paling bawah layar tepat di belakang kapsul kaca navbar.
+   - `BottomNavBar` diletakkan langsung di dalam root `Box` dengan `Alignment.BottomCenter` dan `padding(start = 24.dp, end = 24.dp, bottom = 20.dp).navigationBarsPadding()`.
+
+### B. Efek Optik "Clear Liquid Glass" (Tanpa Warna Merah/Coklat Keruh)
+1. **Hapus** warna merah/coklat keruh dan border merah pada tombol aktif.
+2. **Real-Time Backdrop Capture & AGSL Refraction (Android 13+):**
+   - Rekam layer konten halaman ke dalam `GraphicsLayer` (`rememberGraphicsLayer()`).
+   - Di dalam kapsul `BottomNavBar`, gambar ulang layer konten di bawahnya melalui `RuntimeShader` AGSL yang menerapkan fisika optik `quickLiquid`:
+     - **Clear Center:** Bagian tengah kapsul bening transparan.
+     - **Refractive Edge (Lensing):** Tepian melengkung kapsul membiaskan piksel konten yang lewat di bawahnya menggunakan rumus pembiasan Snell dan kurva busur cembung, dilengkapi *chromatic dispersion* tipis pada kanal R/G/B.
+     - **Fresnel Specular Rim:** Pantulan cahaya kaca putih tipis (`1.dp`) yang tajam di bibir lengkungan atas dan bawah kapsul.
+3. **Kapsul Tab Aktif:**
+   - Lensa kaca putih bening (`Color(0x28FFFFFF)` hingga `Color(0x12FFFFFF)`) dengan border kaca putih tipis (`1.dp`, `Color(0x73FFFFFF)` -> `Color(0x1FFFFFFF)`).
+   - Menampilkan **Ikon Putih Solid + Teks Judul Putih SF Bold** (`Home`, `Jadwal`, `Cari`, `Chat`, `Profile`) dengan animasi pegas `animateContentSize`.
+   - Tab tidak aktif hanya menampilkan **Ikon Outline** tanpa teks.
+
+---
+
+## 20. SPESIFIKASI FITUR 17: Perbaikan `Komik Terbaru` di Home (Tanpa Kotak Overlay, 10 Item, Fix Gambar & 3 Chapter Sejajar)
+
+Berdasarkan evaluasi `Screenshot_20261108_135755_Yuranime.jpg`:
+
+### A. Hapus Kotak / Card Overlay di Belakang Item Komik
+1. **HAPUS** background kotak abu-abu (`#141418`) dan border (`#222632`) pada setiap item komik.
+2. Poster di kiri dan informasi di kanan tampil bersih langsung di atas latar utama halaman (`#0B0B0B`).
+
+### B. 10 Komik Terbaru (5 Baris x 2 Kolom Grid Vertikal)
+1. Ambil **10 komik terbaru (`comics.take(10)`)** dan susun dalam **5 baris ke bawah x 2 kolom berdampingan** (`Modifier.weight(1f)`).
+
+### C. Perbaikan Gambar Poster Komik (100% Muncul)
+1. Pada `ComicRepository`, gunakan fallback otomatis: jika `cover_portrait_url` kosong (`""`), ambil `cover_image_url` dari respons API.
+2. Tambahkan header HTTP pada setiap request gambar komik:
+   - `"User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"`
+   - `"Referer": "https://app.shinigami.asia/"`
+
+### D. Kesejajaran Presisi 3 Chapter Terbaru
+1. Kunci tinggi teks Judul Komik menjadi tepat 2 baris (`minLines = 2, maxLines = 2`) diikuti ikon bendera negara (`cn.webp` / `jp.webp` / `kr.webp`) sehingga awal baris chapter di kolom kiri dan kanan sejajar 100% rata horizontal.
+2. Hapus pembatas tinggi statis yang memotong chapter ke-3. Pastikan selalu tampil 3 baris chapter utuh (`• CH. [Nomor]` di kiri dan waktu rilis singkat di kanan) tanpa titik oranye kosong.
+
+---
+
+## 21. SPESIFIKASI FITUR 18: Perbaikan Kartu `KATEGORI` & `TAHUN` di SearchScreen Tanpa Pembatas Warna
+
+Berdasarkan evaluasi `Screenshot_20261108_145552_Yuranime.jpg`:
+
+### A. Penyatuan Warna Latar Penuh dari Kiri ke Kanan
+1. Gambar banner `KATEGORI` dan `TAHUN` memiliki latar warna terang solid di belakang karakter.
+2. Ambil sampel warna piksel tepi gambar secara otomatis saat bitmap dimuat (`allowHardware(false)`):
+   - Pada `WhiteCategoryCard` (karakter di kanan), ambil warna piksel dari sisi kiri gambar (`x = 5% lebar`, `y = 50% tinggi`).
+   - Pada `WhiteYearCard` (karakter di kiri), ambil warna piksel dari sisi kanan gambar (`x = 95% lebar`, `y = 50% tinggi`).
+3. Terapkan warna tersebut sebagai `background` penuh kartu (`Modifier.fillMaxWidth().height(92.dp)`) disertai *smooth horizontal gradient blend* dari warna latar kartu menuju gambar karakter.
+4. Tampilkan teks kategori (`Genre` / `Theme` `#64748B` dan judul besar **SF Bold** `#1E293B`) atau angka tahun di atas latar yang menyatu penuh tanpa garis pembatas warna di tengah kartu.
+
+---
+
+## 22. SPESIFIKASI FITUR 19: Halaman Detail Komik (`ComicDetailScreen`) Sesuai Referensi `Vortex`
+
+Berdasarkan 3 gambar referensi `Screenshot_20261108_145758_ANIMEIN.jpg`, `145804`, dan `145812`:
+
+### A. Hero Cover Atas & Informasi Utama
+1. Gambar Cover/Poster komik berukuran besar di bagian atas layar (`height = 430.dp`, edge-to-edge tembus status bar) dengan gradasi gelap halus di bagian bawah.
+2. Pojok kiri atas: tombol panah kembali `<-`. Pojok kanan atas: tombol ikon hati outline `♡` (favorit).
+3. Pojok kiri bawah di atas gambar cover:
+   - **Judul Komik** ukuran besar (`26.sp`, **SF Bold** putih bersih).
+   - Di bawah judul: `Row` berisi ikon mata + jumlah views (dari data scrape `view_count`), pemisah tipis `|`, dan ikon hati + jumlah suka/bookmark (dari data scrape `bookmark_count`).
+   - **Tanpa** badge `Choice Mode`.
+
+### B. Bar Tab Melengkung dengan 2 Tab Saja (`INFO` & `CHAPTER`)
+1. Di bawah area cover, tampilkan header melengkung (*curved arc header*) dengan busur halus.
+2. **Hanya tampilkan 2 tab: `INFO` dan `CHAPTER`** (tanpa tab `CAST` dan tanpa `Choice Mode`).
+3. Indikator garis bawah berwarna oranye (`#FF5722`) pada tab yang sedang aktif.
+
+### C. Tampilan Tab `INFO` (Menyesuaikan Data Scrape Komik)
+1. **Bagian Atas (Poster Kiri + Info Kanan):**
+   - Sisi Kiri: Poster Komik vertikal (`width = 125.dp`, `aspectRatio(2f/3f)`, `RoundedCornerShape(10.dp)`).
+   - Sisi Kanan Poster (vertikal rata kiri):
+     - Label abu-abu (`#94A3B8`, `12.sp`) `Title` -> teks putih **SF Bold** `17.sp` (judul komik).
+     - Label abu-abu `Status` -> teks status berwarna **Oranye (`#FF5722`, SF Bold `16.sp`)** (`ongoing` / `completed`).
+     - Label abu-abu `Type` -> tipe komik (`Manga` / `Manhwa` / `Manhua`) beserta bendera negara.
+2. **Bagian Bawah Poster (Vertikal Rata Kiri Tanpa Kotak Border):**
+   - Label abu-abu `Sinopsis` diikuti paragraf cerita komik lengkap (`#E2E8F0`, `14.sp`, line-height `21.sp`).
+   - Label abu-abu `Kategori` -> daftar genre dipisahkan koma (putih **SF Bold** `15.sp`).
+   - Label abu-abu `Aired Start` -> tanggal rilis (`created_at` / `release_year` dari scrape) atau `-`.
+   - Label abu-abu `Aired End` -> tanggal tamat atau `-`.
+   - Label abu-abu `Author` -> nama pengarang/artist dari `taxonomy` scrape (putih **SF Bold** `15.sp`).
+
+### D. Tampilan Tab `CHAPTER` + Search Chapter Real-Time
+1. **Kolom Search Chapter:** Di bagian atas daftar chapter (`Cari nomor atau judul chapter...`, latar `#14171F`, sudut `10.dp`, ikon kaca pembesar) yang memfilter daftar chapter secara real-time.
+2. **Daftar Vertikal Chapter (Tanpa Gembok Kunci):**
+   - Pemisah `HorizontalDivider` (`#1E222B`) antar item.
+   - Sisi Kiri: Thumbnail persegi membulat (`54.dp x 54.dp`, `RoundedCornerShape(10.dp)`, `ContentScale.Crop` dengan fallback `yuranime-monochrome.svg`).
+   - Bagian Tengah (3 baris vertikal rapat):
+     1. Nomor chapter abu-abu (`#94A3B8`, SF SemiBold `12.sp`, contoh: `#01`, `#02`).
+     2. Judul Chapter putih (**SF Bold** `15.sp`).
+     3. Metadata bawah: Ikon kalender kecil + tanggal rilis (`24 Agu 26`) + ` • ` + ikon mata kecil + jumlah views (`584` dari `view_count` chapter) warna `#94A3B8` (`12.sp`).
+   - Sisi Kanan: Ikon panah kanan `>` (langsung membuka halaman baca komik untuk chapter tersebut).
+
+---
+
+## 23. SPESIFIKASI FITUR 20: Kartu `Lanjut Nonton` (Watch History) Horizontal Cover di Home
+
+1. Ubah tampilan `ContinueWatchingCard` di `HomeScreen` dari poster vertikal (`2:3`) menjadi **Cover Horizontal (`16:9`, lebar `185.dp`, sudut `8.dp`)**.
+2. Simpan dan gunakan gambar cover horizontal (`getEffectiveCover()` / thumbnail episode) saat merekam riwayat tontonan di `StreamingScreen` dan `HomeViewModel`.

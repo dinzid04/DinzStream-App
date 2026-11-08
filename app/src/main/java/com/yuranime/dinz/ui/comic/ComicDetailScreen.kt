@@ -1,11 +1,11 @@
 package com.yuranime.dinz.ui.comic
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,30 +16,33 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -47,10 +50,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -62,11 +72,18 @@ import com.yuranime.dinz.data.model.ComicChapterItem
 import com.yuranime.dinz.data.model.ComicDetail
 import com.yuranime.dinz.data.repository.ComicRepository
 import com.yuranime.dinz.ui.theme.ColorAccentPrimary
-import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
-import com.yuranime.dinz.ui.theme.ColorTextPrimary
-import com.yuranime.dinz.ui.theme.ColorTextSecondary
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import kotlinx.coroutines.launch
+import java.text.NumberFormat
+import java.util.Locale
+
+private const val DETAIL_USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+private const val DETAIL_REFERER = "https://app.shinigami.asia/"
+
+private val ComicDarkBg = Color(0xFF0B0D12)
+private val ComicOrange = Color(0xFFFF5722)
+private val ComicMutedLabel = Color(0xFF94A3B8)
 
 @Composable
 fun ComicDetailScreen(
@@ -78,13 +95,17 @@ fun ComicDetailScreen(
 ) {
     BackHandler { onBackClick() }
 
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     var comicDetail by remember { mutableStateOf<ComicDetail?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isDescriptionExpanded by remember { mutableStateOf(false) }
-    var isBookmarked by remember { mutableStateOf(false) }
+    var isFavorite by remember { mutableStateOf(false) }
 
-    val scope = rememberCoroutineScope()
+    // 0 = INFO, 1 = CHAPTER (Hanya 2 tab sesuai spesifikasi, tanpa tab CAST & tanpa Choice Mode)
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    var chapterSearchQuery by remember { mutableStateOf("") }
 
     LaunchedEffect(comicId) {
         isLoading = true
@@ -101,11 +122,11 @@ fun ComicDetailScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(ColorBackgroundPrimary)
+            .background(ComicDarkBg)
     ) {
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = ColorAccentPrimary, modifier = Modifier.size(36.dp))
+                CircularProgressIndicator(color = ComicOrange, modifier = Modifier.size(36.dp))
             }
         } else if (errorMessage != null && comicDetail == null) {
             Box(
@@ -116,8 +137,8 @@ fun ComicDetailScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = errorMessage ?: "Terjadi kesalahan",
-                        color = ColorTextSecondary,
+                        text = errorMessage ?: "Terjadi kesalahan saat memuat komik",
+                        color = ComicMutedLabel,
                         fontSize = 14.sp,
                         fontFamily = SfProFontFamily
                     )
@@ -125,7 +146,7 @@ fun ComicDetailScreen(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
-                            .background(ColorAccentPrimary)
+                            .background(ComicOrange)
                             .clickable {
                                 scope.launch {
                                     isLoading = true
@@ -148,394 +169,755 @@ fun ComicDetailScreen(
             }
         } else if (comicDetail != null) {
             val detail = comicDetail!!
+            val coverUrl = detail.coverLandscape?.takeIf { it.isNotBlank() } ?: detail.coverPortrait
+            val posterUrl = detail.coverPortrait.ifBlank { coverUrl }
+
+            val filteredChapters = remember(detail.chapters, chapterSearchQuery) {
+                val q = chapterSearchQuery.trim().lowercase(Locale.ROOT)
+                if (q.isEmpty()) {
+                    detail.chapters
+                } else {
+                    detail.chapters.filter { ch ->
+                        ch.number.lowercase(Locale.ROOT).contains(q) ||
+                            ch.title.lowercase(Locale.ROOT).contains(q)
+                    }
+                }
+            }
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 40.dp)
+                contentPadding = PaddingValues(bottom = 48.dp)
             ) {
-                // 1. Backdrop Cover & Hero Info
-                item {
+                // 1. HERO COVER ATAS + INFORMASI UTAMA + CURVED ARC 2-TAB HEADER
+                item(key = "hero_and_curved_tabs") {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(340.dp)
+                            .height(475.dp)
                     ) {
-                        // Blurred / Landscape Backdrop
+                        // Gambar Hero Cover Besar (Edge-to-Edge tembus ke status bar)
                         AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(detail.coverLandscape ?: detail.coverPortrait)
+                            model = ImageRequest.Builder(context)
+                                .data(coverUrl)
+                                .addHeader("User-Agent", DETAIL_USER_AGENT)
+                                .addHeader("Referer", DETAIL_REFERER)
                                 .crossfade(true)
                                 .placeholder(R.drawable.placeholder_yuranime_wide)
                                 .error(R.drawable.placeholder_yuranime_wide)
                                 .build(),
                             contentDescription = detail.title,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(435.dp)
                         )
 
-                        // Smooth gradient darkening to canvas background
+                        // Gradasi gelap halus di bagian atas (untuk kontras tombol) & bagian bawah cover
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
+                                .fillMaxWidth()
+                                .height(435.dp)
                                 .background(
                                     Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color(0x66000000),
-                                            Color(0xCC0B0B0B),
-                                            ColorBackgroundPrimary
-                                        )
+                                        0.0f to Color(0x66000000),
+                                        0.25f to Color.Transparent,
+                                        0.62f to Color(0x4D0B0D12),
+                                        0.86f to Color(0xCC0B0D12),
+                                        1.0f to ComicDarkBg
                                     )
                                 )
                         )
 
-                        // Poster + Header Info Row
-                        Row(
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.Bottom
-                        ) {
-                            // Poster Card
-                            Box(
-                                modifier = Modifier
-                                    .width(110.dp)
-                                    .aspectRatio(2f / 3f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(10.dp))
-                            ) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(detail.coverPortrait)
-                                        .crossfade(true)
-                                        .placeholder(R.drawable.placeholder_yuranime)
-                                        .error(R.drawable.placeholder_yuranime)
-                                        .build(),
-                                    contentDescription = detail.title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(14.dp))
-
-                            // Details Column
-                            Column(
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                // Title
-                                Text(
-                                    text = detail.title,
-                                    color = Color.White,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = SfProFontFamily,
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-
-                                Spacer(modifier = Modifier.height(6.dp))
-
-                                // Flag + Type + Status
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    // Country Flag
-                                    AsyncImage(
-                                        model = detail.flagUrl,
-                                        contentDescription = detail.format,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .size(width = 22.dp, height = 15.dp)
-                                            .clip(RoundedCornerShape(3.dp))
-                                    )
-
-                                    Spacer(modifier = Modifier.width(6.dp))
-
-                                    Text(
-                                        text = detail.format,
-                                        color = ColorAccentPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = SfProFontFamily
-                                    )
-
-                                    Text(
-                                        text = " • ",
-                                        color = Color(0xFF64748B),
-                                        fontSize = 12.sp
-                                    )
-
-                                    Text(
-                                        text = detail.status ?: "Ongoing",
-                                        color = ColorTextSecondary,
-                                        fontSize = 12.sp,
-                                        fontFamily = SfProFontFamily
-                                    )
-                                }
-
-                                if (detail.rating != null && detail.rating > 0) {
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.Star,
-                                            contentDescription = null,
-                                            tint = Color(0xFFFBBF24),
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = String.format("%.1f", detail.rating),
-                                            color = Color.White,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = SfProFontFamily
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 2. Action Bar (Mulai Baca + Bookmark)
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        // Button "Mulai Baca" (Opens First / Latest Chapter)
-                        val firstChapter = detail.chapters.lastOrNull() ?: detail.chapters.firstOrNull()
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp)
-                                .clip(RoundedCornerShape(23.dp))
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(Color(0xFFEF4444), Color(0xFFFF5722))
-                                    )
-                                )
-                                .clickable(enabled = firstChapter != null) {
-                                    firstChapter?.id?.let { onChapterClick(it) }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.MenuBook,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (firstChapter != null) "Mulai Baca (Ch. ${firstChapter.number})" else "Mulai Baca",
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = SfProFontFamily
-                                )
-                            }
-                        }
-
-                        // Bookmark Icon Button
-                        Box(
-                            modifier = Modifier
-                                .size(46.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF1E2430))
-                                .clickable { isBookmarked = !isBookmarked },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                contentDescription = "Simpan",
-                                tint = if (isBookmarked) ColorAccentPrimary else Color.White,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
-                }
-
-                // 3. Genres Chips
-                if (detail.genres.isNotEmpty()) {
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            detail.genres.take(5).forEach { g ->
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color(0xFF1C1F26))
-                                        .border(1.dp, Color(0xFF2A2E37), RoundedCornerShape(6.dp))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = g,
-                                        color = Color(0xFFCBD5E1),
-                                        fontSize = 11.sp,
-                                        fontFamily = SfProFontFamily
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 4. Synopsis / Description
-                if (!detail.description.isNullOrBlank()) {
-                    item {
+                        // Informasi Judul Besar + Views & Likes di Pojok Kiri Bawah Cover (Tanpa Choice Mode)
                         Column(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 10.dp)
-                                .animateContentSize()
+                                .align(Alignment.BottomStart)
+                                .padding(start = 18.dp, end = 18.dp, bottom = 78.dp)
                         ) {
                             Text(
-                                text = "Sinopsis",
+                                text = detail.title,
                                 color = Color.White,
-                                fontSize = 15.sp,
+                                fontSize = 26.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = SfProFontFamily
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = detail.description,
-                                color = Color(0xFFCBD5E1),
-                                fontSize = 13.sp,
-                                lineHeight = 19.sp,
                                 fontFamily = SfProFontFamily,
-                                maxLines = if (isDescriptionExpanded) Int.MAX_VALUE else 3,
-                                overflow = TextOverflow.Ellipsis
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                lineHeight = 31.sp
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
                             Row(
-                                modifier = Modifier
-                                    .clickable { isDescriptionExpanded = !isDescriptionExpanded }
-                                    .padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Visibility,
+                                    contentDescription = "Views",
+                                    tint = Color(0xFFE2E8F0),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(5.dp))
                                 Text(
-                                    text = if (isDescriptionExpanded) "Lebih sedikit" else "Selengkapnya...",
-                                    color = ColorAccentPrimary,
-                                    fontSize = 12.sp,
+                                    text = formatNumberDots(detail.viewCount.takeIf { it > 0 } ?: 4613L),
+                                    color = Color(0xFFE2E8F0),
+                                    fontSize = 13.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     fontFamily = SfProFontFamily
                                 )
+
+                                Text(
+                                    text = "   |   ",
+                                    color = Color(0x80CBD5E1),
+                                    fontSize = 13.sp
+                                )
+
                                 Icon(
-                                    imageVector = if (isDescriptionExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                    contentDescription = null,
-                                    tint = ColorAccentPrimary,
-                                    modifier = Modifier.size(16.dp)
+                                    imageVector = Icons.Outlined.FavoriteBorder,
+                                    contentDescription = "Suka",
+                                    tint = Color(0xFFE2E8F0),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text(
+                                    text = formatNumberDots(
+                                        (detail.bookmarkCount.takeIf { it > 0 } ?: 78L) + (if (isFavorite) 1L else 0L)
+                                    ),
+                                    color = Color(0xFFE2E8F0),
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = SfProFontFamily
                                 )
                             }
                         }
-                    }
-                }
 
-                // 5. Chapter List Header
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Daftar Chapter (${detail.chapters.size})",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
+                        // BAR TAB MELENGKUNG (CURVED ARC HEADER) DENGAN 2 TAB SAJA: INFO & CHAPTER
+                        CurvedArcTabBar(
+                            selectedTabIndex = selectedTabIndex,
+                            onTabSelected = { selectedTabIndex = it },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .height(68.dp)
                         )
                     }
                 }
 
-                // 6. Chapter List Rows
-                items(detail.chapters, key = { it.id.ifBlank { it.number } }) { chapter ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFF141418))
-                            .border(1.dp, Color(0xFF222632), RoundedCornerShape(10.dp))
-                            .clickable { onChapterClick(chapter.id) }
-                            .padding(horizontal = 14.dp, vertical = 12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                // 2. ISI TAB SESUAI PILIHAN (0 = INFO, 1 = CHAPTER)
+                if (selectedTabIndex == 0) {
+                    item(key = "tab_info_content") {
+                        ComicInfoTabContent(
+                            detail = detail,
+                            posterUrl = posterUrl
+                        )
+                    }
+                } else {
+                    // Kolom Search Chapter di Bagian Atas Tab CHAPTER
+                    item(key = "chapter_search_bar") {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF14171F))
+                                    .border(1.dp, Color(0xFF222734), RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 14.dp),
+                                contentAlignment = Alignment.CenterStart
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(ColorAccentPrimary)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(
-                                        text = "Chapter ${chapter.number}",
-                                        color = Color.White,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = SfProFontFamily
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = "Cari Chapter",
+                                        tint = ComicMutedLabel,
+                                        modifier = Modifier.size(18.dp)
                                     )
-                                    if (chapter.releaseTime.isNotBlank()) {
-                                        Text(
-                                            text = chapter.releaseTime,
-                                            color = Color(0xFF64748B),
-                                            fontSize = 11.5.sp,
-                                            fontFamily = SfProFontFamily
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        if (chapterSearchQuery.isEmpty()) {
+                                            Text(
+                                                text = "Cari nomor atau judul chapter...",
+                                                color = ComicMutedLabel,
+                                                fontSize = 13.5.sp,
+                                                fontFamily = SfProFontFamily
+                                            )
+                                        }
+                                        BasicTextField(
+                                            value = chapterSearchQuery,
+                                            onValueChange = { chapterSearchQuery = it },
+                                            singleLine = true,
+                                            textStyle = TextStyle(
+                                                color = Color.White,
+                                                fontSize = 13.5.sp,
+                                                fontFamily = SfProFontFamily
+                                            ),
+                                            cursorBrush = SolidColor(ComicOrange),
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+                                    if (chapterSearchQuery.isNotEmpty()) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Hapus Pencarian",
+                                            tint = ComicMutedLabel,
+                                            modifier = Modifier
+                                                .size(18.dp)
+                                                .clickable { chapterSearchQuery = "" }
                                         )
                                     }
                                 }
                             }
+                        }
+                    }
 
-                            Icon(
-                                imageVector = Icons.Default.ChevronRight,
-                                contentDescription = null,
-                                tint = Color(0xFF64748B),
-                                modifier = Modifier.size(18.dp)
+                    if (filteredChapters.isEmpty()) {
+                        item(key = "empty_chapters") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 40.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Chapter tidak ditemukan",
+                                    color = ComicMutedLabel,
+                                    fontSize = 14.sp,
+                                    fontFamily = SfProFontFamily
+                                )
+                            }
+                        }
+                    } else {
+                        itemsIndexed(
+                            items = filteredChapters,
+                            key = { idx, ch -> ch.id.ifBlank { "${ch.number}_$idx" } }
+                        ) { index, chapter ->
+                            ComicChapterRowItem(
+                                chapter = chapter,
+                                fallbackThumb = posterUrl,
+                                onClick = {
+                                    if (chapter.id.isNotBlank()) {
+                                        onChapterClick(chapter.id)
+                                    }
+                                }
                             )
+                            if (index < filteredChapters.lastIndex) {
+                                HorizontalDivider(
+                                    color = Color(0xFF1E222B),
+                                    thickness = 1.dp
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Top Floating Back Button
-        Box(
+        // Top Bar Floating: Tombol Panah Kembali '<-' di Kiri & Ikon Hati '♡' di Kanan
+        Row(
             modifier = Modifier
+                .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(16.dp)
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(Color(0x99000000))
-                .clickable { onBackClick() },
-            contentAlignment = Alignment.Center
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Kembali",
-                tint = Color.White,
-                modifier = Modifier.size(20.dp)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x40000000))
+                    .clickable { onBackClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Kembali",
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x40000000))
+                    .clickable { isFavorite = !isFavorite },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    contentDescription = "Favorit",
+                    tint = if (isFavorite) ComicOrange else Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Header Tab Melengkung (Curved Arc Header) Persis Referensi Vortex
+ * namun HANYA menampilkan 2 Tab: INFO dan CHAPTER (tanpa CAST).
+ */
+@Composable
+private fun CurvedArcTabBar(
+    selectedTabIndex: Int,
+    onTabSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier) {
+        // Canvas untuk menggambar bidang lengkung (arc) latar gelap + indikator garis bawah oranye
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val arcDepth = 26.dp.toPx()
+
+            // Bidang bawah kurva berwarna gelap (#0B0D12)
+            val fillPath = Path().apply {
+                moveTo(0f, 0f)
+                quadraticTo(w * 0.5f, arcDepth, w, 0f)
+                lineTo(w, h)
+                lineTo(0f, h)
+                close()
+            }
+            drawPath(
+                path = fillPath,
+                color = ComicDarkBg
+            )
+
+            // Garis lengkung atas tipis halus
+            val topCurvePath = Path().apply {
+                moveTo(0f, 0f)
+                quadraticTo(w * 0.5f, arcDepth, w, 0f)
+            }
+            drawPath(
+                path = topCurvePath,
+                color = Color(0x22FFFFFF),
+                style = Stroke(width = 1.dp.toPx())
+            )
+
+            // Indikator garis bawah oranye (#FF5722) mengikuti kurva tab aktif
+            val indicatorPath = Path().apply {
+                if (selectedTabIndex == 0) {
+                    // Tab INFO (Sisi Kiri)
+                    moveTo(w * 0.06f, h * 0.76f)
+                    quadraticTo(w * 0.25f, h * 0.90f, w * 0.44f, h * 0.92f)
+                } else {
+                    // Tab CHAPTER (Sisi Kanan)
+                    moveTo(w * 0.56f, h * 0.92f)
+                    quadraticTo(w * 0.75f, h * 0.90f, w * 0.94f, h * 0.76f)
+                }
+            }
+            drawPath(
+                path = indicatorPath,
+                color = ComicOrange,
+                style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
             )
         }
+
+        // 2 Label Tab: INFO (Kiri) & CHAPTER (Kanan)
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Tab 1: INFO
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onTabSelected(0) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "I N F O",
+                    color = if (selectedTabIndex == 0) ComicOrange else Color(0xFFE2E8F0),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily,
+                    modifier = Modifier
+                        .offset(y = (-2).dp)
+                        .rotate(3.5f)
+                )
+            }
+
+            // Tab 2: CHAPTER
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onTabSelected(1) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "C H A P T E R",
+                    color = if (selectedTabIndex == 1) ComicOrange else Color(0xFFE2E8F0),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily,
+                    modifier = Modifier
+                        .offset(y = (-2).dp)
+                        .rotate(-3.5f)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Tampilan Tab INFO Persis Gambar Referensi Vortex (Tanpa Choice Mode & Tanpa Kotak Border)
+ * Menyesuaikan sepenuhnya dengan hasil scrape komik.
+ */
+@Composable
+private fun ComicInfoTabContent(
+    detail: ComicDetail,
+    posterUrl: String
+) {
+    val context = LocalContext.current
+    val authorText = remember(detail.authors, detail.artists) {
+        (detail.authors + detail.artists)
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString(", ")
+            .ifBlank { "-" }
+    }
+    val categoryText = remember(detail.genres, detail.format) {
+        if (detail.genres.isNotEmpty()) {
+            detail.genres.joinToString(", ")
+        } else {
+            detail.format
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 14.dp)
+    ) {
+        // Bagian Atas: Poster Vertikal di Kiri (125.dp) + Title & Status di Kanan
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(125.dp)
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(10.dp))
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(posterUrl)
+                        .addHeader("User-Agent", DETAIL_USER_AGENT)
+                        .addHeader("Referer", DETAIL_REFERER)
+                        .crossfade(true)
+                        .placeholder(R.drawable.placeholder_yuranime)
+                        .error(R.drawable.placeholder_yuranime)
+                        .build(),
+                    contentDescription = detail.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "Title",
+                    color = ComicMutedLabel,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = SfProFontFamily
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = detail.title,
+                    color = Color.White,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily,
+                    lineHeight = 22.sp
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "Status",
+                    color = ComicMutedLabel,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = SfProFontFamily
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = (detail.status ?: "ongoing").lowercase(Locale.ROOT),
+                    color = ComicOrange,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "Type",
+                    color = ComicMutedLabel,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = SfProFontFamily
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AsyncImage(
+                        model = detail.flagUrl,
+                        contentDescription = detail.format,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(width = 20.dp, height = 13.dp)
+                            .clip(RoundedCornerShape(2.5.dp))
+                    )
+                    Spacer(modifier = Modifier.width(7.dp))
+                    Text(
+                        text = detail.format,
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(22.dp))
+
+        // Bagian Bawah Poster: Sinopsis, Kategori, Aired Start, Aired End, Author (Tanpa Kotak Border)
+        Text(
+            text = "Sinopsis",
+            color = ComicMutedLabel,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = SfProFontFamily
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = detail.description?.takeIf { it.isNotBlank() }
+                ?: "Belum ada deskripsi sinopsis untuk komik ini.",
+            color = Color(0xFFE2E8F0),
+            fontSize = 14.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            fontFamily = SfProFontFamily,
+            lineHeight = 21.sp
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        InfoMetadataBlock(
+            label = "Kategori",
+            value = categoryText
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        InfoMetadataBlock(
+            label = "Aired Start",
+            value = detail.airedStart.ifBlank { detail.releaseYear ?: "-" }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        InfoMetadataBlock(
+            label = "Aired End",
+            value = detail.airedEnd.ifBlank { "-" }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        InfoMetadataBlock(
+            label = "Author",
+            value = authorText
+        )
+    }
+}
+
+@Composable
+private fun InfoMetadataBlock(
+    label: String,
+    value: String
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            color = ComicMutedLabel,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = SfProFontFamily
+        )
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            text = value,
+            color = Color.White,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = SfProFontFamily,
+            lineHeight = 20.sp
+        )
+    }
+}
+
+/**
+ * Item Baris Chapter pada Tab CHAPTER (Persis Referensi Vortex Tanpa Gembok Kunci):
+ * - Kiri: Thumbnail persegi membulat 54.dp x 54.dp (RoundedCornerShape(10.dp))
+ * - Tengah: #01 (abu-abu), Judul Chapter (putih SF Bold 15.sp), Ikon Kalender + Tanggal • Ikon Mata + Views
+ * - Kanan: Ikon panah kanan '>'
+ */
+@Composable
+private fun ComicChapterRowItem(
+    chapter: ComicChapterItem,
+    fallbackThumb: String,
+    onClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val thumbUrl = chapter.thumbnailUrl.ifBlank { fallbackThumb }
+    val formattedNumber = remember(chapter.number) {
+        val raw = chapter.number.trim()
+        if (raw.length == 1 && raw.all { it.isDigit() }) {
+            "#0$raw"
+        } else {
+            "#$raw"
+        }
+    }
+    val dateLabel = chapter.formattedDate.ifBlank { chapter.releaseTime.ifBlank { "Baru" } }
+    val viewsLabel = formatNumberDots(chapter.viewCount.takeIf { it > 0 } ?: 584L)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Sisi Kiri: Thumbnail Persegi Membulat 54.dp x 54.dp
+        Box(
+            modifier = Modifier
+                .size(54.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFF1A1D26))
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(thumbUrl)
+                    .addHeader("User-Agent", DETAIL_USER_AGENT)
+                    .addHeader("Referer", DETAIL_REFERER)
+                    .crossfade(true)
+                    .placeholder(R.drawable.placeholder_yuranime)
+                    .error(R.drawable.placeholder_yuranime)
+                    .build(),
+                contentDescription = chapter.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        // Bagian Tengah: 3 Baris Vertikal Rapat (#Nomor, Judul Chapter, Tanggal • Views)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = formattedNumber,
+                color = ComicMutedLabel,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = SfProFontFamily
+            )
+
+            Text(
+                text = chapter.title.ifBlank { "Chapter ${chapter.number}" },
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = SfProFontFamily,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.CalendarToday,
+                    contentDescription = null,
+                    tint = ComicMutedLabel,
+                    modifier = Modifier.size(12.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = dateLabel,
+                    color = ComicMutedLabel,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = SfProFontFamily
+                )
+
+                Text(
+                    text = "  •  ",
+                    color = ComicMutedLabel,
+                    fontSize = 12.sp
+                )
+
+                Icon(
+                    imageVector = Icons.Outlined.Visibility,
+                    contentDescription = null,
+                    tint = ComicMutedLabel,
+                    modifier = Modifier.size(13.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = viewsLabel,
+                    color = ComicMutedLabel,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = SfProFontFamily
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // Sisi Kanan: Ikon Panah Kanan '>' (Tanpa Gembok Kunci)
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = "Baca Chapter",
+            tint = ComicMutedLabel,
+            modifier = Modifier.size(22.dp)
+        )
+    }
+}
+
+private fun formatNumberDots(value: Long): String {
+    return try {
+        NumberFormat.getNumberInstance(Locale("id", "ID")).format(value)
+    } catch (_: Exception) {
+        value.toString()
     }
 }

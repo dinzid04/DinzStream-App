@@ -221,17 +221,21 @@ fun StreamingScreen(
 
     val localDb = remember { LocalAuthDatabase(context) }
 
-    // Periodic watch progress recording
+    // Periodic watch progress recording (simpan Cover Horizontal agar tampilan Lanjut Nonton di Home horizontal)
     LaunchedEffect(uiState.isPlaying, uiState.currentPositionMs) {
         if (uiState.isPlaying && uiState.currentPositionMs > 5000L) {
             val mId = uiState.movieId.ifBlank { uiState.episode?.idMovie ?: "" }
             if (mId.isNotBlank()) {
+                val horizontalCoverUrl = uiState.movieDetail?.movie?.getEffectiveCover()?.takeIf { it.isNotBlank() }
+                    ?: uiState.episode?.getEffectiveImage()?.takeIf { it.isNotBlank() }
+                    ?: uiState.movieDetail?.movie?.getEffectivePoster()
+                    ?: ""
                 localDb.saveWatchProgress(
                     movieId = mId,
                     animeTitle = uiState.movieDetail?.movie?.title ?: uiState.episode?.title?.substringBefore(" Episode") ?: "Anime",
                     episodeId = uiState.episodeId,
                     episodeTitle = "Episode ${uiState.episode?.index ?: "1"}",
-                    posterUrl = uiState.movieDetail?.movie?.imagePoster ?: uiState.episode?.getEffectiveImage() ?: "",
+                    posterUrl = horizontalCoverUrl,
                     positionMs = uiState.currentPositionMs,
                     durationMs = uiState.durationMs
                 )
@@ -245,12 +249,16 @@ fun StreamingScreen(
             val state = viewModel.uiState.value
             val mId = state.movieId.ifBlank { state.episode?.idMovie ?: "" }
             if (mId.isNotBlank() && state.currentPositionMs > 3000L) {
+                val horizontalCoverUrl = state.movieDetail?.movie?.getEffectiveCover()?.takeIf { it.isNotBlank() }
+                    ?: state.episode?.getEffectiveImage()?.takeIf { it.isNotBlank() }
+                    ?: state.movieDetail?.movie?.getEffectivePoster()
+                    ?: ""
                 localDb.saveWatchProgress(
                     movieId = mId,
                     animeTitle = state.movieDetail?.movie?.title ?: state.episode?.title?.substringBefore(" Episode") ?: "Anime",
                     episodeId = state.episodeId,
                     episodeTitle = "Episode ${state.episode?.index ?: "1"}",
-                    posterUrl = state.movieDetail?.movie?.imagePoster ?: state.episode?.getEffectiveImage() ?: "",
+                    posterUrl = horizontalCoverUrl,
                     positionMs = state.currentPositionMs,
                     durationMs = state.durationMs
                 )

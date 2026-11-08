@@ -65,6 +65,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -90,6 +91,7 @@ import com.yuranime.dinz.ui.components.CoachmarkStep
 import com.yuranime.dinz.ui.components.CuplixAvatarItem
 import com.yuranime.dinz.ui.components.NavTab
 import com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay
+import com.yuranime.dinz.ui.components.liquidGlassBackdrop
 import com.yuranime.dinz.ui.components.onboardingTarget
 import com.yuranime.dinz.ui.theme.ColorAccentPrimary
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
@@ -115,6 +117,7 @@ fun SearchScreen(
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
     val targetBounds = remember { mutableStateMapOf<String, Rect>() }
+    val backdropLayer = rememberGraphicsLayer()
 
     BackHandler(enabled = uiState.selectedSubPage != null || uiState.isSearchActive) {
         if (uiState.selectedSubPage != null) {
@@ -124,21 +127,17 @@ fun SearchScreen(
         }
     }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = ColorBackgroundPrimary,
-        bottomBar = {
-            BottomNavBar(
-                selectedTab = selectedTab,
-                onTabSelected = onTabSelected
-            )
-        }
-    ) { innerPadding ->
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(ColorBackgroundPrimary)
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .liquidGlassBackdrop(backdropLayer)
                 .background(ColorBackgroundPrimary)
+                .statusBarsPadding()
         ) {
             if (uiState.selectedSubPage != null) {
                 // Sub-Page Full List for KATEGORI, TAHUN, KARAKTER
@@ -311,7 +310,7 @@ fun SearchScreen(
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 16.dp),
+                        .padding(end = 16.dp, bottom = 100.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Sort order button with Emerald Green Arrow
@@ -383,6 +382,14 @@ fun SearchScreen(
                 }
             )
         }
+
+        // Floating Clear Liquid Glass Navbar
+        BottomNavBar(
+            selectedTab = selectedTab,
+            onTabSelected = onTabSelected,
+            backdropLayer = backdropLayer,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 
@@ -402,7 +409,7 @@ private fun ExploreDefaultContent(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 115.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         // 1. KATEGORI (White Cards with Right Illustration)
@@ -662,7 +669,7 @@ private fun SearchResultsContent(
                         columns = GridCells.Fixed(3),
                         state = gridState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 80.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 115.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
@@ -696,7 +703,7 @@ private fun SearchResultsContent(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 80.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 115.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(displayedList, key = { it.id ?: it.hashCode().toString() }) { anime ->
@@ -775,7 +782,7 @@ private fun ExploreSubPageContent(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 115.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             when (subPage) {
@@ -867,37 +874,57 @@ private fun WhiteCategoryCard(
     imageUrl: String,
     onClick: () -> Unit
 ) {
+    var cardBgColor by remember(imageUrl) { mutableStateOf(Color(0xFFF8FAFC)) }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(90.dp)
+            .height(92.dp)
             .clip(RoundedCornerShape(12.dp))
+            .background(cardBgColor)
             .clickable(onClick = onClick)
     ) {
-        // Full background image from API (CenterEnd to prevent cropping character face on right)
+        // Gambar karakter di kanan + ekstraksi warna latar piksel tepi kiri agar menyatu penuh tanpa garis batas
         if (imageUrl.isNotBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(imageUrl)
+                    .allowHardware(false)
                     .size(coil.size.Size.ORIGINAL)
                     .crossfade(false)
-                    .placeholder(R.drawable.placeholder_yuranime_wide)
-                    .error(R.drawable.placeholder_yuranime_wide)
                     .build(),
                 contentDescription = name,
                 contentScale = ContentScale.FillHeight,
                 alignment = Alignment.CenterEnd,
+                onSuccess = { state ->
+                    val bmp = (state.result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                    if (bmp != null && bmp.width > 4 && bmp.height > 4) {
+                        val sampleX = (bmp.width * 0.04f).toInt().coerceIn(1, bmp.width - 2)
+                        val sampleY = (bmp.height * 0.5f).toInt().coerceIn(1, bmp.height - 2)
+                        val pixel = bmp.getPixel(sampleX, sampleY)
+                        if (android.graphics.Color.alpha(pixel) > 200) {
+                            cardBgColor = Color(pixel)
+                        }
+                    }
+                },
                 modifier = Modifier.fillMaxSize()
             )
-        } else {
+
+            // Smooth horizontal gradient blend agar tepi kiri gambar menyatu 100% ke latar kartu
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.White)
+                    .background(
+                        Brush.horizontalGradient(
+                            0.0f to cardBgColor,
+                            0.46f to cardBgColor,
+                            0.68f to Color.Transparent
+                        )
+                    )
             )
         }
 
-        // Text on top (Left aligned)
+        // Teks Kategori di sisi kiri (kontras tajam di atas latar yang menyatu penuh)
         Column(
             modifier = Modifier
                 .align(Alignment.CenterStart)
@@ -905,7 +932,7 @@ private fun WhiteCategoryCard(
         ) {
             Text(
                 text = group,
-                color = Color(0xFF6B7280),
+                color = Color(0xFF64748B),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 fontFamily = SfProFontFamily
@@ -913,7 +940,7 @@ private fun WhiteCategoryCard(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = name,
-                color = Color(0xFF222222),
+                color = Color(0xFF1E293B),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = SfProFontFamily
@@ -928,40 +955,60 @@ private fun WhiteYearCard(
     imageUrl: String,
     onClick: () -> Unit
 ) {
+    var cardBgColor by remember(imageUrl) { mutableStateOf(Color(0xFFF8FAFC)) }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(90.dp)
+            .height(92.dp)
             .clip(RoundedCornerShape(12.dp))
+            .background(cardBgColor)
             .clickable(onClick = onClick)
     ) {
-        // Full background image from API (CenterStart to prevent cropping character face on left)
+        // Gambar karakter di kiri + ekstraksi warna latar piksel tepi kanan agar menyatu penuh dari kiri ke kanan
         if (imageUrl.isNotBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(imageUrl)
+                    .allowHardware(false)
                     .size(coil.size.Size.ORIGINAL)
                     .crossfade(false)
-                    .placeholder(R.drawable.placeholder_yuranime_wide)
-                    .error(R.drawable.placeholder_yuranime_wide)
                     .build(),
                 contentDescription = year,
                 contentScale = ContentScale.FillHeight,
                 alignment = Alignment.CenterStart,
+                onSuccess = { state ->
+                    val bmp = (state.result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                    if (bmp != null && bmp.width > 4 && bmp.height > 4) {
+                        val sampleX = (bmp.width * 0.96f).toInt().coerceIn(1, bmp.width - 2)
+                        val sampleY = (bmp.height * 0.5f).toInt().coerceIn(1, bmp.height - 2)
+                        val pixel = bmp.getPixel(sampleX, sampleY)
+                        if (android.graphics.Color.alpha(pixel) > 200) {
+                            cardBgColor = Color(pixel)
+                        }
+                    }
+                },
                 modifier = Modifier.fillMaxSize()
             )
-        } else {
+
+            // Smooth horizontal gradient blend agar tepi kanan gambar menyatu 100% ke latar kartu
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.White)
+                    .background(
+                        Brush.horizontalGradient(
+                            0.32f to Color.Transparent,
+                            0.54f to cardBgColor,
+                            1.0f to cardBgColor
+                        )
+                    )
             )
         }
 
-        // Text on top (Right aligned)
+        // Teks Tahun di sisi kanan
         Text(
             text = year,
-            color = Color(0xFF222222),
+            color = Color(0xFF1E293B),
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = SfProFontFamily,

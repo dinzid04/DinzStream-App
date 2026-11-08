@@ -1,5 +1,7 @@
 package com.yuranime.dinz.ui.components
 
+import android.graphics.RenderEffect
+import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -40,24 +42,36 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yuranime.dinz.ui.theme.ColorAccentPrimary
 import com.yuranime.dinz.ui.theme.SfProFontFamily
+import org.intellij.lang.annotations.Language
 
 /**
  * Tab navigasi utama aplikasi Yuranime.
@@ -75,84 +89,237 @@ enum class NavTab(
     CHAT("Chat", Icons.AutoMirrored.Filled.Send, Icons.AutoMirrored.Outlined.Send),
     PROFILE("Profile", Icons.Filled.Person, Icons.Outlined.Person);
 
-    // Backward compatibility getters
     val title: String get() = label
     val icon: ImageVector get() = filledIcon
 }
 
 /**
- * Floating Bottom Navigation Bar dengan gaya "Liquid Glass"
- * Terinspirasi dari quickLiquid (amarnath3003/quickLiquid):
- * - Floating pill dengan jarak aman padding horizontal dan bottom.
- * - Active tab: Lensa Liquid Glass memanjang dengan Row(Ikon Filled + Label SF Bold)
- *   didukung animasi spring physics (squash and stretch).
- * - Inactive tabs: Hanya Ikon Outline tanpa label teks sama sekali.
- * - Efek optik kaca cair: clear center, refractive rim highlight (fresnel specular),
- *   chromatic edge halus, serta bayangan lembut.
+ * Modifier untuk merekam konten halaman ke dalam [GraphicsLayer] agar piksel
+ * yang berada tepat di bawah [BottomNavBar] dapat dibiaskan secara real-time
+ * oleh lensa Clear Liquid Glass.
+ */
+fun Modifier.liquidGlassBackdrop(layer: GraphicsLayer): Modifier = this.drawWithContent {
+    layer.record {
+        this@drawWithContent.drawContent()
+    }
+    drawLayer(layer)
+}
+
+/**
+ * AGSL Shader fisika optik Clear Liquid Glass (diadaptasi dari amarnath3003/quickLiquid):
+ * - Clear Center: bagian tengah kapsul bening transparan sehingga konten di bawahnya terlihat jelas.
+ * - Refractive Edge (Lensing): tepi lengkungan kapsul membelokkan/membiaskan piksel latar
+ *   dengan kurva busur cembung (Snell refraction) + chromatic dispersion (R/G/B).
+ * - Fresnel Specular Rim: pantulan cahaya kaca putih tajam di sepanjang bibir kapsul.
+ */
+@Language("AGSL")
+private const val QUICK_LIQUID_AGSL_SHADER = """
+    uniform shader content;
+    uniform float2 resolution;
+
+    float sdRoundedBox(float2 p, float2 b, float r) {
+        float2 q = abs(p) - b + r;
+        return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+    }
+
+    half4 main(float2 fragCoord) {
+        float2 center = resolution * 0.5;
+        float radius = min(center.x, center.y);
+        float2 p = fragCoord - center;
+
+        // Signed distance dari tepi kapsul (negatif di dalam kapsul)
+        float dist = sdRoundedBox(p, center, radius);
+        float d = max(-dist, 0.0);
+
+        // Lebar bezel pembiasan tepi kaca (22px)
+        float bezel = min(22.0, radius * 0.68);
+        float s = clamp(d / bezel, 0.0, 1.0);
+
+        // Profil lengkungan kaca cembung: 0 di bagian tengah (clear center), kuat di tepi
+        float edgeCurve = pow(1.0 - s, 2.15);
+
+        // Vektor normal permukaan menuju pusat kapsul
+        float2 normal = (length(p) > 0.001) ? normalize(p) : float2(0.0, -1.0);
+
+        // Kekuatan pembiasan (lensing magnification + edge bending)
+        float shiftStrength = edgeCurve * 18.0;
+        float2 delta = -normal * shiftStrength;
+
+        // Chromatic dispersion halus pada kanal R, G, B
+        float2 uvR = clamp(fragCoord + delta * 0.88, float2(1.0), resolution - 1.0);
+        float2 uvG = clamp(fragCoord + delta * 1.00, float2(1.0), resolution - 1.0);
+        float2 uvB = clamp(fragCoord + delta * 1.14, float2(1.0), resolution - 1.0);
+
+        half4 colR = content.eval(uvR);
+        half4 colG = content.eval(uvG);
+        half4 colB = content.eval(uvB);
+        half3 refracted = half3(colR.r, colG.g, colB.b);
+
+        // Lapisan kaca bening (clear glass) dengan sedikit penyeimbang kontras agar ikon putih tajam
+        half3 glassTint = mix(refracted * 0.82, half3(0.09, 0.11, 0.15), 0.22);
+
+        // Fresnel specular highlight pada bibir kapsul (atas-kiri & bawah-kanan)
+        float lightDir = clamp((-normal.y * 0.72 - normal.x * 0.38), 0.0, 1.0);
+        float oppLight = clamp((normal.y * 0.55 + normal.x * 0.35), 0.0, 1.0);
+        float fresnelRim = pow(1.0 - s, 4.2) * (0.42 * lightDir + 0.22 * oppLight);
+        float innerCaustic = pow(1.0 - s, 2.4) * 0.12;
+
+        half3 finalRgb = clamp(glassTint + half3(fresnelRim + innerCaustic), half3(0.0), half3(1.0));
+        return half4(finalRgb, 1.0);
+    }
+"""
+
+/**
+ * Floating Bottom Navigation Bar dengan gaya optik "Clear Liquid Glass" (quickLiquid):
+ * - Mengambang murni 100% di atas konten halaman tanpa blok hitam di bawahnya.
+ * - Clear Center & Refractive Edge: tengah kapsul bening transparan, tepinya membiaskan konten di bawahnya.
+ * - Tab Aktif: Lensa kaca bening putih (tanpa warna coklat/merah keruh) + Ikon Putih Solid + Teks Judul Putih SF Bold.
+ * - Tab Tidak Aktif: Hanya Ikon Outline tanpa teks.
  */
 @Composable
 fun BottomNavBar(
     selectedTab: NavTab,
     onTabSelected: (NavTab) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    backdropLayer: GraphicsLayer? = null
 ) {
+    var pillOffsetInRoot by remember { mutableStateOf(Offset.Zero) }
+    var pillSize by remember { mutableStateOf(IntSize.Zero) }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
+            .padding(start = 24.dp, end = 24.dp, bottom = 20.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Kapsul Utama Liquid Glass (Floating Pill)
+        // Kapsul Utama Clear Liquid Glass (Floating Pill)
         Box(
             modifier = Modifier
-                .shadow(20.dp, CircleShape)
+                .onGloballyPositioned { coords ->
+                    pillOffsetInRoot = coords.positionInRoot()
+                    pillSize = coords.size
+                }
+                .shadow(16.dp, CircleShape, clip = false)
                 .clip(CircleShape)
-                .background(Color(0xEB11141B))
-                // Lapisan Pembiasan Kaca Cair (Fresnel Rim Specular + Chromatic Dispersion Edge)
+                // Lapisan dasar kaca bening (Clear Glass) jika backdropLayer belum terekam
+                .background(Color(0x3310131A))
                 .drawBehind {
-                    val strokeWidth = 1.2.dp.toPx()
+                    val strokeWidth = 1.dp.toPx()
                     val halfStroke = strokeWidth / 2f
+                    val r = size.height / 2f
 
-                    // 1. Chromatic dispersion subtle inner rim (bias optik spektrum kaca)
+                    // Lapisan kilau dalam kaca (Clear Center + Subtle Refractive Edge Highlight)
+                    drawRoundRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0x38FFFFFF),
+                                Color(0x0AFFFFFF),
+                                Color(0x05FFFFFF),
+                                Color(0x24FFFFFF)
+                            )
+                        ),
+                        cornerRadius = CornerRadius(r, r)
+                    )
+
+                    // Chromatic dispersion tipis di bagian dalam tepi lensa
                     drawRoundRect(
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color(0x26FF5722), // Red-orange bias
-                                Color(0x143B82F6), // Cyan-blue bias
-                                Color(0x0DFFFFFF)
+                                Color(0x337DD3FC), // Cyan refraction edge
+                                Color(0x08FFFFFF),
+                                Color(0x26F472B6)  // Warm spectrum edge
                             ),
                             start = Offset(0f, 0f),
                             end = Offset(size.width, size.height)
                         ),
-                        topLeft = Offset(halfStroke, halfStroke),
-                        size = Size(size.width - strokeWidth, size.height - strokeWidth),
-                        cornerRadius = CornerRadius(size.height / 2f, size.height / 2f),
-                        style = Stroke(width = strokeWidth * 1.5f)
+                        topLeft = Offset(strokeWidth * 1.5f, strokeWidth * 1.5f),
+                        size = Size(size.width - strokeWidth * 3f, size.height - strokeWidth * 3f),
+                        cornerRadius = CornerRadius(r - strokeWidth, r - strokeWidth),
+                        style = Stroke(width = strokeWidth * 1.4f)
                     )
 
-                    // 2. Fresnel specular highlight pada bibir atas kapsul
+                    // Fresnel Specular Rim putih tajam (1.dp) di bibir kapsul
                     drawRoundRect(
-                        brush = Brush.verticalGradient(
+                        brush = Brush.linearGradient(
                             colors = listOf(
-                                Color(0x59FFFFFF), // 35% specular highlight di puncak atas
-                                Color(0x1AFFFFFF), // 10% di tengah
-                                Color(0x08FFFFFF)  // 3% di dasar bawah
-                            )
+                                Color(0xB3FFFFFF),
+                                Color(0x33FFFFFF),
+                                Color(0x1AFFFFFF),
+                                Color(0x66FFFFFF)
+                            ),
+                            start = Offset(0f, 0f),
+                            end = Offset(size.width * 0.85f, size.height)
                         ),
                         topLeft = Offset(halfStroke, halfStroke),
                         size = Size(size.width - strokeWidth, size.height - strokeWidth),
-                        cornerRadius = CornerRadius(size.height / 2f, size.height / 2f),
+                        cornerRadius = CornerRadius(r, r),
                         style = Stroke(width = strokeWidth)
                     )
                 }
-                .padding(horizontal = 8.dp, vertical = 6.dp)
         ) {
+            // Live Refracted Backdrop Layer (Android 13+ AGSL RuntimeShader / Clear Glass Backdrop)
+            if (backdropLayer != null && pillSize.width > 0 && pillSize.height > 0) {
+                val agslRenderEffect = remember(pillSize) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        try {
+                            val shader = RuntimeShader(QUICK_LIQUID_AGSL_SHADER).apply {
+                                setFloatUniform(
+                                    "resolution",
+                                    pillSize.width.toFloat(),
+                                    pillSize.height.toFloat()
+                                )
+                            }
+                            RenderEffect.createRuntimeShaderEffect(shader, "content")
+                                .asComposeRenderEffect()
+                        } catch (_: Throwable) {
+                            null
+                        }
+                    } else {
+                        null
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer {
+                            if (agslRenderEffect != null) {
+                                renderEffect = agslRenderEffect
+                            }
+                            alpha = 0.96f
+                        }
+                        .drawBehind {
+                            translate(
+                                left = -pillOffsetInRoot.x,
+                                top = -pillOffsetInRoot.y
+                            ) {
+                                drawLayer(backdropLayer)
+                            }
+                        }
+                        // Rim Fresnel di atas hasil bias AGSL
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color(0xB3FFFFFF),
+                                    Color(0x2EFFFFFF),
+                                    Color(0x1AFFFFFF),
+                                    Color(0x66FFFFFF)
+                                ),
+                                start = Offset(0f, 0f),
+                                end = Offset(400f, 140f)
+                            ),
+                            shape = CircleShape
+                        )
+                )
+            }
+
+            // Baris Item Navigasi di Dalam Kapsul Kaca
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 NavTab.entries.forEach { tab ->
@@ -160,46 +327,44 @@ fun BottomNavBar(
                     val interactionSource = remember { MutableInteractionSource() }
 
                     if (isSelected) {
-                        // TAB AKTIF: Kapsul Lensa Liquid Glass Memanjang (Ikon + Judul)
+                        // TAB AKTIF: Lensa Kapsul Clear Liquid Glass (Bening Kaca Putih, TANPA Warna Coklat/Merah Keruh!)
                         Box(
                             modifier = Modifier
-                                .height(46.dp)
+                                .height(44.dp)
                                 .animateContentSize(
                                     animationSpec = spring(
                                         dampingRatio = Spring.DampingRatioLowBouncy,
                                         stiffness = Spring.StiffnessMediumLow
                                     )
                                 )
-                                .shadow(8.dp, RoundedCornerShape(24.dp))
-                                .clip(RoundedCornerShape(24.dp))
-                                // Lensa Liquid Glass dengan aksen oranye Yuranime
+                                .clip(RoundedCornerShape(22.dp))
                                 .background(
-                                    Brush.linearGradient(
+                                    Brush.verticalGradient(
                                         colors = listOf(
-                                            Color(0x3DFF5722),
-                                            Color(0x26EF4444),
-                                            Color(0x1F141418)
-                                        ),
-                                        start = Offset(0f, 0f),
-                                        end = Offset(200f, 100f)
+                                            Color(0x38FFFFFF),
+                                            Color(0x18FFFFFF),
+                                            Color(0x28FFFFFF)
+                                        )
                                     )
                                 )
                                 .border(
                                     width = 1.dp,
-                                    brush = Brush.verticalGradient(
+                                    brush = Brush.linearGradient(
                                         colors = listOf(
-                                            Color(0x80FF5722),
-                                            Color(0x33FF5722),
-                                            Color(0x1AFFFFFF)
-                                        )
+                                            Color(0xA6FFFFFF),
+                                            Color(0x33FFFFFF),
+                                            Color(0x66FFFFFF)
+                                        ),
+                                        start = Offset(0f, 0f),
+                                        end = Offset(160f, 90f)
                                     ),
-                                    shape = RoundedCornerShape(24.dp)
+                                    shape = RoundedCornerShape(22.dp)
                                 )
                                 .clickable(
                                     interactionSource = interactionSource,
-                                    indication = ripple(bounded = true, color = ColorAccentPrimary)
+                                    indication = ripple(bounded = true, color = Color.White)
                                 ) { onTabSelected(tab) }
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                                .padding(horizontal = 15.dp, vertical = 9.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Row(
@@ -232,22 +397,22 @@ fun BottomNavBar(
                             }
                         }
                     } else {
-                        // TAB TIDAK AKTIF: Hanya Ikon Outline Saja (Tanpa Label)
+                        // TAB TIDAK AKTIF: Hanya Ikon Outline Saja (Tanpa Teks Judul)
                         Box(
                             modifier = Modifier
-                                .size(46.dp)
+                                .size(44.dp)
                                 .clip(CircleShape)
                                 .clickable(
                                     interactionSource = interactionSource,
-                                    indication = ripple(bounded = false, radius = 24.dp)
+                                    indication = ripple(bounded = false, radius = 22.dp, color = Color.White)
                                 ) { onTabSelected(tab) },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = tab.outlinedIcon,
                                 contentDescription = tab.label,
-                                tint = Color(0xFF8E95A5),
-                                modifier = Modifier.size(22.dp)
+                                tint = Color(0xD9FFFFFF),
+                                modifier = Modifier.size(21.dp)
                             )
                         }
                     }

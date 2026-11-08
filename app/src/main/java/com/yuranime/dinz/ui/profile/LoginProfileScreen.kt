@@ -86,6 +86,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -111,6 +112,7 @@ import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.local.AppPreferences
 import com.yuranime.dinz.ui.components.BottomNavBar
 import com.yuranime.dinz.ui.components.NavTab
+import com.yuranime.dinz.ui.components.liquidGlassBackdrop
 import com.yuranime.dinz.ui.leaderboard.LeaderboardScreen
 import com.yuranime.dinz.ui.profile.subscreens.DownloadsScreen
 import com.yuranime.dinz.ui.profile.subscreens.EditProfileScreen
@@ -289,21 +291,19 @@ fun LoginProfileScreen(
                         }
                     )
                 } else {
-                    // LAYAR PROFIL (Setelah Login Real-Time)
-                    Scaffold(
-                        modifier = modifier.fillMaxSize(),
-                        containerColor = Color(0xFF0E0F12),
-                        bottomBar = {
-                            BottomNavBar(
-                                selectedTab = selectedTab,
-                                onTabSelected = onTabSelected
-                            )
-                        }
-                    ) { innerPadding ->
+                    // LAYAR PROFIL (Setelah Login Real-Time - Floating Clear Liquid Glass Navbar)
+                    val backdropLayer = rememberGraphicsLayer()
+                    Box(
+                        modifier = modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF0E0F12))
+                    ) {
                         UserProfileView(
                             profile = userProfile,
                             currentUser = currentUser,
-                            modifier = Modifier.padding(innerPadding),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .liquidGlassBackdrop(backdropLayer),
                             onEditProfileClick = { currentSubScreen = ProfileSubScreen.EDIT_PROFILE },
                             onDownloadMenuClick = { currentSubScreen = ProfileSubScreen.DOWNLOADS },
                             onLeaderboardMenuClick = { currentSubScreen = ProfileSubScreen.LEADERBOARD },
@@ -314,6 +314,13 @@ fun LoginProfileScreen(
                                 FirebaseManager.signOut(context)
                                 Toast.makeText(context, "Akun berhasil keluar", Toast.LENGTH_SHORT).show()
                             }
+                        )
+
+                        BottomNavBar(
+                            selectedTab = selectedTab,
+                            onTabSelected = onTabSelected,
+                            backdropLayer = backdropLayer,
+                            modifier = Modifier.align(Alignment.BottomCenter)
                         )
                     }
                 }
@@ -659,6 +666,8 @@ private fun UserProfileView(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(110.dp))
             }
         }
     }

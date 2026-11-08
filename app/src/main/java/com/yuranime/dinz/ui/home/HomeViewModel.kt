@@ -68,16 +68,28 @@ class HomeViewModel(
     fun refreshWatchHistory(context: Context) {
         val localDb = LocalAuthDatabase(context)
         val history = localDb.getWatchHistory()
+        val currentState = _uiState.value
+        val allLoadedAnime = currentState.newEpisodesList +
+            currentState.hotAnimeList +
+            currentState.todayScheduleList +
+            currentState.waitingAnimeList +
+            currentState.popularAnimeList
+
         val list = history.map { item ->
             val fraction = if (item.durationMs > 0) {
                 (item.positionMs.toFloat() / item.durationMs.toFloat()).coerceIn(0.01f, 1f)
             } else 0f
+            val matchedCover = allLoadedAnime
+                .firstOrNull { it.id == item.movieId }
+                ?.getEffectiveCover()
+                ?.takeIf { it.isNotBlank() }
+            val resolvedCover = matchedCover ?: com.yuranime.dinz.data.model.normalizeImageUrl(item.posterUrl)
             ContinueWatchingItem(
                 id = item.movieId,
                 idMovie = item.movieId,
                 title = item.animeTitle,
                 episodeText = item.episodeTitle,
-                imageUrl = item.posterUrl,
+                imageUrl = resolvedCover,
                 progressFraction = fraction,
                 episodeId = item.episodeId,
                 positionMs = item.positionMs
@@ -110,19 +122,34 @@ class HomeViewModel(
                 val comicsItems = comicsResult.getOrDefault(emptyList())
 
                 _uiState.update { current ->
+                    val newEp = data?.newEpisodes ?: emptyList()
+                    val hot = data?.hotAnime ?: emptyList()
+                    val today = data?.todayAnime ?: emptyList()
+                    val waiting = data?.waitingAnime ?: emptyList()
+                    val popular = data?.popularAnime ?: emptyList()
+                    val combinedAnime = newEp + hot + today + waiting + popular
+                    val upgradedContinueWatching = current.continueWatchingList.map { cw ->
+                        val matchedCover = combinedAnime
+                            .firstOrNull { it.id == cw.idMovie }
+                            ?.getEffectiveCover()
+                            ?.takeIf { it.isNotBlank() }
+                        if (matchedCover != null) cw.copy(imageUrl = matchedCover) else cw
+                    }
+
                     current.copy(
                         isLoading = false,
                         errorMessage = null,
                         sliderItem = data?.slider?.firstOrNull(),
                         cuplixList = cuplixItems,
-                        newEpisodesList = data?.newEpisodes ?: emptyList(),
-                        hotAnimeList = data?.hotAnime ?: emptyList(),
+                        continueWatchingList = upgradedContinueWatching,
+                        newEpisodesList = newEp,
+                        hotAnimeList = hot,
                         newTitlesList = newTitles,
                         comicsList = if (comicsItems.isNotEmpty()) comicsItems else current.comicsList,
-                        todayScheduleList = data?.todayAnime ?: emptyList(),
+                        todayScheduleList = today,
                         jatForYuList = randomItems,
-                        waitingAnimeList = data?.waitingAnime ?: emptyList(),
-                        popularAnimeList = data?.popularAnime ?: emptyList(),
+                        waitingAnimeList = waiting,
+                        popularAnimeList = popular,
                         manreList = emptyList()
                     )
                 }

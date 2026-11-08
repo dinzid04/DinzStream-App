@@ -27,8 +27,12 @@ data class ShngmMangaDto(
     @SerializedName("cover_portrait_url") val coverPortraitUrl: String? = null,
     @SerializedName("cover_image_url") val coverImageUrl: String? = null,
     @SerializedName("user_rate") val userRate: Any? = null,
+    @SerializedName("view_count") val viewCount: Long? = null,
+    @SerializedName("bookmark_count") val bookmarkCount: Long? = null,
     @SerializedName("status") val status: Any? = null,
     @SerializedName("release_year") val releaseYear: String? = null,
+    @SerializedName("created_at") val createdAt: String? = null,
+    @SerializedName("updated_at") val updatedAt: String? = null,
     @SerializedName("latest_chapter_id") val latestChapterId: String? = null,
     @SerializedName("latest_chapter_number") val latestChapterNumber: Any? = null,
     @SerializedName("latest_chapter_time") val latestChapterTime: String? = null,
@@ -41,6 +45,7 @@ data class ShngmChapterDto(
     @SerializedName("chapter_title") val chapterTitle: String? = null,
     @SerializedName("chapter_number") val chapterNumber: Any? = null,
     @SerializedName("thumbnail_image_url") val thumbnailImageUrl: String? = null,
+    @SerializedName("view_count") val viewCount: Long? = null,
     @SerializedName("release_date") val releaseDate: String? = null
 )
 
@@ -105,7 +110,11 @@ interface ComicApiService {
                 .addInterceptor { chain ->
                     val request = chain.request().newBuilder()
                         .header("Accept", "application/json")
-                        .header("User-Agent", "KomikID-Android/2.0.2 (komikid)")
+                        .header(
+                            "User-Agent",
+                            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+                        )
+                        .header("Referer", "https://app.shinigami.asia/")
                         .build()
                     chain.proceed(request)
                 }

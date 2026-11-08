@@ -1,7 +1,6 @@
 package com.yuranime.dinz.ui.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,11 +34,16 @@ import com.yuranime.dinz.R
 import com.yuranime.dinz.data.model.ComicItem
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 
+private const val COMIC_IMAGE_USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+private const val COMIC_IMAGE_REFERER = "https://app.shinigami.asia/"
+
 /**
  * Section Komik Terbaru di HomeScreen:
- * - 2 kolom grid ke bawah (total 8 poster, 4 baris ke bawah).
- * - Tidak menggunakan slider / LazyRow yang memotong kartu kanan.
- * - Sisi kiri poster murni tanpa overlay gelap di belakang poster.
+ * - 10 komik terbaru (5 baris ke bawah x 2 kolom berdampingan).
+ * - TANPA kotak/card overlay abu-abu (#141418) dan TANPA border di belakang item komik.
+ * - Judul dikunci tepat 2 baris (minLines = 2, maxLines = 2) agar bendera dan 3 chapter
+ *   di kolom kiri dan kanan 100% sejajar rata horizontal.
  */
 @Composable
 fun ComicLatestSection(
@@ -51,22 +54,22 @@ fun ComicLatestSection(
 ) {
     if (comics.isEmpty()) return
 
-    // Ambil maksimal 8 komik terbaru dan bagi menjadi 4 pasang (2 kolom per baris)
-    val displayComics = comics.take(8)
+    // Ambil 10 komik terbaru dan susun menjadi 5 baris x 2 kolom
+    val displayComics = comics.take(10)
     val rows = displayComics.chunked(2)
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         rows.forEach { pair ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top
             ) {
-                // Kartu Kolom Kiri
                 val first = pair.getOrNull(0)
                 if (first != null) {
                     ComicGridCard(
@@ -79,7 +82,6 @@ fun ComicLatestSection(
                     Spacer(modifier = Modifier.weight(1f))
                 }
 
-                // Kartu Kolom Kanan
                 val second = pair.getOrNull(1)
                 if (second != null) {
                     ComicGridCard(
@@ -97,11 +99,9 @@ fun ComicLatestSection(
 }
 
 /**
- * Kartu Komik 2 Kolom Padat & Rapi:
- * - Poster 62.dp vertikal 2:3 tanpa overlay gelap di belakang poster.
- * - Judul komik SF Bold putih 12.sp max 2 baris.
- * - Bendera negara 16.dp x 11.dp.
- * - 3 chapter terbaru dengan titik oranye + CH. [Nomor] + waktu rilis singkat.
+ * Item Komik Bersih Tanpa Kotak/Border Overlay:
+ * - Poster vertikal di kiri langsung di atas latar utama (#0B0B0B).
+ * - Judul komik 2 baris rata (minLines = 2, maxLines = 2) + bendera negara + 3 chapter sejajar.
  */
 @Composable
 fun ComicGridCard(
@@ -110,132 +110,128 @@ fun ComicGridCard(
     onChapterClick: (chapterId: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
+    val context = LocalContext.current
+    val effectiveCover = comic.coverPortrait.ifBlank { comic.coverLandscape.orEmpty() }
+
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(112.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFF141418))
-            .border(1.dp, Color(0xFF222632), RoundedCornerShape(10.dp))
-            .clickable(onClick = onComicClick)
-            .padding(6.dp)
+            .clickable(onClick = onComicClick),
+        verticalAlignment = Alignment.Top
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically
+        // SISI KIRI: Poster Komik Vertikal Murni (Tanpa kotak overlay di belakangnya)
+        Box(
+            modifier = Modifier
+                .width(68.dp)
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(8.dp))
         ) {
-            // SISI KIRI: Poster Murni (width = 62.dp, ratio 2:3, TANPA overlay gelap di belakang poster)
-            Box(
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(effectiveCover)
+                    .addHeader("User-Agent", COMIC_IMAGE_USER_AGENT)
+                    .addHeader("Referer", COMIC_IMAGE_REFERER)
+                    .crossfade(true)
+                    .placeholder(R.drawable.placeholder_yuranime)
+                    .error(R.drawable.placeholder_yuranime)
+                    .build(),
+                contentDescription = comic.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        // SISI KANAN: Judul (2 baris tetap), Bendera Negara, dan 3 Chapter Terbaru Sejajar
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = comic.title,
+                color = Color.White,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = SfProFontFamily,
+                minLines = 2,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 15.sp
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Ikon Bendera Negara (China / Jepang / Korea)
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(comic.flagUrl)
+                    .crossfade(false)
+                    .build(),
+                contentDescription = comic.format,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .width(62.dp)
-                    .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(6.dp))
-            ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(comic.coverPortrait)
-                        .crossfade(false)
-                        .size(coil.size.Size.ORIGINAL)
-                        .placeholder(R.drawable.placeholder_yuranime)
-                        .error(R.drawable.placeholder_yuranime)
-                        .build(),
-                    contentDescription = comic.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+                    .size(width = 18.dp, height = 12.dp)
+                    .clip(RoundedCornerShape(2.5.dp))
+            )
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // SISI KANAN: Judul, Bendera, dan 3 Chapter Terbaru
+            // 3 Chapter Terbaru yang Rapat & Sejajar Rata Horizontal
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                verticalArrangement = Arrangement.SpaceBetween
+                verticalArrangement = Arrangement.spacedBy(3.5.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                // Judul & Bendera
-                Column {
-                    Text(
-                        text = comic.title,
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 14.sp
-                    )
+                comic.chapters.take(3).forEach { chapter ->
+                    val chNum = chapter.number.ifBlank { "1" }
+                    val timeStr = chapter.releaseTime.ifBlank { chapter.releaseDate ?: "Just now" }
 
-                    Spacer(modifier = Modifier.height(3.dp))
-
-                    // Bendera Negara (16x11dp, rounded 2dp)
-                    AsyncImage(
-                        model = comic.flagUrl,
-                        contentDescription = comic.format,
-                        contentScale = ContentScale.Crop,
+                    Row(
                         modifier = Modifier
-                            .size(width = 16.dp, height = 11.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                    )
-                }
-
-                // 3 Chapter Terbaru (Jarak rapat 4.dp di bawah bendera)
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    val displayChapters = comic.chapters.take(3)
-                    displayChapters.forEach { chapter ->
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(3.dp))
+                            .clickable {
+                                if (chapter.id.isNotBlank()) {
+                                    onChapterClick(chapter.id)
+                                } else {
+                                    onComicClick()
+                                }
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(3.dp))
-                                .clickable {
-                                    if (chapter.id.isNotBlank()) {
-                                        onChapterClick(chapter.id)
-                                    } else {
-                                        onComicClick()
-                                    }
-                                },
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            modifier = Modifier.weight(1f, fill = false)
                         ) {
-                            // Kiri: Titik bulat oranye + CH. [Nomor]
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f, fill = false)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(4.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFFFF5722))
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text(
-                                    text = if (chapter.number.isNotBlank()) "CH. ${chapter.number}" else "CH. -",
-                                    color = Color.White,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = SfProFontFamily,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-
-                            // Kanan: Waktu rilis relatif
-                            val timeStr = chapter.releaseTime.ifBlank { chapter.releaseDate ?: "Baru" }
+                            Box(
+                                modifier = Modifier
+                                    .size(4.5.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFFF5722))
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = timeStr,
-                                color = Color(0xFF64748B),
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Normal,
+                                text = "CH. $chNum",
+                                color = Color.White,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
                                 fontFamily = SfProFontFamily,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        Text(
+                            text = timeStr,
+                            color = Color(0xFF64748B),
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = SfProFontFamily,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }

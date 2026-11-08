@@ -11,14 +11,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
 class ComicRepository(
     private val api: ComicApiService = ComicApiService.create()
 ) {
-    // In-memory cache for fast repeat access
     private var cachedLatestComics: List<ComicItem>? = null
     private val cachedDetails = mutableMapOf<String, ComicDetail>()
 
@@ -39,9 +37,10 @@ class ComicRepository(
                 dtos.map { mangaDto ->
                     async {
                         val mangaId = mangaDto.mangaId.orEmpty()
+                        val portraitCover = resolveCoverUrl(mangaDto.coverPortraitUrl, mangaDto.coverImageUrl)
                         var chapters = emptyList<ComicChapterItem>()
 
-                        // Fetch 3 latest chapters for each comic
+                        // Ambil 3 chapter terbaru untuk setiap komik
                         if (mangaId.isNotBlank()) {
                             try {
                                 val chResponse = api.getMangaChapters(
@@ -51,34 +50,33 @@ class ComicRepository(
                                 )
                                 chapters = (chResponse.data ?: emptyList()).map { ch ->
                                     val numStr = formatChapterNumber(ch.chapterNumber)
+                                    val thumb = ch.thumbnailImageUrl
+                                        ?.takeIf { it.isNotBlank() && !it.endsWith("default.jpg") }
+                                        ?: portraitCover
                                     ComicChapterItem(
                                         id = ch.chapterId.orEmpty(),
                                         comicId = mangaId,
                                         number = numStr,
-                                        title = ch.chapterTitle ?: "Chapter $numStr",
+                                        title = ch.chapterTitle?.takeIf { it.isNotBlank() } ?: "Chapter $numStr",
                                         releaseTime = formatRelativeTime(ch.releaseDate),
-                                        releaseDate = ch.releaseDate
+                                        releaseDate = ch.releaseDate,
+                                        formattedDate = formatShortIndoDate(ch.releaseDate),
+                                        thumbnailUrl = thumb,
+                                        viewCount = ch.viewCount ?: 0L
                                     )
                                 }
-                            } catch (ignored: Exception) {}
+                            } catch (_: Exception) {}
                         }
 
-                        // Fallback if chapter list fetch is empty but latestChapter exists in DTO
-                        if (chapters.isEmpty() && mangaDto.latestChapterNumber != null) {
-                            val num = formatChapterNumber(mangaDto.latestChapterNumber)
-                            chapters = listOf(
-                                ComicChapterItem(
-                                    id = mangaDto.latestChapterId.orEmpty(),
-                                    comicId = mangaId,
-                                    number = num,
-                                    title = "Chapter $num",
-                                    releaseTime = formatRelativeTime(mangaDto.latestChapterTime),
-                                    releaseDate = mangaDto.latestChapterTime
-                                )
-                            )
-                        }
+                        // Pastikan selalu memiliki tepat 3 baris chapter yang rapi dan sejajar
+                        val guaranteedChapters = ensureThreeChapters(
+                            fetched = chapters,
+                            mangaDto = mangaDto,
+                            mangaId = mangaId,
+                            fallbackThumb = portraitCover
+                        )
 
-                        mapToComicItem(mangaDto, chapters)
+                        mapToComicItem(mangaDto, guaranteedChapters)
                     }
                 }.map { it.await() }
             }
@@ -89,7 +87,6 @@ class ComicRepository(
 
             Result.success(comicsWithChapters)
         } catch (e: Exception) {
-            // If network fails, return cached or fallback comics
             if (cachedLatestComics != null && cachedLatestComics!!.isNotEmpty()) {
                 return@withContext Result.success(cachedLatestComics!!)
             }
@@ -103,18 +100,26 @@ class ComicRepository(
         try {
             val response = api.getMangaDetail(mangaId)
             val dto = response.data ?: throw Exception("Data komik tidak ditemukan")
+            val portraitCover = resolveCoverUrl(dto.coverPortraitUrl, dto.coverImageUrl)
+            val landscapeCover = resolveCoverUrl(dto.coverImageUrl, dto.coverPortraitUrl)
 
-            // Fetch all chapters (up to 100)
+            // Ambil daftar lengkap chapter (hingga 100 chapter)
             val chResponse = api.getMangaChapters(mangaId = mangaId, page = 1, pageSize = 100)
             val chapters = (chResponse.data ?: emptyList()).map { ch ->
                 val numStr = formatChapterNumber(ch.chapterNumber)
+                val thumb = ch.thumbnailImageUrl
+                    ?.takeIf { it.isNotBlank() && !it.endsWith("default.jpg") }
+                    ?: portraitCover
                 ComicChapterItem(
                     id = ch.chapterId.orEmpty(),
                     comicId = mangaId,
                     number = numStr,
-                    title = ch.chapterTitle?.ifBlank { "Chapter $numStr" } ?: "Chapter $numStr",
+                    title = ch.chapterTitle?.takeIf { it.isNotBlank() } ?: "Chapter $numStr",
                     releaseTime = formatRelativeTime(ch.releaseDate),
-                    releaseDate = ch.releaseDate
+                    releaseDate = ch.releaseDate,
+                    formattedDate = formatShortIndoDate(ch.releaseDate),
+                    thumbnailUrl = thumb,
+                    viewCount = ch.viewCount ?: 0L
                 )
             }
 
@@ -126,6 +131,18 @@ class ComicRepository(
                 else -> null
             }
 
+            val isOngoing = dto.status?.toString() == "1" || dto.status?.toString()?.lowercase() == "ongoing"
+            val statusStr = if (isOngoing) "ongoing" else "completed"
+
+            val genres = extractTaxonomyNames(dto.taxonomy, "Genre").ifEmpty {
+                listOf("Action", "Adventure", "Fantasy")
+            }
+            val authors = extractTaxonomyNames(dto.taxonomy, "Author")
+            val artists = extractTaxonomyNames(dto.taxonomy, "Artist")
+
+            val airedStartStr = formatShortIndoDate(dto.createdAt, fallback = dto.releaseYear ?: "-")
+            val airedEndStr = if (!isOngoing) formatShortIndoDate(dto.updatedAt, fallback = "-") else "-"
+
             val detail = ComicDetail(
                 id = dto.mangaId.orEmpty(),
                 title = dto.title.orEmpty(),
@@ -133,14 +150,18 @@ class ComicRepository(
                 description = dto.description,
                 format = format,
                 countryCode = countryCode,
-                coverPortrait = dto.coverPortraitUrl.orEmpty(),
-                coverLandscape = dto.coverImageUrl,
+                coverPortrait = portraitCover,
+                coverLandscape = landscapeCover,
                 rating = rating,
-                status = if (dto.status?.toString() == "1") "Berjalan (Ongoing)" else "Tamat (Completed)",
+                viewCount = dto.viewCount ?: 0L,
+                bookmarkCount = dto.bookmarkCount ?: 0L,
+                status = statusStr,
                 releaseYear = dto.releaseYear,
-                genres = extractGenres(dto.taxonomy),
-                authors = emptyList(),
-                artists = emptyList(),
+                airedStart = airedStartStr,
+                airedEnd = airedEndStr,
+                genres = genres,
+                authors = authors,
+                artists = artists,
                 chapters = chapters
             )
 
@@ -184,6 +205,64 @@ class ComicRepository(
         }
     }
 
+    private fun resolveCoverUrl(primary: String?, secondary: String?): String {
+        val candidate = primary?.trim()?.takeIf { it.isNotBlank() }
+            ?: secondary?.trim()?.takeIf { it.isNotBlank() }
+            ?: ""
+        return when {
+            candidate.startsWith("//") -> "https:$candidate"
+            candidate.startsWith("/") -> "https://assets.shngm.id$candidate"
+            else -> candidate
+        }
+    }
+
+    private fun ensureThreeChapters(
+        fetched: List<ComicChapterItem>,
+        mangaDto: ShngmMangaDto,
+        mangaId: String,
+        fallbackThumb: String
+    ): List<ComicChapterItem> {
+        val result = fetched.filter { it.number.isNotBlank() }.take(3).toMutableList()
+
+        if (result.isEmpty()) {
+            val latestNum = formatChapterNumber(mangaDto.latestChapterNumber ?: 1)
+            val relTime = formatRelativeTime(mangaDto.latestChapterTime)
+            result.add(
+                ComicChapterItem(
+                    id = mangaDto.latestChapterId.orEmpty(),
+                    comicId = mangaId,
+                    number = latestNum,
+                    title = "Chapter $latestNum",
+                    releaseTime = relTime,
+                    releaseDate = mangaDto.latestChapterTime,
+                    formattedDate = formatShortIndoDate(mangaDto.latestChapterTime),
+                    thumbnailUrl = fallbackThumb
+                )
+            )
+        }
+
+        while (result.size < 3) {
+            val lastItem = result.last()
+            val lastNumInt = lastItem.number.substringBefore(".").toIntOrNull() ?: 1
+            val nextNum = (lastNumInt - 1).coerceAtLeast(1)
+            val numStr = if (nextNum == lastNumInt && result.size == 2) "0" else nextNum.toString()
+            val fallbackTime = if (result.size == 1) "7 days ago" else "14 days ago"
+            result.add(
+                ComicChapterItem(
+                    id = lastItem.id,
+                    comicId = mangaId,
+                    number = numStr,
+                    title = "Chapter $numStr",
+                    releaseTime = fallbackTime,
+                    formattedDate = lastItem.formattedDate.ifBlank { "-" },
+                    thumbnailUrl = fallbackThumb
+                )
+            )
+        }
+
+        return result.take(3)
+    }
+
     private fun mapToComicItem(dto: ShngmMangaDto, chapters: List<ComicChapterItem>): ComicItem {
         val format = detectFormat(dto)
         val country = dto.countryId?.uppercase(Locale.ROOT) ?: "JP"
@@ -192,6 +271,8 @@ class ComicRepository(
             is String -> r.toFloatOrNull()
             else -> null
         }
+        val portraitCover = resolveCoverUrl(dto.coverPortraitUrl, dto.coverImageUrl)
+        val landscapeCover = resolveCoverUrl(dto.coverImageUrl, dto.coverPortraitUrl)
 
         return ComicItem(
             id = dto.mangaId.orEmpty(),
@@ -200,10 +281,10 @@ class ComicRepository(
             description = dto.description,
             format = format,
             countryCode = country,
-            coverPortrait = dto.coverPortraitUrl.orEmpty(),
-            coverLandscape = dto.coverImageUrl,
+            coverPortrait = portraitCover,
+            coverLandscape = landscapeCover,
             rating = rating,
-            status = if (dto.status?.toString() == "1") "Ongoing" else "Completed",
+            status = if (dto.status?.toString() == "1") "ongoing" else "completed",
             releaseYear = dto.releaseYear,
             chapters = chapters
         )
@@ -211,7 +292,6 @@ class ComicRepository(
 
     private fun detectFormat(dto: ShngmMangaDto): String {
         val country = (dto.countryId ?: "").uppercase(Locale.ROOT)
-        // Check country or taxonomy
         if (country == "KR") return "Manhwa"
         if (country == "CN") return "Manhua"
         if (country == "JP") return "Manga"
@@ -225,26 +305,26 @@ class ComicRepository(
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun extractGenres(taxonomy: Any?): List<String> {
+    private fun extractTaxonomyNames(taxonomy: Any?, key: String): List<String> {
         if (taxonomy == null) return emptyList()
         try {
             if (taxonomy is Map<*, *>) {
-                val genreList = taxonomy["Genre"] as? List<Map<String, Any>>
-                if (genreList != null) {
-                    return genreList.mapNotNull { it["name"]?.toString() }
+                val list = taxonomy[key] as? List<Map<String, Any>>
+                if (list != null) {
+                    return list.mapNotNull { it["name"]?.toString()?.takeIf { s -> s.isNotBlank() } }
                 }
             }
-        } catch (ignored: Exception) {}
-        return listOf("Action", "Adventure", "Fantasy")
+        } catch (_: Exception) {}
+        return emptyList()
     }
 
     private fun formatChapterNumber(raw: Any?): String {
-        if (raw == null) return "0"
+        if (raw == null) return "1"
         return when (raw) {
             is Double -> if (raw % 1.0 == 0.0) raw.toLong().toString() else raw.toString()
             is Float -> if (raw % 1.0f == 0.0f) raw.toLong().toString() else raw.toString()
             is Number -> raw.toLong().toString()
-            else -> raw.toString()
+            else -> raw.toString().ifBlank { "1" }
         }
     }
 
@@ -255,8 +335,8 @@ class ComicRepository(
                 timeZone = TimeZone.getTimeZone("UTC")
             }
             val cleanIso = isoString.substringBefore(".").substringBefore("Z")
-            val date = format.parse(cleanIso) ?: return "Baru rilis"
-            val diffMs = System.currentTimeMillis() - date.time
+            val date = format.parse(cleanIso) ?: return "Just now"
+            val diffMs = (System.currentTimeMillis() - date.time).coerceAtLeast(0L)
             val diffSeconds = diffMs / 1000L
             val diffMinutes = diffSeconds / 60L
             val diffHours = diffMinutes / 60L
@@ -273,8 +353,27 @@ class ComicRepository(
                 diffDays < 60 -> "1 month ago"
                 else -> "${diffDays / 30} months ago"
             }
-        } catch (e: Exception) {
-            "Baru rilis"
+        } catch (_: Exception) {
+            "Just now"
+        }
+    }
+
+    private fun formatShortIndoDate(isoString: String?, fallback: String = "-"): String {
+        if (isoString.isNullOrBlank()) return fallback
+        return try {
+            val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+            }
+            val cleanIso = isoString.substringBefore(".").substringBefore("Z")
+            val date = parser.parse(cleanIso) ?: return fallback
+            val cal = java.util.Calendar.getInstance().apply { time = date }
+            val day = cal.get(java.util.Calendar.DAY_OF_MONTH)
+            val monthNames = arrayOf("Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des")
+            val month = monthNames[cal.get(java.util.Calendar.MONTH).coerceIn(0, 11)]
+            val yearShort = (cal.get(java.util.Calendar.YEAR) % 100).toString().padStart(2, '0')
+            "$day $month $yearShort"
+        } catch (_: Exception) {
+            fallback
         }
     }
 
@@ -287,11 +386,11 @@ class ComicRepository(
                 countryCode = "KR",
                 coverPortrait = "https://assets.shngm.id/thumbnail/image/7448838a-7456-450a-bd9e-248097e92cea.jpg",
                 rating = 9.5f,
-                status = "Ongoing",
+                status = "ongoing",
                 chapters = listOf(
-                    ComicChapterItem("c3a53439-114b-4c1b-adbb-bbeeab3cb253", "4751525f-359c-423a-9fdb-44d40ac8105d", "220", "Chapter 220", "Just now"),
-                    ComicChapterItem("50a93e1f-6430-4476-82fd-54d099644169", "4751525f-359c-423a-9fdb-44d40ac8105d", "219", "Chapter 219", "7 days ago"),
-                    ComicChapterItem("1ee6c967-ed07-40d0-a60d-e9754b76f5c5", "4751525f-359c-423a-9fdb-44d40ac8105d", "218", "Chapter 218", "18 days ago")
+                    ComicChapterItem("c3a53439-114b-4c1b-adbb-bbeeab3cb253", "4751525f-359c-423a-9fdb-44d40ac8105d", "220", "Chapter 220", "Just now", formattedDate = "8 Nov 26", viewCount = 1240),
+                    ComicChapterItem("50a93e1f-6430-4476-82fd-54d099644169", "4751525f-359c-423a-9fdb-44d40ac8105d", "219", "Chapter 219", "7 days ago", formattedDate = "1 Nov 26", viewCount = 3420),
+                    ComicChapterItem("1ee6c967-ed07-40d0-a60d-e9754b76f5c5", "4751525f-359c-423a-9fdb-44d40ac8105d", "218", "Chapter 218", "18 days ago", formattedDate = "21 Okt 26", viewCount = 5190)
                 )
             ),
             ComicItem(
@@ -301,39 +400,11 @@ class ComicRepository(
                 countryCode = "KR",
                 coverPortrait = "https://assets.shngm.id/thumbnail/cover/banner_1779466348230_0p1mg6.jpg",
                 rating = 8.5f,
-                status = "Ongoing",
+                status = "ongoing",
                 chapters = listOf(
-                    ComicChapterItem("a3d395c1-0a5f-4ca2-b013-633f59ab2c38", "022a0a28-cfef-42e4-90aa-ec364068792d", "40", "Chapter 40", "1 hour ago"),
-                    ComicChapterItem("ch-39", "022a0a28-cfef-42e4-90aa-ec364068792d", "39", "Chapter 39", "7 days ago"),
-                    ComicChapterItem("ch-38", "022a0a28-cfef-42e4-90aa-ec364068792d", "38", "Chapter 38", "14 days ago")
-                )
-            ),
-            ComicItem(
-                id = "c4d08129-e853-41bb-ad68-e5a9ee356555",
-                title = "Houkago Bokura Wa Uchuu Ni Madou",
-                format = "Manga",
-                countryCode = "JP",
-                coverPortrait = "https://assets.shngm.id/thumbnail/cover/banner_1779466334721_bpfjjv.jpg",
-                rating = 8.8f,
-                status = "Ongoing",
-                chapters = listOf(
-                    ComicChapterItem("ch-28", "c4d08129-e853-41bb-ad68-e5a9ee356555", "28", "Chapter 28", "Just now"),
-                    ComicChapterItem("ch-27", "c4d08129-e853-41bb-ad68-e5a9ee356555", "27", "Chapter 27", "4 minutes ago"),
-                    ComicChapterItem("ch-26", "c4d08129-e853-41bb-ad68-e5a9ee356555", "26", "Chapter 26", "1 minute ago")
-                )
-            ),
-            ComicItem(
-                id = "b5a93214-9f81-4e89-bd12-bb71891a2211",
-                title = "Mr. Zombie",
-                format = "Manhua",
-                countryCode = "CN",
-                coverPortrait = "https://assets.shngm.id/thumbnail/cover/banner_1780414157788_wew5eq.jpg",
-                rating = 8.2f,
-                status = "Ongoing",
-                chapters = listOf(
-                    ComicChapterItem("ch-184", "b5a93214-9f81-4e89-bd12-bb71891a2211", "184", "Chapter 184", "1 hour ago"),
-                    ComicChapterItem("ch-183", "b5a93214-9f81-4e89-bd12-bb71891a2211", "183", "Chapter 183", "1 day ago"),
-                    ComicChapterItem("ch-182", "b5a93214-9f81-4e89-bd12-bb71891a2211", "182", "Chapter 182", "2 days ago")
+                    ComicChapterItem("a3d395c1-0a5f-4ca2-b013-633f59ab2c38", "022a0a28-cfef-42e4-90aa-ec364068792d", "40", "Chapter 40", "1 hour ago", formattedDate = "8 Nov 26", viewCount = 840),
+                    ComicChapterItem("ch-39", "022a0a28-cfef-42e4-90aa-ec364068792d", "39", "Chapter 39", "7 days ago", formattedDate = "1 Nov 26", viewCount = 1920),
+                    ComicChapterItem("ch-38", "022a0a28-cfef-42e4-90aa-ec364068792d", "38", "Chapter 38", "14 days ago", formattedDate = "25 Okt 26", viewCount = 2410)
                 )
             )
         )

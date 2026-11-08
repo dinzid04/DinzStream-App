@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "2.0.0"
+  APP_VERSION: "2.1.0"
 
 jobs:
   build:
@@ -63,35 +63,33 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Liquid Glass Navbar, Dynamic Spotlight Onboarding, 2-Kolom Komik & Fix Zoom Cari (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Pure Clear Liquid Glass Navbar, Comic Detail Vortex, 10-Komik Clean Grid & Unified Search Cards (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
-            ### Pembaruan & Peningkatan Utama:
-            1. **Redesign Floating Bottom Navigation Bar dengan Gaya "Liquid Glass":**
-               - Mengambang elegan di atas konten layar dengan margin aman dan padding navigasi sistem.
-               - Kapsul utama berpenampilan kaca cair gelap transparan (`#11141B`) dengan rim highlight fresnel specular di bibir atas dan bias chromatic dispersion halus.
-               - **Tab Aktif:** Dilingkupi kapsul lensa Liquid Glass beraksen oranye khas Yuranime dengan efek pegas dinamis (*spring physics: squash and stretch*), menampilkan Ikon Solid + Teks Judul SF Bold di sebelah kanan.
-               - **Tab Tidak Aktif:** Hanya menampilkan Ikon Outline abu-abu kebiruan tanpa teks judul sama sekali, dengan touch target 48dp sesuai standar aksesibilitas R-03.
+            ### Pembaruan & Perbaikan Utama:
+            1. **Floating Bottom Navbar Murni & Clear Liquid Glass (`quickLiquid` AGSL):**
+               - Dilepaskan sepenuhnya dari `Scaffold(bottomBar)` sehingga tidak ada lagi blok hitam di bawah kapsul dan konten halaman mengalir penuh 100% di belakang kaca navbar.
+               - Menggunakan `GraphicsLayer` + AGSL `RuntimeShader` (Android 13+) dengan *clear center*, *refractive lensing edge*, *chromatic dispersion*, dan *fresnel specular rim* putih `1.dp`.
+               - Kapsul tab aktif kini menggunakan lensa kaca bening putih bersih (tanpa warna coklat/merah keruh) dengan Ikon Putih Solid + Teks Judul Putih SF Bold, sedangkan tab tidak aktif hanya menampilkan Ikon Outline.
 
-            2. **Perbaikan Total Koordinat Spotlight Onboarding (Dynamic Measurement):**
-               - Menghapus 100% koordinat persentase/offset tebakan yang sebelumnya meleset dari komponen asli.
-               - Menggunakan `Modifier.onGloballyPositioned` dan `coordinates.boundsInRoot()` secara real-time di semua layar (Home, Detail Anime, Streaming Player, dan Search).
-               - Auto-scroll LazyList secara mulus ke posisi elemen sebelum menggambar sorotan (misalnya section Komik di Home).
-               - Posisi Kartu Petunjuk (Tooltip Card) dinamis otomatis: berada di bawah elemen jika target di paruh atas layar, dan berada di atas elemen jika target di paruh bawah layar sehingga tidak pernah menutupi konten yang disorot.
+            2. **Perbaikan Section `Komik Terbaru` di Home (Tanpa Kotak Overlay, 10 Item, Fix Poster & 3 Chapter Sejajar):**
+               - Menghapus kotak/border abu-abu (`#141418`) di belakang setiap item komik sehingga poster dan teks tampil bersih langsung di atas latar utama (`#0B0B0B`).
+               - Menampilkan 10 komik terbaru (5 baris x 2 kolom).
+               - Memperbaiki pemuatan gambar poster komik dengan fallback `cover_image_url` dan header HTTP (`User-Agent` & `Referer`).
+               - Mengunci tinggi judul menjadi 2 baris (`minLines = 2, maxLines = 2`) dan menjamin 3 chapter terbaru selalu tampil utuh serta sejajar rata horizontal antara kolom kiri dan kanan.
 
-            3. **Tata Letak Komik Terbaru Grid 2 Kolom (Total 8 Poster):**
-               - Menggantikan slider geser samping dengan susunan grid 2 kolom ke bawah (4 baris x 2 kartu = total 8 komik).
-               - Poster komik vertikal (62dp, 2:3) tampil bersih murni tanpa ada lapisan overlay gelap di belakangnya.
-               - Sisi kanan kartu memuat judul SF Bold putih 12sp, bendera asal negara (China, Jepang, Korea), dan 3 baris chapter terbaru dengan waktu rilis relatif rapat dan presisi.
+            3. **Perbaikan Kartu `KATEGORI` & `TAHUN` di Halaman Cari (`CARI`) Tanpa Pembatas Warna:**
+               - Mengekstrak warna latar piksel tepi gambar secara otomatis (`getPixel`) sebagai warna latar penuh kartu disertai *smooth horizontal gradient blend*, sehingga kartu menyatu penuh dari kiri ke kanan tanpa garis pembatas warna kaku.
 
-            4. **Perbaikan Bug Gambar Kategori & Tahun di Halaman Cari (`CARI`) yang Nge-Zoom:**
-               - Mengunci ukuran kartu tetap di 90dp dengan decode size `coil.size.Size.ORIGINAL` dan `crossfade(false)`.
-               - Menggunakan `ContentScale.FillHeight` sehingga gambar banner karakter tidak pernah melompat atau nge-zoom sendiri saat layar diam maupun saat di-scroll.
+            4. **Halaman Detail Komik Baru (`ComicDetailScreen` Gaya `Vortex`):**
+               - Hero cover besar di bagian atas (tembus status bar) dengan tombol kembali, favorit, judul besar, jumlah views, dan jumlah suka sesuai hasil scrape.
+               - Header tab melengkung (*curved arc header*) dengan 2 tab saja: `INFO` dan `CHAPTER` (tanpa `CAST` dan tanpa `Choice Mode`) disertai indikator garis bawah oranye (`#FF5722`).
+               - Tab `INFO` menampilkan poster vertikal di kiri, `Title`, `Status` (oranye), `Type` + bendera negara, serta `Sinopsis`, `Kategori`, `Aired Start`, `Aired End`, dan `Author` dari hasil scrape.
+               - Tab `CHAPTER` dilengkapi kolom pencarian chapter real-time dan daftar chapter vertikal dengan thumbnail persegi membulat, nomor `#01`, judul chapter, tanggal rilis, jumlah views, dan panah kanan `>` tanpa gembok.
 
-            5. **Kepatuhan Desain Anti-Slop (Delivery Gate):**
-               - Bebas gradasi biru-ungu generik dan bebas karakter em dash pada teks UI.
-               - Target sentuh minimum 44dp-48dp dan penanganan UI states lengkap.
+            5. **Kartu `Lanjut Nonton` (Watch History) Horizontal Cover (`16:9`):**
+               - Mengubah tampilan riwayat tontonan di halaman Home dari poster vertikal menjadi cover horizontal (`16:9`).
           draft: false
           prerelease: false
           make_latest: true

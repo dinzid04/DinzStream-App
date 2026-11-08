@@ -47,28 +47,29 @@ fun ContinueWatchingCard(
 ) {
     Column(
         modifier = modifier
-            .width(115.dp)
+            .width(185.dp)
             .clickable(onClick = onClick)
     ) {
+        // Cover Horizontal 16:9 untuk Riwayat Tontonan (Lanjut Nonton)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(2f / 3f)
+                .aspectRatio(16f / 9f)
                 .clip(RoundedCornerShape(8.dp))
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(item.imageUrl)
                     .crossfade(true)
-                    .placeholder(R.drawable.placeholder_yuranime)
-                    .error(R.drawable.placeholder_yuranime)
+                    .placeholder(R.drawable.placeholder_yuranime_wide)
+                    .error(R.drawable.placeholder_yuranime_wide)
                     .build(),
                 contentDescription = item.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize()
             )
 
-            // Red Progress Bar at the bottom
+            // Progress Bar di bagian bawah Cover Horizontal
             LinearProgressIndicator(
                 progress = { item.progressFraction },
                 modifier = Modifier
@@ -85,7 +86,7 @@ fun ContinueWatchingCard(
         Text(
             text = item.episodeText,
             color = ColorAccentPrimary,
-            fontSize = 10.5.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -96,17 +97,15 @@ fun ContinueWatchingCard(
         Text(
             text = item.title,
             color = ColorTextPrimary,
-            fontSize = 12.sp,
+            fontSize = 12.5.sp,
             fontWeight = FontWeight.Bold,
-            maxLines = 2,
-            minLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             lineHeight = 15.sp
         )
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // Views row (Red #EF4444)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -126,15 +125,9 @@ fun ContinueWatchingCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-        }
 
-        Spacer(modifier = Modifier.height(1.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
-        // Favorites row (Yellow #FACC15)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
             Icon(
                 imageVector = Icons.Filled.Star,
                 contentDescription = null,
@@ -153,4 +146,3 @@ fun ContinueWatchingCard(
         }
     }
 }
-

@@ -28,7 +28,10 @@ data class ComicChapterItem(
     val number: String,
     val title: String = "",
     val releaseTime: String = "",
-    val releaseDate: String? = null
+    val releaseDate: String? = null,
+    val formattedDate: String = "",
+    val thumbnailUrl: String = "",
+    val viewCount: Long = 0L
 )
 
 data class ComicDetail(
@@ -41,8 +44,12 @@ data class ComicDetail(
     val coverPortrait: String = "",
     val coverLandscape: String? = null,
     val rating: Float? = null,
+    val viewCount: Long = 0L,
+    val bookmarkCount: Long = 0L,
     val status: String? = null,
     val releaseYear: String? = null,
+    val airedStart: String = "-",
+    val airedEnd: String = "-",
     val genres: List<String> = emptyList(),
     val authors: List<String> = emptyList(),
     val artists: List<String> = emptyList(),

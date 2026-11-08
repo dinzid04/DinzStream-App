@@ -140,16 +140,13 @@ fun ComicGridItem(
     comic: ComicItem,
     onClick: () -> Unit
 ) {
+    val effectiveCover = comic.coverPortrait.ifBlank { comic.coverLandscape.orEmpty() }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF141418))
-            .border(1.dp, Color(0xFF222632), RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(8.dp)
     ) {
-        // Poster with Aspect Ratio 2:3
+        // Poster with Aspect Ratio 2:3 (Tanpa kotak overlay abu-abu di belakangnya)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -158,7 +155,12 @@ fun ComicGridItem(
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(comic.coverPortrait)
+                    .data(effectiveCover)
+                    .addHeader(
+                        "User-Agent",
+                        "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+                    )
+                    .addHeader("Referer", "https://app.shinigami.asia/")
                     .crossfade(true)
                     .placeholder(R.drawable.placeholder_yuranime)
                     .error(R.drawable.placeholder_yuranime)
@@ -185,7 +187,7 @@ fun ComicGridItem(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         // Title
         Text(
@@ -194,11 +196,12 @@ fun ComicGridItem(
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = SfProFontFamily,
+            minLines = 2,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(2.dp))
 
         // Latest Chapter
         comic.chapters.firstOrNull()?.let { ch ->
