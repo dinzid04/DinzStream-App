@@ -63,7 +63,6 @@ import com.yuranime.dinz.data.model.ComicDetail
 import com.yuranime.dinz.data.repository.ComicRepository
 import com.yuranime.dinz.ui.theme.ColorAccentPrimary
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
-import com.yuranime.dinz.ui.theme.ColorCardSurface
 import com.yuranime.dinz.ui.theme.ColorTextPrimary
 import com.yuranime.dinz.ui.theme.ColorTextSecondary
 import com.yuranime.dinz.ui.theme.SfProFontFamily

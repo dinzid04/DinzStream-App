@@ -108,6 +108,7 @@ import coil.request.ImageRequest
 import com.yuranime.dinz.BuildConfig
 import com.yuranime.dinz.R
 import com.yuranime.dinz.data.firebase.FirebaseManager
+import com.yuranime.dinz.data.local.AppPreferences
 import com.yuranime.dinz.ui.components.BottomNavBar
 import com.yuranime.dinz.ui.components.NavTab
 import com.yuranime.dinz.ui.leaderboard.LeaderboardScreen
@@ -213,9 +214,6 @@ fun LoginProfileScreen(
 
     LaunchedEffect(isUserLoggedIn) {
         if (isUserLoggedIn) {
-            FirebaseManager.startListeningCurrentUser(context)
-        }
-    }
             FirebaseManager.startListeningCurrentUser(context)
         }
     }

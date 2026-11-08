@@ -1200,7 +1200,7 @@ fun StreamingScreen(
 
         com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay(
             steps = streamingSteps,
-            isVisible = showStreamingOnboarding && !isFullscreen,
+            isVisible = showStreamingOnboarding && !uiState.isFullScreen,
             onDismiss = {
                 showStreamingOnboarding = false
                 com.yuranime.dinz.data.local.AppPreferences.setStreamingOnboardingCompleted(context, true)
