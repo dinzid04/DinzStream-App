@@ -100,7 +100,7 @@ fun BottomNavBar(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 20.dp, bottom = 16.dp),
+            .padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         // Kapsul Utama Liquid Glass (Floating Pill)
