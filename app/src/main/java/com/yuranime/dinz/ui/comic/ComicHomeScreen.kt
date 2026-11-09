@@ -91,11 +91,13 @@ fun ComicHomeScreen(
     selectedTab: NavTab = NavTab.COMIC,
     onTabSelected: (NavTab) -> Unit,
     onComicClick: (comicId: String) -> Unit,
-    onChapterClick: (chapterId: String) -> Unit,
-    onOpenAllComics: () -> Unit,
+    onChapterClick: (chapterId: String) -> Unit = {},
+    onOpenAllComics: () -> Unit = {},
+    onComicChapterClick: ((chapterId: String) -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: ComicHomeViewModel = viewModel()
 ) {
+    val actualChapterClick = onComicChapterClick ?: onChapterClick
     val uiState by viewModel.uiState.collectAsState()
     val backdropLayer = rememberGraphicsLayer()
     val isLiquidGlass = AppPreferences.liquidGlassEnabled.collectAsState().value
@@ -149,7 +151,7 @@ fun ComicHomeScreen(
                                 historyList = uiState.continueReading,
                                 onContinueClick = { item ->
                                     if (item.chapterId.isNotBlank()) {
-                                        onChapterClick(item.chapterId)
+                                        actualChapterClick(item.chapterId)
                                     } else {
                                         onComicClick(item.comicId)
                                     }
@@ -188,7 +190,7 @@ fun ComicHomeScreen(
                             ComicLatestGridSection(
                                 comics = uiState.latestComics.take(12),
                                 onComicClick = onComicClick,
-                                onChapterClick = onChapterClick
+                                onChapterClick = actualChapterClick
                             )
                         }
                     }

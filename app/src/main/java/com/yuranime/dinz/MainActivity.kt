@@ -292,7 +292,7 @@ class MainActivity : ComponentActivity() {
                                             onComicClick = { cId ->
                                                 selectedComicId = cId
                                             },
-                                            onComicChapterClick = { chId ->
+                                            onChapterClick = { chId ->
                                                 selectedComicChapterId = chId
                                             },
                                             onOpenAllComics = {
