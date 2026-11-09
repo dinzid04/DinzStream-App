@@ -402,6 +402,18 @@ fun ComicDetailScreen(
                                 fallbackThumb = posterUrl,
                                 onClick = {
                                     if (chapter.id.isNotBlank()) {
+                                        comicDetail?.let { cd ->
+                                            try {
+                                                com.yuranime.dinz.data.local.LocalAuthDatabase(context).saveComicReadHistory(
+                                                    comicId = cd.id,
+                                                    comicTitle = cd.title,
+                                                    coverUrl = cd.coverPortrait,
+                                                    chapterId = chapter.id,
+                                                    chapterNumber = chapter.number,
+                                                    chapterTitle = chapter.title
+                                                )
+                                            } catch (_: Exception) {}
+                                        }
                                         onChapterClick(chapter.id)
                                     }
                                 }

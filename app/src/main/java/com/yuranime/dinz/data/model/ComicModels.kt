@@ -1,5 +1,27 @@
 package com.yuranime.dinz.data.model
 
+import com.yuranime.dinz.R
+
+data class ComicBannerItem(
+    val id: String,
+    val title: String,
+    val synopsis: String,
+    val rating: Float? = null,
+    val comicId: String,
+    val backgroundImage: String,
+    val posterImage: String
+)
+
+data class ComicReadHistoryItem(
+    val comicId: String,
+    val comicTitle: String,
+    val coverUrl: String,
+    val chapterId: String,
+    val chapterNumber: String,
+    val chapterTitle: String = "",
+    val updatedAt: Long = 0L
+)
+
 data class ComicItem(
     val id: String,
     val title: String,
@@ -12,8 +34,16 @@ data class ComicItem(
     val rating: Float? = null,
     val status: String? = null,
     val releaseYear: String? = null,
+    val viewCount: Long = 0L,
     val chapters: List<ComicChapterItem> = emptyList()
 ) {
+    val flagDrawableRes: Int
+        get() = when (format.trim().lowercase()) {
+            "manhwa" -> R.drawable.kr
+            "manhua" -> R.drawable.cn
+            else -> R.drawable.jp
+        }
+
     val flagUrl: String
         get() = when (format.trim().lowercase()) {
             "manhwa" -> "https://flagpedia.net/data/flags/w1160/kr.webp"
@@ -55,6 +85,13 @@ data class ComicDetail(
     val artists: List<String> = emptyList(),
     val chapters: List<ComicChapterItem> = emptyList()
 ) {
+    val flagDrawableRes: Int
+        get() = when (format.trim().lowercase()) {
+            "manhwa" -> R.drawable.kr
+            "manhua" -> R.drawable.cn
+            else -> R.drawable.jp
+        }
+
     val flagUrl: String
         get() = when (format.trim().lowercase()) {
             "manhwa" -> "https://flagpedia.net/data/flags/w1160/kr.webp"

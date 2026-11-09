@@ -665,3 +665,82 @@ Berdasarkan 3 gambar referensi `Screenshot_20261108_145758_ANIMEIN.jpg`, `145804
      - Kapsul tab aktif menggunakan permukaan semi-transparan ringan (`#26FFFFFF`) dengan border tipis (`#33FFFFFF`), tetap menampilkan Ikon Putih Solid + Teks Judul Putih SF Bold.
 3. **Toggle Switch di `SettingsScreen`:**
    - Opsi switch *"Efek Liquid Glass Navbar"* di bagian `NAVIGASI & TAMPILAN` dengan deskripsi *"Aktifkan efek kaca cair pada navigasi bawah (Otomatis aktif di Android 13+)"* yang bereaksi real-time tanpa perlu restart aplikasi.
+
+---
+
+## 25. SPESIFIKASI FITUR 22: Halaman Khusus Beranda Komik (`ComicHomeScreen`) dengan Data `komikid`
+
+Berdasarkan referensi visual `/storage/emulated/0/termux/design/reff/Screenshot_20260731_160054_Firefox.jpg` dan `/storage/emulated/0/termux/design/reff/Screenshot_20261109_103709_KomiKu.jpg`, layar `ComicHomeScreen` dibangun dengan susunan vertikal berikut:
+
+### A. Hero Slider Komik (Teks & 2 Tombol di Kiri, Poster di Kanan)
+1. **Komponen Utama:** `HorizontalPager` di posisi paling atas halaman (edge-to-edge, menyatu ke status bar transparan).
+2. **Latar Belakang:** Cover/poster komik yang diperbesar dengan efek dark blur / vignette radial halus sehingga teks di atasnya sangat kontras dan mudah dibaca.
+3. **Komposisi Konten (`Row`):**
+   - **Sisi Kiri (`Modifier.weight(1f)`):**
+     - **Judul Komik:** Huruf kapital tebal (`UPPERCASE`, font **SF Bold** putih `22.sp`–`24.sp`, maksimal 2 baris).
+     - **Sinopsis Singkat:** Deskripsi cerita (`maxLines = 3`, `overflow = TextOverflow.Ellipsis`, font SF Regular/Medium `12.sp`, warna abu-abu terang `#CBD5E1`).
+     - **2 Tombol Aksi Berdampingan (`Row`):**
+       - Kiri: Kapsul merah menyala (`#E11D48` / `#EF4444`) bertuliskan **`▶ BACA SEKARANG`** (SF Bold putih `11.sp`–`12.sp`, langsung membuka chapter pertama/terakhir komik tersebut).
+       - Kanan: Kapsul gelap semi-transparan (`#33FFFFFF` dengan border tipis `#4DFFFFFF`) bertuliskan **`DETAIL`** (SF Bold putih `11.sp`–`12.sp`, membuka `ComicDetailScreen`).
+   - **Sisi Kanan:** Kartu **Poster Komik Vertikal** (`width = 110.dp`, `aspectRatio(2f/3f)`, `RoundedCornerShape(10.dp)`, dengan *elevation shadow*).
+4. **Indikator Slide (Pagination Dots):**
+   - Terletak di bagian bawah tengah slider: titik aktif berupa kapsul merah memanjang (`18.dp x 4.dp`), dan titik lainnya berbentuk bulat abu-abu gelap (`6.dp x 4.dp`).
+
+### B. Section `LANJUTKAN MEMBACA` (Kondisional Berdasarkan Riwayat Baca)
+1. **Kondisional:** Hanya tampil jika pengguna telah memiliki riwayat membaca komik di database lokal `LocalAuthDatabase` (`comic_read_history`). Jika kosong, section disembunyikan.
+2. **Header:** Aksen bar merah `| LANJUTKAN MEMBACA` (**SF Bold** putih `16.sp`) dengan sub-teks *"Lanjutkan membaca komik yang terakhir kamu buka"*.
+3. **Daftar Horizontal (`LazyRow`):**
+   - Kartu horizontal gelap (`#141418`, `RoundedCornerShape(12.dp)`):
+     - **Kiri:** Poster komik kecil (`width = 56.dp`, `aspectRatio(2f/3f)`, `RoundedCornerShape(8.dp)`).
+     - **Kanan:** Judul komik (`maxLines = 2`, **SF Bold** putih `12.sp`), dan di bawahnya kapsul merah **`LANJUTKAN [Judul/Chapter]...`** yang saat diklik langsung membuka chapter terakhir yang dibaca.
+
+### C. Section `TRENDING & POPULER`
+1. **Header:** Aksen bar merah `| TRENDING & POPULER` (**SF Bold** putih `16.sp`) dengan sub-teks abu-abu *"Explore multiple options for maximum fun"*.
+2. **Daftar Horizontal (`LazyRow`):**
+   - Setiap item berlebar `118.dp`:
+     - **Atas:** Poster Komik vertikal (`aspectRatio(2f/3f)`, `RoundedCornerShape(8.dp)`).
+     - **Tengah:** Judul Komik huruf kapital (**SF Bold** putih `12.sp`, `maxLines = 2`, `minLines = 2`, `overflow = TextOverflow.Ellipsis`).
+     - **Bawah (`Row` `SpaceBetween`):** Di kiri: ikon bintang emas + skor rating (`★ 7.0`, `11.sp` warna emas `#FACC15`). Di kanan: **Ikon Bendera Negara** (`16.dp x 11.dp`: China untuk Manhua, Jepang untuk Manga, Korea untuk Manhwa).
+
+### D. Section `RILISAN TERBARU` (Grid 2 Kolom Isi 12 Komik)
+1. **Header:** Aksen bar merah `| RILISAN TERBARU` dengan sub-teks di sisi kiri, dan tombol **`LIHAT SEMUA >`** berwarna merah/oranye di sisi kanan (membuka `ComicViewAllScreen`).
+2. **Grid 2 Kolom x 6 Baris (Total 12 Item Komik):**
+   - 12 item komik terbaru (`latestComics.take(12)`) disusun dalam 6 baris x 2 kolom (`Modifier.weight(1f)`).
+   - Setiap item menampilkan:
+     - **Kiri:** Poster (`width = 68.dp`, `aspectRatio(2f/3f)`, `RoundedCornerShape(8.dp)`).
+     - **Kanan:** **Judul Komik** (`maxLines = 2`, `minLines = 2`, **SF Bold** putih `12.sp`), **Ikon Bendera Negara** di bawah judul, dan **3 Chapter Terbaru** (`• CH. [Nomor]` di kiri & waktu rilis di kanan) yang tersusun rapat dan sejajar.
+
+### E. Section `TERPOPULER SEPANJANG MASA` (Di Bawah Rilisan Terbaru)
+1. **Konsistensi Header & Tipografi:** Gaya header sama persis dengan section lainnya: aksen bar merah `| TERPOPULER SEPANJANG MASA` (**SF Bold** putih `16.sp`), sub-teks abu-abu *"Paling banyak dibaca sepanjang masa"*, dan tombol **`LIHAT SEMUA >`** di sebelah kanan.
+2. **Tata Letak Kolom Peringkat Geser Horizontal (3 Baris per Kolom):**
+   - `LazyRow` (`spacedBy(20.dp)`) di mana setiap item adalah `Column` (lebar `290.dp`–`310.dp`) berisi 3 komik secara vertikal:
+     - Kolom 1: Peringkat `1, 2, 3`
+     - Kolom 2: Peringkat `4, 5, 6`
+     - Kolom 3: Peringkat `7, 8, 9`
+   - Setiap baris item peringkat disusun dalam `Row(verticalAlignment = Alignment.CenterVertically)`:
+     1. **Angka Peringkat Besar di Kiri:** Lebar tetap `36.dp`, font **SF Bold** ukuran `32.sp`, warna Putih terang untuk peringkat `1`–`3` dan abu-abu perak (`#94A3B8`) untuk peringkat `4` ke bawah.
+     2. **Poster Komik di Tengah:** `width = 64.dp`, `aspectRatio(2f/3f)`, `RoundedCornerShape(8.dp)`.
+     3. **Informasi di Kanan:**
+        - Baris atas: **Judul Komik** (**SF Bold** putih `15.sp`, `maxLines = 2`, `overflow = TextOverflow.Ellipsis`).
+        - Baris bawah: `Row` berisi ikon bintang kuning + rating (`★ 8,6`, SF SemiBold putih/emas `12.sp`), spasi, dan ikon mata + jumlah pembaca (`👁 79,7jt`, SF Medium abu-abu `#94A3B8` `12.sp`).
+
+---
+
+## 26. SPESIFIKASI FITUR 23: Fitur 2 Pilihan (Search Anime & Beranda Komik) pada Tombol Tengah Liquid Glass Bottom Navbar
+
+### A. Pertahankan Efek Liquid Glass 100%
+- Efek optik `Clear Liquid Glass` (AGSL runtime shader, Fresnel rim, chromatic dispersion, dan floating capsule) dipertahankan penuh tanpa merusak arsitektur yang sudah ada.
+
+### B. Floating Liquid Glass Chooser Pill
+1. **Trigger:** Saat pengguna mengklik tombol tengah Bottom Navbar:
+   - Jika chooser pill belum terbuka: tampilkan **Floating Liquid Glass Chooser Pill** tepat mengambang di atas tombol tengah Bottom Navbar dengan animasi *spring physics* halus (`dampingRatio = Spring.DampingRatioLowBouncy`, `stiffness = Spring.StiffnessMediumLow`).
+   - Pilihan di dalam Floating Pill:
+     1. **`🔍 Cari Anime`**: Membuka `SearchScreen` (pencarian anime).
+     2. **`📖 Komik`**: Membuka `ComicHomeScreen` (beranda komik).
+2. **Label Dinamis pada Tombol Tengah Bottom Navbar:**
+   - Saat berada di `ComicHomeScreen`: ikon berubah menjadi buku/komik (`AutoStories` / `MenuBook`) dan teks label menjadi **`Komik`**.
+   - Saat berada di `SearchScreen`: ikon pencarian (`Search`) dan teks label menjadi **`Cari`**.
+3. **Toggle Mudah:**
+   - Jika pengguna menekan tombol tengah saat sedang berada di `SearchScreen` atau `ComicHomeScreen`, munculkan kembali floating chooser agar pengguna dapat berpindah antara Cari Anime dan Beranda Komik dengan sekali sentuh.
+4. **Ikon Pencarian di Beranda Komik:**
+   - Di pojok kanan atas `ComicHomeScreen`, sertakan tombol ikon `🔍` yang membuka dialog atau halaman pencarian komik khusus `komikid`.

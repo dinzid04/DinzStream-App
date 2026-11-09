@@ -276,6 +276,30 @@ class MainActivity : ComponentActivity() {
                                             }
                                         )
                                     }
+                                    NavTab.COMIC -> {
+                                        BackHandler {
+                                            currentTab = NavTab.HOME
+                                        }
+                                        com.yuranime.dinz.ui.comic.ComicHomeScreen(
+                                            selectedTab = currentTab,
+                                            onTabSelected = { tab ->
+                                                if (tab == NavTab.CHAT) {
+                                                    Toast.makeText(this@MainActivity, "Fitur ${tab.title} segera hadir", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    currentTab = tab
+                                                }
+                                            },
+                                            onComicClick = { cId ->
+                                                selectedComicId = cId
+                                            },
+                                            onComicChapterClick = { chId ->
+                                                selectedComicChapterId = chId
+                                            },
+                                            onOpenAllComics = {
+                                                showAllComics = true
+                                            }
+                                        )
+                                    }
                                     NavTab.PROFILE -> {
                                         BackHandler {
                                             currentTab = NavTab.HOME

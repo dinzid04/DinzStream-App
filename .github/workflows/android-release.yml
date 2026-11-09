@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "2.1.3"
+  APP_VERSION: "2.2.0"
 
 jobs:
   build:
@@ -63,24 +63,28 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Fix 'Gagal Memuat Konten' & 100% AnimeIn + Komik Images (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Halaman Khusus Beranda Komik & Floating Liquid Glass Chooser (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
-            ### Pembaruan & Perbaikan Utama:
-            1. **Perbaikan Error 'Gagal Memuat Konten' (Gson Deserialization Crash):**
-               - Menghapus deklarasi kunci duplikat pada `@SerializedName` model data `AnimeItem` yang memicu `IllegalArgumentException: class com.yuranime.dinz.data.model.AnimeItem declares multiple JSON fields named poster`.
-               - Seluruh endpoint API AnimeIn (`getHomeData`, `getHomeNewTitles`, `getHomeRandom`, `searchMovies`, `getCuplixFeed`) kini ter-parse 100% bersih dan konten beranda langsung muncul tanpa error.
+            ### Fitur & Pembaruan Utama:
+            1. **Halaman Khusus Beranda Komik (`ComicHomeScreen`):**
+               - Terintegrasi penuh dengan sumber data live scraper **`komikid`**.
+               - **Hero Slider Komik:** `HorizontalPager` edge-to-edge dengan cover background vignette blur, judul UPPERCASE SF Bold putih 22-24sp, sinopsis 3 baris, tombol kapsul merah `▶ BACA SEKARANG` & tombol kaca `DETAIL`, poster komik 110dp di kanan, serta pagination dots aktif merah.
+               - **Section `LANJUTKAN MEMBACA`:** Tampil kondisional berdasarkan riwayat baca lokal dari SQLite database dengan tombol cepat lanjutkan chapter.
+               - **Section `TRENDING & POPULER`:** `LazyRow` komik populer lengkap dengan rating bintang emas dan ikon bendera negara.
+               - **Section `RILISAN TERBARU`:** Grid 2 kolom x 6 baris (12 komik terbaru) dengan poster, judul, bendera, dan 3 chapter terbaru sejajar rapi.
+               - **Section `TERPOPULER SEPANJANG MASA`:** Kolom geser horizontal berisi peringkat komik (3 komik per kolom) dengan angka peringkat besar 32sp (putih untuk 1-3, perak untuk 4+), bintang skor, dan jumlah views pembaca (e.g. `79,7jt`, `60,5jt`).
 
-            2. **Perbaikan Total Seluruh Gambar AnimeIn (Hero Slider, Cuplix, Episode Baru, Sedang Hangat, Jat For Yu, Paling Dinanti, Jadwal & Detail):**
-               - Memperbaiki penanganan User-Agent pada Coil OkHttpClient: request gambar AnimeIn dikirimkan dengan User-Agent standar OkHttp (`okhttp/4.12.0`) tanpa header Referer asing, meloloskan tantangan bot Cloudflare WAF dengan status 200 OK.
-               - Gambar komik tetap dikirim dengan `Referer: https://app.shinigami.asia/` dan User-Agent browser sehingga gambar anime dan komik tampil 100% secara bersamaan.
-               - Mengaktifkan fallback gambar berantai cerdas (`imagePoster?.takeIf { it.isNotBlank() } ?: poster?.takeIf { it.isNotBlank() } ?: imageCover`) dan normalisasi path URL.
+            2. **Fitur 2 Pilihan (Cari Anime vs Beranda Komik) pada Tombol Tengah Liquid Glass Bottom Navbar:**
+               - 100% mempertahankan efek optik **Clear Liquid Glass** (AGSL RuntimeShader, chromatic dispersion, dan Fresnel rim).
+               - **Floating Liquid Glass Chooser Pill:** Animasi spring physics halus yang melayang di atas tombol tengah navbar saat diklik untuk berpindah cepat antara `🔍 Cari Anime` dan `📖 Komik`.
+               - Label dinamis: otomatis menampilkan ikon buku/komik dan teks **`Komik`** saat berada di Beranda Komik, dan **`Cari`** saat berada di Cari Anime.
+               - Fitur pencarian komik real-time melalui ikon `🔍` di pojok kanan atas Beranda Komik.
 
-            3. **Fitur On/Off Efek Liquid Glass pada Floating Bottom Navbar:**
-               - Deteksi default otomatis: Android 13+ (API 33+) default **ON (`true`)**, Android 12- (API 32-) default **OFF (`false`)**.
-               - Desain kapsul mengambang (floating) dan struktur tab aktif/inaktif tetap 100% identik.
-               - Toggle switch real-time di `SettingsScreen` (Pengaturan) bagian `NAVIGASI & TAMPILAN`.
+            3. **Aset Bendera & Isolasi Referer OkHttpClient:**
+               - Aset bendera negara `cn.webp`, `jp.webp`, `kr.webp` tersedia lokal di `res/drawable/` untuk performa instan tanpa delay jaringan.
+               - Isolasi header request OkHttpClient Coil memastikan gambar anime AnimeIn dan komik komikid tampil sempurna tanpa bentrok WAF Cloudflare.
           draft: false
           prerelease: false
           make_latest: true

@@ -8,6 +8,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Url
 import java.util.concurrent.TimeUnit
 
 // ==================== DTO MODELS ====================
@@ -16,6 +17,20 @@ data class ShngmBaseResponse<T>(
     @SerializedName("retcode") val retcode: Int? = null,
     @SerializedName("message") val message: String? = null,
     @SerializedName("data") val data: T? = null
+)
+
+data class ShngmSliderResponse(
+    @SerializedName("data") val data: List<ShngmSliderDto>? = null
+)
+
+data class ShngmSliderDto(
+    @SerializedName("id") val id: Any? = null,
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("rating") val rating: Any? = null,
+    @SerializedName("background_image") val backgroundImage: String? = null,
+    @SerializedName("chara_image") val charaImage: String? = null,
+    @SerializedName("slider_link") val sliderLink: String? = null,
+    @SerializedName("detail") val detail: String? = null
 )
 
 data class ShngmMangaDto(
@@ -69,12 +84,38 @@ data class ShngmChapterImagesDto(
 
 interface ComicApiService {
 
+    @GET
+    suspend fun getBanners(
+        @Url url: String = "https://slider.shinigami.io/v1/slider/web"
+    ): ShngmSliderResponse
+
     @GET("manga/list")
     suspend fun getLatestManga(
         @Query("sort") sort: String = "latest",
         @Query("sort_order") sortOrder: String = "desc",
         @Query("page") page: Int = 1,
         @Query("page_size") pageSize: Int = 12
+    ): ShngmBaseResponse<List<ShngmMangaDto>>
+
+    @GET("manga/list")
+    suspend fun getTrendingManga(
+        @Query("is_recommended") isRecommended: Boolean = true,
+        @Query("page") page: Int = 1,
+        @Query("page_size") pageSize: Int = 12
+    ): ShngmBaseResponse<List<ShngmMangaDto>>
+
+    @GET("manga/top")
+    suspend fun getPopularManga(
+        @Query("filter") filter: String = "all_time",
+        @Query("page") page: Int = 1,
+        @Query("page_size") pageSize: Int = 12
+    ): ShngmBaseResponse<List<ShngmMangaDto>>
+
+    @GET("manga/list")
+    suspend fun searchManga(
+        @Query("q") query: String,
+        @Query("page") page: Int = 1,
+        @Query("page_size") pageSize: Int = 20
     ): ShngmBaseResponse<List<ShngmMangaDto>>
 
     @GET("chapter/{mangaId}/list")

@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.yuranime.dinz.data.model.EpisodeCommentItem
 
-class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_local.db", null, 2) {
+class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_local.db", null, 3) {
 
     private val prefs = context.getSharedPreferences("animein_auth_prefs", Context.MODE_PRIVATE)
 
@@ -47,6 +47,19 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
             )
             """.trimIndent()
         )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS comic_read_history (
+                comic_id TEXT PRIMARY KEY,
+                comic_title TEXT,
+                cover_url TEXT,
+                chapter_id TEXT,
+                chapter_number TEXT,
+                chapter_title TEXT,
+                updated_at INTEGER
+            )
+            """.trimIndent()
+        )
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -61,6 +74,21 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
                     poster_url TEXT,
                     position_ms INTEGER,
                     duration_ms INTEGER,
+                    updated_at INTEGER
+                )
+                """.trimIndent()
+            )
+        }
+        if (oldVersion < 3) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS comic_read_history (
+                    comic_id TEXT PRIMARY KEY,
+                    comic_title TEXT,
+                    cover_url TEXT,
+                    chapter_id TEXT,
+                    chapter_number TEXT,
+                    chapter_title TEXT,
                     updated_at INTEGER
                 )
                 """.trimIndent()
@@ -284,6 +312,62 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
     fun clearWatchHistory() {
         val db = writableDatabase
         db.delete("watch_history", null, null)
+    }
+
+    fun saveComicReadHistory(
+        comicId: String,
+        comicTitle: String,
+        coverUrl: String,
+        chapterId: String,
+        chapterNumber: String,
+        chapterTitle: String = ""
+    ) {
+        val db = writableDatabase
+        val cv = ContentValues().apply {
+            put("comic_id", comicId)
+            put("comic_title", comicTitle)
+            put("cover_url", coverUrl)
+            put("chapter_id", chapterId)
+            put("chapter_number", chapterNumber)
+            put("chapter_title", chapterTitle)
+            put("updated_at", System.currentTimeMillis())
+        }
+        db.insertWithOnConflict("comic_read_history", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    fun getComicReadHistory(): List<com.yuranime.dinz.data.model.ComicReadHistoryItem> {
+        val db = readableDatabase
+        val list = mutableListOf<com.yuranime.dinz.data.model.ComicReadHistoryItem>()
+        val cursor = db.rawQuery(
+            "SELECT comic_id, comic_title, cover_url, chapter_id, chapter_number, chapter_title, updated_at FROM comic_read_history ORDER BY updated_at DESC",
+            null
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                list.add(
+                    com.yuranime.dinz.data.model.ComicReadHistoryItem(
+                        comicId = it.getString(0) ?: "",
+                        comicTitle = it.getString(1) ?: "",
+                        coverUrl = it.getString(2) ?: "",
+                        chapterId = it.getString(3) ?: "",
+                        chapterNumber = it.getString(4) ?: "",
+                        chapterTitle = it.getString(5) ?: "",
+                        updatedAt = it.getLong(6)
+                    )
+                )
+            }
+        }
+        return list
+    }
+
+    fun deleteComicReadHistory(comicId: String) {
+        val db = writableDatabase
+        db.delete("comic_read_history", "comic_id = ?", arrayOf(comicId))
+    }
+
+    fun clearComicReadHistory() {
+        val db = writableDatabase
+        db.delete("comic_read_history", null, null)
     }
 }
 

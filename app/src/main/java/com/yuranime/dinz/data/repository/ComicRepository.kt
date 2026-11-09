@@ -17,8 +17,123 @@ import java.util.TimeZone
 class ComicRepository(
     private val api: ComicApiService = ComicApiService.create()
 ) {
+    private var cachedBanners: List<com.yuranime.dinz.data.model.ComicBannerItem>? = null
+    private var cachedTrendingComics: List<ComicItem>? = null
+    private var cachedPopularComics: List<ComicItem>? = null
     private var cachedLatestComics: List<ComicItem>? = null
     private val cachedDetails = mutableMapOf<String, ComicDetail>()
+
+    suspend fun getBanners(forceRefresh: Boolean = false): Result<List<com.yuranime.dinz.data.model.ComicBannerItem>> = withContext(Dispatchers.IO) {
+        if (!forceRefresh && cachedBanners != null && cachedBanners!!.isNotEmpty()) {
+            return@withContext Result.success(cachedBanners!!)
+        }
+        try {
+            val response = api.getBanners()
+            val dtos = response.data ?: emptyList()
+            val list = dtos.map { dto ->
+                val ratingFloat = when (val r = dto.rating) {
+                    is Number -> r.toFloat()
+                    is String -> r.toFloatOrNull()
+                    else -> null
+                }
+                val bg = resolveCoverUrl(dto.backgroundImage, null)
+                val poster = resolveCoverUrl(dto.charaImage, dto.backgroundImage)
+                com.yuranime.dinz.data.model.ComicBannerItem(
+                    id = dto.id?.toString().orEmpty(),
+                    title = dto.title.orEmpty(),
+                    synopsis = dto.detail.orEmpty(),
+                    rating = ratingFloat,
+                    comicId = dto.sliderLink.orEmpty(),
+                    backgroundImage = bg,
+                    posterImage = poster
+                )
+            }.filter { it.title.isNotBlank() && it.comicId.isNotBlank() }
+
+            if (list.isNotEmpty()) {
+                cachedBanners = list
+                Result.success(list)
+            } else {
+                Result.success(getFallbackBanners())
+            }
+        } catch (_: Exception) {
+            if (cachedBanners != null && cachedBanners!!.isNotEmpty()) {
+                Result.success(cachedBanners!!)
+            } else {
+                Result.success(getFallbackBanners())
+            }
+        }
+    }
+
+    suspend fun getTrendingComics(
+        page: Int = 1,
+        pageSize: Int = 12,
+        forceRefresh: Boolean = false
+    ): Result<List<ComicItem>> = withContext(Dispatchers.IO) {
+        if (!forceRefresh && page == 1 && cachedTrendingComics != null && cachedTrendingComics!!.isNotEmpty()) {
+            return@withContext Result.success(cachedTrendingComics!!)
+        }
+        try {
+            val response = api.getTrendingManga(page = page, pageSize = pageSize)
+            val dtos = response.data ?: emptyList()
+            val items = dtos.map { mangaDto ->
+                mapToComicItem(mangaDto, emptyList())
+            }
+            if (page == 1 && items.isNotEmpty()) {
+                cachedTrendingComics = items
+            }
+            Result.success(items)
+        } catch (_: Exception) {
+            if (cachedTrendingComics != null && cachedTrendingComics!!.isNotEmpty()) {
+                Result.success(cachedTrendingComics!!)
+            } else {
+                Result.success(getFallbackComics())
+            }
+        }
+    }
+
+    suspend fun getPopularAllTimeComics(
+        page: Int = 1,
+        pageSize: Int = 12,
+        forceRefresh: Boolean = false
+    ): Result<List<ComicItem>> = withContext(Dispatchers.IO) {
+        if (!forceRefresh && page == 1 && cachedPopularComics != null && cachedPopularComics!!.isNotEmpty()) {
+            return@withContext Result.success(cachedPopularComics!!)
+        }
+        try {
+            val response = api.getPopularManga(page = page, pageSize = pageSize)
+            val dtos = response.data ?: emptyList()
+            val items = dtos.map { mangaDto ->
+                mapToComicItem(mangaDto, emptyList())
+            }
+            if (page == 1 && items.isNotEmpty()) {
+                cachedPopularComics = items
+            }
+            Result.success(items)
+        } catch (_: Exception) {
+            if (cachedPopularComics != null && cachedPopularComics!!.isNotEmpty()) {
+                Result.success(cachedPopularComics!!)
+            } else {
+                Result.success(getFallbackComics())
+            }
+        }
+    }
+
+    suspend fun searchComics(
+        query: String,
+        page: Int = 1,
+        pageSize: Int = 20
+    ): Result<List<ComicItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.searchManga(query = query, page = page, pageSize = pageSize)
+            val dtos = response.data ?: emptyList()
+            val items = dtos.map { mangaDto ->
+                mapToComicItem(mangaDto, emptyList())
+            }
+            Result.success(items)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
     suspend fun getLatestComics(
         page: Int = 1,
@@ -286,6 +401,7 @@ class ComicRepository(
             rating = rating,
             status = if (dto.status?.toString() == "1") "ongoing" else "completed",
             releaseYear = dto.releaseYear,
+            viewCount = dto.viewCount ?: 0L,
             chapters = chapters
         )
     }
@@ -375,6 +491,29 @@ class ComicRepository(
         } catch (_: Exception) {
             fallback
         }
+    }
+
+    private fun getFallbackBanners(): List<com.yuranime.dinz.data.model.ComicBannerItem> {
+        return listOf(
+            com.yuranime.dinz.data.model.ComicBannerItem(
+                id = "banner-1",
+                title = "GOD OF MARTIAL ARTS",
+                synopsis = "Setelah mengalami kematian karena kecelakaan mobil \"lin feng\" melintasi dunia dan menemukan kalau dirinya di dunia lain dalam keadaan hampir mati, karena itulah ia berhasil mendapatkan kesempatan untuk hidup kedua...",
+                rating = 7.1f,
+                comicId = "c0f1d049-ff7f-474d-8c6a-3a55e4c44147",
+                backgroundImage = "https://assets.shngm.id/thumbnail/banner/banner_1786001844086_z7n82u.webp",
+                posterImage = "https://assets.shngm.id/thumbnail/image/d00e4253-656d-481e-b3ef-701e4c6d451e.jpg"
+            ),
+            com.yuranime.dinz.data.model.ComicBannerItem(
+                id = "banner-2",
+                title = "DEMONIC EMPEROR",
+                synopsis = "Zhuo Yifan menemui nasib sial karena dikhianati dan dibunuh oleh murid kepercayaannya. Setelah terlahir kembali kultivasinya kembali ke nol dan dia terjebak oleh heart demon...",
+                rating = 8.6f,
+                comicId = "c0f1d049-ff7f-474d-8c6a-3a55e4c44147",
+                backgroundImage = "https://assets.shngm.id/thumbnail/image/d00e4253-656d-481e-b3ef-701e4c6d451e.jpg",
+                posterImage = "https://assets.shngm.id/thumbnail/image/d00e4253-656d-481e-b3ef-701e4c6d451e.jpg"
+            )
+        )
     }
 
     private fun getFallbackComics(): List<ComicItem> {
