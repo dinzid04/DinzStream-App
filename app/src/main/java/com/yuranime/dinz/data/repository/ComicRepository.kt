@@ -292,14 +292,19 @@ class ComicRepository(
             }
             val authors = extractTaxonomyNames(dto.taxonomy, "Author")
             val artists = extractTaxonomyNames(dto.taxonomy, "Artist")
+            val serialization = extractTaxonomyNames(dto.taxonomy, "Serialization").firstOrNull()
+                ?: extractTaxonomyNames(dto.taxonomy, "Magazine").firstOrNull()
 
-            val airedStartStr = formatShortIndoDate(dto.createdAt, fallback = dto.releaseYear ?: "-")
-            val airedEndStr = if (!isOngoing) formatShortIndoDate(dto.updatedAt, fallback = "-") else "-"
+            val releaseYear = dto.releaseYear?.takeIf { it.isNotBlank() && it != "-" }
+            val updatedOnStr = formatShortIndoDate(dto.updatedAt, fallback = "").takeIf { it.isNotBlank() && it != "-" }
+            val airedStartStr = formatShortIndoDate(dto.createdAt, fallback = "").takeIf { it.isNotBlank() && it != "-" }
+                ?: (releaseYear ?: "")
+            val airedEndStr = if (!isOngoing) formatShortIndoDate(dto.updatedAt, fallback = "") else ""
 
             val detail = ComicDetail(
                 id = dto.mangaId.orEmpty(),
                 title = dto.title.orEmpty(),
-                alternativeTitle = dto.alternativeTitle,
+                alternativeTitle = dto.alternativeTitle?.takeIf { it.isNotBlank() && it != "-" },
                 description = dto.description,
                 format = format,
                 countryCode = countryCode,
@@ -309,9 +314,11 @@ class ComicRepository(
                 viewCount = dto.viewCount ?: 0L,
                 bookmarkCount = dto.bookmarkCount ?: 0L,
                 status = statusStr,
-                releaseYear = dto.releaseYear,
+                releaseYear = releaseYear,
                 airedStart = airedStartStr,
                 airedEnd = airedEndStr,
+                serialization = serialization,
+                updatedOn = updatedOnStr,
                 genres = genres,
                 authors = authors,
                 artists = artists,
@@ -465,15 +472,53 @@ class ComicRepository(
     @Suppress("UNCHECKED_CAST")
     private fun extractTaxonomyNames(taxonomy: Any?, key: String): List<String> {
         if (taxonomy == null) return emptyList()
+        val results = mutableListOf<String>()
         try {
-            if (taxonomy is Map<*, *>) {
-                val list = taxonomy[key] as? List<Map<String, Any>>
-                if (list != null) {
-                    return list.mapNotNull { it["name"]?.toString()?.takeIf { s -> s.isNotBlank() } }
+            when (taxonomy) {
+                is Map<*, *> -> {
+                    for ((k, v) in taxonomy) {
+                        val kStr = k?.toString().orEmpty()
+                        if (kStr.equals(key, ignoreCase = true) || kStr.startsWith(key, ignoreCase = true)) {
+                            when (v) {
+                                is List<*> -> {
+                                    v.forEach { item ->
+                                        if (item is Map<*, *>) {
+                                            val name = item["name"]?.toString()
+                                                ?: item["title"]?.toString()
+                                                ?: item["taxonomy_name"]?.toString()
+                                            if (!name.isNullOrBlank() && name != "-" && !name.equals("N/A", true)) {
+                                                results.add(name.trim())
+                                            }
+                                        } else if (item is String && item.isNotBlank() && item != "-") {
+                                            results.add(item.trim())
+                                        }
+                                    }
+                                }
+                                is String -> {
+                                    if (v.isNotBlank() && v != "-") results.add(v.trim())
+                                }
+                            }
+                        }
+                    }
+                }
+                is List<*> -> {
+                    taxonomy.forEach { item ->
+                        if (item is Map<*, *>) {
+                            val taxType = item["taxonomy"]?.toString()
+                                ?: item["type"]?.toString()
+                                ?: item["taxonomy_type"]?.toString()
+                            if (taxType.equals(key, ignoreCase = true)) {
+                                val name = item["name"]?.toString() ?: item["title"]?.toString()
+                                if (!name.isNullOrBlank() && name != "-") {
+                                    results.add(name.trim())
+                                }
+                            }
+                        }
+                    }
                 }
             }
         } catch (_: Exception) {}
-        return emptyList()
+        return results.distinct()
     }
 
     private fun formatChapterNumber(raw: Any?): String {
@@ -597,5 +642,66 @@ class ComicRepository(
 
     suspend fun getKomikStationComicsByGenre(genreSlugOrUrl: String, page: Int = 1): Result<List<ComicItem>> {
         return komikStationScraper.getComicsByGenre(genreSlugOrUrl, page)
+    }
+
+    suspend fun getFilteredComics(
+        query: String? = null,
+        format: String? = null,
+        genre: String? = null,
+        status: String? = null,
+        sort: String? = null,
+        page: Int = 1,
+        pageSize: Int = 24
+    ): Result<List<ComicItem>> = withContext(Dispatchers.IO) {
+        try {
+            val mappedFormat = when (format?.lowercase(Locale.ROOT)) {
+                "manhwa" -> "manhwa"
+                "manhua" -> "manhua"
+                "manga" -> "manga"
+                else -> null
+            }
+            val mappedStatus = when (status?.lowercase(Locale.ROOT)) {
+                "berlanjut", "ongoing" -> "ongoing"
+                "tamat", "completed" -> "completed"
+                else -> null
+            }
+            val mappedSort = when (sort?.lowercase(Locale.ROOT)) {
+                "populer", "popular" -> "popular"
+                else -> "latest"
+            }
+
+            val response = api.getMangaList(
+                query = query?.takeIf { it.isNotBlank() },
+                sort = mappedSort,
+                status = mappedStatus,
+                format = mappedFormat,
+                genre = genre?.takeIf { it.isNotBlank() && !it.equals("semua", true) },
+                page = page,
+                pageSize = pageSize
+            )
+            val dtos = response.data ?: emptyList()
+            val comicidItems = dtos.map { mangaDto ->
+                mapToComicItem(mangaDto, emptyList())
+            }
+
+            val ksItems = if (!query.isNullOrBlank()) {
+                komikStationScraper.searchComics(query, page).getOrDefault(emptyList())
+            } else if (!genre.isNullOrBlank() && !genre.equals("semua", true)) {
+                komikStationScraper.getComicsByGenre(genre, page).getOrDefault(emptyList())
+            } else {
+                emptyList()
+            }
+
+            val combined = (comicidItems + ksItems)
+                .distinctBy { it.title.trim().lowercase(Locale.ROOT) }
+
+            Result.success(combined)
+        } catch (e: Exception) {
+            if (cachedLatestComics != null && cachedLatestComics!!.isNotEmpty()) {
+                Result.success(cachedLatestComics!!)
+            } else {
+                Result.failure(e)
+            }
+        }
     }
 }

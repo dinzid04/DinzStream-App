@@ -739,7 +739,7 @@ object FirebaseManager {
             LeaderboardUser("top3", 3, "多渔のOnly be...", "@duoyu", "https://api.dicebear.com/7.x/adventurer/svg?seed=Kaito", 14508587L, 14508),
             LeaderboardUser("top4", 4, "淘气鬼~", "@taoqigui", "https://api.dicebear.com/7.x/adventurer/svg?seed=Neko", 13091239L, 13091),
             LeaderboardUser("top5", 5, "Sj.温凛", "@wenlin", "https://api.dicebear.com/7.x/adventurer/svg?seed=Rin", 13045944L, 13045),
-            LeaderboardUser("top6", 6, "🌙 晴天", "@qingtian", "https://api.dicebear.com/7.x/adventurer/svg?seed=Yuki", 12566371L, 12566),
+            LeaderboardUser("top6", 6, "晴天", "@qingtian", "https://api.dicebear.com/7.x/adventurer/svg?seed=Yuki", 12566371L, 12566),
             LeaderboardUser("top7", 7, "Ciflorette", "@ciflorette", "https://api.dicebear.com/7.x/adventurer/svg?seed=Chloe", 10954067L, 10954),
             LeaderboardUser("top8", 8, "还不睡", "@haibushui", "https://api.dicebear.com/7.x/adventurer/svg?seed=Shin", 10528192L, 10528),
             LeaderboardUser("top9", 9, "Gading Kencana", "@gadingkencana", "https://api.dicebear.com/7.x/adventurer/svg?seed=Gading", 9850210L, 9850),

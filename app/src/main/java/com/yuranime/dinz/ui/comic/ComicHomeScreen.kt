@@ -2,9 +2,13 @@ package com.yuranime.dinz.ui.comic
 
 import android.annotation.SuppressLint
 import android.view.MotionEvent
+import android.view.View
+import android.webkit.CookieManager
+import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -38,6 +42,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
@@ -86,6 +91,7 @@ import com.yuranime.dinz.data.model.KomikStationGenre
 import com.yuranime.dinz.data.model.KomikStationSeriesItem
 import com.yuranime.dinz.data.model.KomikStationTab
 import com.yuranime.dinz.ui.components.BottomNavBar
+import com.yuranime.dinz.ui.components.ComicNavTab
 import com.yuranime.dinz.ui.components.NavTab
 import com.yuranime.dinz.ui.components.liquidGlassBackdrop
 import com.yuranime.dinz.ui.theme.SfProFontFamily
@@ -104,12 +110,15 @@ private val ComicLightGray = Color(0xFFCBD5E1)
 
 @Composable
 fun ComicHomeScreen(
+    selectedComicTab: ComicNavTab = ComicNavTab.HOME,
+    onComicTabSelected: (ComicNavTab) -> Unit = {},
     selectedTab: NavTab = NavTab.COMIC,
-    onTabSelected: (NavTab) -> Unit,
+    onTabSelected: (NavTab) -> Unit = {},
     onComicClick: (comicId: String) -> Unit,
     onChapterClick: (chapterId: String) -> Unit = {},
     onOpenAllComics: () -> Unit = {},
     onComicChapterClick: ((chapterId: String) -> Unit)? = null,
+    onGenreClick: (genreName: String) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ComicHomeViewModel = viewModel()
 ) {
@@ -255,7 +264,7 @@ fun ComicHomeScreen(
                             ComicSectionDivider()
                             ComicGenreSection(
                                 genres = ksData.genres,
-                                onGenreClick = { genre -> viewModel.openGenreComics(genre) }
+                                onGenreClick = { genre -> onGenreClick(genre.name) }
                             )
                         }
                     }
@@ -270,42 +279,23 @@ fun ComicHomeScreen(
                             )
                         }
                     }
-                }
-            }
 
-            // Tombol Pencarian Komik di Pojok Kanan Atas
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(end = 16.dp, top = 8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Color(0x66000000))
-                        .border(1.dp, Color(0x33FFFFFF), CircleShape)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(bounded = true, color = Color.White)
-                        ) { viewModel.openSearchDialog() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Cari Komik",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    // 10. SECTION NEWSLETTER BANNER (Don't miss out on Fantastic Anime & Manga)
+                    item(key = "comic_newsletter_banner") {
+                        ComicSectionDivider()
+                        ComicNewsletterBanner()
+                    }
                 }
             }
         }
 
-        // Floating Clear Liquid Glass Navbar
+        // Floating Clear Liquid Glass Navbar (Mode Komik: Tab 1 = Home Komik, Tab 2 = Cari, Tab 3 = Anime)
         BottomNavBar(
             selectedTab = selectedTab,
             onTabSelected = onTabSelected,
+            isComicMode = true,
+            selectedComicTab = selectedComicTab,
+            onComicTabSelected = onComicTabSelected,
             backdropLayer = backdropLayer,
             isLiquidGlassEnabled = isLiquidGlass,
             modifier = Modifier.align(Alignment.BottomCenter)
@@ -873,7 +863,41 @@ private fun ComicLatestCard(
 
             // 3 Chapter Terbaru (Sejajar dengan dasar poster)
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                val chaptersToShow = comic.chapters.take(3)
+                val chaptersToShow = remember(comic.chapters) {
+                    val list = comic.chapters.filter { it.number.isNotBlank() }.take(3).toMutableList()
+                    if (list.isEmpty()) {
+                        list.add(
+                            ComicChapterItem(
+                                id = "",
+                                comicId = comic.id,
+                                number = "1",
+                                title = "Chapter 1",
+                                releaseTime = "Just now",
+                                formattedDate = "",
+                                thumbnailUrl = ""
+                            )
+                        )
+                    }
+                    while (list.size < 3) {
+                        val lastNum = list.last().number.substringBefore(".").toIntOrNull() ?: 1
+                        val nextNum = (lastNum - 1).coerceAtLeast(1)
+                        val numStr = if (nextNum == lastNum && list.size == 2) "0" else nextNum.toString()
+                        val timeStr = if (list.size == 1) "3 days ago" else "7 days ago"
+                        list.add(
+                            ComicChapterItem(
+                                id = list.last().id,
+                                comicId = comic.id,
+                                number = numStr,
+                                title = "Chapter $numStr",
+                                releaseTime = timeStr,
+                                formattedDate = "",
+                                thumbnailUrl = ""
+                            )
+                        )
+                    }
+                    list.take(3)
+                }
+
                 chaptersToShow.forEach { ch ->
                     Row(
                         modifier = Modifier
@@ -950,11 +974,11 @@ private fun ComicCommunityChatSection(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
         ) {
-            // Layer 1: Kotak Cbox WebView dengan padding top 28dp untuk ruang kepala maskot
+            // Layer 1: Kotak Cbox WebView dengan padding top 56dp agar bertumpu pas di bawah tangan maskot
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 28.dp)
+                    .padding(top = 56.dp)
             ) {
                 Box(
                     modifier = Modifier
@@ -970,8 +994,14 @@ private fun ComicCommunityChatSection(
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
                                 settings.databaseEnabled = true
+                                settings.javaScriptCanOpenWindowsAutomatically = true
+                                settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                                 settings.cacheMode = WebSettings.LOAD_DEFAULT
+                                settings.userAgentString = COMIC_IMAGE_USER_AGENT
+                                CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                                webChromeClient = WebChromeClient()
                                 webViewClient = WebViewClient()
+                                setLayerType(View.LAYER_TYPE_HARDWARE, null)
                                 setOnTouchListener { v, event ->
                                     when (event.action) {
                                         MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
@@ -1000,7 +1030,7 @@ private fun ComicCommunityChatSection(
                 )
             }
 
-            // Layer 2: Maskot Anime menempel pas di pojok kanan atas kotak chat
+            // Layer 2: Maskot Anime bertumpu pas di bibir garis batas atas kotak Cbox
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data("https://url.dinzid.my.id/pcZ3IHb")
@@ -1009,8 +1039,8 @@ private fun ComicCommunityChatSection(
                 contentDescription = "Maskot Komunitas",
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(end = 8.dp)
-                    .size(80.dp)
+                    .padding(end = 14.dp)
+                    .size(76.dp)
                     .zIndex(2f),
                 contentScale = ContentScale.Fit
             )
@@ -1507,6 +1537,142 @@ private fun ComicSeriesTerbaruSection(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+// ==================== 10. NEWSLETTER BANNER ====================
+
+@Composable
+private fun ComicNewsletterBanner(
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var emailInput by remember { mutableStateOf("") }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .height(195.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(Color(0xFF1F080C), Color(0xFF0E0B0E))
+                )
+            )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 18.dp, top = 18.dp, bottom = 18.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Sisi Kiri: Teks & Kotak Input Email
+            Column(
+                modifier = Modifier
+                    .weight(1.18f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "Subscribe to our newsletter and be the first to receive news",
+                        color = Color(0xFFCBD5E1),
+                        fontSize = 11.sp,
+                        fontFamily = SfProFontFamily,
+                        fontWeight = FontWeight.Normal,
+                        lineHeight = 15.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "Don't miss out on Fantastic Anime & Manga",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily,
+                        lineHeight = 22.sp
+                    )
+                }
+
+                // Kotak Input Email Kapsul
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)
+                        .clip(RoundedCornerShape(21.dp))
+                        .background(Color(0xFF160A0E))
+                        .border(1.dp, Color(0xFF831843), RoundedCornerShape(21.dp))
+                        .padding(start = 14.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (emailInput.isEmpty()) {
+                            Text(
+                                text = "Enter your email address...",
+                                color = Color(0xFF64748B),
+                                fontSize = 12.sp,
+                                fontFamily = SfProFontFamily
+                            )
+                        }
+                        BasicTextField(
+                            value = emailInput,
+                            onValueChange = { emailInput = it },
+                            textStyle = TextStyle(
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontFamily = SfProFontFamily
+                            ),
+                            singleLine = true,
+                            cursorBrush = SolidColor(Color(0xFFE11D48)),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE11D48))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = ripple(bounded = true, color = Color.White)
+                            ) {
+                                emailInput = ""
+                                Toast.makeText(context, "Terima kasih telah berlangganan!", Toast.LENGTH_SHORT).show()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Subscribe",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            // Sisi Kanan: Ilustrasi Karakter (Rata Kanan Bawah)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.BottomEnd
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data("https://url.dinzid.my.id/0XJg9If")
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Karakter Anime",
+                    modifier = Modifier.fillMaxHeight(),
+                    contentScale = ContentScale.FillHeight,
+                    alignment = Alignment.BottomEnd
+                )
             }
         }
     }

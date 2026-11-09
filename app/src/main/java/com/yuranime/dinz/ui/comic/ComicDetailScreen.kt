@@ -608,13 +608,22 @@ private fun ComicInfoTabContent(
     posterUrl: String
 ) {
     val context = LocalContext.current
-    val authorText = remember(detail.authors, detail.artists) {
-        (detail.authors + detail.artists)
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
-            .joinToString(", ")
-            .ifBlank { "-" }
+    val authorText = remember(detail.authors) {
+        detail.authors.map { it.trim() }.filter { it.isNotBlank() && it != "-" && !it.equals("N/A", true) }.distinct().joinToString(", ")
+    }
+    val artistText = remember(detail.artists) {
+        detail.artists.map { it.trim() }.filter { it.isNotBlank() && it != "-" && !it.equals("N/A", true) }.distinct().joinToString(", ")
+    }
+    val yearText = remember(detail.releaseYear, detail.airedStart, detail.chapters) {
+        detail.releaseYear?.takeIf { it.isNotBlank() && it != "-" }
+            ?: detail.airedStart.takeIf { it.isNotBlank() && it != "-" }
+            ?: detail.chapters.lastOrNull()?.formattedDate?.takeLast(2)?.let { "20$it" }
+            ?: ""
+    }
+    val updatedText = remember(detail.updatedOn, detail.chapters) {
+        detail.updatedOn?.takeIf { it.isNotBlank() && it != "-" }
+            ?: detail.chapters.firstOrNull()?.formattedDate?.takeIf { it.isNotBlank() && it != "-" }
+            ?: ""
     }
     val categoryText = remember(detail.genres, detail.format) {
         if (detail.genres.isNotEmpty()) {
@@ -677,6 +686,28 @@ private fun ComicInfoTabContent(
                     lineHeight = 22.sp
                 )
 
+                if (!detail.alternativeTitle.isNullOrBlank() && detail.alternativeTitle != "-") {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Judul Lain",
+                        color = ComicMutedLabel,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = SfProFontFamily
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = detail.alternativeTitle,
+                        color = Color(0xFFCBD5E1),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal,
+                        fontFamily = SfProFontFamily,
+                        lineHeight = 17.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
@@ -728,7 +759,7 @@ private fun ComicInfoTabContent(
 
         Spacer(modifier = Modifier.height(22.dp))
 
-        // Bagian Bawah Poster: Sinopsis, Kategori, Aired Start, Aired End, Author (Tanpa Kotak Border)
+        // Bagian Bawah Poster: Sinopsis, Kategori, Tahun Rilis, Author, Artist, Serialisasi (Tanpa Nilai Strip '-')
         Text(
             text = "Sinopsis",
             color = ComicMutedLabel,
@@ -754,25 +785,29 @@ private fun ComicInfoTabContent(
             value = categoryText
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
-
         InfoMetadataBlock(
-            label = "Aired Start",
-            value = detail.airedStart.ifBlank { detail.releaseYear ?: "-" }
+            label = "Tahun Rilis",
+            value = yearText
         )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        InfoMetadataBlock(
-            label = "Aired End",
-            value = detail.airedEnd.ifBlank { "-" }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
 
         InfoMetadataBlock(
             label = "Author",
             value = authorText
+        )
+
+        InfoMetadataBlock(
+            label = "Artist",
+            value = artistText
+        )
+
+        InfoMetadataBlock(
+            label = "Serialisasi",
+            value = detail.serialization
+        )
+
+        InfoMetadataBlock(
+            label = "Pembaruan Terakhir",
+            value = updatedText
         )
     }
 }
@@ -780,8 +815,11 @@ private fun ComicInfoTabContent(
 @Composable
 private fun InfoMetadataBlock(
     label: String,
-    value: String
+    value: String?
 ) {
+    val cleanVal = value?.trim().orEmpty()
+    if (cleanVal.isBlank() || cleanVal == "-" || cleanVal.equals("N/A", true)) return
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = label,
@@ -792,13 +830,14 @@ private fun InfoMetadataBlock(
         )
         Spacer(modifier = Modifier.height(3.dp))
         Text(
-            text = value,
+            text = cleanVal,
             color = Color.White,
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = SfProFontFamily,
             lineHeight = 20.sp
         )
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 

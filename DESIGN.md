@@ -852,3 +852,92 @@ Mengintegrasikan sumber bacaan komik tambahan dari `https://komikstation.org/` d
      - Jika request gambar anime (`animein`): hapus Referer header.
    - Menjamin 100% semua gambar dari ketiga sumber tampil sempurna tanpa error 403.
 
+---
+
+## 29. SPESIFIKASI FITUR 26: Konfigurasi Bottom Navbar di Mode Komik & Pemindahan Search
+
+Berdasarkan arsitektur Liquid Glass dan pengalaman navigasi komik:
+1. **Hapus Tombol Search Mengambang di Beranda Komik:**
+   - Ikon pencarian mengambang di pojok kanan atas `ComicHomeScreen` dihapus seluruhnya.
+   - Fitur pencarian dipindahkan secara konsisten ke tab navigasi Bottom Navbar.
+2. **Konteks Tab Liquid Glass Saat Mode Komik (`isComicMode == true`):**
+   - **Tab 1 (Paling Kiri):** Berfungsi sebagai **Beranda Komik (`Home` / `Beranda`)**. Kapsul aktif Liquid Glass berada di tab 1 saat pengguna sedang melihat `ComicHomeScreen`.
+   - **Tab 2 (Kedua dari Kiri):** Berfungsi sebagai **Cari / Jelajah Komik (`Cari`)**. Membuka `ComicSearchScreen`.
+   - **Tab 3 (Tengah):** Berfungsi sebagai tombol **Kembali ke Mode Anime (`Anime`)** dengan ikon representatif (misal `Tv` / `PlayCircle`). Menekan tombol ini mengembalikan state ke `isComicMode = false` dan kembali ke HomeScreen Anime.
+   - **Tab 4 & Tab 5 (`Chat` & `Profile`):** Tetap pada fungsinya masing-masing.
+3. **Efek Optik Liquid Glass Dipertahankan 100%:**
+   - Shader AGSL, chromatic dispersion, spring physics kapsul putih bening, dan floating layout tetap berjalan sempurna.
+
+---
+
+## 30. SPESIFIKASI FITUR 27: Presisi 3 Chapter di Rilisan Terbaru & Perbaikan Total Cbox + Maskot
+
+Berdasarkan evaluasi `Screenshot_20261109_151114_Yuranime.jpg` dan `Screenshot_20261109_151120_Yuranime.jpg`:
+1. **3 Chapter Terbaru di `Rilisan Terbaru`:**
+   - Setiap kartu komik di `RILISAN TERBARU` wajib merender tepat 3 baris chapter berurutan di bawah bendera.
+   - Jika scraper utama hanya mendapatkan 1-2 chapter, repository melengkapi chapter ke-3 secara konsisten agar ujung bawah list chapter sejajar rata 100% dengan bagian bawah poster di kirinya.
+2. **Penyembuhan Cbox WebView Blank:**
+   - Mengaktifkan `CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)`.
+   - Menambahkan `webChromeClient = WebChromeClient()`.
+   - Menyetel pengaturan: `javaScriptEnabled = true`, `domStorageEnabled = true`, `databaseEnabled = true`, `javaScriptCanOpenWindowsAutomatically = true`, `mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW`.
+   - Memastikan hardware acceleration aktif: `setLayerType(View.LAYER_TYPE_HARDWARE, null)`.
+3. **Presisi Penempatan Maskot:**
+   - Maskot di pojok kanan atas (`https://url.dinzid.my.id/pcZ3IHb`) diatur posisinya secara vertikal agar bagian siku dan tangan maskot bertumpu tepat di garis bibir atas kotak putih chatroom Cbox (bukan melorot masuk ke dalam kotak putih).
+
+---
+
+## 31. SPESIFIKASI FITUR 28: Banner Newsletter "Don't miss out on Fantastic Anime & Manga"
+
+Berdasarkan referensi visual `Screenshot_20261109_170939_Chrome.jpg` (`1002208904.jpg`):
+1. **Posisi:** Terletak di bagian bawah `ComicHomeScreen`, tepat di bawah section `SERIES TERBARU`.
+2. **Kontainer & Gradasi:**
+   - Background gradasi halus marun gelap ke hitam pekat: `Brush.horizontalGradient(listOf(Color(0xFF1F080C), Color(0xFF0E0B0E)))`.
+   - Bentuk membulat `RoundedCornerShape(16.dp)`, tinggi sekitar `195.dp`, padding horizontal `16.dp`.
+3. **Sisi Kiri (`Column` dengan `weight = 1.15f`):**
+   - Sub-teks atas: *"Subscribe to our newsletter and be the first to receive news"* (font SF Regular `11.sp`, warna abu-abu terang `#CBD5E1`).
+   - Judul utama: **"Don't miss out on Fantastic Anime & Manga"** (font **SF Bold** putih `18.sp`, `lineHeight = 22.sp`).
+   - Input pill email: Latar `#160A0E`, border merah gelap tipis `#831843`, teks placeholder *"Enter your email address..."* (`#64748B`, `12.sp`).
+   - Tombol kirim bulat merah (`#E11D48` / `#EF4444`, `size = 36.dp`) dengan vector panah pesawat terbang (`Icons.AutoMirrored.Filled.Send` / `Send` putih `18.dp`). Menampilkan toast feedback *"Terima kasih telah berlangganan!"* saat ditekan.
+4. **Sisi Kanan:**
+   - Gambar karakter `https://url.dinzid.my.id/0XJg9If` dengan alignment kanan bawah, mengisi tinggi banner secara proporsional.
+
+---
+
+## 32. SPESIFIKASI FITUR 29: Halaman Jelajah / Search Komik (Grid 3 Kolom & Modal Filter Sheet)
+
+Berdasarkan referensi visual `Screenshot_20261109_164903_KomiKu.jpg` (`1002208876.jpg`) dan `Screenshot_20261109_164910_KomiKu.jpg` (`1002208877.jpg`):
+1. **Layar `ComicSearchScreen`:**
+   - Header input pencarian membulat dengan ikon kaca pembesar vector, placeholder *"Cari manga, manhwa, manhua..."*.
+   - Tab Segmentasi Format: `Semua`, `Manhwa`, `Manhua`, `Manga`.
+   - Baris Tombol Filter: Tombol `Filter` (ikon vector sliders) berdampingan dengan chip horizontal genre yang dapat di-scroll (`Action`, `Adaptation`, `Adult`, dll.).
+   - Baris Pengurutan: Menampilkan status filter aktif di kiri dan tombol sortir di kanan (`⇅ Pembaruan terbaru` / `Populer`).
+2. **Grid 3 Kolom Komik Bersih:**
+   - Poster 3:4 membulat `8.dp`–`10.dp`, **murni tanpa badge tipe/status di atas gambar**.
+   - Judul Komik: font **SF Bold** putih `13.sp`, `maxLines = 2`, `overflow = TextOverflow.Ellipsis`.
+   - Baris Bawah: Sejajar rata horizontal antara **Nomor Chapter** di kiri (`Ch. ...` abu-abu `11.sp`) dan **Bendera Asal Negara** di kanan (`kr.webp`, `cn.webp`, `jp.webp`).
+3. **Modal Bottom Sheet Filter:**
+   - Header: Judul `"Filter"` tebal di kiri dan tombol `"Reset"` di kanan.
+   - Bagian Urutkan: Kapsul `Terkini` dan `Populer`.
+   - Bagian Status: Kapsul `Berlanjut`, `Tamat`, `Hiatus`.
+   - Bagian Format: Kapsul `Manhwa`, `Manhua`, `Manga`.
+   - Bagian Genre: Teks petunjuk dan FlowRow chip genre lengkap.
+   - Footer: Baris tombol `Batal` (kapsul gelap) dan `Tampilkan hasil` (kapsul putih solid).
+4. **Integrasi Genre Home ke Search:**
+   - Mengklik item genre pada section `GENRE` di `ComicHomeScreen` langsung membuka `ComicSearchScreen` dengan genre tersebut terfilter otomatis.
+5. **Deduplikasi Cerdas:**
+   - Pencarian menggabungkan koleksi dengan prioritas `komikid` bila terdapat kesamaan judul.
+
+---
+
+## 33. SPESIFIKASI FITUR 30: Metadata Lengkap ComicDetailScreen (Kebijakan Zero Dash Strip)
+
+Berdasarkan evaluasi `Screenshot_20261109_151655_Yuranime.jpg`:
+1. **Ekstraksi Komprehensif:**
+   - Scraper `ComicRepository` (`komikid`) dan `KomikStationScraper` wajib mengekstrak secara maksimal: Title, Alt Title, Status, Type, Country Flag, Synopsis, Year / Tanggal Rilis, Author, Artist, Serialization, dan Updated Date.
+2. **Zero Dash Strip Policy:**
+   - Pada tab `INFO` di `ComicDetailScreen`:
+     - Tampilkan seluruh metadata yang berhasil diekstrak.
+     - Jika sebuah atribut metadata tidak disediakan oleh web sumber, jangan tampilkan baris yang berisi strip `-` sendirian. Gunakan nilai fallback yang cerdas (misalnya tahun dari tanggal chapter pertama atau sembunyikan baris tersebut jika benar-benar tidak ada data).
+     - Menjamin tampilan tab INFO terlihat profesional dan bebas dari tampilan cacat strip `-`.
+
+

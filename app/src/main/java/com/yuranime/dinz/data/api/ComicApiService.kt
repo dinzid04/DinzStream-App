@@ -118,6 +118,18 @@ interface ComicApiService {
         @Query("page_size") pageSize: Int = 20
     ): ShngmBaseResponse<List<ShngmMangaDto>>
 
+    @GET("manga/list")
+    suspend fun getMangaList(
+        @Query("q") query: String? = null,
+        @Query("sort") sort: String? = null,
+        @Query("sort_order") sortOrder: String? = null,
+        @Query("status") status: String? = null,
+        @Query("format") format: String? = null,
+        @Query("genre") genre: String? = null,
+        @Query("page") page: Int = 1,
+        @Query("page_size") pageSize: Int = 24
+    ): ShngmBaseResponse<List<ShngmMangaDto>>
+
     @GET("chapter/{mangaId}/list")
     suspend fun getMangaChapters(
         @Path("mangaId") mangaId: String,

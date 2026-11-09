@@ -267,6 +267,72 @@ class KomikStationScraper(
         }
     }
 
+    suspend fun searchComics(query: String, page: Int = 1): Result<List<ComicItem>> = withContext(Dispatchers.IO) {
+        try {
+            val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+            val url = if (page > 1) "${BASE_URL}page/$page/?s=$encoded" else "${BASE_URL}?s=$encoded"
+            val request = newRequestBuilder(url).build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code} saat mencari komik"))
+            }
+            val html = response.body?.string().orEmpty()
+            val doc = Jsoup.parse(html, url)
+
+            val comics = mutableListOf<ComicItem>()
+            doc.select(".bsx").forEach { bsx ->
+                val a = bsx.selectFirst("a")
+                val title = a?.attr("title")?.takeIf { it.isNotBlank() }
+                    ?: bsx.selectFirst(".tt")?.text()?.trim()
+                    ?: "Komik"
+                val link = a?.attr("href").orEmpty()
+                val img = bsx.selectFirst("img.ts-post-image") ?: bsx.selectFirst("img")
+                val cover = img?.attr("data-src")?.takeIf { it.isNotBlank() }
+                    ?: img?.attr("src")?.takeIf { it.isNotBlank() }
+                    ?: ""
+                val typeSpan = bsx.selectFirst(".type")
+                val rawFormat = typeSpan?.text()?.trim() ?: "Manga"
+                val format = when {
+                    rawFormat.contains("Manhwa", ignoreCase = true) -> "Manhwa"
+                    rawFormat.contains("Manhua", ignoreCase = true) -> "Manhua"
+                    else -> "Manga"
+                }
+                val countryCode = when (format) {
+                    "Manhwa" -> "KR"
+                    "Manhua" -> "CN"
+                    else -> "JP"
+                }
+                val score = bsx.selectFirst(".numscore")?.text()?.trim()?.toFloatOrNull()
+                val chText = bsx.selectFirst(".epxs")?.text()?.trim() ?: ""
+
+                comics.add(
+                    ComicItem(
+                        id = link,
+                        title = title,
+                        format = format,
+                        countryCode = countryCode,
+                        coverPortrait = cover,
+                        rating = score,
+                        status = "ongoing",
+                        chapters = if (chText.isNotBlank()) {
+                            listOf(
+                                ComicChapterItem(
+                                    id = "",
+                                    number = chText.replace("Chapter", "", ignoreCase = true).trim(),
+                                    title = chText
+                                )
+                            )
+                        } else emptyList()
+                    )
+                )
+            }
+
+            Result.success(comics)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun getComicDetail(urlOrSlug: String): Result<ComicDetail> = withContext(Dispatchers.IO) {
         try {
             val url = when {
@@ -318,6 +384,42 @@ class KomikStationScraper(
 
             val ratingScore = doc.selectFirst(".numscore, .rating-prc .num")?.text()?.trim()?.toFloatOrNull()
 
+            // Ekstraksi Metadata Lengkap (Author, Artist, Serialization, Released, Updated On)
+            val altTitle = doc.select(".desktop-tit, .alter, .spe span:contains(Alternative)").text()
+                .replace("Alternative:", "", ignoreCase = true)
+                .trim()
+                .takeIf { it.isNotBlank() && it != "-" }
+
+            val rawAuthor = doc.select(".tsinfo .imptdt:contains(Author) i, .spe span:contains(Author) i, .spe span:contains(Author)").text()
+                .replace("Author:", "", ignoreCase = true)
+                .trim()
+            val authorList = if (rawAuthor.isNotBlank() && rawAuthor != "-" && !rawAuthor.equals("N/A", true)) {
+                rawAuthor.split(",", "/", "&").map { it.trim() }.filter { it.isNotBlank() }
+            } else emptyList()
+
+            val rawArtist = doc.select(".tsinfo .imptdt:contains(Artist) i, .spe span:contains(Artist) i, .spe span:contains(Artist)").text()
+                .replace("Artist:", "", ignoreCase = true)
+                .trim()
+            val artistList = if (rawArtist.isNotBlank() && rawArtist != "-" && !rawArtist.equals("N/A", true)) {
+                rawArtist.split(",", "/", "&").map { it.trim() }.filter { it.isNotBlank() }
+            } else emptyList()
+
+            val serialization = doc.select(".tsinfo .imptdt:contains(Serialization) i, .spe span:contains(Serialization) i, .spe span:contains(Serialization)").text()
+                .replace("Serialization:", "", ignoreCase = true)
+                .trim()
+                .takeIf { it.isNotBlank() && it != "-" && !it.equals("N/A", true) }
+
+            val releasedYear = doc.select(".tsinfo .imptdt:contains(Released) i, .spe span:contains(Released) i, .spe span:contains(Released)").text()
+                .replace("Released:", "", ignoreCase = true)
+                .trim()
+                .takeIf { it.isNotBlank() && it != "-" && !it.equals("N/A", true) }
+
+            val updatedOn = doc.select(".tsinfo .imptdt:contains(Updated) i, .spe span:contains(Updated) i, .spe span:contains(Updated)").text()
+                .replace("Updated on:", "", ignoreCase = true)
+                .replace("Updated:", "", ignoreCase = true)
+                .trim()
+                .takeIf { it.isNotBlank() && it != "-" }
+
             val chapters = mutableListOf<ComicChapterItem>()
             val chapterElements = doc.select("#chapterlist ul li, ul.clstyle li")
             chapterElements.forEach { li ->
@@ -347,6 +449,7 @@ class KomikStationScraper(
             val detail = ComicDetail(
                 id = url,
                 title = title,
+                alternativeTitle = altTitle,
                 description = description,
                 format = format,
                 countryCode = countryCode,
@@ -354,7 +457,12 @@ class KomikStationScraper(
                 coverLandscape = posterUrl,
                 rating = ratingScore,
                 status = status,
+                releaseYear = releasedYear,
+                serialization = serialization,
+                updatedOn = updatedOn,
                 genres = genres,
+                authors = authorList,
+                artists = artistList,
                 chapters = chapters
             )
 

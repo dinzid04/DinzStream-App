@@ -38,11 +38,13 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -95,6 +97,29 @@ enum class NavTab(
     JADWAL("Jadwal", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth),
     CARI("Cari", Icons.Filled.Search, Icons.Outlined.Search),
     COMIC("Komik", Icons.Filled.AutoStories, Icons.Outlined.AutoStories),
+    CHAT("Chat", Icons.AutoMirrored.Filled.Send, Icons.AutoMirrored.Outlined.Send),
+    PROFILE("Profile", Icons.Filled.Person, Icons.Outlined.Person);
+
+    val title: String get() = label
+    val icon: ImageVector get() = filledIcon
+}
+
+/**
+ * Tab navigasi saat aplikasi berada di Mode Komik (isComicMode == true):
+ * 1. Tab 1 (Paling Kiri): Beranda Komik (Home / Beranda)
+ * 2. Tab 2 (Kedua dari Kiri): Halaman Search / Jelajah Komik (Cari) -> ComicSearchScreen
+ * 3. Tab 3 (Tengah): Kembali ke Mode Anime (Anime) -> isComicMode = false
+ * 4. Tab 4: Chat
+ * 5. Tab 5: Profile
+ */
+enum class ComicNavTab(
+    val label: String,
+    val filledIcon: ImageVector,
+    val outlinedIcon: ImageVector
+) {
+    HOME("Home", Icons.Filled.Home, Icons.Outlined.Home),
+    CARI("Cari", Icons.Filled.Search, Icons.Outlined.Search),
+    ANIME("Anime", Icons.Filled.Tv, Icons.Outlined.Tv),
     CHAT("Chat", Icons.AutoMirrored.Filled.Send, Icons.AutoMirrored.Outlined.Send),
     PROFILE("Profile", Icons.Filled.Person, Icons.Outlined.Person);
 
@@ -192,8 +217,11 @@ private const val QUICK_LIQUID_AGSL_SHADER = """
  */
 @Composable
 fun BottomNavBar(
-    selectedTab: NavTab,
-    onTabSelected: (NavTab) -> Unit,
+    selectedTab: NavTab = NavTab.HOME,
+    onTabSelected: (NavTab) -> Unit = {},
+    isComicMode: Boolean = false,
+    selectedComicTab: ComicNavTab = ComicNavTab.HOME,
+    onComicTabSelected: (ComicNavTab) -> Unit = {},
     modifier: Modifier = Modifier,
     backdropLayer: GraphicsLayer? = null,
     isLiquidGlassEnabled: Boolean = AppPreferences.liquidGlassEnabled.collectAsState().value
@@ -202,15 +230,60 @@ fun BottomNavBar(
     var pillSize by remember { mutableStateOf(IntSize.Zero) }
     var showChooser by remember { mutableStateOf(false) }
 
-    // Otomatis sembunyikan chooser ketika tab berpindah
-    LaunchedEffect(selectedTab) {
+    // Otomatis sembunyikan chooser ketika tab berpindah atau mode berubah
+    LaunchedEffect(selectedTab, selectedComicTab, isComicMode) {
         showChooser = false
     }
 
-    // Tentukan tab tengah yang aktif: Komik jika sedang di Komik, sebaliknya Cari
-    val middleTab = if (selectedTab == NavTab.COMIC) NavTab.COMIC else NavTab.CARI
-    val displayTabs = remember(middleTab) {
-        listOf(NavTab.HOME, NavTab.JADWAL, middleTab, NavTab.CHAT, NavTab.PROFILE)
+    data class TabVisualItem(
+        val label: String,
+        val filledIcon: ImageVector,
+        val outlinedIcon: ImageVector,
+        val isSelected: Boolean,
+        val onClick: () -> Unit
+    )
+
+    val items = if (isComicMode) {
+        listOf(
+            ComicNavTab.HOME,
+            ComicNavTab.CARI,
+            ComicNavTab.ANIME,
+            ComicNavTab.CHAT,
+            ComicNavTab.PROFILE
+        ).map { tab ->
+            TabVisualItem(
+                label = tab.label,
+                filledIcon = tab.filledIcon,
+                outlinedIcon = tab.outlinedIcon,
+                isSelected = (tab == selectedComicTab),
+                onClick = { onComicTabSelected(tab) }
+            )
+        }
+    } else {
+        val middleTab = if (selectedTab == NavTab.COMIC) NavTab.COMIC else NavTab.CARI
+        listOf(
+            NavTab.HOME,
+            NavTab.JADWAL,
+            middleTab,
+            NavTab.CHAT,
+            NavTab.PROFILE
+        ).map { tab ->
+            val isMiddle = (tab == NavTab.CARI || tab == NavTab.COMIC)
+            TabVisualItem(
+                label = tab.label,
+                filledIcon = tab.filledIcon,
+                outlinedIcon = tab.outlinedIcon,
+                isSelected = (tab == selectedTab),
+                onClick = {
+                    if (isMiddle) {
+                        showChooser = !showChooser
+                    } else {
+                        showChooser = false
+                        onTabSelected(tab)
+                    }
+                }
+            )
+        }
     }
 
     Box(
@@ -224,42 +297,44 @@ fun BottomNavBar(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // ==================== FLOATING LIQUID GLASS CHOOSER PILL ====================
-            AnimatedVisibility(
-                visible = showChooser,
-                enter = fadeIn(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioLowBouncy,
-                        stiffness = Spring.StiffnessMediumLow
+            // ==================== FLOATING LIQUID GLASS CHOOSER PILL (MODE ANIME) ====================
+            if (!isComicMode) {
+                AnimatedVisibility(
+                    visible = showChooser,
+                    enter = fadeIn(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ) + scaleIn(
+                        initialScale = 0.82f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ),
+                    exit = fadeOut(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + scaleOut(
+                        targetScale = 0.82f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
                     )
-                ) + scaleIn(
-                    initialScale = 0.82f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioLowBouncy,
-                        stiffness = Spring.StiffnessMediumLow
+                ) {
+                    FloatingLiquidGlassChooserPill(
+                        selectedTab = selectedTab,
+                        onOptionSelected = { chosenTab ->
+                            showChooser = false
+                            onTabSelected(chosenTab)
+                        },
+                        isLiquidGlassEnabled = isLiquidGlassEnabled
                     )
-                ),
-                exit = fadeOut(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMedium
-                    )
-                ) + scaleOut(
-                    targetScale = 0.82f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMedium
-                    )
-                )
-            ) {
-                FloatingLiquidGlassChooserPill(
-                    selectedTab = selectedTab,
-                    onOptionSelected = { chosenTab ->
-                        showChooser = false
-                        onTabSelected(chosenTab)
-                    },
-                    isLiquidGlassEnabled = isLiquidGlassEnabled
-                )
+                }
             }
 
             // ==================== MAIN LIQUID GLASS BOTTOM NAVBAR ====================
@@ -402,19 +477,9 @@ fun BottomNavBar(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    displayTabs.forEach { tab ->
-                        val isSelected = tab == selectedTab
-                        val isMiddleTab = (tab == NavTab.CARI || tab == NavTab.COMIC)
+                    items.forEach { tabItem ->
+                        val isSelected = tabItem.isSelected
                         val interactionSource = remember { MutableInteractionSource() }
-
-                        val onClickAction = {
-                            if (isMiddleTab) {
-                                showChooser = !showChooser
-                            } else {
-                                showChooser = false
-                                onTabSelected(tab)
-                            }
-                        }
 
                         if (isSelected) {
                             val activeTabModifier = Modifier
@@ -464,7 +529,7 @@ fun BottomNavBar(
                                 .clickable(
                                     interactionSource = interactionSource,
                                     indication = ripple(bounded = true, color = Color.White)
-                                ) { onClickAction() }
+                                ) { tabItem.onClick() }
                                 .padding(horizontal = 15.dp, vertical = 9.dp)
 
                             Box(
@@ -476,8 +541,8 @@ fun BottomNavBar(
                                     horizontalArrangement = Arrangement.Center
                                 ) {
                                     Icon(
-                                        imageVector = tab.filledIcon,
-                                        contentDescription = tab.label,
+                                        imageVector = tabItem.filledIcon,
+                                        contentDescription = tabItem.label,
                                         tint = Color.White,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -490,7 +555,7 @@ fun BottomNavBar(
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
-                                                text = tab.label,
+                                                text = tabItem.label,
                                                 color = Color.White,
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Bold,
@@ -509,12 +574,12 @@ fun BottomNavBar(
                                     .clickable(
                                         interactionSource = interactionSource,
                                         indication = ripple(bounded = false, radius = 22.dp, color = Color.White)
-                                    ) { onClickAction() },
+                                    ) { tabItem.onClick() },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = tab.outlinedIcon,
-                                    contentDescription = tab.label,
+                                    imageVector = tabItem.outlinedIcon,
+                                    contentDescription = tabItem.label,
                                     tint = Color(0xD9FFFFFF),
                                     modifier = Modifier.size(21.dp)
                                 )
