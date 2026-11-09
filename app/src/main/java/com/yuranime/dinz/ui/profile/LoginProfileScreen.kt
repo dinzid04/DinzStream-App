@@ -144,7 +144,8 @@ fun LoginProfileScreen(
     onTabSelected: (NavTab) -> Unit = {},
     onAnimeClick: (id: String) -> Unit = {},
     onEpisodeClick: (episodeId: String, movieId: String) -> Unit = { _, _ -> },
-    onCheckUpdateClick: () -> Unit = {}
+    onCheckUpdateClick: () -> Unit = {},
+    onComicChapterClick: ((chapterId: String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -249,7 +250,10 @@ fun LoginProfileScreen(
             }
             ProfileSubScreen.DOWNLOADS -> {
                 DownloadsScreen(
-                    onBackClick = { currentSubScreen = ProfileSubScreen.MAIN }
+                    onBackClick = { currentSubScreen = ProfileSubScreen.MAIN },
+                    onReadComicOffline = { offlineComic ->
+                        onComicChapterClick?.invoke(offlineComic.chapterId)
+                    }
                 )
             }
             ProfileSubScreen.SETTINGS -> {

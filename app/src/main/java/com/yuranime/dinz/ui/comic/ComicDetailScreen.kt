@@ -1,5 +1,6 @@
 package com.yuranime.dinz.ui.comic
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -28,19 +29,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +65,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -70,7 +76,9 @@ import coil.request.ImageRequest
 import com.yuranime.dinz.R
 import com.yuranime.dinz.data.model.ComicChapterItem
 import com.yuranime.dinz.data.model.ComicDetail
+import com.yuranime.dinz.data.repository.ComicDownloader
 import com.yuranime.dinz.data.repository.ComicRepository
+import com.yuranime.dinz.ui.components.shimmerBrush
 import com.yuranime.dinz.ui.theme.ColorAccentPrimary
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import kotlinx.coroutines.launch
@@ -133,8 +141,39 @@ fun ComicDetailScreen(
             .background(ComicDarkBg)
     ) {
         if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = ComicOrange, modifier = Modifier.size(36.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(ComicDarkBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(shimmerBrush()),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_yuranime_monochrome),
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.35f),
+                            modifier = Modifier.size(50.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Memuat detail komik...",
+                        color = ComicMutedLabel,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = SfProFontFamily
+                    )
+                }
             }
         } else if (errorMessage != null && comicDetail == null) {
             Box(
@@ -408,6 +447,9 @@ fun ComicDetailScreen(
                             ComicChapterRowItem(
                                 chapter = chapter,
                                 fallbackThumb = posterUrl,
+                                comicId = comicId,
+                                comicTitle = comicDetail?.title ?: "Komik",
+                                repository = repository,
                                 onClick = {
                                     if (chapter.id.isNotBlank()) {
                                         comicDetail?.let { cd ->
@@ -842,19 +884,34 @@ private fun InfoMetadataBlock(
 }
 
 /**
- * Item Baris Chapter pada Tab CHAPTER (Persis Referensi Vortex Tanpa Gembok Kunci):
+ * Item Baris Chapter pada Tab CHAPTER (Sesuai Referensi Gambar 1002209126.jpg):
  * - Kiri: Thumbnail persegi membulat 54.dp x 54.dp (RoundedCornerShape(10.dp))
  * - Tengah: #01 (abu-abu), Judul Chapter (putih SF Bold 15.sp), Ikon Kalender + Tanggal • Ikon Mata + Views
- * - Kanan: Ikon panah kanan '>'
+ * - Kanan: Tombol Unduh Offline (Icons.Outlined.FileDownload / CheckCircle / Progress Unduh)
  */
 @Composable
 private fun ComicChapterRowItem(
     chapter: ComicChapterItem,
     fallbackThumb: String,
+    comicId: String,
+    comicTitle: String,
+    repository: ComicRepository,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val thumbUrl = chapter.thumbnailUrl.ifBlank { fallbackThumb }
+
+    val activeDownloads by ComicDownloader.activeDownloads.collectAsState()
+    val downloadProgress by ComicDownloader.downloadProgress.collectAsState()
+    val isDownloading = activeDownloads.contains(chapter.id)
+    val progress = downloadProgress[chapter.id] ?: 0f
+
+    var isDownloaded by remember(chapter.id) {
+        mutableStateOf(ComicDownloader.isChapterDownloaded(context, chapter.id))
+    }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     val formattedNumber = remember(chapter.number) {
         val raw = chapter.number.trim()
         if (raw.length == 1 && raw.all { it.isDigit() }) {
@@ -865,6 +922,46 @@ private fun ComicChapterRowItem(
     }
     val dateLabel = chapter.formattedDate.ifBlank { chapter.releaseTime.ifBlank { "Baru" } }
     val viewsLabel = formatNumberDots(chapter.viewCount.takeIf { it > 0 } ?: 584L)
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = {
+                Text(
+                    text = "Hapus Unduhan?",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
+                )
+            },
+            text = {
+                Text(
+                    text = "Hapus Chapter ${chapter.number} dari memori internal perangkat?",
+                    color = Color(0xFFCBD5E1),
+                    fontSize = 13.sp,
+                    fontFamily = SfProFontFamily
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        ComicDownloader.deleteDownloadedChapter(context, chapter.id, comicId)
+                        isDownloaded = false
+                        Toast.makeText(context, "Unduhan chapter berhasil dihapus", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Text("Hapus", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Batal", color = Color(0xFF94A3B8))
+                }
+            },
+            containerColor = Color(0xFF1E222A)
+        )
+    }
 
     Row(
         modifier = Modifier
@@ -963,13 +1060,80 @@ private fun ComicChapterRowItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Sisi Kanan: Ikon Panah Kanan '>' (Tanpa Gembok Kunci)
-        Icon(
-            imageVector = Icons.Default.ChevronRight,
-            contentDescription = "Baca Chapter",
-            tint = ComicMutedLabel,
-            modifier = Modifier.size(22.dp)
-        )
+        // Sisi Kanan: Tombol Unduh Offline / Status Terunduh (Menggantikan Ikon '>')
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(Color(0x14FFFFFF))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(bounded = true, color = Color.White)
+                ) {
+                    if (isDownloaded) {
+                        showDeleteDialog = true
+                    } else if (!isDownloading) {
+                        scope.launch {
+                            Toast.makeText(
+                                context,
+                                "Mulai mengunduh Chapter ${chapter.number}...",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            val res = ComicDownloader.downloadChapter(
+                                context = context,
+                                comicId = comicId,
+                                comicTitle = comicTitle,
+                                chapter = chapter,
+                                coverUrl = fallbackThumb,
+                                repository = repository
+                            )
+                            if (res.isSuccess) {
+                                isDownloaded = true
+                                Toast.makeText(
+                                    context,
+                                    "Chapter ${chapter.number} berhasil diunduh!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    res.exceptionOrNull()?.localizedMessage ?: "Gagal mengunduh chapter",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            when {
+                isDownloading -> {
+                    Text(
+                        text = "${(progress * 100).toInt()}%",
+                        color = ComicOrange,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
+                }
+                isDownloaded -> {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = "Terunduh",
+                        tint = Color(0xFF10B981),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                else -> {
+                    Icon(
+                        imageVector = Icons.Outlined.FileDownload,
+                        contentDescription = "Unduh Chapter",
+                        tint = ComicMutedLabel,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
     }
 }
 

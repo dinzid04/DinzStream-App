@@ -240,24 +240,25 @@ class ComicRepository(
     }
 
     suspend fun getComicDetail(mangaId: String): Result<ComicDetail> = withContext(Dispatchers.IO) {
-        cachedDetails[mangaId]?.let { return@withContext Result.success(it) }
+        val cleanId = mangaId.trim().removeSurrounding("\"").removeSurrounding("'")
+        cachedDetails[cleanId]?.let { return@withContext Result.success(it) }
 
-        if (mangaId.contains("komikstation.org") || mangaId.startsWith("ks:")) {
-            val res = komikStationScraper.getComicDetail(mangaId)
+        if (cleanId.contains("komikstation.org") || cleanId.startsWith("ks:") || cleanId.startsWith("http")) {
+            val res = komikStationScraper.getComicDetail(cleanId)
             if (res.isSuccess) {
-                res.getOrNull()?.let { cachedDetails[mangaId] = it }
+                res.getOrNull()?.let { cachedDetails[cleanId] = it }
+                return@withContext res
             }
-            return@withContext res
         }
 
         try {
-            val response = api.getMangaDetail(mangaId)
+            val response = api.getMangaDetail(cleanId)
             val dto = response.data ?: throw Exception("Data komik tidak ditemukan")
             val portraitCover = resolveCoverUrl(dto.coverPortraitUrl, dto.coverImageUrl)
             val landscapeCover = resolveCoverUrl(dto.coverImageUrl, dto.coverPortraitUrl)
 
             // Ambil daftar lengkap chapter (hingga 100 chapter)
-            val chResponse = api.getMangaChapters(mangaId = mangaId, page = 1, pageSize = 100)
+            val chResponse = api.getMangaChapters(mangaId = cleanId, page = 1, pageSize = 100)
             val chapters = (chResponse.data ?: emptyList()).map { ch ->
                 val numStr = formatChapterNumber(ch.chapterNumber)
                 val thumb = ch.thumbnailImageUrl
@@ -265,7 +266,7 @@ class ComicRepository(
                     ?: portraitCover
                 ComicChapterItem(
                     id = ch.chapterId.orEmpty(),
-                    comicId = mangaId,
+                    comicId = cleanId,
                     number = numStr,
                     title = ch.chapterTitle?.takeIf { it.isNotBlank() } ?: "Chapter $numStr",
                     releaseTime = formatRelativeTime(ch.releaseDate),
@@ -325,20 +326,42 @@ class ComicRepository(
                 chapters = chapters
             )
 
-            cachedDetails[mangaId] = detail
+            cachedDetails[cleanId] = detail
             Result.success(detail)
         } catch (e: Exception) {
+            // AUTOMATIC FALLBACK MIRROR: Jika terjadi HTTP 432 / Cloudflare / 404, coba cari di KomikStation
+            try {
+                val searchQuery = cleanId.removePrefix("ks:").removePrefix("manga-")
+                    .substringAfterLast("/")
+                    .replace("-", " ")
+                    .trim()
+                if (searchQuery.isNotBlank()) {
+                    val searchRes = komikStationScraper.searchComics(searchQuery)
+                    val first = searchRes.getOrNull()?.firstOrNull()
+                    if (first != null) {
+                        val fbDetailRes = komikStationScraper.getComicDetail(first.id)
+                        if (fbDetailRes.isSuccess) {
+                            val fbDetail = fbDetailRes.getOrNull()
+                            if (fbDetail != null) {
+                                cachedDetails[cleanId] = fbDetail
+                                return@withContext Result.success(fbDetail)
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
             Result.failure(e)
         }
     }
 
     suspend fun getChapterDetail(chapterId: String): Result<ComicChapterDetail> = withContext(Dispatchers.IO) {
-        if (chapterId.contains("komikstation.org") || chapterId.startsWith("ks-ch:")) {
-            return@withContext komikStationScraper.getChapterDetail(chapterId)
+        val cleanChapterId = chapterId.trim()
+        if (cleanChapterId.contains("komikstation.org") || cleanChapterId.startsWith("ks-ch:") || cleanChapterId.startsWith("http")) {
+            return@withContext komikStationScraper.getChapterDetail(cleanChapterId)
         }
 
         try {
-            val response = api.getChapterDetail(chapterId)
+            val response = api.getChapterDetail(cleanChapterId)
             val data = response.data ?: throw Exception("Data chapter tidak ditemukan")
 
             val rawBaseUrl = data.baseUrl?.trimEnd('/') ?: "https://assets.shngm.id"
@@ -365,6 +388,13 @@ class ComicRepository(
 
             Result.success(result)
         } catch (e: Exception) {
+            // Fallback ke KomikStation jika terjadi error atau 432
+            try {
+                val ksResult = komikStationScraper.getChapterDetail(cleanChapterId)
+                if (ksResult.isSuccess) {
+                    return@withContext ksResult
+                }
+            } catch (_: Exception) {}
             Result.failure(e)
         }
     }

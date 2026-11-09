@@ -10,6 +10,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
@@ -48,7 +50,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -97,14 +98,16 @@ import com.yuranime.dinz.ui.components.BottomNavBar
 import com.yuranime.dinz.ui.components.ComicNavTab
 import com.yuranime.dinz.ui.components.NavTab
 import com.yuranime.dinz.ui.components.liquidGlassBackdrop
+import com.yuranime.dinz.ui.components.shimmerBrush
 import com.yuranime.dinz.ui.theme.SfProFontFamily
+import kotlinx.coroutines.delay
 import java.util.Locale
 
 private const val COMIC_IMAGE_USER_AGENT =
     "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
 private const val COMIC_IMAGE_REFERER = "https://app.shinigami.asia/"
 
-private val ComicScreenBg = Color(0xFF0B0D12)
+private val ComicScreenBg = Color(0xFF0B0B0B)
 private val ComicCardBg = Color(0xFF141418)
 private val ComicRedAccent = Color(0xFFE11D48)
 private val ComicGoldRating = Color(0xFFFACC15)
@@ -146,10 +149,38 @@ fun ComicHomeScreen(
         ) {
             if (uiState.isLoading && uiState.banners.isEmpty() && uiState.latestComics.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(ComicScreenBg),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = ComicRedAccent, strokeWidth = 3.dp)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(100.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(shimmerBrush()),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_yuranime_monochrome),
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.35f),
+                                modifier = Modifier.size(50.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Memuat Beranda Komik...",
+                            color = ComicMutedText,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = SfProFontFamily
+                        )
+                    }
                 }
             } else {
                 LazyColumn(
@@ -286,7 +317,14 @@ fun ComicHomeScreen(
                     // 10. SECTION NEWSLETTER BANNER (Don't miss out on Fantastic Anime & Manga)
                     item(key = "comic_newsletter_banner") {
                         ComicSectionDivider()
-                        ComicNewsletterBanner()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF0B0B0B))
+                                .padding(bottom = 16.dp)
+                        ) {
+                            ComicNewsletterBanner()
+                        }
                     }
                 }
             }
@@ -359,6 +397,21 @@ private fun ComicHeroSlider(
 ) {
     val pagerState = rememberPagerState(pageCount = { banners.size })
     val context = LocalContext.current
+
+    // Auto-Slide Hero Slider setiap 4500ms dengan animasi spring halus (pause jika disentuh manual)
+    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress, banners.size) {
+        if (banners.size > 1 && !pagerState.isScrollInProgress) {
+            delay(4500L)
+            val nextPage = (pagerState.currentPage + 1) % banners.size
+            pagerState.animateScrollToPage(
+                page = nextPage,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioLowBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+        }
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         HorizontalPager(
@@ -1565,6 +1618,7 @@ private fun ComicNewsletterBanner(
                     colors = listOf(Color(0xFF1F080C), Color(0xFF0E0B0E))
                 )
             )
+            .border(0.8.dp, Color(0x4D831843), RoundedCornerShape(16.dp))
     ) {
         Row(
             modifier = Modifier
@@ -1887,10 +1941,17 @@ private fun ComicSearchDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(120.dp),
+                            .height(120.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(shimmerBrush()),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = ComicRedAccent, strokeWidth = 2.dp)
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_yuranime_monochrome),
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.25f),
+                            modifier = Modifier.size(36.dp)
+                        )
                     }
                 } else if (results.isEmpty() && query.isNotBlank()) {
                     Box(
@@ -2036,7 +2097,32 @@ private fun ComicGenreDialog(
 
                 if (isLoading) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = ComicRedAccent, strokeWidth = 3.dp)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(90.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(shimmerBrush()),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_yuranime_monochrome),
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.35f),
+                                    modifier = Modifier.size(44.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = "Memuat komik...",
+                                color = ComicMutedText,
+                                fontSize = 13.sp,
+                                fontFamily = SfProFontFamily
+                            )
+                        }
                     }
                 } else if (comics.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

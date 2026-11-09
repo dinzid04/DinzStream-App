@@ -39,7 +39,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -63,6 +62,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,6 +77,7 @@ import com.yuranime.dinz.data.repository.ComicRepository
 import com.yuranime.dinz.ui.components.BottomNavBar
 import com.yuranime.dinz.ui.components.ComicNavTab
 import com.yuranime.dinz.ui.components.liquidGlassBackdrop
+import com.yuranime.dinz.ui.components.shimmerBrush
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -87,7 +88,7 @@ private const val SEARCH_IMAGE_USER_AGENT =
     "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
 private const val SEARCH_IMAGE_REFERER = "https://app.shinigami.asia/"
 
-private val SearchScreenBg = Color(0xFF0B0D12)
+private val SearchScreenBg = Color(0xFF0B0B0B)
 private val SearchCardBg = Color(0xFF141418)
 private val SearchRedAccent = Color(0xFFE11D48)
 private val SearchMutedText = Color(0xFF94A3B8)
@@ -434,7 +435,32 @@ fun ComicSearchScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(color = SearchRedAccent, strokeWidth = 3.dp)
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(90.dp)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(shimmerBrush()),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_yuranime_monochrome),
+                                        contentDescription = null,
+                                        tint = Color.White.copy(alpha = 0.35f),
+                                        modifier = Modifier.size(44.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Text(
+                                    text = "Mencari komik...",
+                                    color = SearchMutedText,
+                                    fontSize = 13.5.sp,
+                                    fontFamily = SfProFontFamily
+                                )
+                            }
                         }
                     } else if (searchResults.isEmpty()) {
                         Box(

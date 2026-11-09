@@ -300,6 +300,9 @@ class MainActivity : ComponentActivity() {
                                                 selectedStreamingMovieId = mId
                                                 selectedStreamingEpisodeId = epId
                                             },
+                                            onComicChapterClick = { chId ->
+                                                selectedComicChapterId = chId
+                                            },
                                             onCheckUpdateClick = {
                                                 scope.launch {
                                                     Toast.makeText(this@MainActivity, "Memeriksa pembaruan...", Toast.LENGTH_SHORT).show()
@@ -342,6 +345,9 @@ class MainActivity : ComponentActivity() {
                                             onEpisodeClick = { epId, mId ->
                                                 selectedStreamingMovieId = mId
                                                 selectedStreamingEpisodeId = epId
+                                            },
+                                            onComicChapterClick = { chId ->
+                                                selectedComicChapterId = chId
                                             },
                                             onCuplixClick = { cuplixItem ->
                                                 selectedCuplixItem = cuplixItem
@@ -470,6 +476,9 @@ class MainActivity : ComponentActivity() {
                                             onEpisodeClick = { epId, mId ->
                                                 selectedStreamingMovieId = mId
                                                 selectedStreamingEpisodeId = epId
+                                            },
+                                            onComicChapterClick = { chId ->
+                                                selectedComicChapterId = chId
                                             },
                                             onCheckUpdateClick = {
                                                 scope.launch {

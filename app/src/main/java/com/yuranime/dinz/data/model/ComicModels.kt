@@ -19,7 +19,22 @@ data class ComicReadHistoryItem(
     val chapterId: String,
     val chapterNumber: String,
     val chapterTitle: String = "",
-    val updatedAt: Long = 0L
+    val updatedAt: Long = 0L,
+    val pageIndex: Int = 0,
+    val scrollOffset: Int = 0
+)
+
+data class DownloadedComicChapter(
+    val chapterId: String,
+    val comicId: String,
+    val comicTitle: String,
+    val chapterNumber: String,
+    val chapterTitle: String = "",
+    val coverUrl: String = "",
+    val pageCount: Int = 0,
+    val localDirPath: String = "",
+    val totalBytes: Long = 0L,
+    val downloadedAt: Long = 0L
 )
 
 data class ComicItem(

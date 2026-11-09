@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.yuranime.dinz.data.model.EpisodeCommentItem
 
-class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_local.db", null, 3) {
+class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_local.db", null, 4) {
 
     private val prefs = context.getSharedPreferences("animein_auth_prefs", Context.MODE_PRIVATE)
 
@@ -56,7 +56,25 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
                 chapter_id TEXT,
                 chapter_number TEXT,
                 chapter_title TEXT,
-                updated_at INTEGER
+                updated_at INTEGER,
+                page_index INTEGER DEFAULT 0,
+                scroll_offset INTEGER DEFAULT 0
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS offline_comic_chapters (
+                chapter_id TEXT PRIMARY KEY,
+                comic_id TEXT,
+                comic_title TEXT,
+                chapter_number TEXT,
+                chapter_title TEXT,
+                cover_url TEXT,
+                page_count INTEGER,
+                local_dir_path TEXT,
+                total_bytes INTEGER,
+                downloaded_at INTEGER
             )
             """.trimIndent()
         )
@@ -93,6 +111,30 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
                 )
                 """.trimIndent()
             )
+        }
+        if (oldVersion < 4) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS offline_comic_chapters (
+                    chapter_id TEXT PRIMARY KEY,
+                    comic_id TEXT,
+                    comic_title TEXT,
+                    chapter_number TEXT,
+                    chapter_title TEXT,
+                    cover_url TEXT,
+                    page_count INTEGER,
+                    local_dir_path TEXT,
+                    total_bytes INTEGER,
+                    downloaded_at INTEGER
+                )
+                """.trimIndent()
+            )
+            try {
+                db.execSQL("ALTER TABLE comic_read_history ADD COLUMN page_index INTEGER DEFAULT 0")
+            } catch (_: Exception) {}
+            try {
+                db.execSQL("ALTER TABLE comic_read_history ADD COLUMN scroll_offset INTEGER DEFAULT 0")
+            } catch (_: Exception) {}
         }
     }
 
@@ -320,7 +362,9 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
         coverUrl: String,
         chapterId: String,
         chapterNumber: String,
-        chapterTitle: String = ""
+        chapterTitle: String = "",
+        pageIndex: Int = 0,
+        scrollOffset: Int = 0
     ) {
         val db = writableDatabase
         val cv = ContentValues().apply {
@@ -330,16 +374,42 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
             put("chapter_id", chapterId)
             put("chapter_number", chapterNumber)
             put("chapter_title", chapterTitle)
+            put("page_index", pageIndex)
+            put("scroll_offset", scrollOffset)
             put("updated_at", System.currentTimeMillis())
         }
         db.insertWithOnConflict("comic_read_history", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    fun getComicReadHistoryItem(comicId: String): com.yuranime.dinz.data.model.ComicReadHistoryItem? {
+        val db = readableDatabase
+        val cursor = db.rawQuery(
+            "SELECT comic_id, comic_title, cover_url, chapter_id, chapter_number, chapter_title, updated_at, page_index, scroll_offset FROM comic_read_history WHERE comic_id = ? LIMIT 1",
+            arrayOf(comicId)
+        )
+        cursor.use {
+            if (it.moveToFirst()) {
+                return com.yuranime.dinz.data.model.ComicReadHistoryItem(
+                    comicId = it.getString(0) ?: "",
+                    comicTitle = it.getString(1) ?: "",
+                    coverUrl = it.getString(2) ?: "",
+                    chapterId = it.getString(3) ?: "",
+                    chapterNumber = it.getString(4) ?: "",
+                    chapterTitle = it.getString(5) ?: "",
+                    updatedAt = it.getLong(6),
+                    pageIndex = if (it.columnCount > 7) it.getInt(7) else 0,
+                    scrollOffset = if (it.columnCount > 8) it.getInt(8) else 0
+                )
+            }
+        }
+        return null
     }
 
     fun getComicReadHistory(): List<com.yuranime.dinz.data.model.ComicReadHistoryItem> {
         val db = readableDatabase
         val list = mutableListOf<com.yuranime.dinz.data.model.ComicReadHistoryItem>()
         val cursor = db.rawQuery(
-            "SELECT comic_id, comic_title, cover_url, chapter_id, chapter_number, chapter_title, updated_at FROM comic_read_history ORDER BY updated_at DESC",
+            "SELECT comic_id, comic_title, cover_url, chapter_id, chapter_number, chapter_title, updated_at, page_index, scroll_offset FROM comic_read_history ORDER BY updated_at DESC",
             null
         )
         cursor.use {
@@ -352,7 +422,9 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
                         chapterId = it.getString(3) ?: "",
                         chapterNumber = it.getString(4) ?: "",
                         chapterTitle = it.getString(5) ?: "",
-                        updatedAt = it.getLong(6)
+                        updatedAt = it.getLong(6),
+                        pageIndex = if (it.columnCount > 7) it.getInt(7) else 0,
+                        scrollOffset = if (it.columnCount > 8) it.getInt(8) else 0
                     )
                 )
             }
@@ -368,6 +440,69 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
     fun clearComicReadHistory() {
         val db = writableDatabase
         db.delete("comic_read_history", null, null)
+    }
+
+    // ==================== OFFLINE COMIC CHAPTERS ====================
+
+    fun saveDownloadedComicChapter(item: com.yuranime.dinz.data.model.DownloadedComicChapter) {
+        val db = writableDatabase
+        val cv = ContentValues().apply {
+            put("chapter_id", item.chapterId)
+            put("comic_id", item.comicId)
+            put("comic_title", item.comicTitle)
+            put("chapter_number", item.chapterNumber)
+            put("chapter_title", item.chapterTitle)
+            put("cover_url", item.coverUrl)
+            put("page_count", item.pageCount)
+            put("local_dir_path", item.localDirPath)
+            put("total_bytes", item.totalBytes)
+            put("downloaded_at", item.downloadedAt)
+        }
+        db.insertWithOnConflict("offline_comic_chapters", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    fun getDownloadedComicChapters(): List<com.yuranime.dinz.data.model.DownloadedComicChapter> {
+        val db = readableDatabase
+        val list = mutableListOf<com.yuranime.dinz.data.model.DownloadedComicChapter>()
+        val cursor = db.rawQuery(
+            "SELECT chapter_id, comic_id, comic_title, chapter_number, chapter_title, cover_url, page_count, local_dir_path, total_bytes, downloaded_at FROM offline_comic_chapters ORDER BY downloaded_at DESC",
+            null
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                list.add(
+                    com.yuranime.dinz.data.model.DownloadedComicChapter(
+                        chapterId = it.getString(0) ?: "",
+                        comicId = it.getString(1) ?: "",
+                        comicTitle = it.getString(2) ?: "",
+                        chapterNumber = it.getString(3) ?: "",
+                        chapterTitle = it.getString(4) ?: "",
+                        coverUrl = it.getString(5) ?: "",
+                        pageCount = it.getInt(6),
+                        localDirPath = it.getString(7) ?: "",
+                        totalBytes = it.getLong(8),
+                        downloadedAt = it.getLong(9)
+                    )
+                )
+            }
+        }
+        return list
+    }
+
+    fun isChapterDownloaded(chapterId: String): Boolean {
+        val db = readableDatabase
+        val cursor = db.rawQuery(
+            "SELECT 1 FROM offline_comic_chapters WHERE chapter_id = ? LIMIT 1",
+            arrayOf(chapterId)
+        )
+        cursor.use {
+            return it.count > 0
+        }
+    }
+
+    fun deleteDownloadedComicChapter(chapterId: String) {
+        val db = writableDatabase
+        db.delete("offline_comic_chapters", "chapter_id = ?", arrayOf(chapterId))
     }
 }
 

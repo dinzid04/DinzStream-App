@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "2.4.0"
+  APP_VERSION: "2.5.0"
 
 jobs:
   build:
@@ -63,40 +63,37 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Kerapian Visual Beranda Komik, Chatroom Komunitas & Scraper KomikStation (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Halaman Baca Komik, Unduh Offline & Apple Design (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
             ### Pembaruan & Fitur Baru:
-            1. **Perbaikan Hero Slider Beranda Komik:**
-               - Menggabungkan data rekomendasi `komikid` dengan slider banner sehingga pilihan komik lebih beragam dan kaya.
-               - Mengurangi kegelapan scrim overlay menjadi 45%–55% agar backdrop ilustrasi belakang tampil terang, jelas, dan hidup.
-               - Poster di sisi kanan menempel 100% penuh ke sudut bingkai (`RoundedCornerShape(12.dp)`) tanpa celah kosong.
+            1. **Halaman Baca Komik (ComicReaderScreen) & Apple Design:**
+               - Header atas semi-transparan dengan tombol kembali, judul komik, dan kapsul pemilih chapter (`Ch. X ⌄`).
+               - Kontrol bawah minimalis dengan 3 tombol bulat elegan: Pengaturan Pembaca, Play/Pause Auto-Scroll instan, dan Daftar Chapter.
+               - Navigasi halaman bawah: Tombol prev/next chapter + kapsul panjang dengan slider progres halaman interaktif langsung melompat ke halaman komik.
+               - Bottom Sheet Daftar Chapter dengan indikator chapter aktif dan auto-scroll.
+               - Bottom Sheet Pengaturan Pembaca: Toggle mode Webtoon vs Per Halaman (dengan pinch-to-zoom), kualitas gambar Tinggi vs Rendah, slider sinkronisasi kecerahan layar HP secara real-time, dan kecepatan auto-scroll 1x hingga 5x.
+               - Auto-Save riwayat baca dan posisi scroll terakhir secara real-time.
 
-            2. **Jarak Antar-Section & Garis Pemisah Elegan:**
-               - Memberikan jarak vertikal proporsional `26.dp` dan garis pemisah tipis `HorizontalDivider` `#181B22` di antara setiap section agar struktur halaman terlihat rapi dan tidak dempet.
+            2. **Sistem Unduh Chapter Offline di Memori Internal App:**
+               - Penggantian ikon `>` di tab CHAPTER `ComicDetailScreen` menjadi tombol Unduh Chapter interaktif.
+               - Gambar chapter disimpan secara privat dan aman di `context.filesDir/offline_comics/` (tidak memenuhi galeri).
+               - Tampilan progres unduhan dan ikon ceklis terunduh dengan opsi hapus unduhan.
+               - Komik yang telah terunduh dapat dibaca 100% offline tanpa internet.
+               - Manajemen unduhan komik terintegrasi di layar Unduh pada menu Profile dengan informasi ukuran memori.
 
-            3. **Penyelarasan Presisi `RILISAN TERBARU`:**
-               - Mengunci tinggi poster (`width = 76.dp`, `fillMaxHeight()`) dengan kolom teks (`height = 110.dp`, `verticalArrangement = SpaceBetween`).
-               - Ujung atas poster sejajar rata dengan judul komik dan ujung bawah poster 100% sejajar rata dengan baris chapter ke-3.
+            3. **Wajib Skeleton Shimmer (Bebas Circular Loading):**
+               - Mengganti seluruh loading putar `CircularProgressIndicator` pada gambar komik, halaman baca, dan pencarian dengan Skeleton Shimmer mengkilap elegan + logo monokrom Yuranime.
 
-            4. **Fix Angka 2 Digit & Vector Icons di `TERPOPULER SEPANJANG MASA`:**
-               - Memperlebar wadah peringkat (`48.dp`) dan mengunci `maxLines = 1`, `softWrap = false` font SF Bold 26sp sehingga angka 10, 13, 14 tidak lagi terpotong ke bawah.
-               - Menghapus karakter emoji mata, digantikan dengan Vector Icon `Icons.Outlined.Visibility` `#94A3B8` dan bintang solid `Icons.Filled.Star` `#FACC15`.
+            4. **Perbaikan Error 432 & Fallback Mirror Scraper:**
+               - Normalisasi ID dan slug komik dari Home Anime.
+               - Header anti-bot modern (User-Agent Pixel 8 Pro, Sec-CH-UA, Referer, Accept-Language, Origin).
+               - Automatic fallback mirror antara komikid dan KomikStation sehingga komik selalu berhasil dimuat tanpa error 432.
 
-            5. **Chatroom Komunitas Cbox + Maskot Anime:**
-               - Ditambahkan tepat di bawah section Rilisan Terbaru.
-               - Kotak Cbox WebView dengan tinggi `390.dp` dan sudut `14.dp`.
-               - Maskot anime di pojok kanan atas dengan tangan menempel pas di atas bingkai kotak chat.
-
-            6. **Integrasi Scraper Live `https://komikstation.org/`:**
-               - Section `YANG NGGAK KALAH SERU!`: Tab dinamis (Gender Bender, Romance, Yaoi, dll.) dalam kontainer `#12141A` + 3 kartu komik dengan bendera negara dan 5 bintang vector solid/outline sesuai rating.
-               - Section `GENRE`: 2 kolom vertikal huruf kapital tebal (#E2E8F0) dengan dialog daftar komik saat diklik.
-               - Section `SERIES TERBARU`: Daftar vertikal komik terbaru dengan poster, judul, genre, dan tahun rilis.
-               - Navigasi Detail Komik & Pembaca Chapter untuk komik KomikStation berjalan lancar.
-
-            7. **Isolasi Referer OkHttpClient Coil:**
-               - Memisahkan Referer otomatis berdasarkan domain: AnimeIn (tanpa referer), komikid (`https://app.shinigami.asia/`), dan KomikStation (`https://komikstation.org/`).
+            5. **Perbaikan Warna Banner Bawah & Auto-Slide Hero Slider:**
+               - Warna container banner newsletter menyatu sempurna dengan background utama `#0B0B0B`.
+               - Auto-slide hero slider setiap 4500ms dengan animasi spring physics Apple Design yang halus.
           draft: false
           prerelease: false
           make_latest: true

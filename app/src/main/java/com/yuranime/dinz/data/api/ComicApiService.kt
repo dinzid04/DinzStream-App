@@ -158,16 +158,24 @@ interface ComicApiService {
             }
 
             val client = OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(15, TimeUnit.SECONDS)
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(20, TimeUnit.SECONDS)
                 .addInterceptor { chain ->
                     val request = chain.request().newBuilder()
-                        .header("Accept", "application/json")
+                        .header("Accept", "application/json, text/plain, */*")
                         .header(
                             "User-Agent",
-                            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+                            "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
                         )
+                        .header("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7")
                         .header("Referer", "https://app.shinigami.asia/")
+                        .header("Origin", "https://app.shinigami.asia")
+                        .header("sec-ch-ua", "\"Chromium\";v=\"126\", \"Not?A_Brand\";v=\"24\"")
+                        .header("sec-ch-ua-mobile", "?1")
+                        .header("sec-ch-ua-platform", "\"Android\"")
+                        .header("Sec-Fetch-Dest", "empty")
+                        .header("Sec-Fetch-Mode", "cors")
+                        .header("Sec-Fetch-Site", "cross-site")
                         .build()
                     chain.proceed(request)
                 }

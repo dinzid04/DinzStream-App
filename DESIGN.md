@@ -940,4 +940,135 @@ Berdasarkan evaluasi `Screenshot_20261109_151655_Yuranime.jpg`:
      - Jika sebuah atribut metadata tidak disediakan oleh web sumber, jangan tampilkan baris yang berisi strip `-` sendirian. Gunakan nilai fallback yang cerdas (misalnya tahun dari tanggal chapter pertama atau sembunyikan baris tersebut jika benar-benar tidak ada data).
      - Menjamin tampilan tab INFO terlihat profesional dan bebas dari tampilan cacat strip `-`.
 
+---
+
+## 34. SPESIFIKASI FITUR 31: Halaman Baca Komik (`ComicReaderScreen`), Apple Design & Kontrol Kustom 3 Tombol
+
+Berdasarkan referensi visual `Screenshot_20261109_193837_KomiKu.jpg`, `Screenshot_20261109_193848_KomiKu.jpg`, `Screenshot_20261109_193911_KomiKu.jpg`, `Screenshot_20261109_193935_KomiKu.jpg`, dan panduan `apple-design-skill`:
+
+1. **Top Header Bar (Imersif & Otomatis Menyembunyi/Tampil Halus):**
+   - Kapsul gelap semi-transparan (`#D9121316` dengan efek blur/translucent halus, sudut `RoundedCornerShape(24.dp)` atau `50.dp`, padding horizontal `16.dp`, status bars padding):
+   - **Sisi Kiri:** Tombol panah kembali vector (`Icons.AutoMirrored.Filled.ArrowBack`) diikuti **Judul Komik** (**SF Bold** putih `16.sp`, 1 baris dengan `TextOverflow.Ellipsis`).
+   - **Sisi Kanan:** Tombol kapsul (`#26FFFFFF`, `RoundedCornerShape(50)`) bertuliskan **`Ch. [Nomor] ⌄`**. Mengklik tombol ini membuka **Bottom Sheet Daftar Chapter**.
+   - Muncul dan menghilang dengan animasi halus `fadeIn()` dan `fadeOut()` saat layar diketuk sekali.
+
+2. **Bottom Control Area (HANYA 3 Tombol Bulat + Bar Progres Halaman):**
+   - Menghapus tombol emoji dan komentar agar UI bersih, imersif, dan fokus membaca.
+   - **Baris Atas (3 Tombol Bulat Mengambang `#D916181D`):**
+     Tiga tombol lingkaran (`size = 46.dp`, border `0.8.dp` `#26FFFFFF`, latar `#D916181D`):
+     1. **Kiri (`⊶` Slider Pengaturan):** Menggunakan vector icon `Icons.Filled.Tune` / `Tune` untuk membuka **Bottom Sheet Pengaturan Pembaca**.
+     2. **Tengah (`▷` / `⏸` Auto-Scroll):** Menyalakan/mematikan **Gulir Otomatis (Auto-Scroll)** secara instan. Saat aktif, warna latar berubah menjadi putih solid atau aksen oranye terang dengan ikon `Icons.Filled.Pause`.
+     3. **Kanan (`☰` Menu Garis Tiga):** Menggunakan vector icon `Icons.Filled.Menu` / `FormatListBulleted` untuk membuka **Bottom Sheet Daftar Chapter**.
+   - **Baris Bawah (Page Progress & Chapter Nav Bar):**
+     - **Tombol Kiri (`<`):** Tombol lingkaran bulat untuk lompat ke Chapter Sebelumnya.
+     - **Kapsul Tengah (`Modifier.weight(1f)`):** Kapsul memanjang (`height = 46.dp`, latar `#D916181D`, border `#26FFFFFF`, `RoundedCornerShape(50)`):
+       - Teks nomor halaman saat ini di kiri (`2`, font SF SemiBold `13.sp`, putih).
+       - `Slider` progres halaman halus di tengah (track abu-abu gelap, active track putih, thumb bulat putih kecil). Saat digeser, langsung lompat (*smooth scroll*) ke halaman tersebut.
+       - Teks total halaman di kanan (`18`, font SF Regular `13.sp`, abu-abu `#94A3B8`).
+     - **Tombol Kanan (`>`):** Tombol lingkaran bulat untuk lompat ke Chapter Selanjutnya.
+
+3. **Auto-Save Histori & Posisi Progres Baca Real-Time:**
+   - Menyimpan `comicId`, `chapterId`, `chapterNumber`, `pageIndex`, dan `scrollOffset` ke database lokal (`ComicReadHistory` / `AppPreferences`).
+   - Saat pengguna membuka kembali komik/chapter tersebut (atau dari section `Lanjutkan Membaca`), posisi scroll langsung dipulihkan ke halaman/offset terakhir yang dibaca.
+
+4. **Bottom Sheet 1 — Daftar `Chapter` (Sesuai Gambar `1002209118.jpg`):**
+   - `ModalBottomSheet` dengan latar gelap `#121316`, drag handle halus, dan animasi spring iOS.
+   - Header: Judul **`Chapter`** (**SF Bold** putih `18.sp`).
+   - `LazyColumn` seluruh chapter dengan auto-scroll ke chapter yang aktif:
+     - **Kiri:** Kotak thumbnail rounded (`48.dp x 48.dp`, `RoundedCornerShape(8.dp)`) memuat gambar chapter / logo monokrom.
+     - **Kanan:**
+       - Baris atas: **`Ch. [Nomor]`** (**SF Bold** `15.sp`, warna aksen emas/oranye jika merupakan chapter aktif).
+       - Baris bawah: `[Tanggal Rilis] • [Views] dilihat` (abu-abu `#94A3B8`, `12.sp`).
+   - Mengklik item chapter menutup bottom sheet dan langsung memuat chapter tersebut.
+
+5. **Bottom Sheet 2 — `Pengaturan pembaca` (Sesuai Gambar `1002209120.jpg`):**
+   - Header: Judul **`Pengaturan pembaca`** (**SF Bold** putih `18.sp`).
+   - **`Mode baca`:** Segmented toggle kapsul:
+     - **`Webtoon`** (ikon strip vertikal): Membaca vertikal berurutan tanpa celah putus menggunakan `LazyColumn`.
+     - **`Per halaman`** (ikon buka buku): Membaca per halaman horizontal (`HorizontalPager`) dengan *pinch-to-zoom* gesture.
+   - **`Kualitas gambar`:** Segmented toggle kapsul **`Tinggi`** vs **`Rendah`**:
+     - Mode `Tinggi`: Memuat gambar dengan resolusi asli (`coil.size.Size.ORIGINAL`).
+     - Mode `Rendah`: Menggunakan downsampling Coil agar hemat kuota dan konsumsi RAM rendah.
+     - Subteks: *"Kualitas rendah lebih cepat dimuat dan hemat kuota."* (abu-abu `#94A3B8`, `12.sp`).
+   - **`Kecerahan` (Sinkronisasi Window Brightness HP):**
+     - Ikon Bulan (`Icons.Outlined.Bedtime` / `DarkMode`) di kiri, `Slider` kecerahan di tengah (`0.05f` hingga `1.0f`), dan ikon Matahari (`Icons.Outlined.LightMode`) di kanan.
+     - Nilai slider terikat langsung ke `activity.window.attributes = activity.window.attributes.apply { screenBrightness = brightnessValue }`.
+   - **`Kecepatan gulir otomatis`:**
+     - Ikon Play di kiri, teks **`Kecepatan gulir otomatis`** + *"Hanya di mode webtoon"* di tengah, dan tombol kapsul kecepatan di kanan (default **`1x`**).
+     - Siklus klik: `1x` -> `1.5x` -> `2x` -> `3x` -> `4x` -> `5x` -> `1x`.
+
+---
+
+## 35. SPESIFIKASI FITUR 32: Sistem Unduh Chapter Offline di Memori Internal App & UI Tab Chapter
+
+Berdasarkan referensi visual `Screenshot_20261109_194123_Yuranime.jpg`:
+1. **Penggantian Ikon Navigasi Chapter:**
+   - Di tab `CHAPTER` pada `ComicDetailScreen`, ganti ikon chevron kanan `>` menjadi tombol **Ikon Unduh (`Download`)** vector (`Icons.Outlined.FileDownload` / `Download`).
+2. **Penyimpanan Privat Memori Internal (`context.filesDir`):**
+   - Saat tombol unduh ditekan:
+     - Gambar halaman chapter diunduh secara berurutan dan disimpan di memori privat aplikasi:
+       `File(context.filesDir, "offline_comics/$comicId/$chapterId/page_$index.webp")`.
+     - Tidak disimpan ke galeri publik HP demi keamanan privasi dan performa.
+     - Menampilkan indikator unduhan aktif (progres download).
+     - Setelah tuntas, ikon berubah menjadi **Ikon Terunduh (Ceklis)** (`Icons.Filled.CheckCircle`). Mengklik kembali memunculkan dialog konfirmasi untuk menghapus unduhan chapter tersebut guna membebaskan ruang memori.
+3. **Membaca Offline Tanpa Koneksi Internet:**
+   - Menyimpan metadata komik dan chapter di database lokal (`Room` / `AppPreferences`).
+   - Saat pengguna membuka chapter terunduh tanpa koneksi internet, `ComicReaderScreen` mendeteksi file lokal di `context.filesDir` dan memuatnya secara instan tanpa request jaringan.
+4. **Integrasi Menu `Unduh` pada Tab Profil:**
+   - Menampilkan daftar komik yang telah diunduh di layar `DownloadScreen` (Profile -> Unduh), memuat total ukuran storage terpakai dan tombol hapus cache/unduhan komik.
+
+---
+
+## 36. SPESIFIKASI FITUR 33: Skeleton Shimmer Mengkilap (Tanpa Circular Loading Bulat)
+
+Sesuai aturan anti-slop visual dan Apple Design:
+1. **Dilarang CircularProgressIndicator:**
+   - Hapus semua penggunaan `CircularProgressIndicator` yang berputar pada saat memuat gambar halaman komik dan poster komik.
+2. **Skeleton Shimmer Elegan + Placeholder Monokrom:**
+   - Gunakan animasi gradasi linear shimmer (`Brush.linearGradient` dari `#16181D` ke `#2A2E39` ke `#16181D`) yang bergerak halus secara berkelanjutan.
+   - Sertakan vector logo monokrom `yuranime-monochrome.svg` atau drawable resmi Yuranime dengan transparansi `0.25f` di tengah skeleton shimmer saat gambar sedang dimuat atau ketika gagal memuat.
+
+---
+
+## 37. SPESIFIKASI FITUR 34: Perbaikan Bug Error 432 & Fallback Mirror Scraper Komik
+
+1. **Penyebab Error 432:**
+   - Beberapa permintaan komik dari `HomeScreen` ke `komikid` mengalami proteksi Cloudflare/WAF karena header HTTP yang minim atau slug url yang belum dinormalisasi.
+2. **Solusi:**
+   - Normalisasi slug dan URL komik sebelum dikirim ke `ComicDetailScreen`.
+   - Menggunakan set header lengkap pada request HTTP:
+     - `User-Agent`: Desktop/Mobile Chrome modern (`Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro)...`).
+     - `Accept`: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8`.
+     - `Accept-Language`: `id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7`.
+     - `Referer`: domain asal (`https://komikid.org/` atau `https://komikstation.org/`).
+   - Implementasi *fallback mirror*: jika salah satu sumber mengembalikan status `432`, `403`, atau error scraping, otomatis lakukan pencarian fallback ke sumber alternatif (`komikstation` <-> `komikid`).
+
+---
+
+## 38. SPESIFIKASI FITUR 35: Warna Background Banner Bawah `#0B0B0B` & Hero Slider Auto-Slide 4500ms
+
+1. **Warna Background Banner Bawah:**
+   - Pada bagian paling bawah `ComicHomeScreen`, sesuaikan kontainer luar pembungkus banner newsletter agar warnanya menyatu dengan warna hitam pekat `#0B0B0B` (tanpa belang abu-abu).
+   - Card banner tetap mempertahankan gradasi marun ke hitam `#1F080C` -> `#0E0B0E` dengan border halus `#831843`.
+2. **Hero Slider Auto-Slide:**
+   - Tambahkan `LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress)` pada Hero Slider `ComicHomeScreen`:
+   - Bergerak otomatis ke slide berikutnya setiap `4500L` (`animateScrollToPage` dengan animasi spring halus).
+   - Pause sementara jika user sedang menyentuh atau menggeser slide secara manual (`pagerState.isScrollInProgress == true`).
+
+---
+
+## 39. SPESIFIKASI FITUR 36: Standar Interaksi Apple Design (Spring Physics & Micro-Interactions)
+
+Sesuai aturan `apple-design-skill`:
+1. **Spring Physics Animasi:**
+   - Menggunakan `spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)` untuk transisi sheet, drawer, dan expand/collapse kontrol.
+2. **Fluid Gestures:**
+   - Dukungan gesture tap to toggle bars di `ComicReaderScreen`.
+   - Drag to dismiss pada ModalBottomSheet.
+   - Pinch-to-zoom dengan `detectTransformGestures` pada mode baca per halaman.
+3. **Micro-interactions:**
+   - Bounded ripple effect halus (`ripple(bounded = true, color = Color.White.copy(alpha = 0.2f))`).
+   - Feedback visual aktif pada tombol yang sedang menyala (Auto-Scroll, toggle kualitas, toggle format).
+
+
 
