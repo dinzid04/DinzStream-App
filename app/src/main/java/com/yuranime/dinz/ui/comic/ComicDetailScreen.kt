@@ -466,8 +466,9 @@ fun ComicDetailScreen(
                                                 )
                                             } catch (_: Exception) {}
                                         }
-                                        if (onChapterWithTitleClick != null && !cd.title.isNullOrBlank()) {
-                                            onChapterWithTitleClick(chapter.id, cd.title)
+                                        val currentTitle = comicDetail?.title
+                                        if (onChapterWithTitleClick != null && !currentTitle.isNullOrBlank()) {
+                                            onChapterWithTitleClick(chapter.id, currentTitle)
                                         } else {
                                             onChapterClick(chapter.id)
                                         }
