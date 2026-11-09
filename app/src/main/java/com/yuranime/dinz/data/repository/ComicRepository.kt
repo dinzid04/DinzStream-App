@@ -15,7 +15,8 @@ import java.util.Locale
 import java.util.TimeZone
 
 class ComicRepository(
-    private val api: ComicApiService = ComicApiService.create()
+    private val api: ComicApiService = ComicApiService.create(),
+    private val komikStationScraper: KomikStationScraper = KomikStationScraper()
 ) {
     private var cachedBanners: List<com.yuranime.dinz.data.model.ComicBannerItem>? = null
     private var cachedTrendingComics: List<ComicItem>? = null
@@ -30,7 +31,7 @@ class ComicRepository(
         try {
             val response = api.getBanners()
             val dtos = response.data ?: emptyList()
-            val list = dtos.map { dto ->
+            val sliderList = dtos.map { dto ->
                 val ratingFloat = when (val r = dto.rating) {
                     is Number -> r.toFloat()
                     is String -> r.toFloatOrNull()
@@ -49,9 +50,38 @@ class ComicRepository(
                 )
             }.filter { it.title.isNotBlank() && it.comicId.isNotBlank() }
 
-            if (list.isNotEmpty()) {
-                cachedBanners = list
-                Result.success(list)
+            // Ambil juga data Rekomendasi dari komikid untuk digabung ke slider
+            val recommendedList = try {
+                val recResponse = api.getTrendingManga(isRecommended = true, page = 1, pageSize = 8)
+                (recResponse.data ?: emptyList()).map { mangaDto ->
+                    val portraitCover = resolveCoverUrl(mangaDto.coverPortraitUrl, mangaDto.coverImageUrl)
+                    val landscapeCover = resolveCoverUrl(mangaDto.coverImageUrl, mangaDto.coverPortraitUrl)
+                    val ratingFloat = when (val r = mangaDto.userRate) {
+                        is Number -> r.toFloat()
+                        is String -> r.toFloatOrNull()
+                        else -> null
+                    }
+                    com.yuranime.dinz.data.model.ComicBannerItem(
+                        id = mangaDto.mangaId.orEmpty(),
+                        title = mangaDto.title.orEmpty(),
+                        synopsis = mangaDto.description?.takeIf { it.isNotBlank() }
+                            ?: "Ikuti kelanjutan kisah petualangan seru dan menegangkan komik rekomendasi ini sekarang juga!",
+                        rating = ratingFloat,
+                        comicId = mangaDto.mangaId.orEmpty(),
+                        backgroundImage = landscapeCover.ifBlank { portraitCover },
+                        posterImage = portraitCover.ifBlank { landscapeCover }
+                    )
+                }.filter { it.title.isNotBlank() && it.comicId.isNotBlank() }
+            } catch (_: Exception) {
+                emptyList()
+            }
+
+            val combinedList = (sliderList + recommendedList)
+                .distinctBy { it.comicId.ifBlank { it.title.lowercase(Locale.ROOT) } }
+
+            if (combinedList.isNotEmpty()) {
+                cachedBanners = combinedList
+                Result.success(combinedList)
             } else {
                 Result.success(getFallbackBanners())
             }
@@ -212,6 +242,14 @@ class ComicRepository(
     suspend fun getComicDetail(mangaId: String): Result<ComicDetail> = withContext(Dispatchers.IO) {
         cachedDetails[mangaId]?.let { return@withContext Result.success(it) }
 
+        if (mangaId.contains("komikstation.org") || mangaId.startsWith("ks:")) {
+            val res = komikStationScraper.getComicDetail(mangaId)
+            if (res.isSuccess) {
+                res.getOrNull()?.let { cachedDetails[mangaId] = it }
+            }
+            return@withContext res
+        }
+
         try {
             val response = api.getMangaDetail(mangaId)
             val dto = response.data ?: throw Exception("Data komik tidak ditemukan")
@@ -288,6 +326,10 @@ class ComicRepository(
     }
 
     suspend fun getChapterDetail(chapterId: String): Result<ComicChapterDetail> = withContext(Dispatchers.IO) {
+        if (chapterId.contains("komikstation.org") || chapterId.startsWith("ks-ch:")) {
+            return@withContext komikStationScraper.getChapterDetail(chapterId)
+        }
+
         try {
             val response = api.getChapterDetail(chapterId)
             val data = response.data ?: throw Exception("Data chapter tidak ditemukan")
@@ -547,5 +589,13 @@ class ComicRepository(
                 )
             )
         )
+    }
+
+    suspend fun getKomikStationHomeData(): Result<com.yuranime.dinz.data.model.KomikStationHomeData> {
+        return komikStationScraper.getHomeData()
+    }
+
+    suspend fun getKomikStationComicsByGenre(genreSlugOrUrl: String, page: Int = 1): Result<List<ComicItem>> {
+        return komikStationScraper.getComicsByGenre(genreSlugOrUrl, page)
     }
 }

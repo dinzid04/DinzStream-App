@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "2.2.0"
+  APP_VERSION: "2.3.0"
 
 jobs:
   build:
@@ -63,28 +63,40 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Halaman Khusus Beranda Komik & Floating Liquid Glass Chooser (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Kerapian Visual Beranda Komik, Chatroom Komunitas & Scraper KomikStation (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
-            ### Fitur & Pembaruan Utama:
-            1. **Halaman Khusus Beranda Komik (`ComicHomeScreen`):**
-               - Terintegrasi penuh dengan sumber data live scraper **`komikid`**.
-               - **Hero Slider Komik:** `HorizontalPager` edge-to-edge dengan cover background vignette blur, judul UPPERCASE SF Bold putih 22-24sp, sinopsis 3 baris, tombol kapsul merah `▶ BACA SEKARANG` & tombol kaca `DETAIL`, poster komik 110dp di kanan, serta pagination dots aktif merah.
-               - **Section `LANJUTKAN MEMBACA`:** Tampil kondisional berdasarkan riwayat baca lokal dari SQLite database dengan tombol cepat lanjutkan chapter.
-               - **Section `TRENDING & POPULER`:** `LazyRow` komik populer lengkap dengan rating bintang emas dan ikon bendera negara.
-               - **Section `RILISAN TERBARU`:** Grid 2 kolom x 6 baris (12 komik terbaru) dengan poster, judul, bendera, dan 3 chapter terbaru sejajar rapi.
-               - **Section `TERPOPULER SEPANJANG MASA`:** Kolom geser horizontal berisi peringkat komik (3 komik per kolom) dengan angka peringkat besar 32sp (putih untuk 1-3, perak untuk 4+), bintang skor, dan jumlah views pembaca (e.g. `79,7jt`, `60,5jt`).
+            ### Pembaruan & Fitur Baru:
+            1. **Perbaikan Hero Slider Beranda Komik:**
+               - Menggabungkan data rekomendasi `komikid` dengan slider banner sehingga pilihan komik lebih beragam dan kaya.
+               - Mengurangi kegelapan scrim overlay menjadi 45%–55% agar backdrop ilustrasi belakang tampil terang, jelas, dan hidup.
+               - Poster di sisi kanan menempel 100% penuh ke sudut bingkai (`RoundedCornerShape(12.dp)`) tanpa celah kosong.
 
-            2. **Fitur 2 Pilihan (Cari Anime vs Beranda Komik) pada Tombol Tengah Liquid Glass Bottom Navbar:**
-               - 100% mempertahankan efek optik **Clear Liquid Glass** (AGSL RuntimeShader, chromatic dispersion, dan Fresnel rim).
-               - **Floating Liquid Glass Chooser Pill:** Animasi spring physics halus yang melayang di atas tombol tengah navbar saat diklik untuk berpindah cepat antara `🔍 Cari Anime` dan `📖 Komik`.
-               - Label dinamis: otomatis menampilkan ikon buku/komik dan teks **`Komik`** saat berada di Beranda Komik, dan **`Cari`** saat berada di Cari Anime.
-               - Fitur pencarian komik real-time melalui ikon `🔍` di pojok kanan atas Beranda Komik.
+            2. **Jarak Antar-Section & Garis Pemisah Elegan:**
+               - Memberikan jarak vertikal proporsional `26.dp` dan garis pemisah tipis `HorizontalDivider` `#181B22` di antara setiap section agar struktur halaman terlihat rapi dan tidak dempet.
 
-            3. **Aset Bendera & Isolasi Referer OkHttpClient:**
-               - Aset bendera negara `cn.webp`, `jp.webp`, `kr.webp` tersedia lokal di `res/drawable/` untuk performa instan tanpa delay jaringan.
-               - Isolasi header request OkHttpClient Coil memastikan gambar anime AnimeIn dan komik komikid tampil sempurna tanpa bentrok WAF Cloudflare.
+            3. **Penyelarasan Presisi `RILISAN TERBARU`:**
+               - Mengunci tinggi poster (`width = 76.dp`, `fillMaxHeight()`) dengan kolom teks (`height = 110.dp`, `verticalArrangement = SpaceBetween`).
+               - Ujung atas poster sejajar rata dengan judul komik dan ujung bawah poster 100% sejajar rata dengan baris chapter ke-3.
+
+            4. **Fix Angka 2 Digit & Vector Icons di `TERPOPULER SEPANJANG MASA`:**
+               - Memperlebar wadah peringkat (`48.dp`) dan mengunci `maxLines = 1`, `softWrap = false` font SF Bold 26sp sehingga angka 10, 13, 14 tidak lagi terpotong ke bawah.
+               - Menghapus karakter emoji mata, digantikan dengan Vector Icon `Icons.Outlined.Visibility` `#94A3B8` dan bintang solid `Icons.Filled.Star` `#FACC15`.
+
+            5. **Chatroom Komunitas Cbox + Maskot Anime:**
+               - Ditambahkan tepat di bawah section Rilisan Terbaru.
+               - Kotak Cbox WebView dengan tinggi `390.dp` dan sudut `14.dp`.
+               - Maskot anime di pojok kanan atas dengan tangan menempel pas di atas bingkai kotak chat.
+
+            6. **Integrasi Scraper Live `https://komikstation.org/`:**
+               - Section `YANG NGGAK KALAH SERU!`: Tab dinamis (Gender Bender, Romance, Yaoi, dll.) dalam kontainer `#12141A` + 3 kartu komik dengan bendera negara dan 5 bintang vector solid/outline sesuai rating.
+               - Section `GENRE`: 2 kolom vertikal huruf kapital tebal (#E2E8F0) dengan dialog daftar komik saat diklik.
+               - Section `SERIES TERBARU`: Daftar vertikal komik terbaru dengan poster, judul, genre, dan tahun rilis.
+               - Navigasi Detail Komik & Pembaca Chapter untuk komik KomikStation berjalan lancar.
+
+            7. **Isolasi Referer OkHttpClient Coil:**
+               - Memisahkan Referer otomatis berdasarkan domain: AnimeIn (tanpa referer), komikid (`https://app.shinigami.asia/`), dan KomikStation (`https://komikstation.org/`).
           draft: false
           prerelease: false
           make_latest: true

@@ -43,11 +43,20 @@ class YuranimeApp : Application(), ImageLoaderFactory {
                 val host = originalRequest.url.host.lowercase(Locale.ROOT)
                 val requestBuilder = originalRequest.newBuilder()
 
-                val isComicDomain = host.contains("shngm") ||
+                val isKomikStationDomain = host.contains("komikstation") ||
+                    host.contains("klikcdn")
+                val isShngmDomain = host.contains("shngm") ||
                     host.contains("shinigami") ||
-                    host.contains("komik")
+                    host.contains("komikid")
 
-                if (isComicDomain) {
+                if (isKomikStationDomain) {
+                    requestBuilder
+                        .header("Referer", "https://komikstation.org/")
+                        .header(
+                            "User-Agent",
+                            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+                        )
+                } else if (isShngmDomain) {
                     requestBuilder
                         .header("Referer", "https://app.shinigami.asia/")
                         .header(

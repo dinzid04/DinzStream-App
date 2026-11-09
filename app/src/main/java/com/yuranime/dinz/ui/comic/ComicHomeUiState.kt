@@ -3,6 +3,7 @@ package com.yuranime.dinz.ui.comic
 import com.yuranime.dinz.data.model.ComicBannerItem
 import com.yuranime.dinz.data.model.ComicItem
 import com.yuranime.dinz.data.model.ComicReadHistoryItem
+import com.yuranime.dinz.data.model.KomikStationHomeData
 
 data class ComicHomeUiState(
     val banners: List<ComicBannerItem> = emptyList(),
@@ -10,6 +11,12 @@ data class ComicHomeUiState(
     val trendingComics: List<ComicItem> = emptyList(),
     val latestComics: List<ComicItem> = emptyList(),
     val popularComics: List<ComicItem> = emptyList(),
+    val komikStationData: KomikStationHomeData? = null,
+    val selectedSeruTabId: String = "",
+    val isGenreDialogVisible: Boolean = false,
+    val selectedGenreTitle: String = "",
+    val selectedGenreComics: List<ComicItem> = emptyList(),
+    val isLoadingGenreComics: Boolean = false,
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.yuranime.dinz.data.local.LocalAuthDatabase
+import com.yuranime.dinz.data.model.KomikStationGenre
 import com.yuranime.dinz.data.repository.ComicRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -47,11 +48,16 @@ class ComicHomeViewModel(
                 val trendingDeferred = async { repository.getTrendingComics(page = 1, pageSize = 12, forceRefresh = forceRefresh) }
                 val latestDeferred = async { repository.getLatestComics(page = 1, pageSize = 12, forceRefresh = forceRefresh) }
                 val popularDeferred = async { repository.getPopularAllTimeComics(page = 1, pageSize = 15, forceRefresh = forceRefresh) }
+                val komikStationDeferred = async { repository.getKomikStationHomeData() }
 
                 val bannersRes = bannersDeferred.await()
                 val trendingRes = trendingDeferred.await()
                 val latestRes = latestDeferred.await()
                 val popularRes = popularDeferred.await()
+                val ksRes = komikStationDeferred.await()
+
+                val ksData = ksRes.getOrNull()
+                val initialSeruTab = ksData?.tabs?.firstOrNull()?.id.orEmpty()
 
                 _uiState.update {
                     it.copy(
@@ -60,12 +66,49 @@ class ComicHomeViewModel(
                         trendingComics = trendingRes.getOrDefault(emptyList()),
                         latestComics = latestRes.getOrDefault(emptyList()),
                         popularComics = popularRes.getOrDefault(emptyList()),
+                        komikStationData = ksData,
+                        selectedSeruTabId = if (it.selectedSeruTabId.isNotBlank()) it.selectedSeruTabId else initialSeruTab,
                         isLoading = false,
                         isRefreshing = false,
                         errorMessage = if (bannersRes.isFailure && latestRes.isFailure) "Gagal memuat konten komik" else null
                     )
                 }
             }
+        }
+    }
+
+    fun selectSeruTab(tabId: String) {
+        _uiState.update { it.copy(selectedSeruTabId = tabId) }
+    }
+
+    fun openGenreComics(genre: KomikStationGenre) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isGenreDialogVisible = true,
+                    selectedGenreTitle = genre.name.uppercase(),
+                    isLoadingGenreComics = true,
+                    selectedGenreComics = emptyList()
+                )
+            }
+            val res = repository.getKomikStationComicsByGenre(genre.url)
+            _uiState.update {
+                it.copy(
+                    isLoadingGenreComics = false,
+                    selectedGenreComics = res.getOrDefault(emptyList())
+                )
+            }
+        }
+    }
+
+    fun closeGenreDialog() {
+        _uiState.update {
+            it.copy(
+                isGenreDialogVisible = false,
+                selectedGenreTitle = "",
+                selectedGenreComics = emptyList(),
+                isLoadingGenreComics = false
+            )
         }
     }
 

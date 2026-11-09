@@ -81,6 +81,14 @@ private const val DETAIL_USER_AGENT =
     "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
 private const val DETAIL_REFERER = "https://app.shinigami.asia/"
 
+private fun getComicReferer(url: String): String {
+    return if (url.contains("komikstation") || url.contains("klikcdn")) {
+        "https://komikstation.org/"
+    } else {
+        DETAIL_REFERER
+    }
+}
+
 private val ComicDarkBg = Color(0xFF0B0D12)
 private val ComicOrange = Color(0xFFFF5722)
 private val ComicMutedLabel = Color(0xFF94A3B8)
@@ -200,7 +208,7 @@ fun ComicDetailScreen(
                             model = ImageRequest.Builder(context)
                                 .data(coverUrl)
                                 .addHeader("User-Agent", DETAIL_USER_AGENT)
-                                .addHeader("Referer", DETAIL_REFERER)
+                                .addHeader("Referer", getComicReferer(coverUrl))
                                 .crossfade(true)
                                 .placeholder(R.drawable.placeholder_yuranime_wide)
                                 .error(R.drawable.placeholder_yuranime_wide)
@@ -636,7 +644,7 @@ private fun ComicInfoTabContent(
                     model = ImageRequest.Builder(context)
                         .data(posterUrl)
                         .addHeader("User-Agent", DETAIL_USER_AGENT)
-                        .addHeader("Referer", DETAIL_REFERER)
+                        .addHeader("Referer", getComicReferer(posterUrl))
                         .crossfade(true)
                         .placeholder(R.drawable.placeholder_yuranime)
                         .error(R.drawable.placeholder_yuranime)
@@ -837,7 +845,7 @@ private fun ComicChapterRowItem(
                 model = ImageRequest.Builder(context)
                     .data(thumbUrl)
                     .addHeader("User-Agent", DETAIL_USER_AGENT)
-                    .addHeader("Referer", DETAIL_REFERER)
+                    .addHeader("Referer", getComicReferer(thumbUrl))
                     .crossfade(true)
                     .placeholder(R.drawable.placeholder_yuranime)
                     .error(R.drawable.placeholder_yuranime)

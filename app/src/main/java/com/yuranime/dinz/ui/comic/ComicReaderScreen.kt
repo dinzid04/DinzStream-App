@@ -166,6 +166,12 @@ fun ComicReaderScreen(
                     items = detail.pages,
                     key = { idx, url -> "$idx-$url" }
                 ) { index, imageUrl ->
+                    val effectiveReferer = if (imageUrl.contains("komikstation") || imageUrl.contains("klikcdn")) {
+                        "https://komikstation.org/"
+                    } else {
+                        "https://app.shinigami.asia/"
+                    }
+
                     SubcomposeAsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(imageUrl)
@@ -174,7 +180,7 @@ fun ComicReaderScreen(
                                 "User-Agent",
                                 "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
                             )
-                            .addHeader("Referer", "https://app.shinigami.asia/")
+                            .addHeader("Referer", effectiveReferer)
                             .build(),
                         contentDescription = "Halaman ${index + 1}",
                         contentScale = ContentScale.FillWidth,

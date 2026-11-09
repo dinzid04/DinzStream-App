@@ -682,7 +682,8 @@ Berdasarkan referensi visual `/storage/emulated/0/termux/design/reff/Screenshot_
      - **2 Tombol Aksi Berdampingan (`Row`):**
        - Kiri: Kapsul merah menyala (`#E11D48` / `#EF4444`) bertuliskan **`▶ BACA SEKARANG`** (SF Bold putih `11.sp`–`12.sp`, langsung membuka chapter pertama/terakhir komik tersebut).
        - Kanan: Kapsul gelap semi-transparan (`#33FFFFFF` dengan border tipis `#4DFFFFFF`) bertuliskan **`DETAIL`** (SF Bold putih `11.sp`–`12.sp`, membuka `ComicDetailScreen`).
-   - **Sisi Kanan:** Kartu **Poster Komik Vertikal** (`width = 110.dp`, `aspectRatio(2f/3f)`, `RoundedCornerShape(10.dp)`, dengan *elevation shadow*).
+   - **Sisi Kanan:** Kartu **Poster Komik Vertikal** (`width = 110.dp`, `aspectRatio(2f/3f)`, `RoundedCornerShape(12.dp)`). **PENTING (Fix Poster Menempel Penuh):** Hapus seluruh padding dalam pada kontainer poster. Gunakan `AsyncImage` dengan `Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))` dan `ContentScale.Crop` sehingga gambar poster menempel 100% penuh ke seluruh sudut bingkainya tanpa celah kosong di dalam frame!
+   - **Backdrop Belakang Terang & Jelas:** Kurangi kegelapan scrim overlay menjadi sekitar `45%`–`55%` di bagian atas-tengah dengan blur lembut dan gradasi hitam halus hanya di tepi bawah, sehingga ilustrasi artwork banner belakang terlihat jelas, terang, dan hidup!
 4. **Indikator Slide (Pagination Dots):**
    - Terletak di bagian bawah tengah slider: titik aktif berupa kapsul merah memanjang (`18.dp x 4.dp`), dan titik lainnya berbentuk bulat abu-abu gelap (`6.dp x 4.dp`).
 
@@ -694,35 +695,52 @@ Berdasarkan referensi visual `/storage/emulated/0/termux/design/reff/Screenshot_
      - **Kiri:** Poster komik kecil (`width = 56.dp`, `aspectRatio(2f/3f)`, `RoundedCornerShape(8.dp)`).
      - **Kanan:** Judul komik (`maxLines = 2`, **SF Bold** putih `12.sp`), dan di bawahnya kapsul merah **`LANJUTKAN [Judul/Chapter]...`** yang saat diklik langsung membuka chapter terakhir yang dibaca.
 
-### C. Section `TRENDING & POPULER`
+### C. Jarak Antar-Section & Garis Pemisah Elegan (Spesifikasi Global Rapi)
+- Setiap transisi antar-section utama (`TRENDING & POPULER`, `RILISAN TERBARU`, `CHATROOM KOMUNITAS`, `TERPOPULER SEPANJANG MASA`, `YANG NGGAK KALAH SERU!`, `GENRE`, `SERIES TERBARU`) WAJIB diberi jarak proporsional:
+  - `Spacer(modifier = Modifier.height(26.dp))`
+  - `HorizontalDivider(color = Color(0xFF181B22), thickness = 1.dp, modifier = Modifier.padding(horizontal = 16.dp))`
+  - Hal ini menjamin halaman terstruktur rapi, tidak dempet, dan mematuhi aturan craftsmanship anti-slop (C-3, R-05).
+
+### D. Section `TRENDING & POPULER`
 1. **Header:** Aksen bar merah `| TRENDING & POPULER` (**SF Bold** putih `16.sp`) dengan sub-teks abu-abu *"Explore multiple options for maximum fun"*.
 2. **Daftar Horizontal (`LazyRow`):**
    - Setiap item berlebar `118.dp`:
      - **Atas:** Poster Komik vertikal (`aspectRatio(2f/3f)`, `RoundedCornerShape(8.dp)`).
      - **Tengah:** Judul Komik huruf kapital (**SF Bold** putih `12.sp`, `maxLines = 2`, `minLines = 2`, `overflow = TextOverflow.Ellipsis`).
-     - **Bawah (`Row` `SpaceBetween`):** Di kiri: ikon bintang emas + skor rating (`★ 7.0`, `11.sp` warna emas `#FACC15`). Di kanan: **Ikon Bendera Negara** (`16.dp x 11.dp`: China untuk Manhua, Jepang untuk Manga, Korea untuk Manhwa).
+     - **Bawah (`Row` `SpaceBetween`):** Di kiri: ikon bintang vector emas (`Icons.Filled.Star`, `#FACC15`) + skor rating (`★ 7.0`, `11.sp` warna emas `#FACC15`). Di kanan: **Ikon Bendera Negara** (`16.dp x 11.dp`: China untuk Manhua, Jepang untuk Manga, Korea untuk Manhwa).
 
-### D. Section `RILISAN TERBARU` (Grid 2 Kolom Isi 12 Komik)
+### E. Section `RILISAN TERBARU` (Grid 2 Kolom Isi 12 Komik - Sejajar Presisi)
 1. **Header:** Aksen bar merah `| RILISAN TERBARU` dengan sub-teks di sisi kiri, dan tombol **`LIHAT SEMUA >`** berwarna merah/oranye di sisi kanan (membuka `ComicViewAllScreen`).
 2. **Grid 2 Kolom x 6 Baris (Total 12 Item Komik):**
    - 12 item komik terbaru (`latestComics.take(12)`) disusun dalam 6 baris x 2 kolom (`Modifier.weight(1f)`).
-   - Setiap item menampilkan:
-     - **Kiri:** Poster (`width = 68.dp`, `aspectRatio(2f/3f)`, `RoundedCornerShape(8.dp)`).
-     - **Kanan:** **Judul Komik** (`maxLines = 2`, `minLines = 2`, **SF Bold** putih `12.sp`), **Ikon Bendera Negara** di bawah judul, dan **3 Chapter Terbaru** (`• CH. [Nomor]` di kiri & waktu rilis di kanan) yang tersusun rapat dan sejajar.
+   - **Penyelarasan Tinggi Presisi 100%:**
+     - Kartu menggunakan `Row(modifier = Modifier.fillMaxWidth().height(110.dp))` (atau tinggi terukur pasti).
+     - **Kiri (Poster):** `Modifier.width(76.dp).fillMaxHeight().clip(RoundedCornerShape(8.dp))` dengan `ContentScale.Crop`.
+     - **Kanan (Kolom Teks):** `Modifier.weight(1f).fillMaxHeight()` dengan `verticalArrangement = Arrangement.SpaceBetween`.
+     - **Hasil Presisi:** Ujung atas poster sejajar rata dengan baris pertama judul komik, dan ujung bawah poster 100% sejajar rata dengan baris chapter ke-3 (`• CH. [Nomor]`). Tidak ada lagi poster yang menggantung atau terpotong!
 
-### E. Section `TERPOPULER SEPANJANG MASA` (Di Bawah Rilisan Terbaru)
+### F. Section `TERPOPULER SEPANJANG MASA` (Fix Angka 2 Digit & Vector Icons)
 1. **Konsistensi Header & Tipografi:** Gaya header sama persis dengan section lainnya: aksen bar merah `| TERPOPULER SEPANJANG MASA` (**SF Bold** putih `16.sp`), sub-teks abu-abu *"Paling banyak dibaca sepanjang masa"*, dan tombol **`LIHAT SEMUA >`** di sebelah kanan.
 2. **Tata Letak Kolom Peringkat Geser Horizontal (3 Baris per Kolom):**
    - `LazyRow` (`spacedBy(20.dp)`) di mana setiap item adalah `Column` (lebar `290.dp`–`310.dp`) berisi 3 komik secara vertikal:
      - Kolom 1: Peringkat `1, 2, 3`
      - Kolom 2: Peringkat `4, 5, 6`
      - Kolom 3: Peringkat `7, 8, 9`
+     - Kolom 4: Peringkat `10, 11, 12`
+     - Kolom 5: Peringkat `13, 14, 15`
    - Setiap baris item peringkat disusun dalam `Row(verticalAlignment = Alignment.CenterVertically)`:
-     1. **Angka Peringkat Besar di Kiri:** Lebar tetap `36.dp`, font **SF Bold** ukuran `32.sp`, warna Putih terang untuk peringkat `1`–`3` dan abu-abu perak (`#94A3B8`) untuk peringkat `4` ke bawah.
+     1. **Angka Peringkat Besar di Kiri (Wadah Lebar & maxLines = 1):**
+        - Wadah nomor: `Modifier.width(48.dp)` (atau `widthIn(min = 44.dp)`).
+        - Tipografi: **SF Bold** ukuran `26.sp`–`28.sp`, parameter wajib **`maxLines = 1`** dan **`softWrap = false`**.
+        - Warna: Putih terang untuk peringkat `1`–`3` dan abu-abu perak (`#94A3B8`) untuk peringkat `4` ke atas.
+        - Hasil: Angka 2 digit (`10`, `13`, `14`) TAMPIL UTUH DALAM 1 BARIS HORIZONTAL dan tidak terpotong menjadi 2 baris vertikal!
      2. **Poster Komik di Tengah:** `width = 64.dp`, `aspectRatio(2f/3f)`, `RoundedCornerShape(8.dp)`.
      3. **Informasi di Kanan:**
         - Baris atas: **Judul Komik** (**SF Bold** putih `15.sp`, `maxLines = 2`, `overflow = TextOverflow.Ellipsis`).
-        - Baris bawah: `Row` berisi ikon bintang kuning + rating (`★ 8,6`, SF SemiBold putih/emas `12.sp`), spasi, dan ikon mata + jumlah pembaca (`👁 79,7jt`, SF Medium abu-abu `#94A3B8` `12.sp`).
+        - Baris bawah: `Row` berisi:
+          - Vector icon bintang solid (`Icons.Filled.Star`) warna `#FACC15` (`size = 13.dp`) + rating (`8,6`, SF SemiBold putih/emas `12.sp`).
+          - Spasi horizontal `8.dp`.
+          - **Vector icon mata (`Icons.Outlined.Visibility`)** warna `#94A3B8` (`size = 14.dp`, HAPUS KARAKTER EMOJI MATA `👁`!) + jumlah pembaca (`34,4jt`, SF Medium abu-abu `#94A3B8` `12.sp`).
 
 ---
 
@@ -744,3 +762,93 @@ Berdasarkan referensi visual `/storage/emulated/0/termux/design/reff/Screenshot_
    - Jika pengguna menekan tombol tengah saat sedang berada di `SearchScreen` atau `ComicHomeScreen`, munculkan kembali floating chooser agar pengguna dapat berpindah antara Cari Anime dan Beranda Komik dengan sekali sentuh.
 4. **Ikon Pencarian di Beranda Komik:**
    - Di pojok kanan atas `ComicHomeScreen`, sertakan tombol ikon `🔍` yang membuka dialog atau halaman pencarian komik khusus `komikid`.
+
+---
+
+## 27. SPESIFIKASI FITUR 24: Chatroom Komunitas Cbox + Maskot Pojok Kanan Atas
+
+Berdasarkan referensi visual `/storage/emulated/0/termux/design/reff/Screenshot_20261109_124434_Chrome.jpg` (file referensi `1002208627.jpg`), section ini ditempatkan tepat di bawah `RILISAN TERBARU` dan di atas `TERPOPULER SEPANJANG MASA`.
+
+### A. Header Section
+- Aksen garis vertikal merah/oranye (`#E11D48` / `#FF5722`) di sebelah kiri teks judul.
+- Teks judul: **`CHATROOM KOMUNITAS`** (**SF Bold** putih `16.sp`, tanpa emoji).
+
+### B. Kotak WebView Cbox & Maskot Pojok Kanan Atas (Presisi Layering)
+1. **Kontainer Utama:**
+   - `Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))`
+2. **Layer 1: Kotak Cbox (WebView):**
+   - Padding atas: `Modifier.padding(top = 28.dp)` untuk memberikan ruang kepala maskot anime di pojok kanan atas.
+   - `AndroidView(factory = { context -> WebView(context) })` dengan tinggi `390.dp`, sudut `RoundedCornerShape(14.dp)`, dan kliping `Modifier.clip(RoundedCornerShape(14.dp))`.
+   - URL Cbox: `https://www5.cbox.ws/box/?boxid=956912&boxtag=ckNwUL`
+   - Pengaturan WebView:
+     - `settings.javaScriptEnabled = true`
+     - `settings.domStorageEnabled = true`
+     - `settings.databaseEnabled = true`
+     - Atur `setOnTouchListener` agar memanggil `requestDisallowInterceptTouchEvent(true)` saat pengguna men-scroll di dalam area Cbox, sehingga tidak konflik dengan scrolling `LazyColumn`.
+3. **Layer 2: Gambar Maskot Pojok Kanan Atas (Tangan Menempel Pas):**
+   - URL Gambar: `https://url.dinzid.my.id/pcZ3IHb`
+   - Penempatan: `Modifier.align(Alignment.TopEnd).padding(end = 8.dp).zIndex(2f)`.
+   - Ukuran: lebar/tinggi sekitar `78.dp`–`84.dp` dengan penyesuaian offset vertikal sehingga **bagian tangan dan siku maskot menempel tepat di atas garis batas sudut kanan atas kotak putih Cbox**, menciptakan efek ilusi karakter maskot sedang bersandar di atas kotak obrolan.
+4. **Keterangan Footer di Bawah Cbox:**
+   - Teks panduan santai: *"Gunakan bahasa yang sopan dan santai saat mengobrol."* (font SF Regular `11.sp`, warna abu-abu `#64748B`, rata kiri di bawah kotak Cbox).
+
+---
+
+## 28. SPESIFIKASI FITUR 25: Scraper & Section Baru `https://komikstation.org/`
+
+Mengintegrasikan sumber bacaan komik tambahan dari `https://komikstation.org/` dengan modul scraper `KomikStationScraper` / `KomikStationRepository` menggunakan `OkHttp` + `Jsoup`. Section-section ini ditampilkan secara berurutan di bawah `TERPOPULER SEPANJANG MASA`.
+
+### A. Section `YANG NGGAK KALAH SERU!` (Dinamis dari Home `komikstation.org`)
+1. **Header:**
+   - Garis vertikal merah/oranye di sebelah kiri judul.
+   - Teks judul: **`YANG NGGAK KALAH SERU!`** (**SF Bold** putih `16.sp`). **DILARANG menggunakan karakter emoji jempol `👍`!**
+2. **Baris Tab Genre Dinamis:**
+   - Scrape daftar tab dari elemen `.series-gen .nav-tabs li a` (contoh tab dinamis: `Gender Bender`, `Romance`, `Sci-fi`, `Slice of Life`, `Yaoi`, dll.).
+   - Kontainer bar tab menggunakan permukaan gelap (`#12141A`, sudut `10.dp`, padding internal `4.dp`).
+   - Tab yang aktif memiliki background aksen merah/oranye (`#E11D48` / `#FF5722`), teks **SF Bold** putih `12.sp`.
+   - Tab inaktif memiliki teks abu-abu terang `#94A3B8` dengan indikator ripple lembut saat diklik.
+3. **Grid 3 Kolom Komik di Bawah Tab:**
+   - Mengambil daftar komik pada tab yang aktif (elemen `.tab-pane.active .bsx`).
+   - Disusun dalam 1 baris 3 kartu komik (`Row` dengan `Modifier.weight(1f)` per kartu, `spacedBy(10.dp)`, padding horizontal `16.dp`):
+     - **Poster (`aspectRatio(2f/3f)`, `RoundedCornerShape(8.dp)`, `ContentScale.Crop`):**
+       - Di pojok kiri bawah dalam poster: **Ikon Bendera Negara** (`jp.webp` untuk Manga, `kr.webp` untuk Manhwa, `cn.webp` untuk Manhua).
+     - **Judul Komik:** Tepat di bawah poster, teks **SF Bold** putih `13.sp`, parameter `maxLines = 2`, `minLines = 2`, `overflow = TextOverflow.Ellipsis`, `lineHeight = 16.sp`.
+     - **Nomor Chapter:** Teks `Chapter [Nomor]` (warna abu-abu `#94A3B8`, font SF Medium `12.sp`).
+     - **5 Ikon Bintang Vector Rating:**
+       - `Row` berisi 5 ikon bintang vector disusul angka skor (misal: `5.6`, `5`, `5.7`).
+       - Konversi skor (skala 10 ke skala 5 bintang: `val filledStars = (score / 2f).roundToInt().coerceIn(0, 5)`).
+       - Bintang terisi menggunakan **Vector Bintang Solid Kuning Emas (`Icons.Filled.Star`, `#FACC15`, `12.dp`)**.
+       - Bintang sisa menggunakan **Vector Bintang Outline / Muted Gray (`Icons.Outlined.Star` / `#475569`, `12.dp`)**.
+
+### B. Section `GENRE` (2 Kolom Vertikal, Huruf Kapital Semua & Font Tebal)
+1. **Posisi:** Tepat di bawah section `YANG NGGAK KALAH SERU!`, dipisahkan oleh `Spacer(26.dp)` dan divider.
+2. **Header:** Garis vertikal merah/oranye + teks **`GENRE`** (**SF Bold** putih `16.sp`, tanpa emoji puzzle).
+3. **Grid 2 Kolom Vertikal Lengkap:**
+   - Scrape seluruh daftar genre lengkap dari `komikstation.org` (`ul.genre li a`):
+     `ACTION`, `ADVENTURE`, `COMEDY`, `DOUJINSHI`, `DRAMA`, `ECCHI`, `FANTASY`, `GENDER BENDER`, `HAREM`, `HISTORICAL`, `HORROR`, `ISEKAI`, `JOSEI`, `MARTIAL ARTS`, `MATURE`, `MECHA`, `MYSTERY`, `ONESHOT`, `PSYCHOLOGICAL`, `ROMANCE`, `SCHOOL LIFE`, `SCI-FI`, `SEINEN`, `SHOUJO`, `SHOUJO AI`, `SHOUNEN`, `SHOUNEN AI`, `SLICE OF LIFE`, `SPORTS`, `SUPERNATURAL`, `TRAGEDY`, `YAOI`, `YURI`.
+   - Tata letak: `Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))` memuat 2 `Column(modifier = Modifier.weight(1f))` sejajar rata kiri.
+   - Tipografi: **HURUF KAPITAL SEMUA (`genre.name.uppercase()`)**, font **SF Bold** ukuran `13.sp`–`14.sp`, warna putih keabu-abuan terang (`#E2E8F0`).
+   - Interaksi: Setiap item genre memiliki area sentuh (`clickable`) yang membuka dialog/halaman daftar komik untuk genre tersebut (`komikstation.org/genres/...`).
+
+### C. Section `SERIES TERBARU` & `SERIES TERPOPULER` (dari `komikstation.org`)
+1. **Posisi:** Di bawah section `GENRE`.
+2. **Header:** Garis vertikal merah/oranye + teks **`SERIES TERBARU`** (**SF Bold** putih `16.sp`, tanpa emoji petir).
+3. **Daftar Vertikal Rapi:**
+   - Scrape daftar `Series Terbaru` dari `.serieslist ul li`:
+     - **Sisi Kiri:** Poster Komik vertikal (`width = 64.dp`, `aspectRatio(2f/3f)`, `RoundedCornerShape(8.dp)`, `ContentScale.Crop`).
+     - **Sisi Kanan (`Column` vertikal rata kiri):**
+       1. **Judul Komik:** Font **SF Bold** putih `15.sp`, `maxLines = 2`, `overflow = TextOverflow.Ellipsis`.
+       2. **Daftar Genre:** Teks `Genre: [Action, Fantasy, Seinen...]` (font SF Medium `12.sp`, warna abu-abu terang `#94A3B8`, `maxLines = 1`, `overflow = TextOverflow.Ellipsis`).
+       3. **Tahun Rilis:** Teks tahun (misal: `2026`, `2025`, `2023`, font **SF SemiBold** `12.sp`, warna abu-abu `#64748B`).
+   - Setiap item dipisahkan oleh garis pemisah tipis `HorizontalDivider(color = Color(0xFF181B22), thickness = 1.dp)`.
+4. **Navigasi Detail & Pembaca Komik KomikStation:**
+   - Setiap kartu komik KomikStation dapat diklik dan membuka `ComicDetailScreen` dengan ID/URL yang sesuai.
+   - Detail page KomikStation memuat judul, sinopsis, status, genre, dan daftar chapter dari elemen `#chapterlist ul li`.
+   - Reader page KomikStation memuat gambar-gambar chapter dari `#readerarea img` atau `ts_reader.run` images dengan lancar dan responsif.
+5. **Isolasi Referer Header pada Coil `OkHttpClient`:**
+   - Menambahkan aturan domain di `YuranimeApp.kt`:
+     - Jika request gambar berasal dari CDN KomikStation (`komikstation`, `klikcdn.com`, `img.klikcdn.com`): kirim header `Referer: https://komikstation.org/` dan User-Agent browser Android.
+     - Jika request gambar berasal dari CDN komikid (`shngm`, `shinigami`, `komik`): kirim header `Referer: https://app.shinigami.asia/`.
+     - Jika request gambar anime (`animein`): hapus Referer header.
+   - Menjamin 100% semua gambar dari ketiga sumber tampil sempurna tanpa error 403.
+
