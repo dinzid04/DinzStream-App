@@ -1070,5 +1070,39 @@ Sesuai aturan `apple-design-skill`:
    - Bounded ripple effect halus (`ripple(bounded = true, color = Color.White.copy(alpha = 0.2f))`).
    - Feedback visual aktif pada tombol yang sedang menyala (Auto-Scroll, toggle kualitas, toggle format).
 
+---
+
+## 40. SPESIFIKASI FITUR 37: Perbaikan 4 Bug Kritis Fitur Komik (Reader Loading Blocker, Vector Icons, Banner Seamless, Chatroom WebView & Mascot Enlarge)
+
+Sesuai aturan anti-slop visual dan Apple Design:
+1. **Perbaikan Total Bug `"Memuat halaman komik..."` di `ComicReaderScreen`:**
+   - **Hapus Blocker Seluruh Layar:** JANGAN menahan seluruh layar di tampilan loading `"Memuat halaman komik..."` jika data chapter (`chapterDetail != null`) dan daftar halaman (`pages.isNotEmpty()`) sudah tersedia. Layar loading awal hanya muncul ketika `isLoading && chapterDetail == null`.
+   - **Skeleton Shimmer per Halaman:** Begitu `pages.isNotEmpty()`, langsung render `LazyColumn` (Webtoon) atau `HorizontalPager` (Per Halaman). Setiap item halaman yang sedang dimuat menampilkan Skeleton Shimmer vertikal elegan (`height = 420.dp`), vector logo monokrom `yuranime-monochrome.svg` (`alpha = 0.35f`), dan teks kecil `Halaman [index + 1]`.
+   - **Judul Komik di Header Anti-Kosong:** Kirim `selectedComicTitle` dari `MainActivity` dan `ComicHomeScreen` ke `ComicReaderScreen`. Gunakan fallback bertingkat: `effectiveTitle.ifBlank` -> `fullComicDetail?.title` -> `chapterDetail?.chapterTitle` -> fallback aman `"Baca Komik"`.
+   - **Scraper & Image Extraction Lengkap:** Ekstrak gambar dari script JSON `ts_reader.run`, variabel JavaScript `chapter_image` / `images`, serta elemen HTML (`#readerarea img`, `.main-reading-area img`, `.chapter-content img`, `#chimg-auh img`) dengan memprioritaskan atribut `data-src`, `data-lazy-src`, `data-original`, dan `src`.
+   - **Optimasi Coil & Referer di `YuranimeApp.kt`:**
+     - Tambahkan `retryOnConnectionFailure(true)` dan `protocols(listOf(Protocol.HTTP_1_1, Protocol.HTTP_2))` pada OkHttpClient ImageLoader.
+     - Penanganan header cerdas: Domain `komikstation`/`klikcdn` menggunakan Referer `https://komikstation.org/`. Domain `shngm`/`shinigami` menggunakan Referer `https://app.shinigami.asia/`. Domain `wp.com`/`i0.wp.com` tidak mengirim Referer untuk mencegah CDN blocking (HTTP 403/404).
+
+2. **Penggantian Simbol Teks Menjadi Vector Icon Resmi:**
+   - Hapus seluruh penggunaan karakter simbol teks (seperti `⌄`, `v`, `^`, `<`, `>`).
+   - Tombol Kapsul `Ch. [Nomor]`: Menggunakan `Row` berisi `Text("Ch. $num")` + `Icon(Icons.Rounded.KeyboardArrowDown, modifier = Modifier.size(16.dp))`.
+   - Tombol Navigasi Prev/Next di Bar Bawah: Menggunakan `Icons.Rounded.ChevronLeft` dan `Icons.Rounded.ChevronRight`.
+   - Tombol Submit Newsletter: Menggunakan `Icons.Rounded.Send` yang diputar miring `-35f` (`Modifier.rotate(-35f)`) menyerupai pesawat kertas.
+
+3. **Background Banner Newsletter 100% Menyatu Tanpa Kotak Marun:**
+   - Hapus container card kotak: hilangkan border marun, hilangkan clip sudut kotak, dan hilangkan background solid marun pekat.
+   - Background banner menyatu alami dengan `#0B0B0B` (atau `Color.Transparent`).
+   - Terapkan aksen radial gradient glow halus `Color(0xFF9F1239).copy(alpha = 0.14f)` di belakang teks dan ilustrasi yang memudar mulus ke warna latar.
+   - Kapsul input email transparan elegan: `background(Color.White.copy(alpha = 0.04f))` dengan border tipis `Color(0xFFE11D48).copy(alpha = 0.22f)`.
+
+4. **Perbaikan Chatroom Cbox WebView & Pembesaran Maskot:**
+   - WebView di-remember dengan `remember(context)` agar instance tetap hidup dan tidak blackscreen saat LazyColumn di-scroll.
+   - Set background color `android.graphics.Color.WHITE` pada WebView dan callback `onPageFinished`.
+   - Bungkus WebView dalam kontainer putih eksplisit berukuran `height = 390.dp` dengan `RoundedCornerShape(14.dp)`.
+   - Perbesar ukuran gambar maskot dari `76.dp` menjadi `115.dp` agar tampak hidup dan atraktif.
+   - Sesuaikan padding top kontainer Cbox menjadi `82.dp` sehingga siku dan tangan maskot bertumpu persis di atas garis bibir bingkai putih Cbox.
+
+
 
 

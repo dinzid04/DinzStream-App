@@ -107,6 +107,7 @@ fun ComicDetailScreen(
     comicId: String,
     onBackClick: () -> Unit,
     onChapterClick: (chapterId: String) -> Unit,
+    onChapterWithTitleClick: ((chapterId: String, title: String) -> Unit)? = null,
     modifier: Modifier = Modifier,
     repository: ComicRepository = remember { ComicRepository() }
 ) {
@@ -465,7 +466,11 @@ fun ComicDetailScreen(
                                                 )
                                             } catch (_: Exception) {}
                                         }
-                                        onChapterClick(chapter.id)
+                                        if (onChapterWithTitleClick != null && !cd.title.isNullOrBlank()) {
+                                            onChapterWithTitleClick(chapter.id, cd.title)
+                                        } else {
+                                            onChapterClick(chapter.id)
+                                        }
                                     }
                                 }
                             )

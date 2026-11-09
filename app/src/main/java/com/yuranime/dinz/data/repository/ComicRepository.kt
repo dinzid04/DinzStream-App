@@ -369,10 +369,18 @@ class ComicRepository(
             val fileNames = data.chapter?.data ?: emptyList()
 
             val pageUrls = fileNames.map { filename ->
-                if (filename.startsWith("http://") || filename.startsWith("https://")) {
-                    filename
-                } else {
-                    "$rawBaseUrl$path$filename"
+                val cleanName = filename.trim()
+                when {
+                    cleanName.startsWith("http://") || cleanName.startsWith("https://") -> cleanName
+                    cleanName.startsWith("/") -> "$rawBaseUrl$cleanName"
+                    else -> "$rawBaseUrl$path$cleanName"
+                }
+            }
+
+            if (pageUrls.isEmpty()) {
+                val ksFallback = komikStationScraper.getChapterDetail(cleanChapterId)
+                if (ksFallback.isSuccess) {
+                    return@withContext ksFallback
                 }
             }
 

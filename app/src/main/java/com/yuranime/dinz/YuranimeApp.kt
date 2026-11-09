@@ -38,18 +38,29 @@ class YuranimeApp : Application(), ImageLoaderFactory {
         val imageOkHttpClient = OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .protocols(listOf(okhttp3.Protocol.HTTP_1_1, okhttp3.Protocol.HTTP_2))
             .addInterceptor { chain ->
                 val originalRequest = chain.request()
                 val host = originalRequest.url.host.lowercase(Locale.ROOT)
                 val requestBuilder = originalRequest.newBuilder()
 
+                val isWpDomain = host.contains("wp.com") || host.contains("wordpress.com")
                 val isKomikStationDomain = host.contains("komikstation") ||
                     host.contains("klikcdn")
                 val isShngmDomain = host.contains("shngm") ||
                     host.contains("shinigami") ||
                     host.contains("komikid")
 
-                if (isKomikStationDomain) {
+                if (isWpDomain) {
+                    requestBuilder
+                        .removeHeader("Referer")
+                        .removeHeader("x-proxy-secret")
+                        .header(
+                            "User-Agent",
+                            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+                        )
+                } else if (isKomikStationDomain) {
                     requestBuilder
                         .header("Referer", "https://komikstation.org/")
                         .header(

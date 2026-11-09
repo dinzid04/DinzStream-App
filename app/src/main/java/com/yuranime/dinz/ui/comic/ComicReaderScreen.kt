@@ -49,6 +49,9 @@ import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.ViewStream
+import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -235,21 +238,32 @@ fun ComicReaderScreen(
                 isLoading = false
             }
 
-            // Muat comic metadata untuk daftar chapter sheet
-            if (effectiveComicId.isNotBlank() && fullComicDetail == null) {
-                val detailResult = repository.getComicDetail(effectiveComicId)
-                if (detailResult.isSuccess) {
-                    val cd = detailResult.getOrNull()
-                    fullComicDetail = cd
-                    if (effectiveTitle.isBlank() && cd != null) {
-                        effectiveTitle = cd.title
+            // Muat comic metadata untuk daftar chapter sheet & title fallback
+            if (effectiveComicId.isNotBlank()) {
+                if (effectiveTitle.isBlank()) {
+                    val savedHistory = localDb.getComicReadHistoryItem(effectiveComicId)
+                    if (savedHistory != null && savedHistory.comicTitle.isNotBlank()) {
+                        effectiveTitle = savedHistory.comicTitle
+                    }
+                }
+                if (fullComicDetail == null) {
+                    val detailResult = repository.getComicDetail(effectiveComicId)
+                    if (detailResult.isSuccess) {
+                        val cd = detailResult.getOrNull()
+                        fullComicDetail = cd
+                        if (effectiveTitle.isBlank() && cd != null && cd.title.isNotBlank()) {
+                            effectiveTitle = cd.title
+                        }
                     }
                 }
             }
         }
     }
 
-    LaunchedEffect(chapterId) {
+    LaunchedEffect(chapterId, comicTitle) {
+        if (!comicTitle.isNullOrBlank()) {
+            effectiveTitle = comicTitle
+        }
         loadChapter(chapterId)
     }
 
@@ -293,7 +307,13 @@ fun ComicReaderScreen(
             }
     ) {
         // ==================== KONTEN BACA (WEBTOON / PER HALAMAN) ====================
-        if (isLoading) {
+        val pages = if (!offlinePageFiles.isNullOrEmpty()) {
+            offlinePageFiles!!.map { it.absolutePath }
+        } else {
+            chapterDetail?.pages ?: emptyList()
+        }
+
+        if (isLoading && pages.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -328,7 +348,7 @@ fun ComicReaderScreen(
                     )
                 }
             }
-        } else if (errorMessage != null && chapterDetail == null) {
+        } else if (errorMessage != null && pages.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -367,13 +387,8 @@ fun ComicReaderScreen(
                     }
                 }
             }
-        } else if (chapterDetail != null) {
-            val detail = chapterDetail!!
-            val pages = if (!offlinePageFiles.isNullOrEmpty()) {
-                offlinePageFiles!!.map { it.absolutePath }
-            } else {
-                detail.pages
-            }
+        } else if (pages.isNotEmpty()) {
+            val detail = chapterDetail
 
             if (readMode == "webtoon") {
                 // Mode 1: Webtoon Vertical LazyColumn Tanpa Sela
@@ -402,29 +417,40 @@ fun ComicReaderScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "Akhir Chapter ${detail.chapterNumber}",
+                                text = "Akhir Chapter ${detail?.chapterNumber ?: ""}",
                                 color = Color(0xFF94A3B8),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 fontFamily = SfProFontFamily
                             )
 
-                            if (!detail.nextChapterId.isNullOrBlank()) {
+                            if (!detail?.nextChapterId.isNullOrBlank()) {
                                 Spacer(modifier = Modifier.height(14.dp))
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(20.dp))
                                         .background(ReaderAccentOrange)
-                                        .clickable { loadChapter(detail.nextChapterId) }
+                                        .clickable { loadChapter(detail!!.nextChapterId!!) }
                                         .padding(horizontal = 22.dp, vertical = 10.dp)
                                 ) {
-                                    Text(
-                                        text = "Lanjut Chapter Berikutnya ▶",
-                                        color = Color.White,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = SfProFontFamily
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "Lanjut Chapter Berikutnya",
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = SfProFontFamily
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Rounded.ChevronRight,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -496,7 +522,9 @@ fun ComicReaderScreen(
                         Spacer(modifier = Modifier.width(8.dp))
 
                         val displayTitle = effectiveTitle.ifBlank {
-                            chapterDetail?.chapterTitle ?: "Baca Komik"
+                            fullComicDetail?.title?.takeIf { it.isNotBlank() }
+                                ?: chapterDetail?.chapterTitle?.takeIf { it.isNotBlank() }
+                                ?: "Baca Komik"
                         }
                         Text(
                             text = displayTitle,
@@ -511,7 +539,7 @@ fun ComicReaderScreen(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // Kapsul Kanan: Ch. [Nomor] ⌄
+                    // Kapsul Kanan: Ch. [Nomor] dengan Vector Icon Caret
                     val currentChNumber = chapterDetail?.chapterNumber ?: "1"
                     Box(
                         modifier = Modifier
@@ -521,15 +549,26 @@ fun ComicReaderScreen(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(bounded = true, color = Color.White)
                             ) { showChapterSheet = true }
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
-                        Text(
-                            text = "Ch. $currentChNumber ⌄",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            fontFamily = SfProFontFamily
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Ch. $currentChNumber",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = SfProFontFamily
+                            )
+                            Icon(
+                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = "Pilih Chapter",
+                                tint = Color.White.copy(alpha = 0.85f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -661,7 +700,7 @@ fun ComicReaderScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.ChevronLeft,
+                            imageVector = Icons.Rounded.ChevronLeft,
                             contentDescription = "Chapter Sebelumnya",
                             tint = if (hasPrev) Color.White else Color(0xFF4B5563),
                             modifier = Modifier.size(22.dp)
@@ -745,7 +784,7 @@ fun ComicReaderScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.ChevronRight,
+                            imageVector = Icons.Rounded.ChevronRight,
                             contentDescription = "Chapter Selanjutnya",
                             tint = if (hasNext) Color.White else Color(0xFF4B5563),
                             modifier = Modifier.size(22.dp)
@@ -1199,19 +1238,6 @@ private fun ComicImageItem(
         } else {
             req.size(800)
         }
-
-        if (!isLocalFile) {
-            val referer = if (pageSource.contains("komikstation") || pageSource.contains("klikcdn")) {
-                "https://komikstation.org/"
-            } else {
-                "https://app.shinigami.asia/"
-            }
-            req.addHeader(
-                "User-Agent",
-                "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
-            )
-            req.addHeader("Referer", referer)
-        }
         req.build()
     }
 
@@ -1221,7 +1247,7 @@ private fun ComicImageItem(
         contentScale = ContentScale.FillWidth,
         modifier = modifier.fillMaxWidth(),
         loading = {
-            // Skeleton Shimmer + Icon Monokrom (Sesuai R-27 & Anti-Slop, DILARANG Loading Bulat!)
+            // Skeleton Shimmer + Icon Monokrom + Nomor Halaman (Sesuai R-27 & Anti-Slop, DILARANG Loading Bulat!)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1229,12 +1255,25 @@ private fun ComicImageItem(
                     .background(shimmerBrush()),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_yuranime_monochrome),
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.25f),
-                    modifier = Modifier.size(54.dp)
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_yuranime_monochrome),
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.35f),
+                        modifier = Modifier.size(52.dp)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Halaman ${pageIndex + 1}",
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = SfProFontFamily
+                    )
+                }
             }
         },
         error = {

@@ -7,8 +7,12 @@ import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.view.ViewGroup
 import android.webkit.WebViewClient
 import android.widget.Toast
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -124,6 +128,7 @@ fun ComicHomeScreen(
     onChapterClick: (chapterId: String) -> Unit = {},
     onOpenAllComics: () -> Unit = {},
     onComicChapterClick: ((chapterId: String) -> Unit)? = null,
+    onComicChapterWithInfoClick: ((chapterId: String, comicId: String?, comicTitle: String?) -> Unit)? = null,
     onGenreClick: (genreName: String) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ComicHomeViewModel = viewModel()
@@ -249,7 +254,8 @@ fun ComicHomeScreen(
                             ComicLatestGridSection(
                                 comics = uiState.latestComics.take(12),
                                 onComicClick = onComicClick,
-                                onChapterClick = actualChapterClick
+                                onChapterClick = actualChapterClick,
+                                onChapterWithInfoClick = onComicChapterWithInfoClick
                             )
                         }
                     }
@@ -523,13 +529,24 @@ private fun ComicHeroSlider(
                                     .padding(horizontal = 14.dp, vertical = 8.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "▶ BACA SEKARANG",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = SfProFontFamily
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.PlayArrow,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = "BACA SEKARANG",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = SfProFontFamily
+                                    )
+                                }
                             }
 
                             // Tombol Kanan: Kapsul Gelap Semi-Transparan
@@ -804,6 +821,7 @@ private fun ComicLatestGridSection(
     comics: List<ComicItem>,
     onComicClick: (comicId: String) -> Unit,
     onChapterClick: (chapterId: String) -> Unit,
+    onChapterWithInfoClick: ((chapterId: String, comicId: String?, comicTitle: String?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val rows = comics.take(12).chunked(2)
@@ -826,6 +844,7 @@ private fun ComicLatestGridSection(
                         comic = first,
                         onComicClick = { onComicClick(first.id) },
                         onChapterClick = onChapterClick,
+                        onChapterWithInfoClick = onChapterWithInfoClick,
                         modifier = Modifier.weight(1f)
                     )
                 } else {
@@ -838,6 +857,7 @@ private fun ComicLatestGridSection(
                         comic = second,
                         onComicClick = { onComicClick(second.id) },
                         onChapterClick = onChapterClick,
+                        onChapterWithInfoClick = onChapterWithInfoClick,
                         modifier = Modifier.weight(1f)
                     )
                 } else {
@@ -853,6 +873,7 @@ private fun ComicLatestCard(
     comic: ComicItem,
     onComicClick: () -> Unit,
     onChapterClick: (chapterId: String) -> Unit,
+    onChapterWithInfoClick: ((chapterId: String, comicId: String?, comicTitle: String?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -963,7 +984,11 @@ private fun ComicLatestCard(
                                 indication = ripple(bounded = true, color = Color.White)
                             ) {
                                 if (ch.id.isNotBlank()) {
-                                    onChapterClick(ch.id)
+                                    if (onChapterWithInfoClick != null) {
+                                        onChapterWithInfoClick(ch.id, comic.id, comic.title)
+                                    } else {
+                                        onChapterClick(ch.id)
+                                    }
                                 } else {
                                     onComicClick()
                                 }
@@ -1017,6 +1042,47 @@ private fun ComicCommunityChatSection(
 ) {
     val context = LocalContext.current
 
+    val webView = remember(context) {
+        WebView(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            setBackgroundColor(android.graphics.Color.WHITE)
+            @SuppressLint("SetJavaScriptEnabled")
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                databaseEnabled = true
+                javaScriptCanOpenWindowsAutomatically = true
+                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                cacheMode = WebSettings.LOAD_DEFAULT
+                userAgentString = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+            }
+            CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+            webChromeClient = WebChromeClient()
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    view?.setBackgroundColor(android.graphics.Color.WHITE)
+                }
+            }
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                        v.parent?.requestDisallowInterceptTouchEvent(true)
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        v.parent?.requestDisallowInterceptTouchEvent(false)
+                    }
+                }
+                false
+            }
+            loadUrl("https://www5.cbox.ws/box/?boxid=956912&boxtag=ckNwUL")
+        }
+    }
+
     Column(modifier = modifier.fillMaxWidth()) {
         ComicSectionHeaderWithAccent(
             title = "CHATROOM KOMUNITAS",
@@ -1030,11 +1096,11 @@ private fun ComicCommunityChatSection(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
         ) {
-            // Layer 1: Kotak Cbox WebView dengan padding top 56dp agar bertumpu pas di bawah tangan maskot
+            // Layer 1: Kotak Cbox WebView dengan padding top 82dp agar bertumpu pas di bawah tangan maskot
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 56.dp)
+                    .padding(top = 82.dp)
             ) {
                 Box(
                     modifier = Modifier
@@ -1044,34 +1110,7 @@ private fun ComicCommunityChatSection(
                         .background(Color.White)
                 ) {
                     AndroidView(
-                        factory = { ctx ->
-                            WebView(ctx).apply {
-                                @SuppressLint("SetJavaScriptEnabled")
-                                settings.javaScriptEnabled = true
-                                settings.domStorageEnabled = true
-                                settings.databaseEnabled = true
-                                settings.javaScriptCanOpenWindowsAutomatically = true
-                                settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                                settings.cacheMode = WebSettings.LOAD_DEFAULT
-                                settings.userAgentString = COMIC_IMAGE_USER_AGENT
-                                CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
-                                webChromeClient = WebChromeClient()
-                                webViewClient = WebViewClient()
-                                setLayerType(View.LAYER_TYPE_HARDWARE, null)
-                                setOnTouchListener { v, event ->
-                                    when (event.action) {
-                                        MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
-                                            v.parent?.requestDisallowInterceptTouchEvent(true)
-                                        }
-                                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                                            v.parent?.requestDisallowInterceptTouchEvent(false)
-                                        }
-                                    }
-                                    false
-                                }
-                                loadUrl("https://www5.cbox.ws/box/?boxid=956912&boxtag=ckNwUL")
-                            }
-                        },
+                        factory = { webView },
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -1096,7 +1135,7 @@ private fun ComicCommunityChatSection(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(end = 14.dp)
-                    .size(76.dp)
+                    .size(115.dp)
                     .zIndex(2f),
                 contentScale = ContentScale.Fit
             )
@@ -1610,26 +1649,29 @@ private fun ComicNewsletterBanner(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .height(195.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .height(200.dp)
             .background(
-                Brush.horizontalGradient(
-                    colors = listOf(Color(0xFF1F080C), Color(0xFF0E0B0E))
+                Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF9F1239).copy(alpha = 0.14f),
+                        Color.Transparent
+                    ),
+                    center = Offset(250f, 250f),
+                    radius = 450f
                 )
             )
-            .border(0.8.dp, Color(0x4D831843), RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 18.dp, top = 18.dp, bottom = 18.dp, end = 4.dp),
+                .padding(start = 6.dp, top = 12.dp, bottom = 12.dp, end = 0.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Sisi Kiri: Teks & Kotak Input Email
             Column(
                 modifier = Modifier
-                    .weight(1.18f)
+                    .weight(1.22f)
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
@@ -1637,7 +1679,7 @@ private fun ComicNewsletterBanner(
                     Text(
                         text = "Subscribe to our newsletter and be the first to receive news",
                         color = Color(0xFFCBD5E1),
-                        fontSize = 11.sp,
+                        fontSize = 11.5.sp,
                         fontFamily = SfProFontFamily,
                         fontWeight = FontWeight.Normal,
                         lineHeight = 15.sp
@@ -1661,8 +1703,8 @@ private fun ComicNewsletterBanner(
                         .fillMaxWidth()
                         .height(42.dp)
                         .clip(RoundedCornerShape(21.dp))
-                        .background(Color(0xFF160A0E))
-                        .border(1.dp, Color(0xFF831843), RoundedCornerShape(21.dp))
+                        .background(Color.White.copy(alpha = 0.04f))
+                        .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.22f), RoundedCornerShape(21.dp))
                         .padding(start = 14.dp, end = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1698,16 +1740,20 @@ private fun ComicNewsletterBanner(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(bounded = true, color = Color.White)
                             ) {
-                                emailInput = ""
-                                Toast.makeText(context, "Terima kasih telah berlangganan!", Toast.LENGTH_SHORT).show()
+                                if (emailInput.isNotBlank()) {
+                                    emailInput = ""
+                                    Toast.makeText(context, "Terima kasih telah berlangganan!", Toast.LENGTH_SHORT).show()
+                                }
                             },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            imageVector = Icons.AutoMirrored.Rounded.Send,
                             contentDescription = "Subscribe",
                             tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier
+                                .size(16.dp)
+                                .rotate(-35f)
                         )
                     }
                 }

@@ -82,6 +82,7 @@ class MainActivity : ComponentActivity() {
                     var selectedBirthdayItem by remember { mutableStateOf<com.yuranime.dinz.data.api.BirthdayCharacterItem?>(null) }
                     var selectedComicChapterId by remember { mutableStateOf<String?>(null) }
                     var selectedComicId by remember { mutableStateOf<String?>(null) }
+                    var selectedComicTitle by remember { mutableStateOf<String?>(null) }
                     var showAllComics by remember { mutableStateOf(false) }
                     var currentTab by remember { mutableStateOf(NavTab.HOME) }
                     var isComicMode by rememberSaveable { mutableStateOf(false) }
@@ -108,6 +109,7 @@ class MainActivity : ComponentActivity() {
                                     com.yuranime.dinz.ui.comic.ComicReaderScreen(
                                         chapterId = selectedComicChapterId!!,
                                         comicId = selectedComicId,
+                                        comicTitle = selectedComicTitle,
                                         onBackClick = { selectedComicChapterId = null }
                                     )
                                 }
@@ -117,7 +119,11 @@ class MainActivity : ComponentActivity() {
                                     com.yuranime.dinz.ui.comic.ComicDetailScreen(
                                         comicId = selectedComicId!!,
                                         onBackClick = { selectedComicId = null },
-                                        onChapterClick = { chId -> selectedComicChapterId = chId }
+                                        onChapterClick = { chId -> selectedComicChapterId = chId },
+                                        onChapterWithTitleClick = { chId, title ->
+                                            selectedComicTitle = title
+                                            selectedComicChapterId = chId
+                                        }
                                     )
                                 }
                             }
@@ -238,6 +244,11 @@ class MainActivity : ComponentActivity() {
                                             },
                                             onChapterClick = { chId ->
                                                 selectedComicChapterId = chId
+                                            },
+                                            onComicChapterWithInfoClick = { chId, cId, cTitle ->
+                                                selectedComicChapterId = chId
+                                                if (cId != null) selectedComicId = cId
+                                                if (cTitle != null) selectedComicTitle = cTitle
                                             },
                                             onOpenAllComics = {
                                                 showAllComics = true
@@ -441,6 +452,11 @@ class MainActivity : ComponentActivity() {
                                             },
                                             onChapterClick = { chId ->
                                                 selectedComicChapterId = chId
+                                            },
+                                            onComicChapterWithInfoClick = { chId, cId, cTitle ->
+                                                selectedComicChapterId = chId
+                                                if (cId != null) selectedComicId = cId
+                                                if (cTitle != null) selectedComicTitle = cTitle
                                             },
                                             onOpenAllComics = {
                                                 showAllComics = true

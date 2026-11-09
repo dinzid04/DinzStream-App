@@ -491,12 +491,12 @@ class KomikStationScraper(
             val rawTitle = doc.selectFirst("h1.entry-title")?.text()?.trim() ?: "Baca Komik"
             val chapterNum = rawTitle.substringAfter("Chapter", "").trim().substringBefore(" ")
 
-            // Extract from ts_reader script
+            // 1. Ekstraksi dari ts_reader script
             val images = mutableListOf<String>()
             var prevUrl: String? = null
             var nextUrl: String? = null
 
-            val tsReaderMatch = Regex("""ts_reader\.run\((\{.*?\})\);""", RegexOption.DOT_MATCHES_ALL).find(html)
+            val tsReaderMatch = Regex("""ts_reader\.run\s*\(\s*(\{.*?\})\s*\)""", RegexOption.DOT_MATCHES_ALL).find(html)
             if (tsReaderMatch != null) {
                 try {
                     val jsonStr = tsReaderMatch.groupValues[1]
@@ -509,7 +509,7 @@ class KomikStationScraper(
                         val imagesArray = firstSource.getAsJsonArray("images")
                         if (imagesArray != null) {
                             imagesArray.forEach { elem ->
-                                val u = elem.asString
+                                val u = elem.asString.replace("\\/", "/").trim()
                                 if (u.isNotBlank() && !images.contains(u)) {
                                     images.add(u)
                                 }
@@ -519,11 +519,40 @@ class KomikStationScraper(
                 } catch (_: Exception) {}
             }
 
-            // Fallback from DOM #readerarea img
+            // 2. Ekstraksi dari variabel JS chapter_image / images
             if (images.isEmpty()) {
-                doc.select("#readerarea img").forEach { img ->
-                    val src = img.attr("data-src").ifBlank { img.attr("src") }.trim()
-                    if (src.isNotBlank() && !src.startsWith("data:image") && !images.contains(src)) {
+                val jsVarMatch = Regex("""(?:chapter_image|var\s+images)\s*=\s*(\[.*?\]);""", RegexOption.DOT_MATCHES_ALL).find(html)
+                if (jsVarMatch != null) {
+                    try {
+                        val arrayJson = jsVarMatch.groupValues[1]
+                        val jsonArr = JsonParser.parseString(arrayJson).asJsonArray
+                        jsonArr.forEach { elem ->
+                            val u = elem.asString.replace("\\/", "/").trim()
+                            if (u.isNotBlank() && !images.contains(u)) {
+                                images.add(u)
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+
+            // 3. Ekstraksi dari DOM HTML: #readerarea img, .main-reading-area img, .chapter-content img, #chimg-auh img
+            if (images.isEmpty()) {
+                doc.select("#readerarea img, .main-reading-area img, .chapter-content img, #chimg-auh img, .reader-area img, .rdimage img").forEach { img ->
+                    val src = img.attr("data-src")
+                        .ifBlank { img.attr("data-lazy-src") }
+                        .ifBlank { img.attr("data-original") }
+                        .ifBlank { img.attr("src") }
+                        .replace("\\/", "/")
+                        .trim()
+
+                    val isIgnored = src.isBlank() ||
+                        src.startsWith("data:image") ||
+                        src.contains("flags/") ||
+                        src.contains("readerarea.svg") ||
+                        src.contains("placeholder")
+
+                    if (!isIgnored && !images.contains(src)) {
                         images.add(src)
                     }
                 }
@@ -539,9 +568,15 @@ class KomikStationScraper(
                 nextUrl = nextA?.attr("href")?.takeIf { it.isNotBlank() && !it.contains("#") }
             }
 
+            // Ekstrak URL manga / komik
+            val mangaUrl = doc.selectFirst(".nextprev a[href*='/manga/']")?.attr("href")
+                ?: doc.selectFirst(".allc a")?.attr("href")
+                ?: doc.selectFirst(".ts-breadcrumb li:nth-child(2) a")?.attr("href")
+                ?: url.substringBeforeLast('/', "").substringBeforeLast('/')
+
             val chapterDetail = ComicChapterDetail(
                 chapterId = url,
-                comicId = url.substringBeforeLast('/', "").substringBeforeLast('/'),
+                comicId = mangaUrl,
                 chapterNumber = chapterNum.ifBlank { "1" },
                 chapterTitle = rawTitle,
                 prevChapterId = prevUrl,
