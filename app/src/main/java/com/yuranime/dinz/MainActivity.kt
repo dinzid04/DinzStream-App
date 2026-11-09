@@ -346,9 +346,6 @@ class MainActivity : ComponentActivity() {
                                                 selectedStreamingMovieId = mId
                                                 selectedStreamingEpisodeId = epId
                                             },
-                                            onComicChapterClick = { chId ->
-                                                selectedComicChapterId = chId
-                                            },
                                             onCuplixClick = { cuplixItem ->
                                                 selectedCuplixItem = cuplixItem
                                             },
