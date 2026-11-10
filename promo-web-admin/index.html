@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yuranime Promo Manager — Admin Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #090A0F;
+      --surface-card: #12141C;
+      --surface-card-hover: #171A24;
+      --surface-input: #0E1017;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(255, 255, 255, 0.22);
+      --accent-red: #E11D48;
+      --accent-orange: #FF5722;
+      --accent-green: #10B981;
+      --accent-blue: #0A84FF;
+      --text-primary: #FFFFFF;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+      --radius-lg: 14px;
+      --radius-md: 10px;
+      --radius-sm: 6px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header Nav */
+    header {
+      background: rgba(18, 20, 28, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-subtle);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 14px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(225, 29, 72, 0.35);
+    }
+
+    .brand-title {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: #FFFFFF;
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .connection-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      transition: background 0.3s;
+    }
+
+    .status-dot.online {
+      background: var(--accent-green);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+    }
+
+    .status-dot.syncing {
+      background: var(--accent-orange);
+    }
+
+    /* Main Container 2 Columns */
+    main {
+      flex: 1;
+      max-width: 1360px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 32px 24px;
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 36px;
+      align-items: start;
+    }
+
+    @media (max-width: 960px) {
+      main {
+        grid-template-columns: 1fr;
+        gap: 40px;
+      }
+    }
+
+    /* Left Column Form */
+    .form-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: border-color 0.2s, background-color 0.2s;
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* Status Switch Row */
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .switch-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .switch-label {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .switch-subtext {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+    }
+
+    /* iOS Toggle Switch */
+    .ios-switch {
+      position: relative;
+      display: inline-block;
+      width: 52px;
+      height: 30px;
+      flex-shrink: 0;
+    }
+
+    .ios-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #272A34;
+      transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 34px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 22px;
+      width: 22px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 50%;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+
+    input:checked + .slider {
+      background-color: var(--accent-green);
+      border-color: var(--accent-green);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+
+    /* Form Fields */
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field-label {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .field-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    input[type="text"], input[type="number"], input[type="url"] {
+      width: 100%;
+      background: var(--surface-input);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      font-size: 14px;
+      color: var(--text-primary);
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input[type="text"]:focus, input[type="number"]:focus, input[type="url"]:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.18);
+    }
+
+    /* Quick Preset Badges */
+    .preset-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .preset-badge {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .preset-badge:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #FFFFFF;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .preset-badge.active {
+      background: rgba(225, 29, 72, 0.15);
+      border-color: var(--accent-red);
+      color: #FFFFFF;
+      font-weight: 600;
+    }
+
+    /* Image Validation Preview Strip */
+    .img-preview-box {
+      margin-top: 8px;
+      border: 1px dashed var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .img-preview-thumb {
+      width: 56px;
+      height: 78px;
+      object-fit: cover;
+      border-radius: 6px;
+      background: #181A22;
+      border: 1px solid var(--border-subtle);
+      flex-shrink: 0;
+    }
+
+    .img-preview-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow: hidden;
+    }
+
+    .img-preview-status {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--accent-green);
+    }
+
+    .img-preview-url {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 320px;
+    }
+
+    /* Action Buttons */
+    .action-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 20px;
+      border-radius: var(--radius-md);
+      font-size: 14.5px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      outline: none;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #E11D48, #FF5722);
+      color: #FFFFFF;
+      box-shadow: 0 4px 18px rgba(225, 29, 72, 0.35);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 6px 24px rgba(225, 29, 72, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Right Column Smartphone Mockup */
+    .preview-column {
+      position: sticky;
+      top: 90px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .preview-title-row {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .preview-heading {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    /* Device Mockup */
+    .smartphone-bezel {
+      width: 320px;
+      height: 660px;
+      background: #000000;
+      border-radius: 46px;
+      border: 8px solid #20222B;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Dynamic Island */
+    .dynamic-island {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90px;
+      height: 22px;
+      background: #000000;
+      border-radius: 20px;
+      z-index: 40;
+    }
+
+    /* Mock Yuranime App Screen */
+    .mock-app {
+      flex: 1;
+      background: #0B0B0B;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      font-size: 12px;
+    }
+
+    .mock-app-header {
+      padding: 38px 14px 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+      z-index: 10;
+    }
+
+    .mock-brand {
+      font-weight: 800;
+      color: #E11D48;
+      font-size: 14px;
+      letter-spacing: -0.5px;
+    }
+
+    .mock-nav-icons {
+      display: flex;
+      gap: 10px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .mock-hero-slide {
+      margin: 10px 14px;
+      height: 180px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #1C1E2A, #10121A);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      align-items: flex-end;
+      padding: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mock-hero-slide::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, #0B0B0B 0%, transparent 60%);
+    }
+
+    .mock-hero-text {
+      position: relative;
+      z-index: 2;
+      font-weight: 700;
+      font-size: 13px;
+      color: #fff;
+    }
+
+    .mock-grid-row {
+      margin: 12px 14px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .mock-card {
+      flex: 1;
+      height: 110px;
+      background: #14161F;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    /* Dimmed Scrim Overlay (Matches app 78% black) */
+    .mock-scrim {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.78);
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .mock-scrim.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Popup Dialog Container inside Mockup */
+    .mock-dialog-wrapper {
+      width: 84%;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      transform: scale(0.9);
+      transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .mock-scrim.show .mock-dialog-wrapper {
+      transform: scale(1);
+    }
+
+    /* Circular ✕ Close Button Outside Image */
+    .mock-close-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.65);
+      border: 0.5px solid rgba(255, 255, 255, 0.25);
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      cursor: pointer;
+      margin-bottom: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .mock-close-btn:hover {
+      transform: scale(1.1);
+      background: rgba(0, 0, 0, 0.85);
+    }
+
+    /* Poster Container */
+    .mock-poster-box {
+      width: 100%;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
+      background: #171A24;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .mock-poster-img {
+      width: 100%;
+      display: block;
+      object-fit: cover;
+      max-height: 380px;
+    }
+
+    .mock-interactive-hint {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      font-size: 9.5px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    /* Reopen Floating Action in Mockup */
+    .mock-reopen-btn {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(225, 29, 72, 0.9);
+      backdrop-filter: blur(8px);
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      z-index: 25;
+      box-shadow: 0 4px 12px rgba(225, 29, 72, 0.4);
+      display: none;
+    }
+
+    /* Device Meta Info Badge */
+    .device-meta-badge {
+      width: 320px;
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .meta-value {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      background: #171A24;
+      border: 1px solid var(--border-subtle);
+      border-left: 4px solid var(--accent-green);
+      padding: 14px 20px;
+      border-radius: var(--radius-md);
+      font-size: 13.5px;
+      color: #FFFFFF;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.error {
+      border-left-color: var(--accent-red);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top App Navigation Bar -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">Y</div>
+      <div>
+        <div class="brand-title">Yuranime Promo Manager</div>
+        <div class="brand-subtitle">Real-Time Firebase Firestore Admin Console</div>
+      </div>
+    </div>
+    <div class="connection-status" id="connectionBadge">
+      <span class="status-dot online" id="statusDot"></span>
+      <span id="statusText">Terhubung ke Firestore</span>
+    </div>
+  </header>
+
+  <!-- Main 2-Column Responsive Container -->
+  <main>
+    <!-- Kolom Kiri: Kontrol Konfigurasi Promo -->
+    <div class="form-column">
+
+      <!-- 1. Status Aktivasi Promo (iOS Switch) -->
+      <div class="card">
+        <div class="switch-row">
+          <div class="switch-info">
+            <div class="switch-label">Status Popup Promosi</div>
+            <div class="switch-subtext" id="toggleSubtitle">Popup sedang aktif dan akan muncul di HP pengguna yang memenuhi syarat</div>
+          </div>
+          <label class="ios-switch">
+            <input type="checkbox" id="promoActiveSwitch" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 2. Gambar Poster Promosi -->
+      <div class="card">
+        <div class="card-title">
+          <span>Poster Gambar Promosi</span>
+          <span style="font-size: 11.5px; color: var(--accent-red); font-weight: 500;">Format 3:4 atau 9:16 Direkomendasikan</span>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="imageUrlInput">URL Gambar Poster (Direct Image Link)</label>
+          <div class="input-wrapper">
+            <input type="url" id="imageUrlInput" placeholder="https://domain.com/poster-promo.jpg" autocomplete="off">
+          </div>
+          <div class="field-hint">Gambar harus berekstensi .jpg, .png, atau .webp dari CDN yang dapat diakses publik.</div>
+        </div>
+
+        <!-- Quick Sample Posters -->
+        <div class="field-group">
+          <span style="font-size: 12px; color: var(--text-secondary); font-weight: 500;">Pilihan Cepat Gambar Contoh:</span>
+          <div class="preset-row">
+            <div class="preset-badge" onclick="setSampleImage(1)">Contoh Survey Fans</div>
+            <div class="preset-badge" onclick="setSampleImage(2)">Contoh Event Komunitas</div>
+            <div class="preset-badge" onclick="setSampleImage(3)">Contoh Rilis Komik Baru</div>
+          </div>
+        </div>
+
+        <!-- Image Preview Card -->
+        <div class="img-preview-box" id="previewStrip">
+          <img id="thumbPreview" class="img-preview-thumb" src="" alt="Thumbnail Preview">
+          <div class="img-preview-info">
+            <span class="img-preview-status" id="thumbStatus">Gambar Terverifikasi</span>
+            <span class="img-preview-url" id="thumbUrlText">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Target Redirect URL (Opsional) -->
+      <div class="card">
+        <div class="card-title">
+          <span>Tautan Aksi Gambar (Opsional)</span>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="targetUrlInput">URL Redirect saat Poster Diklik</label>
+          <div class="input-wrapper">
+            <input type="url" id="targetUrlInput" placeholder="https://yuranime.com/event atau https://discord.gg/..." autocomplete="off">
+          </div>
+          <div class="field-hint">
+            <strong>Catatan:</strong> Kosongkan field ini jika Anda hanya ingin menampilkan poster sebagai pengumuman/informasi tanpa membuka link browser.
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Pengaturan Waktu & Frekuensi Muncul -->
+      <div class="card">
+        <div class="card-title">
+          <span>Frekuensi & Interval Waktu Muncul</span>
+        </div>
+
+        <!-- Interval Hours -->
+        <div class="field-group">
+          <label class="field-label" for="intervalInput">Interval Minimal Antar Kemunculan (Jam)</label>
+          <div class="input-wrapper">
+            <input type="number" id="intervalInput" min="0.1" step="0.5" value="8">
+          </div>
+          <div class="preset-row">
+            <div class="preset-badge active" data-hours="8" onclick="selectInterval(8)">Setiap 8 Jam (Default)</div>
+            <div class="preset-badge" data-hours="1" onclick="selectInterval(1)">Setiap 1 Jam</div>
+            <div class="preset-badge" data-hours="12" onclick="selectInterval(12)">Setiap 12 Jam</div>
+            <div class="preset-badge" data-hours="24" onclick="selectInterval(24)">Setiap 24 Jam (1 Hari)</div>
+            <div class="preset-badge" data-hours="720" onclick="selectInterval(720)">Sekali Sebulan</div>
+          </div>
+          <div class="field-hint">Setelah pengguna melihat popup dan menutupnya, popup tidak akan muncul kembali sebelum waktu interval ini berlalu.</div>
+        </div>
+
+        <!-- Max Impressions -->
+        <div class="field-group" style="margin-top: 8px;">
+          <label class="field-label" for="maxImpressionsInput">Batas Maksimal Tampil per Pengguna</label>
+          <div class="input-wrapper">
+            <input type="number" id="maxImpressionsInput" min="0" step="1" value="0">
+          </div>
+          <div class="preset-row">
+            <div class="preset-badge active" data-imp="0" onclick="selectImpression(0)">0 = Tanpa Batas (Berulang sesuai jam)</div>
+            <div class="preset-badge" data-imp="1" onclick="selectImpression(1)">1x Saja (Seumur Hidup Promo)</div>
+            <div class="preset-badge" data-imp="3" onclick="selectImpression(3)">Maksimal 3x</div>
+            <div class="preset-badge" data-imp="5" onclick="selectImpression(5)">Maksimal 5x</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Tombol Aksi Utama -->
+      <div class="action-group">
+        <button class="btn btn-primary" id="btnSaveApply" onclick="savePromoConfig(false)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+          Simpan & Terapkan ke Aplikasi
+        </button>
+
+        <button class="btn btn-secondary" id="btnPushNew" onclick="savePromoConfig(true)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          Push sebagai Promo Baru (Reset Cooldown Semua User)
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Kolom Kanan: Live Interactive Smartphone Mockup -->
+    <div class="preview-column">
+      <div class="preview-title-row">
+        <span class="preview-heading">Live Interactive Preview</span>
+        <span style="font-size: 11.5px; color: var(--text-muted);">Skala 1:1 Tampilan Layar HP</span>
+      </div>
+
+      <!-- Smartphone Chassis -->
+      <div class="smartphone-bezel">
+        <div class="dynamic-island"></div>
+
+        <!-- Mock Yuranime App Background -->
+        <div class="mock-app">
+          <div class="mock-app-header">
+            <span class="mock-brand">YURANIME</span>
+            <div class="mock-nav-icons">
+              <span>🔍</span>
+              <span>🔔</span>
+            </div>
+          </div>
+
+          <div class="mock-hero-slide">
+            <span class="mock-hero-text">Demon Slayer: Hashira Training Arc</span>
+          </div>
+
+          <div class="mock-grid-row">
+            <div class="mock-card"></div>
+            <div class="mock-card"></div>
+          </div>
+
+          <!-- Dimmed Scrim Overlay (78% Black) -->
+          <div class="mock-scrim show" id="mockScrim">
+            <div class="mock-dialog-wrapper">
+              <!-- Circular Close Button Outside Image (8px above top-right) -->
+              <div class="mock-close-btn" onclick="dismissMockPopup()" title="Tutup Dialog">✕</div>
+
+              <!-- Poster Container -->
+              <div class="mock-poster-box" onclick="handleMockPosterClick()">
+                <img id="mockPosterImg" class="mock-poster-img" src="https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&q=80" alt="Poster Promo">
+                <div class="mock-interactive-hint" id="mockHintBadge">🔗 Klik untuk Menguji Tautan</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reopen Button when dismissed -->
+          <button class="mock-reopen-btn" id="mockReopenBtn" onclick="reopenMockPopup()">
+            Buka Mockup Lagi
+          </button>
+        </div>
+      </div>
+
+      <!-- Device Meta Badge -->
+      <div class="device-meta-badge">
+        <div class="meta-row">
+          <span>Promo ID Aktif:</span>
+          <span class="meta-value" id="badgePromoId">promo_initial</span>
+        </div>
+        <div class="meta-row">
+          <span>Interval Tampil:</span>
+          <span class="meta-value" id="badgeInterval">8 Jam</span>
+        </div>
+        <div class="meta-row">
+          <span>Batas Muncul:</span>
+          <span class="meta-value" id="badgeMaxImp">Tanpa Batas</span>
+        </div>
+        <div class="meta-row">
+          <span>Tipe Interaksi:</span>
+          <span class="meta-value" id="badgeActionType" style="color: var(--accent-orange);">Redirect Aktif</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Floating Toast Notification -->
+  <div class="toast" id="toast">
+    <span id="toastIcon">✓</span>
+    <span id="toastMessage">Konfigurasi promo berhasil disimpan!</span>
+  </div>
+
+  <!-- Firebase Modular SDK via ESM -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    // Konfigurasi Resmi Firebase Proyek dinz-ai-gemini-copy
+    const firebaseConfig = {
+      apiKey: "AIzaSyAPZsUFl1RoV3bfMWWOsJ0M9yt_YPqrRSg",
+      authDomain: "dinz-ai-gemini-copy.firebaseapp.com",
+      projectId: "dinz-ai-gemini-copy",
+      storageBucket: "dinz-ai-gemini-copy.firebasestorage.app",
+      messagingSenderId: "400464992596",
+      appId: "1:400464992596:android:68fde66c88d351699610c1"
+    };
+
+    let db;
+    let currentConfig = {
+      isActive: true,
+      promoId: "promo_default",
+      imageUrl: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&q=80",
+      targetUrl: "https://yuranime.com",
+      intervalHours: 8,
+      maxImpressions: 0,
+      updatedAt: Date.now()
+    };
+
+    try {
+      const app = initializeApp(firebaseConfig);
+      // Hubungkan ke firestore database ai-studio-eff2e4c3-4396-44bb-b0c9-0936b4c631a4 atau (default)
+      try {
+        db = getFirestore(app, "ai-studio-eff2e4c3-4396-44bb-b0c9-0936b4c631a4");
+      } catch (e) {
+        db = getFirestore(app);
+      }
+      listenToFirestore();
+    } catch (e) {
+      console.warn("Firebase Init Error:", e);
+      updateStatus("Offline (Local Mock Mode)", false);
+    }
+
+    // Realtime Listener
+    function listenToFirestore() {
+      if (!db) return;
+      const docRef = doc(db, "app_config", "promo_popup");
+      onSnapshot(docRef, (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          currentConfig = {
+            isActive: data.isActive !== undefined ? data.isActive : true,
+            promoId: data.promoId || "promo_default",
+            imageUrl: data.imageUrl || "",
+            targetUrl: data.targetUrl || "",
+            intervalHours: Number(data.intervalHours) || 8,
+            maxImpressions: Number(data.maxImpressions) || 0,
+            updatedAt: data.updatedAt || Date.now()
+          };
+          syncUiFromData(currentConfig);
+          updateStatus("Tersinkronisasi Real-Time", true);
+        } else {
+          // Dokumen belum ada, buat dokumen awal
+          setDoc(docRef, currentConfig, { merge: true });
+        }
+      }, (err) => {
+        console.error("Firestore listener error:", err);
+        updateStatus("Koneksi Firestore Gagal", false);
+      });
+    }
+
+    function updateStatus(text, isOnline) {
+      const dot = document.getElementById("statusDot");
+      const label = document.getElementById("statusText");
+      if (dot && label) {
+        dot.className = isOnline ? "status-dot online" : "status-dot";
+        label.textContent = text;
+      }
+    }
+
+    function syncUiFromData(data) {
+      const activeSwitch = document.getElementById("promoActiveSwitch");
+      const imgInput = document.getElementById("imageUrlInput");
+      const targetInput = document.getElementById("targetUrlInput");
+      const intervalInput = document.getElementById("intervalInput");
+      const maxImpInput = document.getElementById("maxImpressionsInput");
+
+      if (activeSwitch) activeSwitch.checked = data.isActive;
+      if (imgInput && document.activeElement !== imgInput) imgInput.value = data.imageUrl;
+      if (targetInput && document.activeElement !== targetInput) targetInput.value = data.targetUrl;
+      if (intervalInput && document.activeElement !== intervalInput) intervalInput.value = data.intervalHours;
+      if (maxImpInput && document.activeElement !== maxImpInput) maxImpInput.value = data.maxImpressions;
+
+      updateToggleText(data.isActive);
+      updateMockupPreview();
+    }
+
+    // Save Promo Config
+    window.savePromoConfig = async function(isNewCampaign) {
+      const activeSwitch = document.getElementById("promoActiveSwitch");
+      const imgInput = document.getElementById("imageUrlInput");
+      const targetInput = document.getElementById("targetUrlInput");
+      const intervalInput = document.getElementById("intervalInput");
+      const maxImpInput = document.getElementById("maxImpressionsInput");
+
+      const imgUrl = (imgInput?.value || "").trim();
+      if (!imgUrl) {
+        showToast("URL gambar poster tidak boleh kosong!", true);
+        return;
+      }
+
+      const newPromoId = isNewCampaign 
+        ? "promo_" + Date.now().toString() 
+        : (currentConfig.promoId || "promo_" + Date.now().toString());
+
+      const payload = {
+        isActive: activeSwitch?.checked || false,
+        promoId: newPromoId,
+        imageUrl: imgUrl,
+        targetUrl: (targetInput?.value || "").trim(),
+        intervalHours: parseFloat(intervalInput?.value) || 8,
+        maxImpressions: parseInt(maxImpInput?.value, 10) || 0,
+        updatedAt: Date.now()
+      };
+
+      currentConfig = payload;
+      updateMockupPreview();
+
+      const btn = isNewCampaign ? document.getElementById("btnPushNew") : document.getElementById("btnSaveApply");
+      const originalText = btn ? btn.innerHTML : "";
+      if (btn) btn.innerHTML = "Menyimpan ke Firestore...";
+
+      try {
+        if (db) {
+          const docRef = doc(db, "app_config", "promo_popup");
+          await setDoc(docRef, payload, { merge: true });
+        }
+        showToast(isNewCampaign 
+          ? "Sukses di-push sebagai Promo Baru! Cooldown user otomatis ter-reset." 
+          : "Konfigurasi promo berhasil diperbarui di Firestore!");
+      } catch (e) {
+        console.error("Save error:", e);
+        showToast("Gagal menyimpan ke Firestore: " + e.message, true);
+      } finally {
+        if (btn) btn.innerHTML = originalText;
+      }
+    };
+
+    // UI Interactive Functions
+    function updateToggleText(isActive) {
+      const sub = document.getElementById("toggleSubtitle");
+      if (sub) {
+        sub.textContent = isActive 
+          ? "Popup sedang aktif dan akan muncul di HP pengguna yang memenuhi syarat." 
+          : "Popup dinonaktifkan. Seluruh kemunculan di aplikasi saat ini dihentikan.";
+      }
+    }
+
+    function updateMockupPreview() {
+      const activeSwitch = document.getElementById("promoActiveSwitch");
+      const imgInput = document.getElementById("imageUrlInput");
+      const targetInput = document.getElementById("targetUrlInput");
+      const intervalInput = document.getElementById("intervalInput");
+      const maxImpInput = document.getElementById("maxImpressionsInput");
+
+      const isActive = activeSwitch ? activeSwitch.checked : true;
+      const imgUrl = (imgInput?.value || "").trim() || "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&q=80";
+      const targetUrl = (targetInput?.value || "").trim();
+      const interval = parseFloat(intervalInput?.value) || 8;
+      const maxImp = parseInt(maxImpInput?.value, 10) || 0;
+
+      // Update Mock Images
+      const mockImg = document.getElementById("mockPosterImg");
+      const thumbPreview = document.getElementById("thumbPreview");
+      const thumbUrlText = document.getElementById("thumbUrlText");
+
+      if (mockImg) mockImg.src = imgUrl;
+      if (thumbPreview) thumbPreview.src = imgUrl;
+      if (thumbUrlText) thumbUrlText.textContent = imgUrl;
+
+      // Update Hint Badge
+      const hint = document.getElementById("mockHintBadge");
+      const badgeAction = document.getElementById("badgeActionType");
+      if (targetUrl) {
+        if (hint) {
+          hint.textContent = "🔗 Klik untuk Menguji Link";
+          hint.style.display = "block";
+        }
+        if (badgeAction) {
+          badgeAction.textContent = "Redirect ke: " + (targetUrl.length > 25 ? targetUrl.substring(0, 22) + "..." : targetUrl);
+          badgeAction.style.color = "var(--accent-orange)";
+        }
+      } else {
+        if (hint) hint.style.display = "none";
+        if (badgeAction) {
+          badgeAction.textContent = "Hanya Informasi (Tanpa Link)";
+          badgeAction.style.color = "var(--text-muted)";
+        }
+      }
+
+      // Meta Badges
+      const badgePromoId = document.getElementById("badgePromoId");
+      const badgeInterval = document.getElementById("badgeInterval");
+      const badgeMaxImp = document.getElementById("badgeMaxImp");
+
+      if (badgePromoId) badgePromoId.textContent = currentConfig.promoId || "promo_default";
+      if (badgeInterval) badgeInterval.textContent = interval + " Jam";
+      if (badgeMaxImp) badgeMaxImp.textContent = maxImp === 0 ? "Tanpa Batas" : (maxImp + " Kali");
+    }
+
+    // Dismiss & Reopen Mockup Dialog
+    window.dismissMockPopup = function() {
+      const scrim = document.getElementById("mockScrim");
+      const reopenBtn = document.getElementById("mockReopenBtn");
+      if (scrim) scrim.classList.remove("show");
+      if (reopenBtn) reopenBtn.style.display = "block";
+      showToast("Dialog ditutup di preview!");
+    };
+
+    window.reopenMockPopup = function() {
+      const scrim = document.getElementById("mockScrim");
+      const reopenBtn = document.getElementById("mockReopenBtn");
+      if (scrim) scrim.classList.add("show");
+      if (reopenBtn) reopenBtn.style.display = "none";
+    };
+
+    window.handleMockPosterClick = function() {
+      const targetInput = document.getElementById("targetUrlInput");
+      const targetUrl = (targetInput?.value || "").trim();
+      if (targetUrl) {
+        showToast("Membuka redirect: " + targetUrl);
+        window.open(targetUrl, "_blank");
+      } else {
+        showToast("Poster bersifat informatif (tanpa aksi redirect).");
+      }
+    };
+
+    window.setSampleImage = function(type) {
+      const imgInput = document.getElementById("imageUrlInput");
+      const targetInput = document.getElementById("targetUrlInput");
+      if (!imgInput) return;
+
+      if (type === 1) {
+        imgInput.value = "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&q=80";
+        if (targetInput) targetInput.value = "https://forms.gle/yuranime-survey";
+      } else if (type === 2) {
+        imgInput.value = "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&q=80";
+        if (targetInput) targetInput.value = "https://discord.gg/yuranime";
+      } else if (type === 3) {
+        imgInput.value = "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=600&q=80";
+        if (targetInput) targetInput.value = "";
+      }
+      updateMockupPreview();
+      showToast("Sampel poster dipilih!");
+    };
+
+    window.selectInterval = function(hours) {
+      const input = document.getElementById("intervalInput");
+      if (input) input.value = hours;
+      document.querySelectorAll(".preset-badge[data-hours]").forEach(b => {
+        b.classList.toggle("active", b.getAttribute("data-hours") == hours);
+      });
+      updateMockupPreview();
+    };
+
+    window.selectImpression = function(imp) {
+      const input = document.getElementById("maxImpressionsInput");
+      if (input) input.value = imp;
+      document.querySelectorAll(".preset-badge[data-imp]").forEach(b => {
+        b.classList.toggle("active", b.getAttribute("data-imp") == imp);
+      });
+      updateMockupPreview();
+    };
+
+    function showToast(msg, isError = false) {
+      const toast = document.getElementById("toast");
+      const msgElem = document.getElementById("toastMessage");
+      const iconElem = document.getElementById("toastIcon");
+      if (!toast || !msgElem) return;
+
+      msgElem.textContent = msg;
+      iconElem.textContent = isError ? "✕" : "✓";
+      toast.className = isError ? "toast error show" : "toast show";
+
+      setTimeout(() => {
+        toast.className = "toast";
+      }, 3500);
+    }
+
+    // Event Listeners for live typing
+    document.getElementById("promoActiveSwitch")?.addEventListener("change", (e) => {
+      updateToggleText(e.target.checked);
+      updateMockupPreview();
+    });
+    document.getElementById("imageUrlInput")?.addEventListener("input", updateMockupPreview);
+    document.getElementById("targetUrlInput")?.addEventListener("input", updateMockupPreview);
+    document.getElementById("intervalInput")?.addEventListener("input", updateMockupPreview);
+    document.getElementById("maxImpressionsInput")?.addEventListener("input", updateMockupPreview);
+
+    // Initial update
+    updateMockupPreview();
+  </script>
+</body>
+</html>

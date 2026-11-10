@@ -23,6 +23,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -129,7 +130,7 @@ fun ComicHomeScreen(
     onChapterClick: (chapterId: String) -> Unit = {},
     onOpenAllComics: () -> Unit = {},
     onComicChapterClick: ((chapterId: String) -> Unit)? = null,
-    onComicChapterWithInfoClick: ((chapterId: String, comicId: String?, comicTitle: String?) -> Unit)? = null,
+    onComicChapterWithInfoClick: ((chapterId: String, comicId: String?, comicTitle: String?, coverUrl: String?) -> Unit)? = null,
     onGenreClick: (genreName: String) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ComicHomeViewModel = viewModel()
@@ -216,7 +217,11 @@ fun ComicHomeScreen(
                                 historyList = uiState.continueReading,
                                 onContinueClick = { item ->
                                     if (item.chapterId.isNotBlank()) {
-                                        actualChapterClick(item.chapterId)
+                                        if (onComicChapterWithInfoClick != null) {
+                                            onComicChapterWithInfoClick(item.chapterId, item.comicId, item.comicTitle, item.coverUrl)
+                                        } else {
+                                            actualChapterClick(item.chapterId)
+                                        }
                                     } else {
                                         onComicClick(item.comicId)
                                     }
@@ -263,7 +268,7 @@ fun ComicHomeScreen(
 
                     // 5. SECTION CHATROOM KOMUNITAS + MASKOT (Tepat di bawah RILISAN TERBARU)
                     item(key = "comic_community_chatroom") {
-                        ComicSectionDivider()
+                        Spacer(modifier = Modifier.height(14.dp))
                         ComicCommunityChatSection()
                     }
 
@@ -402,19 +407,21 @@ private fun ComicHeroSlider(
     onDetailClick: (ComicBannerItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val pagerState = rememberPagerState(pageCount = { banners.size })
+    val slideCount = banners.size
+    val pagerState = rememberPagerState(pageCount = { slideCount })
     val context = LocalContext.current
+    val isDragged by pagerState.interactionSource.collectIsDraggedAsState()
 
-    // Auto-Slide Hero Slider setiap 4500ms dengan animasi spring halus (pause jika disentuh manual)
-    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress, banners.size) {
-        if (banners.size > 1 && !pagerState.isScrollInProgress) {
-            delay(4500L)
-            val nextPage = (pagerState.currentPage + 1) % banners.size
+    // Auto-Slide Hero Slider setiap 4 detik (pause jika disentuh manual)
+    LaunchedEffect(pagerState.settledPage, isDragged, slideCount) {
+        if (!isDragged && slideCount > 1) {
+            delay(4000L)
+            val nextPage = (pagerState.settledPage + 1) % slideCount
             pagerState.animateScrollToPage(
                 page = nextPage,
                 animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessLow
                 )
             )
         }
@@ -822,7 +829,7 @@ private fun ComicLatestGridSection(
     comics: List<ComicItem>,
     onComicClick: (comicId: String) -> Unit,
     onChapterClick: (chapterId: String) -> Unit,
-    onChapterWithInfoClick: ((chapterId: String, comicId: String?, comicTitle: String?) -> Unit)? = null,
+    onChapterWithInfoClick: ((chapterId: String, comicId: String?, comicTitle: String?, coverUrl: String?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val rows = comics.take(12).chunked(2)
@@ -874,7 +881,7 @@ private fun ComicLatestCard(
     comic: ComicItem,
     onComicClick: () -> Unit,
     onChapterClick: (chapterId: String) -> Unit,
-    onChapterWithInfoClick: ((chapterId: String, comicId: String?, comicTitle: String?) -> Unit)? = null,
+    onChapterWithInfoClick: ((chapterId: String, comicId: String?, comicTitle: String?, coverUrl: String?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -986,7 +993,8 @@ private fun ComicLatestCard(
                             ) {
                                 if (ch.id.isNotBlank()) {
                                     if (onChapterWithInfoClick != null) {
-                                        onChapterWithInfoClick(ch.id, comic.id, comic.title)
+                                        val cover = comic.coverPortrait.ifBlank { comic.coverLandscape }
+                                        onChapterWithInfoClick(ch.id, comic.id, comic.title, cover)
                                     } else {
                                         onChapterClick(ch.id)
                                     }
@@ -1084,49 +1092,43 @@ private fun ComicCommunityChatSection(
         }
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        ComicSectionHeaderWithAccent(
-            title = "CHATROOM KOMUNITAS",
-            subtitle = null
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        // Area Gabungan Header Title + Maskot Anime Tepat di Atas Kotak Putih Cbox
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
+                .height(115.dp)
         ) {
-            // Layer 1: Kotak Cbox WebView dengan padding top 82dp agar bertumpu pas di bawah tangan maskot
-            Column(
+            // Teks '| CHATROOM KOMUNITAS' di Kiri Bawah (10.dp tepat di atas bibir Cbox)
+            Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 82.dp)
+                    .align(Alignment.BottomStart)
+                    .padding(bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(390.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color.White)
-                ) {
-                    AndroidView(
-                        factory = { webView },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
+                        .width(3.5.dp)
+                        .height(16.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(ComicRedAccent)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Gunakan bahasa yang sopan dan santai saat mengobrol.",
-                    color = Color(0xFF64748B),
-                    fontSize = 11.sp,
-                    fontFamily = SfProFontFamily
+                    text = "CHATROOM KOMUNITAS",
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily,
+                    letterSpacing = 0.5.sp
                 )
             }
 
-            // Layer 2: Maskot Anime bertumpu pas di bibir garis batas atas kotak Cbox
+            // Gambar Maskot Anime di Kanan Bawah bertumpu pas di bibir kanan atas kotak Cbox
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data("https://url.dinzid.my.id/pcZ3IHb")
@@ -1134,13 +1136,36 @@ private fun ComicCommunityChatSection(
                     .build(),
                 contentDescription = "Maskot Komunitas",
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = 14.dp)
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 12.dp)
                     .size(115.dp)
                     .zIndex(2f),
                 contentScale = ContentScale.Fit
             )
         }
+
+        // Kotak Cbox WebView Putih Elegan Tepat di Bawah Header & Maskot
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(390.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.White)
+        ) {
+            AndroidView(
+                factory = { webView },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Gunakan bahasa yang sopan dan santai saat mengobrol.",
+            color = Color(0xFF64748B),
+            fontSize = 11.sp,
+            fontFamily = SfProFontFamily
+        )
     }
 }
 

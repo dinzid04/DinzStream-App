@@ -1,8 +1,11 @@
 package com.yuranime.dinz.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,16 +67,22 @@ fun YuranimeHeroSlider(
 ) {
     if (items.isEmpty()) return
 
-    val pagerState = rememberPagerState(pageCount = { items.size })
+    val slideCount = items.size
+    val pagerState = rememberPagerState(pageCount = { slideCount })
+    val isDragged by pagerState.interactionSource.collectIsDraggedAsState()
 
-    // Auto-scroll loop every 5 seconds
-    LaunchedEffect(pagerState.pageCount) {
-        while (true) {
-            delay(5000)
-            if (pagerState.pageCount > 1) {
-                val nextPage = (pagerState.currentPage + 1) % pagerState.pageCount
-                pagerState.animateScrollToPage(nextPage)
-            }
+    // Auto-Slide Hero Slider setiap 4 detik (pause jika disentuh user, spring halus tanpa bouncing)
+    LaunchedEffect(pagerState.settledPage, isDragged, slideCount) {
+        if (!isDragged && slideCount > 1) {
+            delay(4000L)
+            val nextPage = (pagerState.settledPage + 1) % slideCount
+            pagerState.animateScrollToPage(
+                page = nextPage,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            )
         }
     }
 

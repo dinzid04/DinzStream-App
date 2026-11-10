@@ -45,6 +45,11 @@ import com.yuranime.dinz.ui.streaming.StreamingScreen
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
 import com.yuranime.dinz.ui.theme.YuranimeTheme
 import com.yuranime.dinz.ui.update.UpdateNoticeDialog
+import com.yuranime.dinz.ui.components.PromoPopupDialog
+import com.yuranime.dinz.data.firebase.FirebaseManager
+import com.yuranime.dinz.data.firebase.PromoPopupConfig
+import com.yuranime.dinz.data.local.AppPreferences
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -83,12 +88,26 @@ class MainActivity : ComponentActivity() {
                     var selectedComicChapterId by remember { mutableStateOf<String?>(null) }
                     var selectedComicId by remember { mutableStateOf<String?>(null) }
                     var selectedComicTitle by remember { mutableStateOf<String?>(null) }
+                    var selectedComicPosterUrl by remember { mutableStateOf<String?>(null) }
                     var showAllComics by remember { mutableStateOf(false) }
                     var currentTab by remember { mutableStateOf(NavTab.HOME) }
                     var isComicMode by rememberSaveable { mutableStateOf(false) }
                     var selectedComicTab by rememberSaveable { mutableStateOf(ComicNavTab.HOME) }
                     var activeComicGenreFilter by remember { mutableStateOf<String?>(null) }
                     var pendingUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
+
+                    // Real-time Promo Popup State
+                    val promoConfig by FirebaseManager.promoPopupConfig.collectAsStateWithLifecycle()
+                    var activePromoToShow by remember { mutableStateOf<PromoPopupConfig?>(null) }
+
+                    LaunchedEffect(promoConfig, showSplash) {
+                        if (!showSplash) {
+                            val cfg = promoConfig
+                            if (cfg != null && AppPreferences.shouldShowPromoPopup(this@MainActivity, cfg)) {
+                                activePromoToShow = cfg
+                            }
+                        }
+                    }
 
                     // TAHAP 1: Pengecekan versi SemVer otomatis saat aplikasi dibuka
                     LaunchedEffect(Unit) {
@@ -110,6 +129,7 @@ class MainActivity : ComponentActivity() {
                                         chapterId = selectedComicChapterId!!,
                                         comicId = selectedComicId,
                                         comicTitle = selectedComicTitle,
+                                        posterUrl = selectedComicPosterUrl,
                                         onBackClick = { selectedComicChapterId = null }
                                     )
                                 }
@@ -122,6 +142,11 @@ class MainActivity : ComponentActivity() {
                                         onChapterClick = { chId -> selectedComicChapterId = chId },
                                         onChapterWithTitleClick = { chId, title ->
                                             selectedComicTitle = title
+                                            selectedComicChapterId = chId
+                                        },
+                                        onChapterWithDetailsClick = { chId, title, poster ->
+                                            selectedComicTitle = title
+                                            selectedComicPosterUrl = poster
                                             selectedComicChapterId = chId
                                         }
                                     )
@@ -245,10 +270,11 @@ class MainActivity : ComponentActivity() {
                                             onChapterClick = { chId ->
                                                 selectedComicChapterId = chId
                                             },
-                                            onComicChapterWithInfoClick = { chId, cId, cTitle ->
+                                            onComicChapterWithInfoClick = { chId, cId, cTitle, cPoster ->
                                                 selectedComicChapterId = chId
                                                 if (cId != null) selectedComicId = cId
                                                 if (cTitle != null) selectedComicTitle = cTitle
+                                                if (cPoster != null) selectedComicPosterUrl = cPoster
                                             },
                                             onOpenAllComics = {
                                                 showAllComics = true
@@ -453,10 +479,11 @@ class MainActivity : ComponentActivity() {
                                             onChapterClick = { chId ->
                                                 selectedComicChapterId = chId
                                             },
-                                            onComicChapterWithInfoClick = { chId, cId, cTitle ->
+                                            onComicChapterWithInfoClick = { chId, cId, cTitle, cPoster ->
                                                 selectedComicChapterId = chId
                                                 if (cId != null) selectedComicId = cId
                                                 if (cTitle != null) selectedComicTitle = cTitle
+                                                if (cPoster != null) selectedComicPosterUrl = cPoster
                                             },
                                             onOpenAllComics = {
                                                 showAllComics = true
@@ -520,6 +547,20 @@ class MainActivity : ComponentActivity() {
                             UpdateNoticeDialog(
                                 updateInfo = pendingUpdateInfo!!,
                                 onDismiss = { pendingUpdateInfo = null }
+                            )
+                        }
+
+                        // Dialog Notifikasi Promosi Dinamis (Sesuai Referensi 1002208488.jpg & Apple Design)
+                        if (!showSplash && activePromoToShow != null) {
+                            PromoPopupDialog(
+                                config = activePromoToShow!!,
+                                onDismiss = {
+                                    AppPreferences.recordPromoPopupShown(
+                                        context = this@MainActivity,
+                                        promoId = activePromoToShow!!.promoId
+                                    )
+                                    activePromoToShow = null
+                                }
                             )
                         }
 

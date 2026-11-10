@@ -115,6 +115,7 @@ fun ComicReaderScreen(
     chapterId: String,
     comicId: String? = null,
     comicTitle: String? = null,
+    posterUrl: String? = null,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
     repository: ComicRepository = remember { ComicRepository() }
@@ -126,6 +127,7 @@ fun ComicReaderScreen(
     var currentChapterId by remember { mutableStateOf(chapterId) }
     var effectiveComicId by remember { mutableStateOf(comicId.orEmpty()) }
     var effectiveTitle by remember { mutableStateOf(comicTitle.orEmpty()) }
+    var effectivePosterUrl by remember { mutableStateOf(posterUrl.orEmpty()) }
 
     var chapterDetail by remember { mutableStateOf<ComicChapterDetail?>(null) }
     var fullComicDetail by remember { mutableStateOf<ComicDetail?>(null) }
@@ -240,11 +242,12 @@ fun ComicReaderScreen(
 
             // Muat comic metadata untuk daftar chapter sheet & title fallback
             if (effectiveComicId.isNotBlank()) {
-                if (effectiveTitle.isBlank()) {
-                    val savedHistory = localDb.getComicReadHistoryItem(effectiveComicId)
-                    if (savedHistory != null && savedHistory.comicTitle.isNotBlank()) {
-                        effectiveTitle = savedHistory.comicTitle
-                    }
+                val savedHistory = localDb.getComicReadHistoryItem(effectiveComicId)
+                if (effectiveTitle.isBlank() && savedHistory != null && savedHistory.comicTitle.isNotBlank()) {
+                    effectiveTitle = savedHistory.comicTitle
+                }
+                if (effectivePosterUrl.isBlank() && savedHistory != null && savedHistory.coverUrl.isNotBlank()) {
+                    effectivePosterUrl = savedHistory.coverUrl
                 }
                 if (fullComicDetail == null) {
                     val detailResult = repository.getComicDetail(effectiveComicId)
@@ -254,15 +257,21 @@ fun ComicReaderScreen(
                         if (effectiveTitle.isBlank() && cd != null && cd.title.isNotBlank()) {
                             effectiveTitle = cd.title
                         }
+                        if (effectivePosterUrl.isBlank() && cd != null && cd.coverPortrait.isNotBlank()) {
+                            effectivePosterUrl = cd.coverPortrait
+                        }
                     }
                 }
             }
         }
     }
 
-    LaunchedEffect(chapterId, comicTitle) {
+    LaunchedEffect(chapterId, comicTitle, posterUrl) {
         if (!comicTitle.isNullOrBlank()) {
             effectiveTitle = comicTitle
+        }
+        if (!posterUrl.isNullOrBlank()) {
+            effectivePosterUrl = posterUrl
         }
         loadChapter(chapterId)
     }
@@ -281,10 +290,13 @@ fun ComicReaderScreen(
     LaunchedEffect(currentChapterId, currentReadingPage) {
         if (effectiveComicId.isNotBlank() && chapterDetail != null) {
             val cd = chapterDetail!!
+            val coverToSave = effectivePosterUrl.ifBlank {
+                fullComicDetail?.coverPortrait.orEmpty()
+            }
             localDb.saveComicReadHistory(
                 comicId = effectiveComicId,
                 comicTitle = effectiveTitle.ifBlank { "Komik" },
-                coverUrl = fullComicDetail?.coverPortrait ?: "",
+                coverUrl = coverToSave,
                 chapterId = currentChapterId,
                 chapterNumber = cd.chapterNumber,
                 chapterTitle = cd.chapterTitle.orEmpty(),

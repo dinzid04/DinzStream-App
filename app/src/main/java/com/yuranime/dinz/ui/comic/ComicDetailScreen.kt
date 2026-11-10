@@ -108,6 +108,7 @@ fun ComicDetailScreen(
     onBackClick: () -> Unit,
     onChapterClick: (chapterId: String) -> Unit,
     onChapterWithTitleClick: ((chapterId: String, title: String) -> Unit)? = null,
+    onChapterWithDetailsClick: ((chapterId: String, title: String, posterUrl: String) -> Unit)? = null,
     modifier: Modifier = Modifier,
     repository: ComicRepository = remember { ComicRepository() }
 ) {
@@ -454,12 +455,15 @@ fun ComicDetailScreen(
                                 repository = repository,
                                 onClick = {
                                     if (chapter.id.isNotBlank()) {
+                                        val effectiveCover = comicDetail?.coverPortrait?.ifBlank {
+                                            comicDetail?.coverLandscape?.ifBlank { posterUrl }
+                                        } ?: posterUrl
                                         comicDetail?.let { cd ->
                                             try {
                                                 com.yuranime.dinz.data.local.LocalAuthDatabase(context).saveComicReadHistory(
                                                     comicId = cd.id,
                                                     comicTitle = cd.title,
-                                                    coverUrl = cd.coverPortrait,
+                                                    coverUrl = effectiveCover,
                                                     chapterId = chapter.id,
                                                     chapterNumber = chapter.number,
                                                     chapterTitle = chapter.title
@@ -467,7 +471,9 @@ fun ComicDetailScreen(
                                             } catch (_: Exception) {}
                                         }
                                         val currentTitle = comicDetail?.title
-                                        if (onChapterWithTitleClick != null && !currentTitle.isNullOrBlank()) {
+                                        if (onChapterWithDetailsClick != null) {
+                                            onChapterWithDetailsClick(chapter.id, currentTitle.orEmpty(), effectiveCover)
+                                        } else if (onChapterWithTitleClick != null && !currentTitle.isNullOrBlank()) {
                                             onChapterWithTitleClick(chapter.id, currentTitle)
                                         } else {
                                             onChapterClick(chapter.id)

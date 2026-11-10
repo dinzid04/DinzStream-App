@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "2.5.0"
+  APP_VERSION: "2.6.0"
 
 jobs:
   build:
@@ -63,37 +63,37 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Halaman Baca Komik, Unduh Offline & Apple Design (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Popup Promosi Dinamis, Web Admin & Bugfix UI (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
             ### Pembaruan & Fitur Baru:
-            1. **Halaman Baca Komik (ComicReaderScreen) & Apple Design:**
-               - Header atas semi-transparan dengan tombol kembali, judul komik, dan kapsul pemilih chapter (`Ch. X ⌄`).
-               - Kontrol bawah minimalis dengan 3 tombol bulat elegan: Pengaturan Pembaca, Play/Pause Auto-Scroll instan, dan Daftar Chapter.
-               - Navigasi halaman bawah: Tombol prev/next chapter + kapsul panjang dengan slider progres halaman interaktif langsung melompat ke halaman komik.
-               - Bottom Sheet Daftar Chapter dengan indikator chapter aktif dan auto-scroll.
-               - Bottom Sheet Pengaturan Pembaca: Toggle mode Webtoon vs Per Halaman (dengan pinch-to-zoom), kualitas gambar Tinggi vs Rendah, slider sinkronisasi kecerahan layar HP secara real-time, dan kecepatan auto-scroll 1x hingga 5x.
-               - Auto-Save riwayat baca dan posisi scroll terakhir secara real-time.
+            1. **Sistem Popup Notifikasi Promosi Dinamis (PromoPopupDialog):**
+               - 100% Sesuai gambar referensi `1002208488.jpg` dan kaidah Apple Design & Anti-Slop.
+               - Latar belakang meredup dengan scrim hitam pekat 78% semi-transparan (`Color.Black.copy(alpha = 0.78f)`) dan animasi iOS spring scale + fade.
+               - Tombol bulat Close (`✕`) berada di pojok kanan atas di luar gambar (jarak 8.dp dari poster).
+               - Poster gambar murni (lebar 84% layar, rounded corner 14.dp, shimmer loading) tanpa teks atau kotak putih tambahan di bawah gambar.
+               - Logika redirect opsional: jika `targetUrl` terisi di web admin, mengklik gambar langsung membuka browser. Jika kosong, bersifat gambar informatif.
+               - Konfigurasi frekuensi & interval 8 jam real-time dari Firebase Firestore (`app_config/promo_popup`).
+            
+            2. **Website Admin Panel (promo-web-admin) — Vercel & Local Ready:**
+               - UI Apple Dark Glassmorphism Obsidian Dark `#090A0F` dengan hairline border `1px solid rgba(255,255,255,0.08)`.
+               - Form kontrol lengkap (iOS toggle switch, URL poster, target link, interval jam, max impressions).
+               - Live interactive iPhone/Android mockup preview dengan simulasi 1:1.
+               - Tombol `Simpan & Terapkan` dan `Push sebagai Promo Baru (Reset Cooldown User)`.
+            
+            3. **Perbaikan Poster Histori Baca ("Lanjutkan Membaca") di Halaman Komik:**
+               - Metadata cover (`posterUrl` / `coverUrl`) selalu diteruskan ke `ComicReaderScreen` dan dilindungi dari penimpaan string kosong di SQLite database.
+               - Kartu `Lanjutkan Membaca` merender cover dengan header Referer yang tepat sehingga poster 100% selalu muncul.
 
-            2. **Sistem Unduh Chapter Offline di Memori Internal App:**
-               - Penggantian ikon `>` di tab CHAPTER `ComicDetailScreen` menjadi tombol Unduh Chapter interaktif.
-               - Gambar chapter disimpan secara privat dan aman di `context.filesDir/offline_comics/` (tidak memenuhi galeri).
-               - Tampilan progres unduhan dan ikon ceklis terunduh dengan opsi hapus unduhan.
-               - Komik yang telah terunduh dapat dibaca 100% offline tanpa internet.
-               - Manajemen unduhan komik terintegrasi di layar Unduh pada menu Profile dengan informasi ukuran memori.
+            4. **Perbaikan Posisi Header Chatroom & Maskot (1002209438.jpg):**
+               - Menggabungkan teks `| CHATROOM KOMUNITAS` dan Maskot Anime ke dalam satu container header tepat di atas kotak putih Cbox.
+               - Teks diletakkan di kiri bawah (10.dp di atas Cbox), dan Maskot di kanan bawah menempel di bibir kotak Cbox.
+               - Mengurangi jarak kosong di bawah `RILISAN TERBARU` sehingga baris komik turun mendekat secara proporsional.
 
-            3. **Wajib Skeleton Shimmer (Bebas Circular Loading):**
-               - Mengganti seluruh loading putar `CircularProgressIndicator` pada gambar komik, halaman baca, dan pencarian dengan Skeleton Shimmer mengkilap elegan + logo monokrom Yuranime.
-
-            4. **Perbaikan Error 432 & Fallback Mirror Scraper:**
-               - Normalisasi ID dan slug komik dari Home Anime.
-               - Header anti-bot modern (User-Agent Pixel 8 Pro, Sec-CH-UA, Referer, Accept-Language, Origin).
-               - Automatic fallback mirror antara komikid dan KomikStation sehingga komik selalu berhasil dimuat tanpa error 432.
-
-            5. **Perbaikan Warna Banner Bawah & Auto-Slide Hero Slider:**
-               - Warna container banner newsletter menyatu sempurna dengan background utama `#0B0B0B`.
-               - Auto-slide hero slider setiap 4500ms dengan animasi spring physics Apple Design yang halus.
+            5. **Perbaikan Auto-Slide Hero Slider (Anime & Komik):**
+               - Auto-slide berjalan mulus setiap 4 detik menggunakan `pagerState.settledPage` dan `collectIsDraggedAsState()` dengan spring physics Apple.
+               - Bekerja sempurna pada Mode Slider Default, Clean Cover Mode, dan Slider Beranda Komik.
           draft: false
           prerelease: false
           make_latest: true

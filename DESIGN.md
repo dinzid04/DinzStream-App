@@ -1103,6 +1103,138 @@ Sesuai aturan anti-slop visual dan Apple Design:
    - Perbesar ukuran gambar maskot dari `76.dp` menjadi `115.dp` agar tampak hidup dan atraktif.
    - Sesuaikan padding top kontainer Cbox menjadi `82.dp` sehingga siku dan tangan maskot bertumpu persis di atas garis bibir bingkai putih Cbox.
 
+---
+
+## 41. SPESIFIKASI FITUR 38: Sistem Popup Notifikasi Promosi Dinamis (`PromoPopupDialog`)
+
+Berdasarkan analisis gambar referensi resmi `1002208488.jpg` dan aturan `apple-design-skill` serta `anti-slop`:
+
+### A. Desain Visual Popup (100% Sesuai Referensi `1002208488.jpg`)
+1. **Dimmed Background Scrim:**
+   - Seluruh layar meredup dengan scrim hitam pekat semi-transparan (`Color.Black.copy(alpha = 0.78f)`).
+   - Animasi kemunculan dialog menggunakan iOS spring physics + fade:
+     - Scale dari `0.85f` ke `1.0f` dengan `spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)`.
+     - Alpha dari `0f` ke `1.0f` dengan `tween(durationMillis = 280)`.
+2. **Tombol Close (`✕`) di Luar Gambar (Pojok Kanan Atas):**
+   - Ditempatkan tepat di atas sudut kanan atas poster gambar dengan jarak `8.dp`.
+   - Bentuk lingkaran gelap transparan (`size = 34.dp`, `background = Color.Black.copy(alpha = 0.6f)`, border tipis `0.5.dp` `#33FFFFFF`).
+   - Ikon vector `Icons.Rounded.Close` warna putih bersih (`#FFFFFF`, `size = 18.dp`).
+   - Memberikan interaksi tutup instan saat disentuh.
+3. **Kontainer Poster Murni (Zero Slop / Tanpa Kotak Putih & Teks Tambahan):**
+   - Lebar poster: `84%` lebar layar (`Modifier.fillMaxWidth(0.84f)`).
+   - Sudut melengkung halus: `RoundedCornerShape(14.dp)`.
+   - Komponen pemuat gambar: `SubcomposeAsyncImage` Coil dengan `contentScale = ContentScale.FillWidth`.
+   - Menampilkan skeleton shimmer elegan dan logo Yuranime monokromatik saat memuat gambar.
+   - **TIDAK ADA** kotak putih, footer, teks tambahan, tombol "Buka Web", atau ornamen lain di bawah gambar. Murni gambar poster saja persis seperti screenshot referensi `1002208488.jpg`.
+
+### B. Logika Interaksi & Navigasi (Opsional Redirect Link)
+1. **Jika `targetUrl` Terisi (`targetUrl.isNotBlank()`):**
+   - Gambar poster dapat diklik dengan feedback visual ripple halus.
+   - Saat diklik: Popup otomatis tertutup (`onDismiss`), dan aplikasi langsung membuka link ke browser sistem melalui `Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl))`.
+2. **Jika `targetUrl` Kosong (`targetUrl.isBlank()`):**
+   - Poster bersifat murni informatif / visual announcement.
+   - Mengklik poster tidak melakukan navigasi keluar; pengguna dapat menutup dialog melalui tombol `✕` di kanan atas atau klik area luar scrim.
+
+### C. Logika Interval 8 Jam & Frekuensi Tampil (Realtime Firebase Firestore)
+1. **Sumber Data Real-Time:**
+   - Dokumen Firestore: `app_config/promo_popup` di database `ai-studio-eff2e4c3-4396-44bb-b0c9-0936b4c631a4` (fallback `(default)`).
+   - Skema Dokumen:
+     - `isActive: Boolean` (Status aktifasi popup)
+     - `promoId: String` (ID unik / timestamp kampanye promo; jika diperbarui admin di web, semua cooldown user otomatis ter-reset)
+     - `imageUrl: String` (URL gambar poster)
+     - `targetUrl: String` (URL tujuan redirect, opsional)
+     - `intervalHours: Float` (Interval waktu minimal antar kemunculan, default: `8.0f`)
+     - `maxImpressions: Int` (Batas kemunculan per user; `0` = tanpa batas selama selang interval terpenuhi, atau `1`, `3`, `5`, dst.)
+2. **Penyimpanan Lokal & Validasi (`AppPreferences`):**
+   - Disimpan pada SharedPreferences HP pengguna: `promo_last_shown_{promoId}: Long` dan `promo_shown_count_{promoId}: Int`.
+   - Logika Pengecekan saat App Dibuka:
+     - `isActive == true` DAN `imageUrl.isNotBlank()`
+     - `currentTime - lastShownTimestamp >= (intervalHours * 3600 * 1000L)`
+     - `maxImpressions == 0 || shownCount < maxImpressions`
+   - Jika semua kondisi terpenuhi: Tampilkan dialog, catat `lastShownTimestamp = System.currentTimeMillis()`, dan naikkan `shownCount + 1`.
+
+---
+
+## 42. SPESIFIKASI FITUR 39: Website Admin Panel (`promo-web-admin`) — Vercel & Lokal (Apple Dark Glassmorphism)
+
+Dibangun di folder `/storage/emulated/0/termux/Workspace_uiApp/promo-web-admin/` dengan konfigurasi siap pakai: `package.json`, `vercel.json`, `index.html`, dan aplikasi web modern.
+
+### A. Desain UI Web Kelas Atas (Obsidian Dark & Glassmorphism — DILARANG AI Slop)
+- **Palet Warna:**
+  - Background Utama: Obsidian Dark `#090A0F`
+  - Permukaan Kaca (Cards & Inputs): `#12141C` dengan *hairline border* `1px solid rgba(255, 255, 255, 0.08)`
+  - Aksen Primer: Crimson `#E11D48` & Yuranime Orange `#FF5722`
+  - Teks: SF Pro Display / Inter (`#FFFFFF` untuk judul, `#94A3B8` untuk label sekunder)
+  - **Dilarang:** Gradien ungu-biru template, AI capsule pill berlebih, atau elemen dekoratif hampa.
+- **Tata Letak 2 Kolom Responsif (Desktop & Mobile):**
+  1. **Kolom Kiri (Form Kontrol Konfigurasi Promo):**
+     - **iOS Style Status Toggle:** Switch aktif/nonaktif promo secara real-time.
+     - **Input Image URL Poster:** Field input URL gambar poster dilengkapi tombol *Preview & Validasi Gambar*.
+     - **Input Target Redirect Link:** Field URL tujuan (dengan instruksi: *"Kosongkan jika hanya ingin menampilkan poster info tanpa klik ke web"*).
+     - **Pengaturan Waktu & Frekuensi:**
+       - Pilihan cepat interval: `Setiap 8 Jam (Default)`, `Setiap 1 Jam`, `Setiap 12 Jam`, `Setiap 24 Jam`, `Sekali Saja`, serta input kustom jam.
+       - Batas maksimal muncul: `0 = Tanpa Batas`, `1 = Hanya 1x`, `3 = Maksimal 3x`, dst.
+     - **Tombol Aksi Utama:**
+       - `Simpan & Terapkan ke Aplikasi`: Update dokumen `app_config/promo_popup` di Firestore.
+       - `Push sebagai Promo Baru (Reset Cooldown)`: Membuat `promoId` baru dengan timestamp saat ini, sehingga seluruh pengguna langsung menerima popup saat membuka aplikasi kembali tanpa menunggu 8 jam.
+  2. **Kolom Kanan (Live Interactive Smartphone Mockup Preview):**
+     - Bingkai smartphone (iPhone/Android bezel) dengan rasio presisi.
+     - Merender tampilan persis aplikasi Yuranime dengan layar belakang diredupkan oleh scrim hitam `78%`.
+     - Poster promosi tampil di tengah dengan rounded corner `14px` dan tombol bulat `✕` di kanan atas di luar gambar.
+     - Terdapat badge indikator interaksi: *"Poster Memiliki Link Aktif"* atau *"Poster Hanya Informasi (Tanpa Link)"*.
+
+---
+
+## 43. SPESIFIKASI FITUR 40: Perbaikan 3 Bug Visual & Fungsional Aplikasi
+
+### A. Bug 1: Poster Hilang pada Histori Baca ("Lanjutkan Membaca") di `ComicHomeScreen`
+1. **Akar Masalah:**
+   - Saat pembaca membuka chapter di `ComicReaderScreen`, metadata poster (`coverUrl` / `posterUrl`) tidak diteruskan dari `ComicDetailScreen` atau `MainActivity`.
+   - Di `ComicReaderScreen.kt:287`, `saveComicReadHistory` menulis `coverUrl = fullComicDetail?.coverPortrait ?: ""`. Karena `fullComicDetail` dimuat secara asinkron atau bernilai null, nilai `cover_url` di database lokal tertimpa string kosong `""`.
+2. **Solusi Presisi:**
+   - Tambahkan parameter `posterUrl: String? = null` pada `ComicReaderScreen`.
+   - Teruskan `posterUrl` dari `MainActivity`, `ComicDetailScreen`, dan `ComicHomeScreen`.
+   - Simpan `effectivePosterUrl`: jika `posterUrl` terisi atau `savedHistory?.coverUrl` sudah ada, jangan pernah menimpanya dengan `""`.
+   - Di `LocalAuthDatabase.kt:saveComicReadHistory`, jika `coverUrl.isBlank()`, lakukan query terhadap data komik yang sudah ada sebelumnya dan pertahankan `cover_url` lama yang valid.
+   - Pastikan kartu `ComicContinueReadingSection` merender `item.coverUrl` dengan `AsyncImage` Coil lengkap dengan header `User-Agent` dan `Referer: https://app.shinigami.asia/` sehingga poster 100% selalu muncul.
+
+### B. Bug 2: Posisi Teks `| CHATROOM KOMUNITAS`, Maskot, & Jarak `RILISAN TERBARU` (`1002209438.jpg`)
+1. **Akar Masalah:**
+   - Di implementasi sebelumnya, `ComicSectionHeaderWithAccent` diletakkan di luar `Box` maskot, lalu kontainer putih Cbox diberi `padding(top = 82.dp)`. Hal ini menyebabkan teks `| CHATROOM KOMUNITAS` terpisah jauh di atas dengan celah kosong hitam besar di antara teks dan kotak Cbox.
+   - Terdapat jarak vertikal yang terlalu longgar dari bagian bawah grid `RILISAN TERBARU` ke kepala maskot.
+2. **Solusi Presisi:**
+   - Hilangkan header terpisah di luar Box!
+   - Satukan teks **`| CHATROOM KOMUNITAS`** dan **Gambar Maskot** ke dalam satu container header tepat di atas kotak putih Cbox:
+     - Gunakan `Box(modifier = Modifier.fillMaxWidth().height(105.dp))` tepat di atas bingkai Cbox.
+     - Teks **`| CHATROOM KOMUNITAS`** diletakkan di **kiri bawah** container tersebut (`Alignment.BottomStart`, dengan jarak `10.dp`–`12.dp` tepat di atas bibir kiri atas kotak putih Cbox).
+     - Gambar **Maskot (`https://url.dinzid.my.id/pcZ3IHb`)** diletakkan di **kanan bawah** (`Alignment.BottomEnd`, padding end `14.dp`, size `115.dp`), dengan siku dan tangan menempel pas pada bibir kanan atas kotak putih Cbox.
+   - Kurangi spacer/divider di bawah `RILISAN TERBARU` sehingga baris komik terakhir turun mendekat secara proporsional dan harmonis tepat di atas kepala maskot.
+
+### C. Bug 3: Auto-Slide Hero Slider di `HomeScreen` & `ComicHomeScreen`
+1. **Akar Masalah:**
+   - Penggunaan `LaunchedEffect(pagerState.pageCount)` dengan loop `while (true)` rentan terhadap pembatalan coroutine saat user melakukan swipe gesture, sehingga animasi auto-slide berhenti selamanya.
+2. **Solusi Presisi:**
+   - Gunakan `val isDragged by pagerState.interactionSource.collectIsDraggedAsState()` untuk mendeteksi gestur sentuh secara reaktif.
+   - Terapkan `LaunchedEffect(pagerState.settledPage, isDragged, slideCount)`:
+     ```kotlin
+     val isDragged by pagerState.interactionSource.collectIsDraggedAsState()
+     LaunchedEffect(pagerState.settledPage, isDragged, slideCount) {
+         if (!isDragged && slideCount > 1) {
+             delay(4000L)
+             val nextPage = (pagerState.settledPage + 1) % slideCount
+             pagerState.animateScrollToPage(
+                 page = nextPage,
+                 animationSpec = spring(
+                     dampingRatio = Spring.DampingRatioNoBouncy,
+                     stiffness = Spring.StiffnessLow
+                 )
+             )
+         }
+     }
+     ```
+   - Auto-slide berjalan mulus setiap 4 detik pada **Mode Slider Default (dengan Poster)**, **Mode Slider Clean Cover**, dan **Slider Beranda Komik**, serta otomatis pause saat disentuh dan resume saat dilepas.
+
+
 
 
 

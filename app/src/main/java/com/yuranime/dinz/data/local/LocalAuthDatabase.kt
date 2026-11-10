@@ -367,10 +367,15 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
         scrollOffset: Int = 0
     ) {
         val db = writableDatabase
+        // Proteksi: jangan pernah menimpa coverUrl atau comicTitle yang sudah valid dengan string kosong
+        val existing = getComicReadHistoryItem(comicId)
+        val finalCover = if (coverUrl.isNotBlank()) coverUrl else (existing?.coverUrl.orEmpty())
+        val finalTitle = if (comicTitle.isNotBlank()) comicTitle else (existing?.comicTitle.orEmpty())
+
         val cv = ContentValues().apply {
             put("comic_id", comicId)
-            put("comic_title", comicTitle)
-            put("cover_url", coverUrl)
+            put("comic_title", finalTitle.ifBlank { "Komik" })
+            put("cover_url", finalCover)
             put("chapter_id", chapterId)
             put("chapter_number", chapterNumber)
             put("chapter_title", chapterTitle)

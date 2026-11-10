@@ -1,0 +1,16 @@
+{
+  "name": "yuranime-promo-web-admin",
+  "version": "1.0.0",
+  "description": "Website Admin Panel Pengaturan Popup Promosi Dinamis Yuranime (Vercel & Local Ready)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3000 --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "npx serve ."
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

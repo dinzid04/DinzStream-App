@@ -61,6 +61,16 @@ data class LeaderboardUser(
     val level: Int = 1
 )
 
+data class PromoPopupConfig(
+    val isActive: Boolean = false,
+    val promoId: String = "",
+    val imageUrl: String = "",
+    val targetUrl: String = "",
+    val intervalHours: Float = 8f,
+    val maxImpressions: Int = 0,
+    val updatedAt: Long = 0L
+)
+
 object FirebaseManager {
 
     val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
@@ -85,11 +95,16 @@ object FirebaseManager {
     private val _leaderboard = MutableStateFlow<List<LeaderboardUser>>(emptyList())
     val leaderboard: StateFlow<List<LeaderboardUser>> = _leaderboard.asStateFlow()
 
+    private val _promoPopupConfig = MutableStateFlow<PromoPopupConfig?>(null)
+    val promoPopupConfig: StateFlow<PromoPopupConfig?> = _promoPopupConfig.asStateFlow()
+
     private var profileListener: ListenerRegistration? = null
     private var leaderboardListener: ListenerRegistration? = null
+    private var promoListener: ListenerRegistration? = null
 
     init {
         try {
+            startListeningPromoConfig()
             _currentUser.value = auth.currentUser
             auth.addAuthStateListener { fbAuth ->
                 _currentUser.value = fbAuth.currentUser
@@ -717,6 +732,44 @@ object FirebaseManager {
     }
 
     /**
+     * Listener Real-Time Konfigurasi Promo Popup Dinamis (app_config/promo_popup)
+     */
+    fun startListeningPromoConfig() {
+        if (promoListener != null) return
+        try {
+            promoListener = firestore.collection("app_config").document("promo_popup")
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        return@addSnapshotListener
+                    }
+                    if (snapshot == null || !snapshot.exists()) {
+                        _promoPopupConfig.value = null
+                        return@addSnapshotListener
+                    }
+                    val isActive = snapshot.getBoolean("isActive") ?: false
+                    val promoId = snapshot.getString("promoId").orEmpty()
+                    val imageUrl = snapshot.getString("imageUrl").orEmpty()
+                    val targetUrl = snapshot.getString("targetUrl").orEmpty()
+                    val interval = snapshot.getDouble("intervalHours")
+                        ?: snapshot.getLong("intervalHours")?.toDouble()
+                        ?: 8.0
+                    val maxImp = snapshot.getLong("maxImpressions")?.toInt() ?: 0
+                    val updatedAt = snapshot.getLong("updatedAt") ?: 0L
+
+                    _promoPopupConfig.value = PromoPopupConfig(
+                        isActive = isActive,
+                        promoId = promoId,
+                        imageUrl = imageUrl,
+                        targetUrl = targetUrl,
+                        intervalHours = interval.toFloat(),
+                        maxImpressions = maxImp,
+                        updatedAt = updatedAt
+                    )
+                }
+        } catch (ignored: Exception) {}
+    }
+
+    /**
      * Logout Akun
      */
     fun signOut() {
@@ -725,6 +778,8 @@ object FirebaseManager {
         } catch (ignored: Exception) {}
         profileListener?.remove()
         profileListener = null
+        promoListener?.remove()
+        promoListener = null
         _userProfile.value = null
         _currentUser.value = null
     }

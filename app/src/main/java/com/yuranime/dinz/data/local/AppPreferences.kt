@@ -179,5 +179,33 @@ object AppPreferences {
             .remove(KEY_GOOGLE_AVATAR)
             .apply()
     }
+
+    // ==================== PROMO POPUP PREFERENCES ====================
+
+    fun shouldShowPromoPopup(context: Context, config: com.yuranime.dinz.data.firebase.PromoPopupConfig): Boolean {
+        if (!config.isActive || config.imageUrl.isBlank()) return false
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val promoKey = config.promoId.ifBlank { "default_promo" }
+        val lastShown = prefs.getLong("promo_last_shown_$promoKey", 0L)
+        val count = prefs.getInt("promo_count_$promoKey", 0)
+
+        if (config.maxImpressions > 0 && count >= config.maxImpressions) {
+            return false
+        }
+
+        val intervalMs = (config.intervalHours * 3600 * 1000L).toLong()
+        val now = System.currentTimeMillis()
+        return (now - lastShown) >= intervalMs
+    }
+
+    fun recordPromoPopupShown(context: Context, promoId: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val promoKey = promoId.ifBlank { "default_promo" }
+        val count = prefs.getInt("promo_count_$promoKey", 0)
+        prefs.edit()
+            .putLong("promo_last_shown_$promoKey", System.currentTimeMillis())
+            .putInt("promo_count_$promoKey", count + 1)
+            .apply()
+    }
 }
 
