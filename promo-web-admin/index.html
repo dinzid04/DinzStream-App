@@ -56,6 +56,8 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
     }
 
     .brand {
@@ -91,6 +93,12 @@
       font-weight: 500;
     }
 
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
     .connection-status {
       display: flex;
       align-items: center;
@@ -117,8 +125,66 @@
       box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
     }
 
-    .status-dot.syncing {
-      background: var(--accent-orange);
+    .status-dot.error {
+      background: var(--accent-red);
+      box-shadow: 0 0 8px rgba(225, 29, 72, 0.6);
+    }
+
+    .btn-rules-header {
+      background: rgba(225, 29, 72, 0.15);
+      border: 1px solid rgba(225, 29, 72, 0.35);
+      color: #FFA4B6;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-rules-header:hover {
+      background: rgba(225, 29, 72, 0.25);
+      color: #FFFFFF;
+    }
+
+    /* Permission Notice Banner */
+    .permission-banner {
+      background: rgba(225, 29, 72, 0.12);
+      border: 1px solid rgba(225, 29, 72, 0.3);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .permission-text {
+      font-size: 13px;
+      color: #FFA4B6;
+      line-height: 1.5;
+    }
+
+    .btn-fix-permission {
+      background: var(--accent-red);
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s;
+    }
+
+    .btn-fix-permission:hover {
+      opacity: 0.9;
     }
 
     /* Main Container 2 Columns */
@@ -127,7 +193,7 @@
       max-width: 1360px;
       margin: 0 auto;
       width: 100%;
-      padding: 32px 24px;
+      padding: 28px 24px;
       display: grid;
       grid-template-columns: 1.15fr 0.85fr;
       gap: 36px;
@@ -170,12 +236,6 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-    }
-
-    .card-desc {
-      font-size: 13px;
-      color: var(--text-secondary);
-      line-height: 1.5;
     }
 
     /* Status Switch Row */
@@ -381,7 +441,7 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-      margin-top: 10px;
+      margin-top: 6px;
     }
 
     .btn {
@@ -465,7 +525,6 @@
       flex-direction: column;
     }
 
-    /* Dynamic Island */
     .dynamic-island {
       position: absolute;
       top: 10px;
@@ -718,6 +777,105 @@
     .toast.error {
       border-left-color: var(--accent-red);
     }
+
+    /* Modal Guide for Firestore Rules */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(12px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-content {
+      background: #14161F;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 18px;
+      width: 100%;
+      max-width: 620px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .modal-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 15px;
+      border: none;
+    }
+
+    .code-box {
+      background: #090A0F;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 14px;
+      font-family: monospace;
+      font-size: 12.5px;
+      color: #38BDF8;
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.5;
+    }
+
+    .modal-step {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 13.5px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .step-number {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent-red);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
   </style>
 </head>
 <body>
@@ -731,9 +889,14 @@
         <div class="brand-subtitle">Real-Time Firebase Firestore Admin Console</div>
       </div>
     </div>
-    <div class="connection-status" id="connectionBadge">
-      <span class="status-dot online" id="statusDot"></span>
-      <span id="statusText">Terhubung ke Firestore</span>
+    <div class="header-actions">
+      <button class="btn-rules-header" onclick="openRulesModal()">
+        <span>📋</span> Solusi Aturan Firestore (Rules)
+      </button>
+      <div class="connection-status" id="connectionBadge">
+        <span class="status-dot online" id="statusDot"></span>
+        <span id="statusText">Terhubung ke Firestore</span>
+      </div>
     </div>
   </header>
 
@@ -741,6 +904,14 @@
   <main>
     <!-- Kolom Kiri: Kontrol Konfigurasi Promo -->
     <div class="form-column">
+
+      <!-- Notice Alert jika ada issue rules -->
+      <div class="permission-banner" id="permissionBanner" style="display: none;">
+        <div class="permission-text">
+          <strong>Perhatian:</strong> Firestore menolak penyimpanan (<i>Missing or insufficient permissions</i>). Perbarui Aturan Keamanan (Rules) di Firebase Console agar admin dapat menulis dokumen.
+        </div>
+        <button class="btn-fix-permission" onclick="openRulesModal()">Buka Panduan 1-Menit</button>
+      </div>
 
       <!-- 1. Status Aktivasi Promo (iOS Switch) -->
       <div class="card">
@@ -931,6 +1102,80 @@
     </div>
   </main>
 
+  <!-- Modal Guide for Firestore Rules -->
+  <div class="modal-overlay" id="rulesModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">🔧 Solusi Aturan Keamanan (Rules) Firestore</div>
+        <button class="modal-close" onclick="closeRulesModal()">✕</button>
+      </div>
+
+      <p style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.5;">
+        Pesan <strong>"Missing or insufficient permissions"</strong> terjadi karena aturan Cloud Firestore di Firebase Console sedang dalam mode terkunci (default) atau masa trial 30 hari telah berakhir.
+      </p>
+
+      <div class="modal-step">
+        <div class="step-number">1</div>
+        <div>
+          Buka halaman Aturan Firestore di Firebase Console Anda:
+          <div style="margin-top: 6px;">
+            <a href="https://console.firebase.google.com/project/dinz-ai-gemini-copy/firestore/rules" target="_blank" style="color: var(--accent-blue); text-decoration: underline; font-weight: 600;">
+              👉 Buka Firebase Console Firestore Rules (dinz-ai-gemini-copy) ↗
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-step">
+        <div class="step-number">2</div>
+        <div style="width: 100%;">
+          Ganti seluruh isi tab <strong>Rules</strong> dengan kode aturan resmi berikut:
+          <div class="code-box" id="rulesCodeBox">rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Izinkan admin & aplikasi membaca dan memperbarui promo popup
+    match /app_config/{document=**} {
+      allow read, write: if true;
+    }
+
+    // 2. Izinkan data pengguna dan check-in
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // 3. Aturan umum untuk database
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}</div>
+          <button class="btn btn-secondary" onclick="copyRulesCode()" style="margin-top: 8px; padding: 8px 14px; font-size: 12.5px;">
+            📋 Salin Seluruh Aturan Rules
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-step">
+        <div class="step-number">3</div>
+        <div>
+          Klik tombol biru <strong>Publish</strong> di pojok kanan atas Firebase Console.
+        </div>
+      </div>
+
+      <div class="modal-step">
+        <div class="step-number">4</div>
+        <div>
+          Kembali ke web ini lalu klik <strong>"Simpan & Terapkan ke Aplikasi"</strong>. Data akan langsung tersimpan secara instan!
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="closeRulesModal()" style="margin-top: 10px;">
+        Saya Sudah Publish Rules, Siap Simpan
+      </button>
+    </div>
+  </div>
+
   <!-- Floating Toast Notification -->
   <div class="toast" id="toast">
     <span id="toastIcon">✓</span>
@@ -941,6 +1186,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
     // Konfigurasi Resmi Firebase Proyek dinz-ai-gemini-copy
     const firebaseConfig = {
@@ -952,7 +1198,11 @@
       appId: "1:400464992596:android:68fde66c88d351699610c1"
     };
 
-    let db;
+    let app;
+    let auth;
+    let dbPrimary;
+    let dbFallback;
+
     let currentConfig = {
       isActive: true,
       promoId: "promo_default",
@@ -964,13 +1214,27 @@
     };
 
     try {
-      const app = initializeApp(firebaseConfig);
-      // Hubungkan ke firestore database ai-studio-eff2e4c3-4396-44bb-b0c9-0936b4c631a4 atau (default)
+      app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+
+      // Auto sign-in secara anonim agar request.auth != null
+      signInAnonymously(auth).catch((authErr) => {
+        console.warn("Anonymous auth info:", authErr.message);
+      });
+
+      // Siapkan koneksi ke database ai-studio dan (default)
       try {
-        db = getFirestore(app, "ai-studio-eff2e4c3-4396-44bb-b0c9-0936b4c631a4");
+        dbPrimary = getFirestore(app, "ai-studio-eff2e4c3-4396-44bb-b0c9-0936b4c631a4");
       } catch (e) {
-        db = getFirestore(app);
+        dbPrimary = getFirestore(app);
       }
+
+      try {
+        dbFallback = getFirestore(app);
+      } catch (e) {
+        dbFallback = dbPrimary;
+      }
+
       listenToFirestore();
     } catch (e) {
       console.warn("Firebase Init Error:", e);
@@ -979,8 +1243,10 @@
 
     // Realtime Listener
     function listenToFirestore() {
-      if (!db) return;
-      const docRef = doc(db, "app_config", "promo_popup");
+      const activeDb = dbPrimary || dbFallback;
+      if (!activeDb) return;
+
+      const docRef = doc(activeDb, "app_config", "promo_popup");
       onSnapshot(docRef, (snap) => {
         if (snap.exists()) {
           const data = snap.data();
@@ -995,23 +1261,34 @@
           };
           syncUiFromData(currentConfig);
           updateStatus("Tersinkronisasi Real-Time", true);
-        } else {
-          // Dokumen belum ada, buat dokumen awal
-          setDoc(docRef, currentConfig, { merge: true });
+          hidePermissionBanner();
         }
       }, (err) => {
-        console.error("Firestore listener error:", err);
-        updateStatus("Koneksi Firestore Gagal", false);
+        console.warn("Firestore snapshot notice:", err.message);
+        if (err.message.includes("permission") || err.code === "permission-denied") {
+          updateStatus("Izin Firestore Terbatas", false, true);
+          showPermissionBanner();
+        }
       });
     }
 
-    function updateStatus(text, isOnline) {
+    function updateStatus(text, isOnline, isError = false) {
       const dot = document.getElementById("statusDot");
       const label = document.getElementById("statusText");
       if (dot && label) {
-        dot.className = isOnline ? "status-dot online" : "status-dot";
+        dot.className = isOnline ? "status-dot online" : (isError ? "status-dot error" : "status-dot");
         label.textContent = text;
       }
+    }
+
+    function showPermissionBanner() {
+      const banner = document.getElementById("permissionBanner");
+      if (banner) banner.style.display = "flex";
+    }
+
+    function hidePermissionBanner() {
+      const banner = document.getElementById("permissionBanner");
+      if (banner) banner.style.display = "none";
     }
 
     function syncUiFromData(data) {
@@ -1031,7 +1308,7 @@
       updateMockupPreview();
     }
 
-    // Save Promo Config
+    // Save Promo Config ke Firestore (mencoba ke primary & fallback)
     window.savePromoConfig = async function(isNewCampaign) {
       const activeSwitch = document.getElementById("promoActiveSwitch");
       const imgInput = document.getElementById("imageUrlInput");
@@ -1066,19 +1343,38 @@
       const originalText = btn ? btn.innerHTML : "";
       if (btn) btn.innerHTML = "Menyimpan ke Firestore...";
 
-      try {
-        if (db) {
-          const docRef = doc(db, "app_config", "promo_popup");
+      let saved = false;
+      let lastError = null;
+
+      // Coba simpan ke database
+      const dbsToTry = [dbPrimary, dbFallback].filter(Boolean);
+      for (const d of dbsToTry) {
+        try {
+          const docRef = doc(d, "app_config", "promo_popup");
           await setDoc(docRef, payload, { merge: true });
+          saved = true;
+          break;
+        } catch (e) {
+          lastError = e;
         }
+      }
+
+      if (btn) btn.innerHTML = originalText;
+
+      if (saved) {
+        hidePermissionBanner();
+        updateStatus("Tersinkronisasi Real-Time", true);
         showToast(isNewCampaign 
           ? "Sukses di-push sebagai Promo Baru! Cooldown user otomatis ter-reset." 
-          : "Konfigurasi promo berhasil diperbarui di Firestore!");
-      } catch (e) {
-        console.error("Save error:", e);
-        showToast("Gagal menyimpan ke Firestore: " + e.message, true);
-      } finally {
-        if (btn) btn.innerHTML = originalText;
+          : "Konfigurasi promo berhasil disimpan ke Firestore!");
+      } else {
+        console.error("Save error:", lastError);
+        showPermissionBanner();
+        showToast("Gagal menyimpan ke Firestore: " + (lastError?.message || "Missing or insufficient permissions."), true);
+        // Tampilkan modal panduan rules
+        setTimeout(() => {
+          openRulesModal();
+        }, 1200);
       }
     };
 
@@ -1208,6 +1504,26 @@
       updateMockupPreview();
     };
 
+    // Modal Rules Handlers
+    window.openRulesModal = function() {
+      const modal = document.getElementById("rulesModal");
+      if (modal) modal.classList.add("open");
+    };
+
+    window.closeRulesModal = function() {
+      const modal = document.getElementById("rulesModal");
+      if (modal) modal.classList.remove("open");
+    };
+
+    window.copyRulesCode = function() {
+      const code = document.getElementById("rulesCodeBox")?.innerText || "";
+      navigator.clipboard.writeText(code).then(() => {
+        showToast("Aturan Firestore berhasil disalin ke clipboard!");
+      }).catch(() => {
+        showToast("Gagal menyalin otomatis, silakan salin manual.");
+      });
+    };
+
     function showToast(msg, isError = false) {
       const toast = document.getElementById("toast");
       const msgElem = document.getElementById("toastMessage");
@@ -1220,7 +1536,7 @@
 
       setTimeout(() => {
         toast.className = "toast";
-      }, 3500);
+      }, 4000);
     }
 
     // Event Listeners for live typing
