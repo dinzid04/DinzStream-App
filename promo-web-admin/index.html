@@ -890,6 +890,9 @@
       </div>
     </div>
     <div class="header-actions">
+      <button class="btn-rules-header" onclick="openDbConfigModal()">
+        <span>⚙️</span> Akun / Database Firebase
+      </button>
       <button class="btn-rules-header" onclick="openRulesModal()">
         <span>📋</span> Solusi Aturan Firestore (Rules)
       </button>
@@ -1110,14 +1113,31 @@
         <button class="modal-close" onclick="closeRulesModal()">✕</button>
       </div>
 
-      <p style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.5;">
+      <!-- Kartu Akun Google & Identitas Proyek -->
+      <div style="background: rgba(10, 132, 255, 0.1); border: 1px solid rgba(10, 132, 255, 0.28); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+          <div style="font-weight: 700; color: #5ac8fa; font-size: 13.5px; display: flex; align-items: center; gap: 6px;">
+            <span>👤</span> Akun Google Pemilik Project Firebase
+          </div>
+          <span style="font-size: 11px; background: rgba(10,132,255,0.25); color: #fff; padding: 2px 8px; border-radius: 10px; font-weight: 600;">Terdaftar</span>
+        </div>
+        <div style="font-size: 12.5px; color: var(--text-primary); line-height: 1.5;">
+          Project ini dibuat dengan email: <strong style="color: #fff; background: rgba(255,255,255,0.12); padding: 2px 6px; border-radius: 4px; font-family: monospace;">dinzid04@gmail.com</strong>
+          <br>
+          <span style="color: var(--text-secondary); font-size: 12px; margin-top: 4px; display: block;">
+            👉 <strong>Lupa akun / project tidak muncul?</strong> Di browser Anda, klik <strong>foto profil Google di pojok kanan atas</strong> pada halaman Firebase Console dan <strong>ganti akun (Switch Account)</strong> ke <code>dinzid04@gmail.com</code>.
+          </span>
+        </div>
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
         Pesan <strong>"Missing or insufficient permissions"</strong> terjadi karena aturan Cloud Firestore di Firebase Console sedang dalam mode terkunci (default) atau masa trial 30 hari telah berakhir.
       </p>
 
       <div class="modal-step">
         <div class="step-number">1</div>
         <div>
-          Buka halaman Aturan Firestore di Firebase Console Anda:
+          Buka halaman Aturan Firestore di Firebase Console:
           <div style="margin-top: 6px;">
             <a href="https://console.firebase.google.com/project/dinz-ai-gemini-copy/firestore/rules" target="_blank" style="color: var(--accent-blue); text-decoration: underline; font-weight: 600;">
               👉 Buka Firebase Console Firestore Rules (dinz-ai-gemini-copy) ↗
@@ -1170,9 +1190,68 @@ service cloud.firestore {
         </div>
       </div>
 
-      <button class="btn btn-primary" onclick="closeRulesModal()" style="margin-top: 10px;">
-        Saya Sudah Publish Rules, Siap Simpan
-      </button>
+      <div style="display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap;">
+        <button class="btn btn-primary" onclick="closeRulesModal()" style="flex: 1;">
+          Saya Sudah Publish Rules, Siap Simpan
+        </button>
+        <button class="btn btn-secondary" onclick="closeRulesModal(); openDbConfigModal();" style="font-size: 12.5px;">
+          ⚙️ Ganti ke Akun/Project Baru
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Custom Firebase Config Switcher -->
+  <div class="modal-overlay" id="dbConfigModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">⚙️ Pengaturan Database / Akun Firebase</div>
+        <button class="modal-close" onclick="closeDbConfigModal()">✕</button>
+      </div>
+
+      <div style="background: rgba(255, 159, 10, 0.1); border: 1px solid rgba(255, 159, 10, 0.28); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px;">
+        <div style="font-weight: 700; color: #ff9f0a; font-size: 13.5px; margin-bottom: 4px;">💡 Ingin Gunakan Akun Google Lain yang Sedang Aktif?</div>
+        <div style="font-size: 12.5px; color: var(--text-primary); line-height: 1.5;">
+          Jika Anda tidak bisa membuka akun <code>dinzid04@gmail.com</code>, Anda dapat membuat project Firebase baru secara gratis dengan akun Google APAPUN yang aktif sekarang:
+          <ol style="margin: 8px 0 0 18px; padding: 0;">
+            <li>Buka <a href="https://console.firebase.google.com" target="_blank" style="color: var(--accent-blue); text-decoration: underline;">console.firebase.google.com</a> & klik <strong>Add project</strong>.</li>
+            <li>Di menu kiri, pilih <strong>Firestore Database</strong> -> klik <strong>Create Database</strong> -> pilih <strong>Start in test mode</strong>.</li>
+            <li>Masuk ke <strong>Project Settings</strong> (ikon gerigi) -> Add Web App (<code>&lt;/&gt;</code>) -> salin kode <code>firebaseConfig</code> dan tempelkan di bawah!</li>
+          </ol>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <label style="font-size: 13px; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 6px;">
+          Project ID Aktif Saat Ini:
+        </label>
+        <div id="activeProjectIdDisplay" style="font-family: monospace; font-size: 13px; color: var(--accent-blue); background: rgba(0,0,0,0.3); padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-hairline);">
+          dinz-ai-gemini-copy (Bawaan)
+        </div>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <label style="font-size: 13px; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 6px;">
+          Tempel Firebase Config Baru (JSON atau Kode Objek JS):
+        </label>
+        <textarea id="customConfigInput" placeholder='const firebaseConfig = {
+  apiKey: "AIza...",
+  authDomain: "project-id.firebaseapp.com",
+  projectId: "project-id",
+  storageBucket: "project-id.firebasestorage.app",
+  messagingSenderId: "...",
+  appId: "..."
+};' style="width: 100%; height: 130px; font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid var(--border-hairline); border-radius: 10px; padding: 10px; resize: vertical; box-sizing: border-box;"></textarea>
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;">
+        <button class="btn btn-secondary" onclick="resetDefaultFirebaseConfig()">
+          🔄 Reset ke Akun Bawaan
+        </button>
+        <button class="btn btn-primary" onclick="saveCustomFirebaseConfig()">
+          💾 Terapkan & Hubungkan Project Baru
+        </button>
+      </div>
     </div>
   </div>
 
@@ -1188,8 +1267,8 @@ service cloud.firestore {
     import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-    // Konfigurasi Resmi Firebase Proyek dinz-ai-gemini-copy
-    const firebaseConfig = {
+    // Konfigurasi Default Resmi Firebase Proyek dinz-ai-gemini-copy
+    const DEFAULT_FIREBASE_CONFIG = {
       apiKey: "AIzaSyAPZsUFl1RoV3bfMWWOsJ0M9yt_YPqrRSg",
       authDomain: "dinz-ai-gemini-copy.firebaseapp.com",
       projectId: "dinz-ai-gemini-copy",
@@ -1197,6 +1276,29 @@ service cloud.firestore {
       messagingSenderId: "400464992596",
       appId: "1:400464992596:android:68fde66c88d351699610c1"
     };
+
+    // Cek apakah ada custom config yang disimpan user
+    let firebaseConfig = DEFAULT_FIREBASE_CONFIG;
+    let isUsingCustomConfig = false;
+    try {
+      const stored = localStorage.getItem("yuranime_custom_firebase_config");
+      if (stored) {
+        firebaseConfig = JSON.parse(stored);
+        isUsingCustomConfig = true;
+      }
+    } catch (e) {
+      console.warn("Gagal membaca custom firebase config dari localStorage:", e);
+    }
+
+    // Update display Project ID
+    setTimeout(() => {
+      const display = document.getElementById("activeProjectIdDisplay");
+      if (display) {
+        display.innerHTML = isUsingCustomConfig 
+          ? `<strong>${firebaseConfig.projectId || 'Custom'}</strong> <span style="color: var(--accent-orange); font-size: 11px;">(Project Kustom)</span>` 
+          : `<strong>dinz-ai-gemini-copy</strong> <span style="color: var(--text-muted); font-size: 11px;">(Akun: dinzid04@gmail.com)</span>`;
+      }
+    }, 100);
 
     let app;
     let auth;
@@ -1513,6 +1615,61 @@ service cloud.firestore {
     window.closeRulesModal = function() {
       const modal = document.getElementById("rulesModal");
       if (modal) modal.classList.remove("open");
+    };
+
+    // Modal Database Config Handlers
+    window.openDbConfigModal = function() {
+      const modal = document.getElementById("dbConfigModal");
+      if (modal) modal.classList.add("open");
+    };
+
+    window.closeDbConfigModal = function() {
+      const modal = document.getElementById("dbConfigModal");
+      if (modal) modal.classList.remove("open");
+    };
+
+    window.saveCustomFirebaseConfig = function() {
+      const input = document.getElementById("customConfigInput");
+      const val = (input?.value || "").trim();
+      if (!val) {
+        showToast("Tempelkan konfigurasi Firebase terlebih dahulu!", true);
+        return;
+      }
+
+      try {
+        let parsed = null;
+        // Coba parsing langsung sebagai JSON
+        if (val.startsWith("{")) {
+          parsed = JSON.parse(val);
+        } else {
+          // Ekstrak blok { ... } dari const firebaseConfig = { ... };
+          const match = val.match(/\{[\s\S]*\}/);
+          if (match) {
+            // Gunakan Function evaluator aman untuk objek literal JS
+            parsed = new Function(`return ${match[0]};`)();
+          }
+        }
+
+        if (parsed && (parsed.projectId || parsed.apiKey)) {
+          localStorage.setItem("yuranime_custom_firebase_config", JSON.stringify(parsed));
+          showToast("Konfigurasi Firebase baru disimpan! Memuat ulang...", false);
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        } else {
+          throw new Error("Objek konfigurasi tidak memiliki projectId atau apiKey");
+        }
+      } catch (err) {
+        showToast("Format config tidak valid: " + err.message, true);
+      }
+    };
+
+    window.resetDefaultFirebaseConfig = function() {
+      localStorage.removeItem("yuranime_custom_firebase_config");
+      showToast("Kembali ke akun Firebase bawaan (dinz-ai-gemini-copy)! Memuat ulang...");
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     };
 
     window.copyRulesCode = function() {
