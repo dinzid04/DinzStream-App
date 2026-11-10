@@ -2,6 +2,8 @@
 
 Website Admin Panel untuk mengatur sistem **Popup Notifikasi Promosi Dinamis (`PromoPopupDialog`)** aplikasi mobile **Yuranime (`com.yuranime.dinz`)** secara real-time melalui **Firebase Firestore (`app_config/promo_popup`)**.
 
+🌐 **Live Vercel Production URL:** [https://yuranime-promo-admin.vercel.app](https://yuranime-promo-admin.vercel.app)
+
 Didesain dengan standar **Apple Dark Glassmorphism / Linear Style (Anti-Slop)**:
 - Background Obsidian Dark `#090A0F`, Card Glass `#12141C`, Hairline border `1px solid rgba(255, 255, 255, 0.08)`.
 - Menggunakan tipografi SF Pro Display / Inter berkelas, tanpa template gradien warna-warni murah khas AI.
