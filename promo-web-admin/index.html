@@ -1324,17 +1324,21 @@ service cloud.firestore {
         console.warn("Anonymous auth info:", authErr.message);
       });
 
-      // Siapkan koneksi ke database ai-studio dan (default)
-      try {
-        dbPrimary = getFirestore(app, "ai-studio-eff2e4c3-4396-44bb-b0c9-0936b4c631a4");
-      } catch (e) {
+      // Siapkan koneksi database: default (standar project baru) atau ai-studio untuk backward compatibility
+      if (isUsingCustomConfig) {
         dbPrimary = getFirestore(app);
-      }
-
-      try {
-        dbFallback = getFirestore(app);
-      } catch (e) {
         dbFallback = dbPrimary;
+      } else {
+        try {
+          dbPrimary = getFirestore(app, "ai-studio-eff2e4c3-4396-44bb-b0c9-0936b4c631a4");
+        } catch (e) {
+          dbPrimary = getFirestore(app);
+        }
+        try {
+          dbFallback = getFirestore(app);
+        } catch (e) {
+          dbFallback = dbPrimary;
+        }
       }
 
       listenToFirestore();

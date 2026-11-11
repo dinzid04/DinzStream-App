@@ -76,10 +76,19 @@ object FirebaseManager {
     val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
     val firestore: FirebaseFirestore by lazy {
         try {
-            val app = FirebaseApp.getInstance()
-            FirebaseFirestore.getInstance(app, "ai-studio-eff2e4c3-4396-44bb-b0c9-0936b4c631a4")
-        } catch (e: Exception) {
             FirebaseFirestore.getInstance()
+        } catch (e: Exception) {
+            try {
+                val app = FirebaseApp.getInstance()
+                FirebaseFirestore.getInstance(app)
+            } catch (fallbackEx: Exception) {
+                try {
+                    val app = FirebaseApp.getInstance()
+                    FirebaseFirestore.getInstance(app, "ai-studio-eff2e4c3-4396-44bb-b0c9-0936b4c631a4")
+                } catch (ignored: Exception) {
+                    FirebaseFirestore.getInstance()
+                }
+            }
         }
     }
 
