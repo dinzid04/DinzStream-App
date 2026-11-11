@@ -742,23 +742,23 @@ object FirebaseManager {
 
     /**
      * Listener Real-Time Konfigurasi Promo Popup Dinamis (app_config/promo_popup)
-     * Dilengkapi auto-fallback online agar tidak pernah gagal meskipun Firestore belum diaktifkan!
+     * Langsung membaca konfigurasi yang diatur oleh Admin dari Web Admin (dinz-62119)!
      */
     fun startListeningPromoConfig() {
         if (promoListener != null) return
-        
-        // Panggil fallback online secara asinkron di awal agar popup langsung siap
-        fetchFallbackPromoConfig()
+
+        // Panggil fetch awal langsung dari REST Firestore dinz-62119
+        fetchLivePromoConfigFromRest()
 
         try {
             promoListener = firestore.collection("app_config").document("promo_popup")
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
-                        fetchFallbackPromoConfig()
+                        fetchLivePromoConfigFromRest()
                         return@addSnapshotListener
                     }
                     if (snapshot == null || !snapshot.exists()) {
-                        fetchFallbackPromoConfig()
+                        _promoPopupConfig.value = null
                         return@addSnapshotListener
                     }
                     val isActive = snapshot.getBoolean("isActive") ?: false
@@ -771,64 +771,65 @@ object FirebaseManager {
                     val maxImp = snapshot.getLong("maxImpressions")?.toInt() ?: 0
                     val updatedAt = snapshot.getLong("updatedAt") ?: 0L
 
-                    _promoPopupConfig.value = PromoPopupConfig(
-                        isActive = isActive,
-                        promoId = promoId,
-                        imageUrl = imageUrl,
-                        targetUrl = targetUrl,
-                        intervalHours = interval.toFloat(),
-                        maxImpressions = maxImp,
-                        updatedAt = updatedAt
-                    )
+                    if (isActive && imageUrl.isNotBlank()) {
+                        _promoPopupConfig.value = PromoPopupConfig(
+                            isActive = true,
+                            promoId = promoId,
+                            imageUrl = imageUrl,
+                            targetUrl = targetUrl,
+                            intervalHours = interval.toFloat(),
+                            maxImpressions = maxImp,
+                            updatedAt = updatedAt
+                        )
+                    } else {
+                        _promoPopupConfig.value = null
+                    }
                 }
         } catch (ignored: Exception) {
-            fetchFallbackPromoConfig()
+            fetchLivePromoConfigFromRest()
         }
     }
 
-    private fun fetchFallbackPromoConfig() {
+    private fun fetchLivePromoConfigFromRest() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val urls = listOf(
-                    "https://raw.githubusercontent.com/dinzid04/DinzStream-App/main/promo_config.json",
-                    "https://cdn.jsdelivr.net/gh/dinzid04/DinzStream-App@main/promo_config.json"
-                )
+                val url = "https://firestore.googleapis.com/v1/projects/dinz-62119/databases/(default)/documents/app_config/promo_popup"
                 val client = okhttp3.OkHttpClient.Builder()
-                    .connectTimeout(4, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(4, java.util.concurrent.TimeUnit.SECONDS)
+                    .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
                     .build()
 
-                for (url in urls) {
-                    try {
-                        val req = okhttp3.Request.Builder().url(url).build()
-                        val res = client.newCall(req).execute()
-                        if (res.isSuccessful) {
-                            val body = res.body?.string()
-                            if (!body.isNullOrBlank()) {
-                                val json = org.json.JSONObject(body)
-                                val isActive = json.optBoolean("isActive", false)
-                                val promoId = json.optString("promoId", "")
-                                val imageUrl = json.optString("imageUrl", "")
-                                val targetUrl = json.optString("targetUrl", "")
-                                val interval = json.optDouble("intervalHours", 8.0).toFloat()
-                                val maxImp = json.optInt("maxImpressions", 0)
-                                val updatedAt = json.optLong("updatedAt", 0L)
+                val req = okhttp3.Request.Builder().url(url).build()
+                val res = client.newCall(req).execute()
+                if (res.isSuccessful) {
+                    val body = res.body?.string()
+                    if (!body.isNullOrBlank()) {
+                        val json = org.json.JSONObject(body)
+                        val fields = json.optJSONObject("fields") ?: return@launch
+                        val isActive = fields.optJSONObject("isActive")?.optBoolean("booleanValue", false) ?: false
+                        val promoId = fields.optJSONObject("promoId")?.optString("stringValue", "") ?: ""
+                        val imageUrl = fields.optJSONObject("imageUrl")?.optString("stringValue", "") ?: ""
+                        val targetUrl = fields.optJSONObject("targetUrl")?.optString("stringValue", "") ?: ""
+                        val interval = (fields.optJSONObject("intervalHours")?.optDouble("doubleValue", 8.0)
+                            ?: fields.optJSONObject("intervalHours")?.optLong("integerValue", 8L)?.toDouble()
+                            ?: 8.0).toFloat()
+                        val maxImp = fields.optJSONObject("maxImpressions")?.optInt("integerValue", 0) ?: 0
+                        val updatedAt = fields.optJSONObject("updatedAt")?.optLong("integerValue", 0L) ?: 0L
 
-                                if (imageUrl.isNotBlank() && _promoPopupConfig.value == null) {
-                                    _promoPopupConfig.value = PromoPopupConfig(
-                                        isActive = isActive,
-                                        promoId = promoId,
-                                        imageUrl = imageUrl,
-                                        targetUrl = targetUrl,
-                                        intervalHours = interval,
-                                        maxImpressions = maxImp,
-                                        updatedAt = updatedAt
-                                    )
-                                    break
-                                }
-                            }
+                        if (isActive && imageUrl.isNotBlank()) {
+                            _promoPopupConfig.value = PromoPopupConfig(
+                                isActive = true,
+                                promoId = promoId,
+                                imageUrl = imageUrl,
+                                targetUrl = targetUrl,
+                                intervalHours = interval,
+                                maxImpressions = maxImp,
+                                updatedAt = updatedAt
+                            )
+                        } else {
+                            _promoPopupConfig.value = null
                         }
-                    } catch (ignored: Exception) {}
+                    }
                 }
             } catch (ignored: Exception) {}
         }

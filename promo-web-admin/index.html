@@ -1323,27 +1323,43 @@ service cloud.firestore {
         console.warn("Anonymous auth info:", authErr.message);
       });
 
-      // Siapkan koneksi database: default (standar project baru) atau ai-studio untuk backward compatibility
-      if (isUsingCustomConfig) {
-        dbPrimary = getFirestore(app);
-        dbFallback = dbPrimary;
-      } else {
-        try {
-          dbPrimary = getFirestore(app, "ai-studio-eff2e4c3-4396-44bb-b0c9-0936b4c631a4");
-        } catch (e) {
-          dbPrimary = getFirestore(app);
-        }
-        try {
-          dbFallback = getFirestore(app);
-        } catch (e) {
-          dbFallback = dbPrimary;
-        }
-      }
+      // Selalu gunakan database default (standar Firestore dinz-62119)
+      dbPrimary = getFirestore(app);
+      dbFallback = dbPrimary;
 
+      loadInitialDataFromRest();
       listenToFirestore();
     } catch (e) {
       console.warn("Firebase Init Error:", e);
       updateStatus("Offline (Local Mock Mode)", false);
+    }
+
+    // Load initial data via REST API (Instan tanpa delay)
+    async function loadInitialDataFromRest() {
+      try {
+        const restUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/app_config/promo_popup?key=${firebaseConfig.apiKey}`;
+        const res = await fetch(restUrl);
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.fields) {
+            const f = json.fields;
+            currentConfig = {
+              isActive: f.isActive?.booleanValue !== undefined ? f.isActive.booleanValue : true,
+              promoId: f.promoId?.stringValue || "promo_default",
+              imageUrl: f.imageUrl?.stringValue || "",
+              targetUrl: f.targetUrl?.stringValue || "",
+              intervalHours: Number(f.intervalHours?.doubleValue || f.intervalHours?.integerValue || 8),
+              maxImpressions: Number(f.maxImpressions?.integerValue || 0),
+              updatedAt: Number(f.updatedAt?.integerValue || Date.now())
+            };
+            syncUiFromData(currentConfig);
+            updateStatus("Tersinkronisasi Real-Time", true);
+            hidePermissionBanner();
+          }
+        }
+      } catch (e) {
+        console.warn("Initial REST fetch notice:", e);
+      }
     }
 
     // Realtime Listener
@@ -1413,7 +1429,7 @@ service cloud.firestore {
       updateMockupPreview();
     }
 
-    // Save Promo Config ke Firestore (mencoba ke primary & fallback)
+    // Save Promo Config ke Firestore (Anti-Stuck dengan REST fallback instan)
     window.savePromoConfig = async function(isNewCampaign) {
       const activeSwitch = document.getElementById("promoActiveSwitch");
       const imgInput = document.getElementById("imageUrlInput");
@@ -1446,40 +1462,67 @@ service cloud.firestore {
 
       const btn = isNewCampaign ? document.getElementById("btnPushNew") : document.getElementById("btnSaveApply");
       const originalText = btn ? btn.innerHTML : "";
-      if (btn) btn.innerHTML = "Menyimpan ke Firestore...";
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = isNewCampaign ? "⏳ Mengirim Promo Baru..." : "⏳ Menyimpan ke Database...";
+      }
 
       let saved = false;
       let lastError = null;
 
-      // Coba simpan ke database
-      const dbsToTry = [dbPrimary, dbFallback].filter(Boolean);
-      for (const d of dbsToTry) {
+      try {
+        // 1. Coba simpan via Firestore SDK dengan Timeout 2 detik
+        const sdkPromise = setDoc(doc(dbPrimary, "app_config", "promo_popup"), payload, { merge: true });
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("SDK Timeout")), 2000));
+        await Promise.race([sdkPromise, timeoutPromise]);
+        saved = true;
+      } catch (sdkErr) {
+        console.warn("Firestore SDK write notice, attempting instant REST API save:", sdkErr);
+        // 2. Fallback instan via REST API resmi Google Cloud Firestore (anti-stuck)
         try {
-          const docRef = doc(d, "app_config", "promo_popup");
-          await setDoc(docRef, payload, { merge: true });
-          saved = true;
-          break;
-        } catch (e) {
-          lastError = e;
+          const restUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/app_config/promo_popup?key=${firebaseConfig.apiKey}`;
+          const restRes = await fetch(restUrl, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fields: {
+                isActive: { booleanValue: payload.isActive },
+                promoId: { stringValue: payload.promoId },
+                imageUrl: { stringValue: payload.imageUrl },
+                targetUrl: { stringValue: payload.targetUrl },
+                intervalHours: { doubleValue: Number(payload.intervalHours) },
+                maxImpressions: { integerValue: String(payload.maxImpressions) },
+                updatedAt: { integerValue: String(payload.updatedAt) }
+              }
+            })
+          });
+          if (restRes.ok) {
+            saved = true;
+          } else {
+            const errJson = await restRes.json().catch(() => ({}));
+            lastError = new Error(errJson?.error?.message || "REST error status " + restRes.status);
+          }
+        } catch (restErr) {
+          lastError = restErr;
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
         }
       }
-
-      if (btn) btn.innerHTML = originalText;
 
       if (saved) {
         hidePermissionBanner();
         updateStatus("Tersinkronisasi Real-Time", true);
+        localStorage.setItem("yuranime_cached_promo_config", JSON.stringify(payload));
         showToast(isNewCampaign 
-          ? "Sukses di-push sebagai Promo Baru! Cooldown user otomatis ter-reset." 
-          : "Konfigurasi promo berhasil disimpan ke Firestore!");
+          ? "🎉 Sukses di-push sebagai Promo Baru! Cooldown user otomatis ter-reset." 
+          : "✓ Konfigurasi promo berhasil disimpan ke database!");
       } else {
         console.error("Save error:", lastError);
         showPermissionBanner();
-        showToast("Gagal menyimpan ke Firestore: " + (lastError?.message || "Missing or insufficient permissions."), true);
-        // Tampilkan modal panduan rules
-        setTimeout(() => {
-          openRulesModal();
-        }, 1200);
+        showToast("Gagal menyimpan: " + (lastError?.message || "Koneksi database bermasalah."), true);
       }
     };
 
