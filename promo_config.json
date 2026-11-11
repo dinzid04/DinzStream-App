@@ -1,0 +1,9 @@
+{
+  "isActive": true,
+  "promoId": "promo_yuranime_v260",
+  "imageUrl": "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&q=80",
+  "targetUrl": "https://yuranime.com",
+  "intervalHours": 8.0,
+  "maxImpressions": 0,
+  "updatedAt": 1731333600000
+}

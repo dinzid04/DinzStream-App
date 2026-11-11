@@ -1117,39 +1117,38 @@
       <div style="background: rgba(10, 132, 255, 0.1); border: 1px solid rgba(10, 132, 255, 0.28); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
           <div style="font-weight: 700; color: #5ac8fa; font-size: 13.5px; display: flex; align-items: center; gap: 6px;">
-            <span>👤</span> Akun Google Pemilik Project Firebase
+            <span>👤</span> Proyek Firebase Aktif: dinz-62119
           </div>
-          <span style="font-size: 11px; background: rgba(10,132,255,0.25); color: #fff; padding: 2px 8px; border-radius: 10px; font-weight: 600;">Terdaftar</span>
+          <span style="font-size: 11px; background: rgba(52, 199, 89, 0.25); color: #34c759; padding: 2px 8px; border-radius: 10px; font-weight: 600;">Terhubung</span>
         </div>
         <div style="font-size: 12.5px; color: var(--text-primary); line-height: 1.5;">
-          Project ini dibuat dengan email: <strong style="color: #fff; background: rgba(255,255,255,0.12); padding: 2px 6px; border-radius: 4px; font-family: monospace;">dinzid04@gmail.com</strong>
+          Proyek: <strong style="color: #fff; background: rgba(255,255,255,0.12); padding: 2px 6px; border-radius: 4px; font-family: monospace;">dinz-62119</strong> (Project No: <code>683241181647</code>)
           <br>
           <span style="color: var(--text-secondary); font-size: 12px; margin-top: 4px; display: block;">
-            👉 <strong>Lupa akun / project tidak muncul?</strong> Di browser Anda, klik <strong>foto profil Google di pojok kanan atas</strong> pada halaman Firebase Console dan <strong>ganti akun (Switch Account)</strong> ke <code>dinzid04@gmail.com</code>.
+            👉 <strong>Langkah 1-Klik:</strong> Jika database Firestore belum diaktifkan atau aturan rules belum diatur, buka langsung link di bawah:
           </span>
         </div>
       </div>
 
-      <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
-        Pesan <strong>"Missing or insufficient permissions"</strong> terjadi karena aturan Cloud Firestore di Firebase Console sedang dalam mode terkunci (default) atau masa trial 30 hari telah berakhir.
-      </p>
-
       <div class="modal-step">
         <div class="step-number">1</div>
         <div>
-          Buka halaman Aturan Firestore di Firebase Console:
+          Buka halaman Firestore Database proyek <strong>dinz-62119</strong>:
           <div style="margin-top: 6px;">
-            <a href="https://console.firebase.google.com/project/dinz-ai-gemini-copy/firestore/rules" target="_blank" style="color: var(--accent-blue); text-decoration: underline; font-weight: 600;">
-              👉 Buka Firebase Console Firestore Rules (dinz-ai-gemini-copy) ↗
+            <a href="https://console.firebase.google.com/project/dinz-62119/firestore" target="_blank" style="color: var(--accent-blue); text-decoration: underline; font-weight: 600;">
+              👉 Buka Firestore Database (dinz-62119) ↗
             </a>
           </div>
+          <span style="font-size: 12px; color: var(--text-muted); display: block; margin-top: 4px;">
+            (Jika tombol <strong>"Create database"</strong> muncul, klik sekali ➔ pilih <em>Start in test mode</em> ➔ Done).
+          </span>
         </div>
       </div>
 
       <div class="modal-step">
         <div class="step-number">2</div>
         <div style="width: 100%;">
-          Ganti seluruh isi tab <strong>Rules</strong> dengan kode aturan resmi berikut:
+          Di tab <strong>Rules</strong>, gunakan aturan terbuka berikut:
           <div class="code-box" id="rulesCodeBox">rules_version = '2';
 
 service cloud.firestore {
@@ -1267,14 +1266,14 @@ service cloud.firestore {
     import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-    // Konfigurasi Default Resmi Firebase Proyek dinz-ai-gemini-copy
+    // Konfigurasi Default Resmi Firebase Proyek Baru dinz-62119
     const DEFAULT_FIREBASE_CONFIG = {
-      apiKey: "AIzaSyAPZsUFl1RoV3bfMWWOsJ0M9yt_YPqrRSg",
-      authDomain: "dinz-ai-gemini-copy.firebaseapp.com",
-      projectId: "dinz-ai-gemini-copy",
-      storageBucket: "dinz-ai-gemini-copy.firebasestorage.app",
-      messagingSenderId: "400464992596",
-      appId: "1:400464992596:android:68fde66c88d351699610c1"
+      apiKey: "AIzaSyDyxfS2r8Y6dLYu2z6Kvdf5IOvzRApQU7E",
+      authDomain: "dinz-62119.firebaseapp.com",
+      projectId: "dinz-62119",
+      storageBucket: "dinz-62119.firebasestorage.app",
+      messagingSenderId: "683241181647",
+      appId: "1:683241181647:android:1e0e591adc20bca80a42ba"
     };
 
     // Cek apakah ada custom config yang disimpan user
@@ -1296,7 +1295,7 @@ service cloud.firestore {
       if (display) {
         display.innerHTML = isUsingCustomConfig 
           ? `<strong>${firebaseConfig.projectId || 'Custom'}</strong> <span style="color: var(--accent-orange); font-size: 11px;">(Project Kustom)</span>` 
-          : `<strong>dinz-ai-gemini-copy</strong> <span style="color: var(--text-muted); font-size: 11px;">(Akun: dinzid04@gmail.com)</span>`;
+          : `<strong>dinz-62119</strong> <span style="color: var(--accent-green); font-size: 11px;">(Proyek Resmi Aktif)</span>`;
       }
     }, 100);
 

@@ -166,9 +166,18 @@ fun LoginProfileScreen(
     val isUserLoggedIn = currentUser != null || googleSession != null
     val userProfile by FirebaseManager.userProfile.collectAsState()
 
-    // Google Sign-In Client (Standar Resmi Android)
-    val gso = remember {
+    // Google Sign-In Client (Standar Resmi Android dengan ID Token untuk Firebase Auth)
+    val webClientId = remember(context) {
+        try {
+            val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+            if (resId != 0) context.getString(resId) else "683241181647-gp00tdtgh2bkn8bojm0pl1hf0eriduq1.apps.googleusercontent.com"
+        } catch (e: Exception) {
+            "683241181647-gp00tdtgh2bkn8bojm0pl1hf0eriduq1.apps.googleusercontent.com"
+        }
+    }
+    val gso = remember(webClientId) {
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(webClientId)
             .requestEmail()
             .requestProfile()
             .build()
