@@ -48,10 +48,11 @@ Setelah masuk ke dashboard project baru Anda:
      Yuranime Android
      ```
    - **Debug signing certificate SHA-1 (SANGAT PENTING untuk Google Sign-In):**
-     Salin dan tempelkan fingerprint SHA-1 keystore Android Yuranime berikut:
+     Salin dan tempelkan fingerprint SHA-1 permanen resmi aplikasi Yuranime berikut:
      ```text
-     24:68:75:90:8B:8B:0E:89:2C:53:A3:13:B5:BF:08:D2:DE:89:79:32
+     7D:D8:C3:6F:6A:72:1E:D6:49:E0:E8:3D:13:EA:10:32:E3:98:C2:60
      ```
+     *(Opsional: Anda juga bisa menambahkan SHA-1 dari APK v2.6.0 saat ini via tombol "Add fingerprint": `D8:C4:B0:44:77:AD:36:94:1C:D9:10:B0:31:FF:24:B6:86:97:8D:1D`)*.
 3. Klik tombol biru **"Register app"**.
 4. Pada langkah ke-2 (*Download config file*), klik tombol biru **"Download google-services.json"**.
 5. Simpan file tersebut. File ini bernama **`google-services.json`**.

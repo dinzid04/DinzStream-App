@@ -28,6 +28,15 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("keystore/yuranime-release.jks")
+            storePassword = "yuranime12345"
+            keyAlias = "yuranime"
+            keyPassword = "yuranime12345"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -35,10 +44,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             isDebuggable = true
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
