@@ -766,7 +766,7 @@ private fun UserProfileView(
             StatusMicroTitleTagRow(
                 role = role,
                 level = level,
-                rankTitle = rankTitle
+                rankClassTitle = rankTitle
             )
 
             Spacer(modifier = Modifier.height(12.dp))

@@ -444,9 +444,11 @@ fun GeometricTitleBadge(
 fun StatusMicroTitleTagRow(
     role: String,
     level: Int,
-    rankClassTitle: String,
+    rankClassTitle: String = "",
+    rankTitle: String = rankClassTitle,
     modifier: Modifier = Modifier
 ) {
+    val resolvedTitle = rankClassTitle.ifBlank { rankTitle }.ifBlank { "Wibu Biasa" }
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(7.dp),
@@ -512,7 +514,7 @@ fun StatusMicroTitleTagRow(
             else -> Color(0xFFE11D48)
         }
         SleekChamferedMicroTag(
-            text = rankClassTitle.uppercase(Locale.ROOT),
+            text = resolvedTitle.uppercase(Locale.ROOT),
             borderColor = classAccent.copy(alpha = 0.55f),
             backgroundColor = Color(0xFF141016),
             textColor = Color(0xFFFDA4AF),
@@ -536,7 +538,7 @@ fun StatusMicroTitleTagRow(
 }
 
 @Composable
-private fun SleekChamferedMicroTag(
+fun SleekChamferedMicroTag(
     text: String,
     borderColor: Color,
     backgroundColor: Color,
@@ -586,9 +588,13 @@ private fun SleekChamferedMicroTag(
 }
 
 @Composable
-private fun SleekHexChevronLevelTag(
+fun SleekHexChevronLevelTag(
     level: Int,
-    accentColor: Color
+    accentColor: Color = when {
+        level >= 35 -> Color(0xFFF3C663)
+        level >= 15 -> Color(0xFFA855F7)
+        else -> Color(0xFFFF5722)
+    }
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
