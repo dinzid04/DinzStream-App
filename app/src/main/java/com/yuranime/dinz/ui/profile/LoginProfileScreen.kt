@@ -678,7 +678,7 @@ private fun UserProfileView(
         ) {
             // Baris 1: Username (SF Bold putih 22.sp) + #ID unik 4 digit (#64748B 16.sp)
             Row(
-                verticalAlignment = Alignment.Baseline
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = displayName,
@@ -687,7 +687,8 @@ private fun UserProfileView(
                     fontWeight = FontWeight.Bold,
                     fontFamily = SfProFontFamily,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.alignByBaseline()
                 )
                 Spacer(modifier = Modifier.width(7.dp))
                 Text(
@@ -695,7 +696,8 @@ private fun UserProfileView(
                     color = Color(0xFF64748B),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                    fontFamily = SfProFontFamily
+                    fontFamily = SfProFontFamily,
+                    modifier = Modifier.alignByBaseline()
                 )
             }
 
