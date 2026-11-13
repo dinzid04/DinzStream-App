@@ -174,8 +174,8 @@ class HomeViewModel(
                                 com.yuranime.dinz.data.model.SliderItem(
                                     id = it.id,
                                     title = it.title,
-                                    image = it.image,
-                                    synopsis = it.description
+                                    image = it.getEffectivePoster(),
+                                    synopsis = it.synopsis
                                 )
                             },
                             cuplixList = cuplixItems,

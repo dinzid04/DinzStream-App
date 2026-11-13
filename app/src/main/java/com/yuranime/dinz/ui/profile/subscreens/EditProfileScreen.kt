@@ -170,7 +170,7 @@ fun EditProfileScreen(
                 matchSearch && matchFilter
             }
             .sortedWith(
-                compareByDescending<com.yuranime.dinz.data.repository.DiscordBorderCosmetic> { it.imageUrl == selectedBorderUrl }
+                compareByDescending<BorderDefinition> { it.imageUrl == selectedBorderUrl }
                     .thenByDescending { unlockedBorders.contains(it.id) }
             )
     }
@@ -192,7 +192,7 @@ fun EditProfileScreen(
                 matchSearch && matchFilter
             }
             .sortedWith(
-                compareByDescending<com.yuranime.dinz.data.repository.DiscordProfileEffectCosmetic> { it.animationUrl == selectedProfileEffectUrl }
+                compareByDescending<ProfileEffectDefinition> { it.animationUrl == selectedProfileEffectUrl }
                     .thenByDescending { unlockedEffects.contains(it.id) }
             )
     }
