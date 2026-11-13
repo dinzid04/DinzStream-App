@@ -1,7 +1,9 @@
 package com.yuranime.dinz.data.api
 
+import com.google.gson.GsonBuilder
 import com.google.gson.annotations.SerializedName
 import okhttp3.OkHttpClient
+import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -157,6 +159,11 @@ interface ComicApiService {
                 level = HttpLoggingInterceptor.Level.NONE
             }
 
+            val gson = GsonBuilder()
+                .setLenient()
+                .serializeNulls()
+                .create()
+
             val client = OkHttpClient.Builder()
                 .connectTimeout(20, TimeUnit.SECONDS)
                 .readTimeout(20, TimeUnit.SECONDS)
@@ -177,7 +184,23 @@ interface ComicApiService {
                         .header("Sec-Fetch-Mode", "cors")
                         .header("Sec-Fetch-Site", "cross-site")
                         .build()
-                    chain.proceed(request)
+                    val response = chain.proceed(request)
+                    val body = response.body
+                    if (body != null) {
+                        val contentType = body.contentType()
+                        val raw = body.string()
+                        var cleanText = raw.trimStart('\uFEFF', ' ', '\t', '\r', '\n')
+                        val firstBrace = cleanText.indexOfAny(charArrayOf('{', '['))
+                        if (firstBrace > 0) {
+                            cleanText = cleanText.substring(firstBrace)
+                        } else if (firstBrace < 0 && (cleanText.startsWith("<") || cleanText.isBlank())) {
+                            cleanText = "{\"retcode\":0,\"message\":\"ok\",\"data\":[]}"
+                        }
+                        val newBody = cleanText.toResponseBody(contentType)
+                        response.newBuilder().body(newBody).build()
+                    } else {
+                        response
+                    }
                 }
                 .addInterceptor(logging)
                 .build()
@@ -185,7 +208,7 @@ interface ComicApiService {
             return Retrofit.Builder()
                 .baseUrl(BASE_URL)
                 .client(client)
-                .addConverterFactory(GsonConverterFactory.create())
+                .addConverterFactory(GsonConverterFactory.create(gson))
                 .build()
                 .create(ComicApiService::class.java)
         }

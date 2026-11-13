@@ -1,6 +1,7 @@
 package com.yuranime.dinz.data.update
 
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -31,7 +32,7 @@ object UpdateChecker {
             .build()
     }
 
-    private val gson = Gson()
+    private val gson = GsonBuilder().setLenient().serializeNulls().create()
 
     suspend fun checkUpdate(currentVersionName: String, forceCheck: Boolean = false): AppUpdateInfo? = withContext(Dispatchers.IO) {
         try {

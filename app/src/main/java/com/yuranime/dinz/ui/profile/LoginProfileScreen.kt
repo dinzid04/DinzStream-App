@@ -115,7 +115,8 @@ import com.yuranime.dinz.data.firebase.UserProfile
 import com.yuranime.dinz.data.local.AppPreferences
 import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.ui.components.BottomNavBar
-import com.yuranime.dinz.ui.components.EmptyTitleSlotBadge
+import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
+import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.NavTab
 import com.yuranime.dinz.ui.components.StatusMicroTitleTagRow
@@ -462,7 +463,7 @@ private fun UserProfileView(
             .background(Color(0xFF0B0B0B))
             .verticalScroll(rememberScrollState())
             .navigationBarsPadding()
-            .padding(bottom = 104.dp)
+            .padding(bottom = 120.dp)
     ) {
         // 1. HEADER BANNER (195.dp edge-to-edge) + AVATAR KIRI (86.dp overlap separuh) + 3 TOMBOL IKON KANAN ATAS
         Box(
@@ -503,8 +504,9 @@ private fun UserProfileView(
 
                 // Render Profile Effect Di Atas Banner (Jika Ada)
                 if (equippedProfileEffectUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = equippedProfileEffectUrl,
+                    AnimatedCosmeticImage(
+                        url = equippedProfileEffectUrl,
+                        isAnimated = cosmeticAnimate,
                         contentDescription = "Profile Effect",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -565,24 +567,18 @@ private fun UserProfileView(
                 }
             }
 
-            // 2. Avatar Kiri (size = 86.dp, padding start = 20.dp) + Circular EXP Progress Ring (strokeWidth = 3.dp)
+            // 2. Avatar Kiri Presisi 100% Pas: Foto Profil 82.dp + Discord Border 100.dp (TANPA Cincin EXP Bertabrakan!)
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(start = 20.dp)
-                    .size(94.dp),
+                    .size(100.dp),
                 contentAlignment = Alignment.Center
             ) {
+                // Layer Foto Profil Bulat: 82.dp
                 Box(
                     modifier = Modifier
-                        .size(92.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF0B0B0B))
-                )
-
-                Box(
-                    modifier = Modifier
-                        .size(78.dp)
+                        .size(82.dp)
                         .clip(CircleShape)
                         .background(Color(0xFF161820))
                         .clickable { if (!isPublicPreviewMode) onEditProfileClick() },
@@ -608,47 +604,13 @@ private fun UserProfileView(
                     }
                 }
 
-                // Circular EXP Progress Ring (size = 86.dp, strokeWidth = 3.dp, gradasi #FF5722 -> #E11D48)
-                Canvas(
-                    modifier = Modifier.size(86.dp)
-                ) {
-                    val strokePx = 3.dp.toPx()
-                    val diameter = size.minDimension - strokePx
-                    val topLeftOffset = Offset(strokePx / 2f, strokePx / 2f)
-                    val arcSize = Size(diameter, diameter)
-
-                    drawArc(
-                        color = Color(0xFF1C1F2A),
-                        startAngle = 0f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        topLeft = topLeftOffset,
-                        size = arcSize,
-                        style = Stroke(width = strokePx, cap = StrokeCap.Round)
-                    )
-
-                    val sweep = (360f * animatedExpProgress).coerceIn(6f, 360f)
-                    drawArc(
-                        brush = Brush.linearGradient(
-                            colors = listOf(Color(0xFFFF5722), Color(0xFFE11D48)),
-                            start = Offset(0f, 0f),
-                            end = Offset(size.width, size.height)
-                        ),
-                        startAngle = -90f,
-                        sweepAngle = if (animatedExpProgress <= 0.005f) 0f else sweep,
-                        useCenter = false,
-                        topLeft = topLeftOffset,
-                        size = arcSize,
-                        style = Stroke(width = strokePx, cap = StrokeCap.Round)
-                    )
-                }
-
+                // Layer Border Avatar Asli (discord_assets): 100.dp tepat konsentris di Alignment.Center
                 if (resolvedBorderUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = resolvedBorderUrl,
+                    AnimatedCosmeticImage(
+                        url = DiscordCosmeticsRepository.getOptimizedUrl(resolvedBorderUrl, size = 240, animated = cosmeticAnimate),
+                        isAnimated = cosmeticAnimate,
                         contentDescription = "Avatar Border",
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.size(108.dp)
+                        modifier = Modifier.size(100.dp)
                     )
                 }
             }

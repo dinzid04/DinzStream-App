@@ -52,7 +52,17 @@ class YuranimeApp : Application(), ImageLoaderFactory {
                     host.contains("shinigami") ||
                     host.contains("komikid")
 
-                if (isWpDomain) {
+                val isDiscordDomain = host.contains("discordapp.com") || host.contains("discord.com")
+
+                if (isDiscordDomain) {
+                    requestBuilder
+                        .removeHeader("Referer")
+                        .removeHeader("x-proxy-secret")
+                        .header(
+                            "User-Agent",
+                            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+                        )
+                } else if (isWpDomain) {
                     requestBuilder
                         .removeHeader("Referer")
                         .removeHeader("x-proxy-secret")
@@ -101,8 +111,8 @@ class YuranimeApp : Application(), ImageLoaderFactory {
             }
             .diskCache {
                 DiskCache.Builder()
-                    .directory(cacheDir.resolve("image_cache_v3"))
-                    .maxSizeBytes(150L * 1024 * 1024)
+                    .directory(cacheDir.resolve("cosmetics_cache"))
+                    .maxSizeBytes(250L * 1024 * 1024)
                     .build()
             }
             .crossfade(true)

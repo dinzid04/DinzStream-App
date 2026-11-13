@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "2.7.0"
+  APP_VERSION: "2.8.0"
 
 jobs:
   build:
@@ -63,29 +63,32 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Redesign Profile, Geometric Title Badge, Real-Time Leaderboard & R2 CDN Upload (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - All 985 Discord Borders & 396 Profile Effects, APNG 60FPS Decoder, Anibi 2-Column Grid, Fix HomeScreen JSON & Clean SF Pro Typography (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
-            ### Pembaruan & Fitur Baru:
-            1. **Redesign Total Halaman Profile (ProfileScreen):**
-               - Mengikuti tata letak referensi baru dengan palet Yuranime (Deep Obsidian `#0B0B0B` + Crimson `#E11D48` & Vibrant Orange `#FF5722`).
-               - Header Banner edge-to-edge (`195.dp`) dengan gradasi dark vignette halus dan 3 tombol ikon bulat minimalis di kanan atas (Preview Profil Publik, Edit Profil, Pengaturan).
-               - Avatar kiri (`86.dp`) dengan Circular EXP Progress Ring (`strokeWidth = 3.dp`) yang sinkron real-time dengan persentase EXP pengguna.
-               - Identitas rata kiri tanpa kotak overlay: Display Name + `#ID` 4 digit unik, Email asli, Tanggal Bergabung asli dari Firestore, Bio, Baris Pill (`Member | Lv. | Gelar Rank`), Slot Custom Title, dan Full-Width EXP Bar.
-               - Area menu bersih di bawah EXP Bar dengan 2 kartu highlight ringkas (`Papan Peringkat` & `Points & Rewards`) serta baris navigasi editorial (`Unduh`, `Koleksi & Riwayat`, `Info Aplikasi`, `Keluar Akun`).
-
-            2. **Sistem Custom Title Geometris (`GeometricTitleBadge`) & `Points & Rewards`:**
-               - Komponen vektor `GeometricTitleBadge` bergaya heksagon + sayap poligon meruncing dengan 4 kasta warna sesuai level (Starter Crimson Slate, Vanguard Blaze Orange-Red, Royal Amethyst, dan Mythic Sovereign Gold-Crimson).
-               - Sistem Misi Harian & Mingguan, Milestone Level Title (Lv. 1, 5, 10, 15, 25, 50), serta Katalog Tukar Poin & Frame Avatar yang 100% sinkron real-time dengan Firestore.
-
-            3. **Redesign Papan Peringkat (`LeaderboardScreen`) 100% Real-Time Tanpa Data Palsu:**
-               - Menghapus seluruh data bot/placeholder statis; menampilkan 100% pengguna asli dari koleksi `users` di Firebase Firestore.
-               - Podium Top 1, Top 2, dan Top 3 dilengkapi Custom Frame Border presisi konsentris di tengah avatar.
-               - Perbaikan header tabel `"Peringkat"` anti-terpotong, baris peringkat 4+ modern tanpa siku kuning kaku, serta floating bar bawah `"Posisi Peringkat Kamu"`.
-
-            4. **Kompresi WebP & Upload Avatar/Banner ke Cloudflare R2 / Dinz CDN (`R2CdnUploader`):**
-               - Gambar dari galeri otomatis di-resize dan dikompresi ke format WebP tajam (`< 150KB`) lalu diunggah ke CDN untuk disimpan sebagai URL publik permanen di Firestore.
+            ### Pembaruan & Fitur Baru (7 Instruksi Wajib):
+            1. **Perbaikan Error JSON Beranda (HomeScreen):**
+               - Semua instance Gson menggunakan `GsonBuilder().setLenient().serializeNulls().create()`.
+               - Interceptor OkHttpClient membersihkan Byte Order Mark (BOM), memangkas spasi/teks sampah sebelum `{` atau `[`, auto-retry 2x, dan fallback cache otomatis sehingga beranda 100% langsung muncul tanpa error.
+            2. **Tipografi Bersih SF Pro Display & Border Avatar Presisi:**
+               - Menghapus total font tipis dan font monospasi bergaris nol `0` (`77.230 / 77.500`); kini menggunakan font sans-serif SF Pro Display bersih dan tegas.
+               - Menghapus cincin EXP yang bertabrakan di foto profil; Avatar kini berukuran 82.dp dengan layer Border Avatar 100.dp (1.22x) tepat di tengah konsentris.
+               - Menambahkan padding bawah 120.dp pada ProfileScreen agar tombol 'Keluar Akun' tidak tertutup bottom navbar.
+            3. **Seluruh 985 Avatar Border & 396 Profile Effect Asli Discord:**
+               - Menghapus 5 item dummy; membaca seluruh 985 Avatar Decorations dan 396 Profile Effects dari `discord_assets` JSON.
+               - Pembagian tier otomatis: 15% Starter (500-1500 Poin), 65% Standard & High (3500-25000 Poin, Lv. 35+), 20% Mythic Limited (Eksklusif Redeem).
+            4. **Animasi APNG 60 FPS & Disk Cache Instan:**
+               - Mengintegrasikan library APNG decoder `com.github.penfeizhou.android.animation:apng:3.0.2` dengan komponen `AnimatedCosmeticImage` auto-start 60 FPS.
+               - Optimasi URL `?size=160&passthrough=true` untuk loading instan dalam milidetik serta disk cache 250MB.
+            5. **Katalog Lengkap di Halaman Edit Profil:**
+               - Menampilkan seluruh 985 Border, 396 Profile Effect, dan Custom Title dengan item dimiliki di urutan teratas.
+               - Memperbaiki bug double `@@` pada username.
+               - Live preview instan di foto profil/banner atas saat item apa pun diklik.
+            6. **Rombak Layout Shop, Rewards, & Leaderboard:**
+               - Shop & Kosmetik: Desain Grid 2 Kolom gaya Anibi, search bar, filter chip, preview animasi 100.dp.
+               - Points & Rewards: Menghapus kotak overlay tumpuk; header ramping 1 baris (`Lv. X • ✦ [Poin] Poin`), 7 kapsul streak check-in bersih emas/kristal, dan padding title 24.dp anti-terpotong.
+               - Papan Peringkat: Menghapus kotak merah/abu podium; foto profil pas di lubang atas bingkai Top 1, 2, 3 konsentris (layer belakang zIndex=0, bingkai zIndex=1).
           draft: false
           prerelease: false
           make_latest: true

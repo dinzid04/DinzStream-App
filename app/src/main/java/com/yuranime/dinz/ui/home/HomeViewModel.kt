@@ -154,12 +154,42 @@ class HomeViewModel(
                     )
                 }
             } else {
-                val errorMsg = homeResult.exceptionOrNull()?.localizedMessage ?: "Gagal memuat data"
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = errorMsg
-                    )
+                val fallbackData = repository.getFallbackHomeData()
+                val comicsItems = comicsResult.getOrDefault(emptyList())
+                val cuplixItems = cuplixResult.getOrDefault(emptyList())
+                val newTitles = newTitlesResult.getOrNull() ?: emptyList()
+                val randomItems = randomResult.getOrNull() ?: emptyList()
+
+                if (fallbackData != null || newTitles.isNotEmpty() || randomItems.isNotEmpty() || comicsItems.isNotEmpty()) {
+                    _uiState.update { current ->
+                        val newEp = fallbackData?.newEpisodes ?: newTitles
+                        val hot = fallbackData?.hotAnime ?: randomItems
+                        val today = fallbackData?.todayAnime ?: emptyList()
+                        val waiting = fallbackData?.waitingAnime ?: emptyList()
+                        val popular = fallbackData?.popularAnime ?: emptyList()
+                        current.copy(
+                            isLoading = false,
+                            errorMessage = null,
+                            sliderItem = fallbackData?.slider?.firstOrNull() ?: newEp.firstOrNull(),
+                            cuplixList = cuplixItems,
+                            newEpisodesList = newEp,
+                            hotAnimeList = hot,
+                            newTitlesList = newTitles,
+                            comicsList = if (comicsItems.isNotEmpty()) comicsItems else current.comicsList,
+                            todayScheduleList = today,
+                            jatForYuList = randomItems,
+                            waitingAnimeList = waiting,
+                            popularAnimeList = popular
+                        )
+                    }
+                } else {
+                    val errorMsg = homeResult.exceptionOrNull()?.localizedMessage ?: "Gagal memuat data"
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = errorMsg
+                        )
+                    }
                 }
             }
         }

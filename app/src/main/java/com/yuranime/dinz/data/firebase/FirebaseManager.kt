@@ -264,285 +264,9 @@ object FirebaseManager {
         )
     )
 
-    val SHOP_BORDERS: List<BorderDefinition> = listOf(
-        // Podium Classics
-        BorderDefinition(
-            id = "border_bronze_crest",
-            name = "Vanguard Bronze Frame",
-            imageUrl = TOP_3_BORDER_URL,
-            pointCost = 250L,
-            description = "Frame avatar bergaya mecha perunggu",
-            tier = "A",
-            category = "Podium"
-        ),
-        BorderDefinition(
-            id = "border_silver_wings",
-            name = "Valkyrie Silver Frame",
-            imageUrl = TOP_2_BORDER_URL,
-            pointCost = 450L,
-            description = "Frame avatar perak bersayap presisi",
-            tier = "A",
-            category = "Podium"
-        ),
-        BorderDefinition(
-            id = "border_sovereign_gold",
-            name = "Sovereign Gold Frame",
-            imageUrl = TOP_1_BORDER_URL,
-            pointCost = 750L,
-            description = "Frame avatar mahkota emas kasta tertinggi",
-            tier = "A",
-            category = "Podium"
-        ),
-        // Tier A (Starter: 300-800 Poin)
-        BorderDefinition(
-            id = "border_rage_red",
-            name = "Rage Crimson Aura",
-            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_e1b0849ce324835695662bb368dca622.png?size=4096&passthrough=true",
-            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_e1b0849ce324835695662bb368dca622.png?size=4096&passthrough=false",
-            pointCost = 500L,
-            description = "Aura api merah berkobar penuh amarah petarung",
-            tier = "A",
-            category = "Anime"
-        ),
-        BorderDefinition(
-            id = "border_rage_purple",
-            name = "Rage Amethyst Aura",
-            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_8171a822bd51b5c00e6203cf65d08fc3.png?size=4096&passthrough=true",
-            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_8171a822bd51b5c00e6203cf65d08fc3.png?size=4096&passthrough=false",
-            pointCost = 550L,
-            description = "Aura petir ungu misterius kekuatan tersembunyi",
-            tier = "A",
-            category = "Anime"
-        ),
-        BorderDefinition(
-            id = "border_nova_surge",
-            name = "Nova Surge Cosmic",
-            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_4de86ce972cebc31f9e2b17f6505708a.png?size=4096&passthrough=true",
-            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_4de86ce972cebc31f9e2b17f6505708a.png?size=4096&passthrough=false",
-            pointCost = 650L,
-            description = "Pusaran energi supernova luar angkasa",
-            tier = "A",
-            category = "Cosmos"
-        ),
-        BorderDefinition(
-            id = "border_constellations",
-            name = "Constellations Dusk",
-            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_1fe04b503e91456565158a74c10a30b5.png?size=4096&passthrough=true",
-            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_1fe04b503e91456565158a74c10a30b5.png?size=4096&passthrough=false",
-            pointCost = 600L,
-            description = "Rasi bintang langit senja memukau",
-            tier = "A",
-            category = "Cosmos"
-        ),
-        BorderDefinition(
-            id = "border_spirit_embers",
-            name = "Spirit Embers",
-            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_10058ec0ffad8e4693b2a2656ca8018e.png?size=4096&passthrough=true",
-            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_10058ec0ffad8e4693b2a2656ca8018e.png?size=4096&passthrough=false",
-            pointCost = 450L,
-            description = "Percikan roh magis api suci melayang",
-            tier = "A",
-            category = "Fantasy"
-        ),
-        // Tier B (Exclusive: Lv. 35+ & 3,500 - 25,000 Poin)
-        BorderDefinition(
-            id = "border_arcane_sigil",
-            name = "Arcane Sigil",
-            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_ef8d91c10d3f25c2ceb90b8f58d0c0fc.png?size=4096&passthrough=true",
-            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_ef8d91c10d3f25c2ceb90b8f58d0c0fc.png?size=4096&passthrough=false",
-            pointCost = 5000L,
-            description = "Segel sihir kuno terlarang bagi penyihir agung",
-            tier = "B",
-            requiredLevel = 35,
-            category = "Dark Fantasy"
-        ),
-        BorderDefinition(
-            id = "border_cybernetic",
-            name = "Cybernetic Neural",
-            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_c6b3b5550a6e7889a9c40330dc372f51.png?size=4096&passthrough=true",
-            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_c6b3b5550a6e7889a9c40330dc372f51.png?size=4096&passthrough=false",
-            pointCost = 7500L,
-            description = "Implan neural sibernetik berkecepatan cahaya",
-            tier = "B",
-            requiredLevel = 35,
-            category = "Cyberpunk"
-        ),
-        BorderDefinition(
-            id = "border_digital_sunrise",
-            name = "Digital Sunrise",
-            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_cc83e95e86a51d957d47e447b966c5d1.png?size=4096&passthrough=true",
-            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_cc83e95e86a51d957d47e447b966c5d1.png?size=4096&passthrough=false",
-            pointCost = 12000L,
-            description = "Spektrum neon fajar neo-Tokyo abad 22",
-            tier = "B",
-            requiredLevel = 40,
-            category = "Cyberpunk"
-        ),
-        BorderDefinition(
-            id = "border_miyabi",
-            name = "Hoshimi Miyabi Blade",
-            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_c8092128806507a66067c174c7ec1fb7.png?size=4096&passthrough=true",
-            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_c8092128806507a66067c174c7ec1fb7.png?size=4096&passthrough=false",
-            pointCost = 20000L,
-            description = "Aura pedang void es pembelah Hollow Zenless",
-            tier = "B",
-            requiredLevel = 50,
-            category = "Zenless Zone Zero"
-        ),
-        BorderDefinition(
-            id = "border_ellen_joe",
-            name = "Ellen Joe Shark Hunter",
-            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_46317d74da81ae77c2e391bb7b607061.png?size=4096&passthrough=true",
-            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_46317d74da81ae77c2e391bb7b607061.png?size=4096&passthrough=false",
-            pointCost = 22500L,
-            description = "Gigi hiu predator maid Victoria Housekeeping",
-            tier = "B",
-            requiredLevel = 50,
-            category = "Zenless Zone Zero"
-        ),
-        // Tier C (Limited: Redeem Only)
-        BorderDefinition(
-            id = "border_venom_logo",
-            name = "Venom Symbiote Crest",
-            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_537adf38d27721432f062cc9d913e2af.png?size=4096&passthrough=true",
-            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_537adf38d27721432f062cc9d913e2af.png?size=4096&passthrough=false",
-            pointCost = 0L,
-            description = "Tendril simbiotik hitam lambang laba-laba putih legendaris",
-            tier = "C",
-            category = "Limited"
-        ),
-        BorderDefinition(
-            id = "border_venom_nologo",
-            name = "Venom Tendrils",
-            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_a7e2ab61c12d84c8b538573f28d58ae0.png?size=4096&passthrough=true",
-            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_a7e2ab61c12d84c8b538573f28d58ae0.png?size=4096&passthrough=false",
-            pointCost = 0L,
-            description = "Sulur simbiotik hitam merayap mengelilingi bingkai avatar",
-            tier = "C",
-            category = "Limited"
-        ),
-        BorderDefinition(
-            id = "border_mythic_emperor",
-            name = "Mythic Emperor Crest",
-            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_ef8d91c10d3f25c2ceb90b8f58d0c0fc.png?size=4096&passthrough=true",
-            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_ef8d91c10d3f25c2ceb90b8f58d0c0fc.png?size=4096&passthrough=false",
-            pointCost = 0L,
-            description = "Mahkota keemasan penguasa mutlak kasta tertinggi",
-            tier = "C",
-            category = "Limited"
-        )
-    )
-
-    val SHOP_PROFILE_EFFECTS: List<ProfileEffectDefinition> = listOf(
-        // Tier A (Starter: 600-800 Poin)
-        ProfileEffectDefinition(
-            id = "effect_magic_hearts_gold",
-            name = "Magic Hearts Gold",
-            animationUrl = "https://cdn.discordapp.com/assets/content/2ecd952da0b1c00559d3e8e2b85e053f1469e3a6cbe70295db2ee3fa3ff55883",
-            pointCost = 600L,
-            description = "Hujan hati emas bersinar dengan aura magis",
-            tier = "A",
-            category = "Anime"
-        ),
-        ProfileEffectDefinition(
-            id = "effect_magic_hearts_blue",
-            name = "Magic Hearts Sapphire",
-            animationUrl = "https://cdn.discordapp.com/assets/content/8b756deca4bb1a5744fa1284d720b08db6faefc3a91e5cfb34d284e3e3b12361",
-            pointCost = 650L,
-            description = "Kilau partikel safir biru berkilau di kartu profil",
-            tier = "A",
-            category = "Anime"
-        ),
-        ProfileEffectDefinition(
-            id = "effect_starlight_wand",
-            name = "Starlight Sparkle",
-            animationUrl = "https://cdn.discordapp.com/media/v1/collectibles-shop/9cf28ca2b03623fa06b4725355a1532189d533dd04cfa886ef299a9a06144e5b",
-            pointCost = 750L,
-            description = "Pusaran tongkat bintang ajaib berkilau lembut",
-            tier = "A",
-            category = "Starlight Magic"
-        ),
-        // Tier B (Exclusive: Lv. 35+ & 3,500 - 25,000 Poin)
-        ProfileEffectDefinition(
-            id = "effect_cosmic_twilight",
-            name = "Cosmic Twilight",
-            animationUrl = "https://cdn.discordapp.com/assets/content/fcfa4926b8731b4c000f576e2c9efca1b27236b567d162bb6b8ec013be82bc72",
-            pointCost = 6500L,
-            description = "Aura kosmik nebula kecubung ungu yang megah",
-            tier = "B",
-            requiredLevel = 35,
-            category = "Cosmos"
-        ),
-        ProfileEffectDefinition(
-            id = "effect_cyberspace",
-            name = "Cyberspace Matrix",
-            animationUrl = "https://cdn.discordapp.com/assets/content/31fe6e737fc1773afa54c0db46235cebaea6989467d51ee2bc3a44d8b9ba58ea",
-            pointCost = 9500L,
-            description = "Aliran data biner matriks hijau neon berkecepatan tinggi",
-            tier = "B",
-            requiredLevel = 40,
-            category = "DISXCORE"
-        ),
-        ProfileEffectDefinition(
-            id = "effect_cosmic_guardian",
-            name = "Cosmic Guardian Nova",
-            animationUrl = "https://cdn.discordapp.com/media/v1/collectibles-shop/0350f55562d987e91d516248aa0c36b69512356598ea1b0b54060851ec690b2d",
-            pointCost = 15000L,
-            description = "Pancaran perisai pelindung nova penjaga galaksi",
-            tier = "B",
-            requiredLevel = 45,
-            category = "Starlight Magic"
-        ),
-        ProfileEffectDefinition(
-            id = "effect_shadow_strike",
-            name = "Shadow Strike Blade",
-            animationUrl = "https://cdn.discordapp.com/media/v1/collectibles-shop/819dcfaf0dd0a6723e7b1c3127dd3fa65239e088a85f81f1e0cfbaab4db3f677",
-            pointCost = 20000L,
-            description = "Tebasan pedang bayangan hitam membelah kartu profil",
-            tier = "B",
-            requiredLevel = 50,
-            category = "Zen Protocol"
-        ),
-        ProfileEffectDefinition(
-            id = "effect_miyabi_slash",
-            name = "Hoshimi Miyabi Slash",
-            animationUrl = "https://cdn.discordapp.com/media/v1/collectibles-shop/8d0841804c183f6bb5ee61befdb3c37c84413d33bcb4eed903841bea8878c665",
-            pointCost = 25000L,
-            description = "Tebasan pedang es klan Hoshimi pembelah waktu",
-            tier = "B",
-            requiredLevel = 50,
-            category = "Zenless Zone Zero"
-        ),
-        ProfileEffectDefinition(
-            id = "effect_ellen_chomp",
-            name = "Ellen Joe Shark Chomp",
-            animationUrl = "https://cdn.discordapp.com/media/v1/collectibles-shop/9d2f22c608f619b02213796d5b08ec8ae2376993ce615c829da49386c99c43d0",
-            pointCost = 25000L,
-            description = "Gigitan rahang hiu laut dalam mematikan",
-            tier = "B",
-            requiredLevel = 50,
-            category = "Zenless Zone Zero"
-        ),
-        // Tier C (Limited: Redeem Only)
-        ProfileEffectDefinition(
-            id = "effect_venom_symbiote",
-            name = "Venom Symbiote Surge",
-            animationUrl = "https://cdn.discordapp.com/media/v1/collectibles-shop/d272f4fc37857c23e9ea7217c35d202a363f8c585679dd2e87e9aa66388bdec2",
-            pointCost = 0L,
-            description = "Venom menerjang layar dengan raungan sulur simbiotik hitam liar",
-            tier = "C",
-            category = "Limited"
-        ),
-        ProfileEffectDefinition(
-            id = "effect_mythic_aurora",
-            name = "Mythic Sovereign Aurora",
-            animationUrl = "https://cdn.discordapp.com/media/v1/collectibles-shop/0350f55562d987e91d516248aa0c36b69512356598ea1b0b54060851ec690b2d",
-            pointCost = 0L,
-            description = "Gelombang aurora keemasan berkilau lambang penguasa",
-            tier = "C",
-            category = "Limited"
-        )
-    )
+    // Seluruh kosmetik dibaca langsung dari katalog Discord Asli (985 Border + 396 Profile Effect)
+    val SHOP_BORDERS: List<BorderDefinition> = emptyList()
+    val SHOP_PROFILE_EFFECTS: List<ProfileEffectDefinition> = emptyList()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -1388,6 +1112,7 @@ object FirebaseManager {
         bannerUrl: String,
         equippedTitle: String? = null,
         equippedBorderUrl: String? = null,
+        equippedProfileEffectUrl: String? = null,
         onComplete: (Boolean, String) -> Unit
     ) {
         val uid = getActiveUid()
@@ -1439,13 +1164,15 @@ object FirebaseManager {
             val current = _userProfile.value ?: UserProfile(uid = uid)
             val cleanName = name.trim().ifBlank { current.name }
             val cleanUsername = username.trim().lowercase(Locale.ROOT).replace(" ", "")
-                .ifBlank { current.username }
+                .removePrefix("@")
+                .ifBlank { current.username.removePrefix("@") }
             val cleanBio = bio.trim().ifBlank { "Penikmat anime & komik di Yuranime." }
             val finalTitle = equippedTitle?.trim() ?: current.equippedTitle
             val titleDef = resolveTitleDefinition(finalTitle, current.level)
             val finalTitleTier = titleDef?.tierLevel ?: current.level
             val finalTitleVariant = titleDef?.styleVariant ?: 0
             val finalBorder = equippedBorderUrl?.trim() ?: current.equippedBorderUrl
+            val finalEffect = equippedProfileEffectUrl?.trim() ?: current.equippedProfileEffectUrl
 
             val updated = current.copy(
                 name = cleanName,
@@ -1456,7 +1183,8 @@ object FirebaseManager {
                 equippedTitle = finalTitle,
                 equippedTitleTier = finalTitleTier,
                 equippedTitleVariant = finalTitleVariant,
-                equippedBorderUrl = finalBorder
+                equippedBorderUrl = finalBorder,
+                equippedProfileEffectUrl = finalEffect
             )
             _userProfile.value = updated
             if (context != null) {
@@ -1492,7 +1220,8 @@ object FirebaseManager {
                 "equippedTitle" to updated.equippedTitle,
                 "equippedTitleTier" to updated.equippedTitleTier,
                 "equippedTitleVariant" to updated.equippedTitleVariant,
-                "equippedBorderUrl" to updated.equippedBorderUrl
+                "equippedBorderUrl" to updated.equippedBorderUrl,
+                "equippedProfileEffectUrl" to updated.equippedProfileEffectUrl
             )
 
             try {

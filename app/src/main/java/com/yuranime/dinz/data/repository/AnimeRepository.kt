@@ -28,6 +28,11 @@ class AnimeRepository(
     private val api: AnimeInApiService = ApiClient.apiService
 ) {
 
+    companion object {
+        @Volatile
+        private var memoryCachedHomeData: AnimeHomeData? = null
+    }
+
     private fun getCurrentDayName(): String {
         val sdf = SimpleDateFormat("EEEE", Locale("id", "ID"))
         return when (sdf.format(Date()).uppercase(Locale.ROOT)) {
@@ -42,18 +47,33 @@ class AnimeRepository(
         }
     }
 
+    fun getFallbackHomeData(): AnimeHomeData? = memoryCachedHomeData
+
     suspend fun getHomeData(): Result<AnimeHomeData> = withContext(Dispatchers.IO) {
         try {
             val day = getCurrentDayName()
             val response = api.getHomeData(day = day)
             val data = response.data
-            if (data != null) {
+            if (data != null && (!data.hotAnime.isNullOrEmpty() || !data.newEpisodes.isNullOrEmpty() || !data.popular.isNullOrEmpty())) {
+                memoryCachedHomeData = data
                 Result.success(data)
             } else {
-                Result.failure(Exception("Data respon kosong"))
+                val fallback = memoryCachedHomeData
+                if (fallback != null) {
+                    Result.success(fallback)
+                } else if (data != null) {
+                    Result.success(data)
+                } else {
+                    Result.failure(Exception("Data respon kosong"))
+                }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            val fallback = memoryCachedHomeData
+            if (fallback != null) {
+                Result.success(fallback)
+            } else {
+                Result.failure(e)
+            }
         }
     }
 

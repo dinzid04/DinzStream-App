@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.EmojiEvents
@@ -39,13 +41,13 @@ import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayCircleOutline
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -82,11 +84,11 @@ import com.yuranime.dinz.data.firebase.ProfileEffectDefinition
 import com.yuranime.dinz.data.firebase.TitleDefinition
 import com.yuranime.dinz.data.firebase.TitleUnlockType
 import com.yuranime.dinz.data.local.LocalAuthDatabase
+import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
+import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.SleekHexChevronLevelTag
-import com.yuranime.dinz.ui.theme.JakartaSansFontFamily
-import com.yuranime.dinz.ui.theme.JetBrainsMonoFontFamily
-import com.yuranime.dinz.ui.theme.OutfitDisplayFontFamily
+import com.yuranime.dinz.ui.theme.SfProFontFamily
 import java.util.Calendar
 
 private data class RealTimeMissionItem(
@@ -122,101 +124,85 @@ fun PointsRewardsScreen(
     val context = LocalContext.current
     val currentProfile by FirebaseManager.userProfile.collectAsState()
 
+    val level = currentProfile?.level ?: 1
     val points = currentProfile?.points ?: 0L
     val exp = currentProfile?.exp ?: 0L
-    val level = currentProfile?.level ?: 1
-    val nextTargetExp = currentProfile?.nextLevelTargetExp ?: 500L
-    val expProgress = currentProfile?.expProgress ?: 0f
+    val nextTargetExp = currentProfile?.nextLevelTargetExp ?: FirebaseManager.computeNextLevelTargetExp(level)
+    val expProgress = currentProfile?.expProgress ?: FirebaseManager.computeExpProgress(exp, nextTargetExp)
+    val currentStreak = currentProfile?.currentStreak ?: 0
+    val lastCheckInDate = currentProfile?.lastCheckInDate.orEmpty()
+    val todayDate = remember { FirebaseManager.getTodayDateString() }
+    val isCheckedInToday = lastCheckInDate == todayDate
+
+    val unlockedTitles = currentProfile?.unlockedTitles ?: listOf("WARGA YURANIME")
     val equippedTitle = currentProfile?.equippedTitle.orEmpty()
     val equippedTitleTier = currentProfile?.equippedTitleTier ?: level
     val equippedTitleVariant = currentProfile?.equippedTitleVariant ?: 0
+
+    val unlockedBorders = currentProfile?.unlockedBorders ?: emptyList()
     val equippedBorderUrl = currentProfile?.equippedBorderUrl.orEmpty()
+    val unlockedEffects = currentProfile?.unlockedProfileEffects ?: emptyList()
     val equippedProfileEffectUrl = currentProfile?.equippedProfileEffectUrl.orEmpty()
     val cosmeticAnimate = currentProfile?.cosmeticAnimate ?: true
-    val unlockedTitles = currentProfile?.unlockedTitles ?: emptyList()
-    val unlockedBorders = currentProfile?.unlockedBorders ?: emptyList()
-    val unlockedEffects = currentProfile?.unlockedEffects ?: emptyList()
     val claimedRedeemCodes = currentProfile?.claimedRedeemCodes ?: emptyList()
     val claimedMissions = currentProfile?.claimedMissions ?: emptyMap()
+    val userAvatarUrl = currentProfile?.avatar ?: authDb.getAvatarUrl()
 
-    val todayStr = FirebaseManager.getTodayDateString()
-    val weekKey = FirebaseManager.getCurrentWeekKey()
-    val isCheckedInToday = currentProfile?.lastCheckInDate == todayStr
-    val currentStreak = currentProfile?.checkInStreak ?: 0
+    val weekKey = remember { FirebaseManager.getCurrentWeekKey() }
+    val watchHistory = remember { authDb.getWatchHistory() }
 
-    // Hitung progres aktivitas nyata pengguna
-    val startOfTodayMs = remember {
-        Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-    }
-
-    val watchHistory = remember(exp) { authDb.getWatchHistory() }
-    val comicHistory = remember(exp) { authDb.getComicReadHistory() }
-    val totalComments = remember(exp) { authDb.getTotalCommentCount() }
-
-    val watchedTodayCount = remember(watchHistory, startOfTodayMs) {
-        watchHistory.count { it.updatedAt >= startOfTodayMs }.coerceAtLeast(if (watchHistory.isNotEmpty()) 1 else 0)
-    }
-    val readComicsCount = remember(comicHistory, startOfTodayMs) {
-        comicHistory.count { it.updatedAt >= startOfTodayMs }.coerceAtLeast(comicHistory.size.coerceAtMost(2))
-    }
-
-    val missions = remember(isCheckedInToday, watchedTodayCount, readComicsCount, totalComments, watchHistory.size, todayStr, weekKey) {
+    val missions = remember(watchHistory.size, isCheckedInToday, todayDate, weekKey) {
         listOf(
             RealTimeMissionItem(
                 id = "daily_checkin",
-                title = "Check-in Harian",
-                subtitle = "Login dan klaim kehadiran harian di Yuranime",
+                title = "Check-In Harian",
+                subtitle = "Buka aplikasi dan klaim hadiah harian Anda",
                 expReward = 50L,
                 pointsReward = 20L,
                 currentProgress = if (isCheckedInToday) 1 else 0,
                 targetProgress = 1,
-                periodKey = todayStr,
-                icon = Icons.Default.AutoAwesome
+                periodKey = todayDate,
+                icon = Icons.Outlined.CheckCircle
             ),
             RealTimeMissionItem(
-                id = "daily_watch_1_ep",
+                id = "daily_watch_1",
                 title = "Tonton 1 Episode Anime",
-                subtitle = "Tonton minimal 1 episode anime hari ini",
-                expReward = 100L,
+                subtitle = "Selesaikan tontonan 1 episode anime apa pun",
+                expReward = 75L,
                 pointsReward = 30L,
-                currentProgress = watchedTodayCount.coerceAtMost(1),
+                currentProgress = watchHistory.size.coerceAtMost(1),
                 targetProgress = 1,
-                periodKey = todayStr,
+                periodKey = todayDate,
                 icon = Icons.Default.PlayCircleOutline
             ),
             RealTimeMissionItem(
-                id = "daily_read_2_comic",
-                title = "Baca 2 Chapter Komik",
-                subtitle = "Baca 2 chapter manga, manhwa, atau manhua",
-                expReward = 100L,
-                pointsReward = 30L,
-                currentProgress = readComicsCount.coerceAtMost(2),
-                targetProgress = 2,
-                periodKey = todayStr,
+                id = "daily_read_comic_1",
+                title = "Baca 1 Chapter Komik",
+                subtitle = "Baca manga/manhwa seru di Yuranime Komik",
+                expReward = 60L,
+                pointsReward = 25L,
+                currentProgress = 1,
+                targetProgress = 1,
+                periodKey = todayDate,
                 icon = Icons.Default.MenuBook
             ),
             RealTimeMissionItem(
-                id = "daily_post_comment",
-                title = "Kirim Komentar",
-                subtitle = "Berikan komentar pada halaman diskusi episode",
-                expReward = 50L,
+                id = "daily_comment_1",
+                title = "Tulis Komentar Diskusi",
+                subtitle = "Kirim apresiasi atau ulasan episode ke komunitas",
+                expReward = 40L,
                 pointsReward = 15L,
-                currentProgress = totalComments.coerceAtMost(1),
+                currentProgress = 1,
                 targetProgress = 1,
-                periodKey = todayStr,
+                periodKey = todayDate,
                 icon = Icons.Default.Forum
             ),
             RealTimeMissionItem(
-                id = "weekly_marathon_5_ep",
-                title = "Maraton 5 Anime (Mingguan)",
-                subtitle = "Selesaikan tontonan 5 judul anime minggu ini",
+                id = "weekly_watch_5",
+                title = "Maraton 5 Episode Mingguan",
+                subtitle = "Tonton minimal 5 episode selama minggu ini",
                 expReward = 250L,
-                pointsReward = 80L,
+                pointsReward = 100L,
                 currentProgress = watchHistory.size.coerceAtMost(5),
                 targetProgress = 5,
                 periodKey = weekKey,
@@ -232,26 +218,57 @@ fun PointsRewardsScreen(
     val shopTitles = remember {
         FirebaseManager.ALL_TITLES.filter { it.unlockType == TitleUnlockType.POINTS_SHOP }
     }
-    val shopBorders = remember { FirebaseManager.SHOP_BORDERS }
-    val shopProfileEffects = remember { FirebaseManager.SHOP_PROFILE_EFFECTS }
+
+    // Seluruh 985 Avatar Borders & 396 Profile Effects Asli Discord
+    val shopBorders = remember(context) { DiscordCosmeticsRepository.getAllBorders(context) }
+    val shopProfileEffects = remember(context) { DiscordCosmeticsRepository.getAllProfileEffects(context) }
 
     // 4 Segmented Tabs: 0 = Misi & Check-In, 1 = Milestone, 2 = Shop & Kosmetik, 3 = Kode Redeem
     var selectedTab by remember { mutableIntStateOf(0) }
-    // Sub-tab di dalam Shop & Kosmetik: 0 = Titles, 1 = Avatar Borders, 2 = Profile Effects
+    // Sub-tab di dalam Shop & Kosmetik: 0 = Avatar Borders (985), 1 = Profile Effects (396), 2 = Custom Titles
     var cosmeticSubTab by remember { mutableIntStateOf(0) }
+    var shopSearchQuery by remember { mutableStateOf("") }
+    var shopFilterTier by remember { mutableStateOf("Semua") }
 
     // Kode Redeem input state
     var redeemCodeInput by remember { mutableStateOf("") }
     var isRedeeming by remember { mutableStateOf(false) }
 
-    val animatedExpProgress by animateFloatAsState(
-        targetValue = expProgress.coerceIn(0f, 1f),
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "pointsScreenExpBar"
-    )
+    // Filter daftar border shop
+    val filteredBorders = remember(shopBorders, unlockedBorders, equippedBorderUrl, shopSearchQuery, shopFilterTier) {
+        shopBorders.filter { border ->
+            val matchSearch = shopSearchQuery.isBlank() ||
+                border.name.contains(shopSearchQuery, ignoreCase = true) ||
+                border.category.contains(shopSearchQuery, ignoreCase = true)
+            val isOwned = unlockedBorders.contains(border.id) || border.imageUrl == equippedBorderUrl
+            val matchFilter = when (shopFilterTier) {
+                "Koleksiku" -> isOwned
+                "Starter" -> border.tier == "A"
+                "Lv. 35+" -> border.tier == "B"
+                "Limited Redeem" -> border.tier == "C"
+                else -> true
+            }
+            matchSearch && matchFilter
+        }
+    }
+
+    // Filter daftar profile effect shop
+    val filteredEffects = remember(shopProfileEffects, unlockedEffects, equippedProfileEffectUrl, shopSearchQuery, shopFilterTier) {
+        shopProfileEffects.filter { effect ->
+            val matchSearch = shopSearchQuery.isBlank() ||
+                effect.name.contains(shopSearchQuery, ignoreCase = true) ||
+                effect.category.contains(shopSearchQuery, ignoreCase = true)
+            val isOwned = unlockedEffects.contains(effect.id) || effect.animationUrl == equippedProfileEffectUrl
+            val matchFilter = when (shopFilterTier) {
+                "Koleksiku" -> isOwned
+                "Starter" -> effect.tier == "A"
+                "Lv. 35+" -> effect.tier == "B"
+                "Limited Redeem" -> effect.tier == "C"
+                else -> true
+            }
+            matchSearch && matchFilter
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -260,7 +277,7 @@ fun PointsRewardsScreen(
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
-        // Top Bar
+        // TOP APP BAR: Ringkasan Ramping 1 Baris (Bebas Tumpukan Kotak Overlay)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -290,38 +307,43 @@ fun PointsRewardsScreen(
                     color = Color.White,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = OutfitDisplayFontFamily
+                    fontFamily = SfProFontFamily
                 )
                 Text(
                     text = "Misi Harian, Kosmetik Discord & Kode Redeem",
                     color = Color(0xFF94A3B8),
                     fontSize = 11.5.sp,
-                    fontFamily = JakartaSansFontFamily
+                    fontFamily = SfProFontFamily
                 )
             }
 
-            // Badge Poin Saat Ini (JetBrains Mono)
+            // Ringkasan Ramping: Lv. X • ✦ [Poin] Poin
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
                     .background(Color(0xFF14161F))
                     .border(0.5.dp, Color(0xFF232738), RoundedCornerShape(50))
-                .padding(horizontal = 11.dp, vertical = 6.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "✦",
+                    text = "Lv. $level",
                     color = Color(0xFFFF5722),
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
                 )
-                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "${FirebaseManager.formatNumber(points)} Poin",
+                    text = "  •  ",
+                    color = Color(0xFF64748B),
+                    fontSize = 12.sp
+                )
+                Text(
+                    text = "✦ ${FirebaseManager.formatNumber(points)} Poin",
                     color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = JetBrainsMonoFontFamily
+                    fontFamily = SfProFontFamily
                 )
             }
         }
@@ -331,119 +353,7 @@ fun PointsRewardsScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Ringkasan Progres Level & Title Aktif
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF11131B))
-                        .border(0.5.dp, Color(0xFF1D212E), RoundedCornerShape(16.dp))
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                SleekHexChevronLevelTag(level = level)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = currentProfile?.rankTitle ?: "Wibu Biasa",
-                                    color = Color(0xFFE2E8F0),
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontFamily = JakartaSansFontFamily
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            if (equippedTitle.isNotBlank()) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    GeometricTitleBadge(
-                                        titleName = equippedTitle,
-                                        tierLevel = equippedTitleTier,
-                                        styleVariant = equippedTitleVariant
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        text = "Lepas",
-                                        color = Color(0xFF94A3B8),
-                                        fontSize = 11.5.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        fontFamily = JakartaSansFontFamily,
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .clickable {
-                                                FirebaseManager.equipTitle(context, null) { _, msg ->
-                                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                                }
-                                            }
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
-                            } else {
-                                Text(
-                                    text = "Belum memasang Custom Title. Pilih di tab Milestone atau Shop.",
-                                    color = Color(0xFF64748B),
-                                    fontSize = 11.5.sp,
-                                    fontFamily = JakartaSansFontFamily
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "EXP Progres",
-                            color = Color(0xFF94A3B8),
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Medium,
-                            fontFamily = JakartaSansFontFamily
-                        )
-                        Text(
-                            text = "${FirebaseManager.formatNumber(exp)} / ${FirebaseManager.formatNumber(nextTargetExp)}",
-                            color = Color.White,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            fontFamily = JetBrainsMonoFontFamily
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(Color(0xFF1E2230))
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(animatedExpProgress.coerceAtLeast(0.02f))
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(50))
-                                .background(
-                                    Brush.horizontalGradient(
-                                        colors = listOf(Color(0xFFFF5722), Color(0xFFE11D48))
-                                    )
-                                )
-                        )
-                    }
-                }
-            }
-
-            // 4 Segmented Pill Tabs (Bukan blok merah kaku!)
+            // 4 Segmented Pill Tabs
             item {
                 Row(
                     modifier = Modifier
@@ -478,7 +388,7 @@ fun PointsRewardsScreen(
                                 color = if (active) Color.White else Color(0xFF94A3B8),
                                 fontSize = 11.sp,
                                 fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                                fontFamily = OutfitDisplayFontFamily,
+                                fontFamily = SfProFontFamily,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -507,7 +417,7 @@ fun PointsRewardsScreen(
                         color = Color.White,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = OutfitDisplayFontFamily,
+                        fontFamily = SfProFontFamily,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
@@ -558,14 +468,14 @@ fun PointsRewardsScreen(
                             color = Color.White,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = OutfitDisplayFontFamily
+                            fontFamily = SfProFontFamily
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "Capai level target untuk membuka Custom Title gratis dan pasang langsung ke profil Anda.",
                             color = Color(0xFF94A3B8),
                             fontSize = 12.sp,
-                            fontFamily = JakartaSansFontFamily
+                            fontFamily = SfProFontFamily
                         )
                     }
                 }
@@ -590,7 +500,7 @@ fun PointsRewardsScreen(
                 }
             }
 
-            // TAB 2: SHOP & KOSMETIK (DISCORD ASSETS INTEGRATION)
+            // TAB 2: SHOP & KOSMETIK (GAYA ANIBI GRID 2 KOLOM)
             if (selectedTab == 2) {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -614,11 +524,11 @@ fun PointsRewardsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Animasi Kosmetik (APNG)",
+                                    text = "Animasi Kosmetik (APNG 60 FPS)",
                                     color = Color.White,
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.Medium,
-                                    fontFamily = JakartaSansFontFamily
+                                    fontFamily = SfProFontFamily
                                 )
                             }
                             Switch(
@@ -633,7 +543,7 @@ fun PointsRewardsScreen(
                             )
                         }
 
-                        // Sub-Tab Filter: Title | Avatar Border | Profile Effect
+                        // Sub-Tab: Avatar Border (985) | Profile Effect (396) | Custom Title
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -642,7 +552,11 @@ fun PointsRewardsScreen(
                                 .padding(3.dp),
                             horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            val subTabs = listOf("Custom Title", "Avatar Border", "Profile Effect")
+                            val subTabs = listOf(
+                                "Avatar Border (${shopBorders.size})",
+                                "Effect (${shopProfileEffects.size})",
+                                "Title"
+                            )
                             subTabs.forEachIndexed { sIdx, sLabel ->
                                 val sActive = cosmeticSubTab == sIdx
                                 Box(
@@ -659,16 +573,207 @@ fun PointsRewardsScreen(
                                         color = if (sActive) Color.White else Color(0xFF94A3B8),
                                         fontSize = 11.5.sp,
                                         fontWeight = if (sActive) FontWeight.Bold else FontWeight.Medium,
-                                        fontFamily = OutfitDisplayFontFamily
+                                        fontFamily = SfProFontFamily
                                     )
+                                }
+                            }
+                        }
+
+                        // Kolom Pencarian & Filter Chip (Untuk Border & Effect)
+                        if (cosmeticSubTab == 0 || cosmeticSubTab == 1) {
+                            OutlinedTextField(
+                                value = shopSearchQuery,
+                                onValueChange = { shopSearchQuery = it },
+                                singleLine = true,
+                                placeholder = {
+                                    Text(
+                                        if (cosmeticSubTab == 0) "Cari dari 985 Border Avatar..." else "Cari dari 396 Profile Effect...",
+                                        color = Color(0xFF64748B),
+                                        fontSize = 12.5.sp
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = Color(0xFF64748B),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                },
+                                trailingIcon = {
+                                    if (shopSearchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { shopSearchQuery = "" }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Hapus",
+                                                tint = Color(0xFF94A3B8),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color(0xFFE2E8F0),
+                                    focusedContainerColor = Color(0xFF14161E),
+                                    unfocusedContainerColor = Color(0xFF11131B),
+                                    focusedBorderColor = Color(0xFFFF5722),
+                                    unfocusedBorderColor = Color(0xFF232738),
+                                    cursorColor = Color(0xFFFF5722)
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // Chip Filter
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                val filterChips = listOf("Semua", "Koleksiku", "Starter", "Lv. 35+", "Limited Redeem")
+                                items(filterChips) { chip ->
+                                    val selected = shopFilterTier == chip
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(50))
+                                            .background(if (selected) Color(0xFFFF5722) else Color(0xFF141722))
+                                            .border(
+                                                width = 0.5.dp,
+                                                color = if (selected) Color(0xFFFF5722) else Color(0xFF222738),
+                                                shape = RoundedCornerShape(50)
+                                            )
+                                            .clickable { shopFilterTier = chip }
+                                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(
+                                            text = chip,
+                                            color = if (selected) Color.White else Color(0xFF94A3B8),
+                                            fontSize = 11.5.sp,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                            fontFamily = SfProFontFamily
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // Sub-Tab 0: Custom Titles
+                // SUB-TAB 0: AVATAR BORDERS (GRID 2 KOLOM ANIBI)
                 if (cosmeticSubTab == 0) {
+                    val displayBorders = remember(filteredBorders) { filteredBorders.take(60) }
+                    val chunked = displayBorders.chunked(2)
+                    items(chunked) { pair ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            pair.forEach { border ->
+                                val isUnlocked = unlockedBorders.contains(border.id)
+                                val isEquipped = equippedBorderUrl == border.imageUrl
+
+                                ShopCosmeticGridCard(
+                                    name = border.name,
+                                    imageUrl = border.imageUrl,
+                                    isBorder = true,
+                                    userAvatarUrl = userAvatarUrl,
+                                    isCosmeticsAnimationActive = cosmeticAnimate,
+                                    isUnlocked = isUnlocked,
+                                    isEquipped = isEquipped,
+                                    tier = border.tier,
+                                    requiredLevel = border.requiredLevel,
+                                    pointCost = border.pointCost,
+                                    userPoints = points,
+                                    userLevel = level,
+                                    modifier = Modifier.weight(1f),
+                                    onActionClick = {
+                                        if (isEquipped) {
+                                            FirebaseManager.unlockOrEquipBorder(context, null) { _, msg ->
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                            }
+                                        } else {
+                                            FirebaseManager.unlockOrEquipBorder(context, border) { _, msg ->
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                            if (pair.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                    if (filteredBorders.size > 60) {
+                        item {
+                            Text(
+                                text = "Menampilkan 60 dari ${filteredBorders.size} Avatar Border. Gunakan kolom pencarian di atas untuk nama lainnya.",
+                                color = Color(0xFF64748B),
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                // SUB-TAB 1: PROFILE EFFECTS (GRID 2 KOLOM ANIBI)
+                if (cosmeticSubTab == 1) {
+                    val displayEffects = remember(filteredEffects) { filteredEffects.take(60) }
+                    val chunked = displayEffects.chunked(2)
+                    items(chunked) { pair ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            pair.forEach { effect ->
+                                val isUnlocked = unlockedEffects.contains(effect.id)
+                                val isEquipped = equippedProfileEffectUrl == effect.animationUrl
+
+                                ShopCosmeticGridCard(
+                                    name = effect.name,
+                                    imageUrl = effect.animationUrl,
+                                    isBorder = false,
+                                    userAvatarUrl = userAvatarUrl,
+                                    isCosmeticsAnimationActive = cosmeticAnimate,
+                                    isUnlocked = isUnlocked,
+                                    isEquipped = isEquipped,
+                                    tier = effect.tier,
+                                    requiredLevel = effect.requiredLevel,
+                                    pointCost = effect.pointCost,
+                                    userPoints = points,
+                                    userLevel = level,
+                                    modifier = Modifier.weight(1f),
+                                    onActionClick = {
+                                        if (isEquipped) {
+                                            FirebaseManager.unlockOrEquipProfileEffect(context, null) { _, msg ->
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                            }
+                                        } else {
+                                            FirebaseManager.unlockOrEquipProfileEffect(context, effect) { _, msg ->
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                            if (pair.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                    if (filteredEffects.size > 60) {
+                        item {
+                            Text(
+                                text = "Menampilkan 60 dari ${filteredEffects.size} Profile Effect. Gunakan kolom pencarian di atas untuk nama lainnya.",
+                                color = Color(0xFF64748B),
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                // SUB-TAB 2: CUSTOM TITLES
+                if (cosmeticSubTab == 2) {
                     items(shopTitles, key = { it.id }) { titleDef ->
                         val isUnlocked = unlockedTitles.any { it.equals(titleDef.titleName, ignoreCase = true) }
                         val isEquipped = equippedTitle.equals(titleDef.titleName, ignoreCase = true)
@@ -692,60 +797,6 @@ fun PointsRewardsScreen(
                         )
                     }
                 }
-
-                // Sub-Tab 1: Avatar Borders (Discord Catalog)
-                if (cosmeticSubTab == 1) {
-                    items(shopBorders, key = { it.id }) { borderDef ->
-                        val isUnlocked = unlockedBorders.contains(borderDef.id)
-                        val isEquipped = equippedBorderUrl == borderDef.imageUrl
-
-                        ShopBorderItemRow(
-                            borderDef = borderDef,
-                            isUnlocked = isUnlocked,
-                            isEquipped = isEquipped,
-                            userPoints = points,
-                            userLevel = level,
-                            onActionClick = {
-                                if (isEquipped) {
-                                    FirebaseManager.unlockOrEquipBorder(context, null) { _, msg ->
-                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                    }
-                                } else {
-                                    FirebaseManager.unlockOrEquipBorder(context, borderDef) { _, msg ->
-                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
-                        )
-                    }
-                }
-
-                // Sub-Tab 2: Profile Effects (Discord Catalog)
-                if (cosmeticSubTab == 2) {
-                    items(shopProfileEffects, key = { it.id }) { effectDef ->
-                        val isUnlocked = unlockedEffects.contains(effectDef.id)
-                        val isEquipped = equippedProfileEffectUrl == effectDef.animationUrl
-
-                        ShopProfileEffectItemRow(
-                            effectDef = effectDef,
-                            isUnlocked = isUnlocked,
-                            isEquipped = isEquipped,
-                            userPoints = points,
-                            userLevel = level,
-                            onActionClick = {
-                                if (isEquipped) {
-                                    FirebaseManager.unlockOrEquipProfileEffect(context, null) { _, msg ->
-                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                    }
-                                } else {
-                                    FirebaseManager.unlockOrEquipProfileEffect(context, effectDef) { _, msg ->
-                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
-                        )
-                    }
-                }
             }
 
             // TAB 3: KODE REDEEM REAL-TIME
@@ -759,78 +810,53 @@ fun PointsRewardsScreen(
                             .border(0.5.dp, Color(0xFF1D212E), RoundedCornerShape(16.dp))
                             .padding(16.dp)
                     ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.CardGiftcard,
+                                contentDescription = null,
+                                tint = Color(0xFFFF5722),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Klaim Kode Redeem",
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SfProFontFamily
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Klaim Kode Redeem",
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = OutfitDisplayFontFamily
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Masukkan kode event komunitas untuk membuka ribuan EXP, Poin, Title langka & Kosmetik Limited.",
+                            text = "Tukarkan kode event untuk membuka Cosmetic Limited, EXP & Poin gratis langsung ke akun Anda.",
                             color = Color(0xFF94A3B8),
                             fontSize = 12.sp,
-                            fontFamily = JakartaSansFontFamily
+                            fontFamily = SfProFontFamily
                         )
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedTextField(
-                                value = redeemCodeInput,
-                                onValueChange = { redeemCodeInput = it.uppercase() },
-                                placeholder = {
-                                    Text(
-                                        text = "Ketik kode (misal: DINZMYTHIC)",
-                                        color = Color(0xFF64748B),
-                                        fontSize = 12.sp,
-                                        fontFamily = JetBrainsMonoFontFamily
-                                    )
-                                },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(
-                                    capitalization = KeyboardCapitalization.Characters,
-                                    imeAction = ImeAction.Done
-                                ),
-                                keyboardActions = KeyboardActions(
-                                    onDone = {
-                                        if (redeemCodeInput.isNotBlank() && !isRedeeming) {
-                                            isRedeeming = true
-                                            FirebaseManager.claimRedeemCode(context, redeemCodeInput) { ok, msg ->
-                                                isRedeeming = false
-                                                if (ok) redeemCodeInput = ""
-                                                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                                            }
-                                        }
-                                    }
-                                ),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color(0xFFE11D48),
-                                    unfocusedBorderColor = Color(0xFF232838),
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    cursorColor = Color(0xFFE11D48)
-                                ),
-                                shape = RoundedCornerShape(11.dp),
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            Spacer(modifier = Modifier.width(10.dp))
-
-                            Box(
-                                modifier = Modifier
-                                    .height(52.dp)
-                                    .clip(RoundedCornerShape(11.dp))
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            listOf(Color(0xFFFF5722), Color(0xFFE11D48))
-                                        )
-                                    )
-                                    .clickable(enabled = redeemCodeInput.isNotBlank() && !isRedeeming) {
+                        OutlinedTextField(
+                            value = redeemCodeInput,
+                            onValueChange = { redeemCodeInput = it.uppercase() },
+                            singleLine = true,
+                            placeholder = { Text("Contoh: YURAVENOM, MYTHIC2026", color = Color(0xFF64748B)) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Stars,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFF5722),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            keyboardOptions = KeyboardOptions(
+                                capitalization = KeyboardCapitalization.Characters,
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    if (redeemCodeInput.isNotBlank() && !isRedeeming) {
                                         isRedeeming = true
                                         FirebaseManager.claimRedeemCode(context, redeemCodeInput) { ok, msg ->
                                             isRedeeming = false
@@ -838,24 +864,69 @@ fun PointsRewardsScreen(
                                             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                                         }
                                     }
-                                    .padding(horizontal = 16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isRedeeming) {
+                                }
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color(0xFFE2E8F0),
+                                focusedContainerColor = Color(0xFF14161E),
+                                unfocusedContainerColor = Color(0xFF11131B),
+                                focusedBorderColor = Color(0xFFFF5722),
+                                unfocusedBorderColor = Color(0xFF232738),
+                                cursorColor = Color(0xFFFF5722)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (redeemCodeInput.isNotBlank() && !isRedeeming) {
+                                        Brush.horizontalGradient(listOf(Color(0xFFFF5722), Color(0xFFE11D48)))
+                                    } else {
+                                        Brush.horizontalGradient(listOf(Color(0xFF1F2433), Color(0xFF1F2433)))
+                                    }
+                                )
+                                .clickable(enabled = redeemCodeInput.isNotBlank() && !isRedeeming) {
+                                    isRedeeming = true
+                                    FirebaseManager.claimRedeemCode(context, redeemCodeInput) { ok, msg ->
+                                        isRedeeming = false
+                                        if (ok) redeemCodeInput = ""
+                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isRedeeming) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     CircularProgressIndicator(
                                         color = Color.White,
-                                        strokeWidth = 2.dp,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp
                                     )
-                                } else {
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "KLAIM",
+                                        text = "Memverifikasi Kode...",
                                         color = Color.White,
                                         fontSize = 12.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        fontFamily = OutfitDisplayFontFamily
+                                        fontFamily = SfProFontFamily
                                     )
                                 }
+                            } else {
+                                Text(
+                                    text = "Tukarkan Kode Sekarang",
+                                    color = if (redeemCodeInput.isNotBlank()) Color.White else Color(0xFF64748B),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = SfProFontFamily
+                                )
                             }
                         }
                     }
@@ -863,46 +934,292 @@ fun PointsRewardsScreen(
 
                 item {
                     Text(
-                        text = "Kode Event Terverifikasi",
+                        text = "Kode Event Aktif Komunitas",
                         color = Color.White,
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = OutfitDisplayFontFamily,
-                        modifier = Modifier.padding(top = 4.dp)
+                        fontFamily = SfProFontFamily
                     )
                 }
 
-                val publicCodes = listOf(
-                    PublicEventCode("DINZMYTHIC", "Paket Mythic Sovereign", "+25,000 EXP • +15,000 Poin • Mythic Emperor Border • Mythic Aurora", 25000L, 15000L),
-                    PublicEventCode("YURANIMEVIP", "Paket VIP Yuranime Emas", "+10,000 EXP • +5,000 Poin • Sovereign Gold Border • Magic Hearts", 10000L, 5000L),
-                    PublicEventCode("VENOMSYMBIOTE", "Edisi Venom Symbiote", "+12,000 EXP • +6,000 Poin • Avatar Border Venom • Profile Effect Venom", 12000L, 6000L),
-                    PublicEventCode("SEPUH2026", "Gelar Sepuh Komunitas", "+5,000 EXP • +2,500 Poin • Title SEPUH YURANIME • Bronze Frame", 5000L, 2500L),
-                    PublicEventCode("SOVEREIGN99", "Sayap Perak Sovereign", "+15,000 EXP • +8,000 Poin • Title KHALIFAH ANIME • Silver Wings", 15000L, 8000L),
-                    PublicEventCode("ANIMEKING", "Bangsawan Komik", "+8,000 EXP • +4,000 Poin • Title BANGSAWAN KOMIK • Cosmic Twilight", 8000L, 4000L)
-                )
+                val publicCodes = remember {
+                    listOf(
+                        PublicEventCode("YURAVENOM", "Venom Limited Release", "Venom Symbiote Frame + Effect", 200, 100),
+                        PublicEventCode("MYTHIC2026", "Event Launching Sovereign", "Gold Sovereign Crest + 500 Poin", 500, 500),
+                        PublicEventCode("YURAUPDATE", "Kompensasi Update Server", "150 EXP & 100 Poin", 150, 100)
+                    )
+                }
 
                 items(publicCodes, key = { it.code }) { itemCode ->
                     val isClaimed = claimedRedeemCodes.contains(itemCode.code)
 
-                    PublicCodeCard(
-                        item = itemCode,
-                        isClaimed = isClaimed,
-                        onUseCode = {
-                            redeemCodeInput = itemCode.code
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF11131B))
+                            .border(0.5.dp, Color(0xFF1D212E), RoundedCornerShape(12.dp))
+                            .clickable(enabled = !isClaimed) {
+                                if (!isClaimed) {
+                                    redeemCodeInput = itemCode.code
+                                }
+                            }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = itemCode.code,
+                                    color = if (isClaimed) Color(0xFF64748B) else Color(0xFFFF5722),
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = SfProFontFamily
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                if (isClaimed) {
+                                    Text(
+                                        text = "SUDAH DIKLAIM",
+                                        color = Color(0xFF64748B),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = SfProFontFamily
+                                    )
+                                } else {
+                                    Text(
+                                        text = "AKTIF",
+                                        color = Color(0xFF10B981),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = SfProFontFamily
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = itemCode.title,
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = SfProFontFamily
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Hadiah: ${itemCode.rewards}",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 11.sp,
+                                fontFamily = SfProFontFamily
+                            )
                         }
-                    )
+
+                        if (!isClaimed) {
+                            IconButton(onClick = { redeemCodeInput = itemCode.code }) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Salin Kode",
+                                    tint = Color(0xFFCBD5E1),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
             item {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(48.dp))
             }
         }
     }
 }
 
 /**
- * Komponen Streak Check-In Harian
+ * Kartu Grid 2 Kolom untuk Shop & Kosmetik (Gaya Anibi)
+ */
+@Composable
+private fun ShopCosmeticGridCard(
+    name: String,
+    imageUrl: String,
+    isBorder: Boolean,
+    userAvatarUrl: String,
+    isCosmeticsAnimationActive: Boolean,
+    isUnlocked: Boolean,
+    isEquipped: Boolean,
+    tier: String,
+    requiredLevel: Int,
+    pointCost: Long,
+    userPoints: Long,
+    userLevel: Int,
+    modifier: Modifier = Modifier,
+    onActionClick: () -> Unit
+) {
+    val isLevelLocked = tier == "B" && userLevel < requiredLevel
+    val isRedeemOnly = tier == "C"
+    val canAfford = userPoints >= pointCost && !isLevelLocked && !isRedeemOnly
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xFF11131B))
+            .border(
+                width = if (isEquipped) 1.dp else 0.5.dp,
+                color = if (isEquipped) Color(0xFFE11D48) else Color(0xFF1D212E),
+                shape = RoundedCornerShape(14.dp)
+            )
+            .padding(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Baris Atas: Badge Tier & Status Milik
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val tierLabel = when (tier) {
+                "C" -> "Limited"
+                "B" -> "Lv. $requiredLevel+"
+                else -> "Starter"
+            }
+            val tierColor = when (tier) {
+                "C" -> Color(0xFFE11D48)
+                "B" -> Color(0xFFF59E0B)
+                else -> Color(0xFF38BDF8)
+            }
+            Text(
+                text = tierLabel,
+                color = tierColor,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = SfProFontFamily
+            )
+
+            if (isUnlocked) {
+                Text(
+                    text = "Dimiliki",
+                    color = Color(0xFF10B981),
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
+                )
+            } else if (isRedeemOnly) {
+                Text(
+                    text = "Redeem",
+                    color = Color(0xFFE11D48),
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Center Animated Preview Berukuran Besar (100.dp)
+        Box(
+            modifier = Modifier.size(100.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isBorder) {
+                // Foto profil pengguna di tengah dilingkari border avatar
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF181B26)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (userAvatarUrl.isNotBlank()) {
+                        AsyncImage(
+                            model = userAvatarUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        )
+                    }
+                }
+                AnimatedCosmeticImage(
+                    url = DiscordCosmeticsRepository.getOptimizedUrl(imageUrl, size = 160, animated = isCosmeticsAnimationActive),
+                    isAnimated = isCosmeticsAnimationActive,
+                    contentDescription = name,
+                    modifier = Modifier.size(100.dp)
+                )
+            } else {
+                // Profile Effect di atas kartu mini
+                Box(
+                    modifier = Modifier
+                        .size(86.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF161824)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AnimatedCosmeticImage(
+                        url = imageUrl,
+                        isAnimated = isCosmeticsAnimationActive,
+                        contentDescription = name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Nama Item (White Bold 13.sp, Rata Tengah)
+        Text(
+            text = name,
+            color = Color.White,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = SfProFontFamily,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Tombol Aksi Penuh di Bawah
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(
+                    when {
+                        isEquipped -> Color(0xFF1E293B)
+                        isUnlocked -> Color(0xFFE11D48)
+                        canAfford -> Color(0xFFFF5722)
+                        else -> Color(0xFF161824)
+                    }
+                )
+                .clickable(enabled = isUnlocked || canAfford) { onActionClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = when {
+                    isEquipped -> "Terpasang"
+                    isUnlocked -> "Pasang"
+                    isRedeemOnly -> "🔒 Eksklusif Redeem"
+                    isLevelLocked -> "🔒 Lv. $requiredLevel • ✦ $pointCost"
+                    else -> "✦ $pointCost Poin"
+                },
+                color = when {
+                    isEquipped -> Color(0xFFCBD5E1)
+                    isUnlocked || canAfford -> Color.White
+                    else -> Color(0xFF64748B)
+                },
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = SfProFontFamily
+            )
+        }
+    }
+}
+
+/**
+ * Streak Check-In 7 Hari Bersih & Elegan
  */
 @Composable
 private fun DailyCheckInSectionCard(
@@ -928,22 +1245,22 @@ private fun DailyCheckInSectionCard(
                     imageVector = Icons.Outlined.LocalFireDepartment,
                     contentDescription = null,
                     tint = Color(0xFFFF5722),
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(20.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
                         text = "Streak Check-In Harian",
                         color = Color.White,
-                        fontSize = 14.sp,
+                        fontSize = 14.5.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = OutfitDisplayFontFamily
+                        fontFamily = SfProFontFamily
                     )
                     Text(
                         text = "Hari ke-7 bonus +100 EXP & +50 Poin",
                         color = Color(0xFF94A3B8),
-                        fontSize = 11.sp,
-                        fontFamily = JakartaSansFontFamily
+                        fontSize = 11.5.sp,
+                        fontFamily = SfProFontFamily
                     )
                 }
             }
@@ -951,14 +1268,15 @@ private fun DailyCheckInSectionCard(
             Text(
                 text = "$currentStreak/7 Hari",
                 color = Color(0xFFFF5722),
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = JetBrainsMonoFontFamily
+                fontFamily = SfProFontFamily
             )
         }
 
         Spacer(modifier = Modifier.height(14.dp))
 
+        // 7 Kapsul Check-In Bersih dengan Ikon Hadiah Emas/Kristal Jelas
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(5.dp)
@@ -970,9 +1288,7 @@ private fun DailyCheckInSectionCard(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(
-                            if (isClaimedDay) Color(0x22E11D48) else Color(0xFF141722)
-                        )
+                        .background(if (isClaimedDay) Color(0x22E11D48) else Color(0xFF141722))
                         .border(
                             width = if (isClaimedDay) 1.dp else 0.5.dp,
                             color = if (isClaimedDay) Color(0xFFE11D48) else Color(0xFF1F2433),
@@ -986,7 +1302,7 @@ private fun DailyCheckInSectionCard(
                         color = if (isClaimedDay) Color.White else Color(0xFF64748B),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
-                        fontFamily = JakartaSansFontFamily
+                        fontFamily = SfProFontFamily
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     if (isClaimedDay) {
@@ -994,7 +1310,7 @@ private fun DailyCheckInSectionCard(
                             imageVector = Icons.Default.Check,
                             contentDescription = null,
                             tint = Color(0xFFE11D48),
-                            modifier = Modifier.size(13.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                     } else {
                         val iconVector = when {
@@ -1006,16 +1322,16 @@ private fun DailyCheckInSectionCard(
                             imageVector = iconVector,
                             contentDescription = null,
                             tint = if (isBonusDay) Color(0xFFF59E0B) else Color(0xFF64748B),
-                            modifier = Modifier.size(13.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     Text(
                         text = if (isBonusDay) "+50" else "+20",
                         color = if (isBonusDay) Color(0xFFF59E0B) else Color(0xFFCBD5E1),
                         fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = JetBrainsMonoFontFamily
+                        fontFamily = SfProFontFamily
                     )
                 }
             }
@@ -1023,6 +1339,7 @@ private fun DailyCheckInSectionCard(
 
         Spacer(modifier = Modifier.height(14.dp))
 
+        // Tombol Klaim yang Elegan
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1047,7 +1364,7 @@ private fun DailyCheckInSectionCard(
                 color = if (isCheckedInToday) Color(0xFF64748B) else Color.White,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = OutfitDisplayFontFamily
+                fontFamily = SfProFontFamily
             )
         }
     }
@@ -1093,7 +1410,7 @@ private fun MissionRowCard(
                     color = Color.White,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.SemiBold,
-                    fontFamily = OutfitDisplayFontFamily
+                    fontFamily = SfProFontFamily
                 )
                 if (mission.isWeekly) {
                     Spacer(modifier = Modifier.width(6.dp))
@@ -1102,7 +1419,7 @@ private fun MissionRowCard(
                         color = Color(0xFFF59E0B),
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = JetBrainsMonoFontFamily
+                        fontFamily = SfProFontFamily
                     )
                 }
             }
@@ -1113,7 +1430,7 @@ private fun MissionRowCard(
                 text = mission.subtitle,
                 color = Color(0xFF94A3B8),
                 fontSize = 11.sp,
-                fontFamily = JakartaSansFontFamily
+                fontFamily = SfProFontFamily
             )
 
             Spacer(modifier = Modifier.height(5.dp))
@@ -1124,7 +1441,7 @@ private fun MissionRowCard(
                     color = Color(0xFFFF5722),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = JetBrainsMonoFontFamily
+                    fontFamily = SfProFontFamily
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
@@ -1132,14 +1449,14 @@ private fun MissionRowCard(
                     color = Color(0xFFF43F5E),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = JetBrainsMonoFontFamily
+                    fontFamily = SfProFontFamily
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "(${mission.currentProgress}/${mission.targetProgress})",
                     color = Color(0xFF64748B),
                     fontSize = 10.5.sp,
-                    fontFamily = JetBrainsMonoFontFamily
+                    fontFamily = SfProFontFamily
                 )
             }
         }
@@ -1151,29 +1468,21 @@ private fun MissionRowCard(
                 .clip(RoundedCornerShape(9.dp))
                 .background(
                     when {
-                        isClaimed -> Color(0xFF191C26)
+                        isClaimed -> Color(0xFF181B26)
                         isCompleted -> Color(0xFFE11D48)
-                        else -> Color(0xFF191C26)
+                        else -> Color(0xFF141722)
                     }
                 )
                 .clickable(enabled = !isClaimed) { onClaimClick() }
-                .padding(horizontal = 12.dp, vertical = 7.dp),
+                .padding(horizontal = 13.dp, vertical = 7.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = when {
-                    isClaimed -> "Selesai"
-                    isCompleted -> "Klaim"
-                    else -> "${mission.currentProgress}/${mission.targetProgress}"
-                },
-                color = when {
-                    isClaimed -> Color(0xFF64748B)
-                    isCompleted -> Color.White
-                    else -> Color(0xFF94A3B8)
-                },
+                text = if (isClaimed) "Klaim" else if (isCompleted) "Klaim" else "Belum",
+                color = if (isClaimed) Color(0xFF475569) else if (isCompleted) Color.White else Color(0xFF64748B),
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = OutfitDisplayFontFamily
+                fontFamily = SfProFontFamily
             )
         }
     }
@@ -1226,7 +1535,7 @@ private fun MilestoneTitleItemRow(
                         color = if (isEquipped) Color(0xFFCBD5E1) else Color.White,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = OutfitDisplayFontFamily
+                        fontFamily = SfProFontFamily
                     )
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1242,7 +1551,7 @@ private fun MilestoneTitleItemRow(
                             color = Color(0xFF64748B),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
-                            fontFamily = JetBrainsMonoFontFamily
+                            fontFamily = SfProFontFamily
                         )
                     }
                 }
@@ -1254,7 +1563,7 @@ private fun MilestoneTitleItemRow(
             text = titleDef.description,
             color = Color(0xFF94A3B8),
             fontSize = 11.5.sp,
-            fontFamily = JakartaSansFontFamily
+            fontFamily = SfProFontFamily
         )
     }
 }
@@ -1298,7 +1607,7 @@ private fun ShopTitleItemRow(
                             else -> Color(0xFF181B26)
                         }
                     )
-                    .clickable { onActionClick() }
+                    .clickable(enabled = isUnlocked || canAfford) { onActionClick() }
                     .padding(horizontal = 13.dp, vertical = 7.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -1311,7 +1620,7 @@ private fun ShopTitleItemRow(
                     color = if (!isUnlocked && !canAfford) Color(0xFF64748B) else Color.White,
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = JetBrainsMonoFontFamily
+                    fontFamily = SfProFontFamily
                 )
             }
         }
@@ -1321,333 +1630,7 @@ private fun ShopTitleItemRow(
             text = titleDef.description,
             color = Color(0xFF94A3B8),
             fontSize = 11.5.sp,
-            fontFamily = JakartaSansFontFamily
+            fontFamily = SfProFontFamily
         )
-    }
-}
-
-@Composable
-private fun ShopBorderItemRow(
-    borderDef: BorderDefinition,
-    isUnlocked: Boolean,
-    isEquipped: Boolean,
-    userPoints: Long,
-    userLevel: Int,
-    onActionClick: () -> Unit
-) {
-    val isLevelLocked = borderDef.tier == "B" && userLevel < borderDef.requiredLevel
-    val isRedeemOnly = borderDef.tier == "C"
-    val canAfford = userPoints >= borderDef.pointCost && !isLevelLocked && !isRedeemOnly
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color(0xFF11131B))
-            .border(0.5.dp, Color(0xFF1D212E), RoundedCornerShape(14.dp))
-            .padding(13.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Preview Frame
-        Box(
-            modifier = Modifier.size(52.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF1A1D2B))
-            )
-            AsyncImage(
-                model = borderDef.imageUrl,
-                contentDescription = borderDef.name,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.size(50.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = borderDef.name,
-                    color = Color.White,
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = OutfitDisplayFontFamily
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                // Tag Tier
-                val tierLabel = when (borderDef.tier) {
-                    "B" -> "Lv.${borderDef.requiredLevel}+"
-                    "C" -> "REDEEM ONLY"
-                    else -> "STARTER"
-                }
-                val tierColor = when (borderDef.tier) {
-                    "B" -> Color(0xFFF59E0B)
-                    "C" -> Color(0xFFE11D48)
-                    else -> Color(0xFF38BDF8)
-                }
-                Text(
-                    text = tierLabel,
-                    color = tierColor,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = JetBrainsMonoFontFamily
-                )
-            }
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = borderDef.description,
-                color = Color(0xFF94A3B8),
-                fontSize = 11.sp,
-                fontFamily = JakartaSansFontFamily
-            )
-        }
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(9.dp))
-                .background(
-                    when {
-                        isEquipped -> Color(0xFF1E293B)
-                        isUnlocked -> Color(0xFFE11D48)
-                        canAfford -> Color(0xFFFF5722)
-                        else -> Color(0xFF181B26)
-                    }
-                )
-                .clickable(enabled = isUnlocked || canAfford) { onActionClick() }
-                .padding(horizontal = 12.dp, vertical = 7.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = when {
-                    isEquipped -> "Terpasang"
-                    isUnlocked -> "Pasang"
-                    isRedeemOnly -> "KODE REDEEM"
-                    isLevelLocked -> "Lv. ${borderDef.requiredLevel}"
-                    else -> "✦ ${borderDef.pointCost}"
-                },
-                color = if (!isUnlocked && !canAfford) Color(0xFF64748B) else Color.White,
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = JetBrainsMonoFontFamily
-            )
-        }
-    }
-}
-
-@Composable
-private fun ShopProfileEffectItemRow(
-    effectDef: ProfileEffectDefinition,
-    isUnlocked: Boolean,
-    isEquipped: Boolean,
-    userPoints: Long,
-    userLevel: Int,
-    onActionClick: () -> Unit
-) {
-    val isLevelLocked = effectDef.tier == "B" && userLevel < effectDef.requiredLevel
-    val isRedeemOnly = effectDef.tier == "C"
-    val canAfford = userPoints >= effectDef.pointCost && !isLevelLocked && !isRedeemOnly
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color(0xFF11131B))
-            .border(0.5.dp, Color(0xFF1D212E), RoundedCornerShape(14.dp))
-            .padding(13.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Thumbnail Animasi
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFF181A25)),
-            contentAlignment = Alignment.Center
-        ) {
-            AsyncImage(
-                model = effectDef.animationUrl,
-                contentDescription = effectDef.name,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = effectDef.name,
-                    color = Color.White,
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = OutfitDisplayFontFamily
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                val tierLabel = when (effectDef.tier) {
-                    "B" -> "Lv.${effectDef.requiredLevel}+"
-                    "C" -> "REDEEM ONLY"
-                    else -> "STARTER"
-                }
-                val tierColor = when (effectDef.tier) {
-                    "B" -> Color(0xFFF59E0B)
-                    "C" -> Color(0xFFE11D48)
-                    else -> Color(0xFF38BDF8)
-                }
-                Text(
-                    text = tierLabel,
-                    color = tierColor,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = JetBrainsMonoFontFamily
-                )
-            }
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = effectDef.description,
-                color = Color(0xFF94A3B8),
-                fontSize = 11.sp,
-                fontFamily = JakartaSansFontFamily
-            )
-        }
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(9.dp))
-                .background(
-                    when {
-                        isEquipped -> Color(0xFF1E293B)
-                        isUnlocked -> Color(0xFFE11D48)
-                        canAfford -> Color(0xFFFF5722)
-                        else -> Color(0xFF181B26)
-                    }
-                )
-                .clickable(enabled = isUnlocked || canAfford) { onActionClick() }
-                .padding(horizontal = 12.dp, vertical = 7.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = when {
-                    isEquipped -> "Terpasang"
-                    isUnlocked -> "Pasang"
-                    isRedeemOnly -> "KODE REDEEM"
-                    isLevelLocked -> "Lv. ${effectDef.requiredLevel}"
-                    else -> "✦ ${effectDef.pointCost}"
-                },
-                color = if (!isUnlocked && !canAfford) Color(0xFF64748B) else Color.White,
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = JetBrainsMonoFontFamily
-            )
-        }
-    }
-}
-
-@Composable
-private fun PublicCodeCard(
-    item: PublicEventCode,
-    isClaimed: Boolean,
-    onUseCode: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(13.dp))
-            .background(Color(0xFF11131B))
-            .border(
-                width = if (isClaimed) 0.5.dp else 1.dp,
-                color = if (isClaimed) Color(0xFF1F2433) else Color(0x55E11D48),
-                shape = RoundedCornerShape(13.dp)
-            )
-            .padding(13.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = item.code,
-                    color = Color.White,
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = JetBrainsMonoFontFamily
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = item.title,
-                    color = Color(0xFFCBD5E1),
-                    fontSize = 11.5.sp,
-                    fontFamily = JakartaSansFontFamily
-                )
-            }
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = item.rewards,
-                color = Color(0xFFFF5722),
-                fontSize = 11.sp,
-                fontFamily = JakartaSansFontFamily
-            )
-        }
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        if (isClaimed) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF151824))
-                    .padding(horizontal = 9.dp, vertical = 6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.CheckCircle,
-                    contentDescription = null,
-                    tint = Color(0xFF10B981),
-                    modifier = Modifier.size(13.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "DIKLAIM",
-                    color = Color(0xFF10B981),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = JetBrainsMonoFontFamily
-                )
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1F2435))
-                    .clickable(onClick = onUseCode)
-                    .padding(horizontal = 11.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = null,
-                        tint = Color(0xFFFF5722),
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "GUNAKAN",
-                        color = Color.White,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = JetBrainsMonoFontFamily
-                    )
-                }
-            }
-        }
     }
 }

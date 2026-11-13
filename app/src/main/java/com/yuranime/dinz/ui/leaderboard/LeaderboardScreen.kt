@@ -61,6 +61,7 @@ import com.yuranime.dinz.ui.components.SleekHexChevronLevelTag
 import com.yuranime.dinz.ui.theme.JakartaSansFontFamily
 import com.yuranime.dinz.ui.theme.JetBrainsMonoFontFamily
 import com.yuranime.dinz.ui.theme.OutfitDisplayFontFamily
+import com.yuranime.dinz.ui.theme.SfProFontFamily
 
 /**
  * Halaman Papan Peringkat Real-Time (`LeaderboardScreen`)
@@ -376,10 +377,10 @@ private fun TopThreeEditorialPodium(
             rank = 2,
             user = top2,
             borderUrl = FirebaseManager.TOP_2_BORDER_URL,
-            frameWidth = 100.dp,
-            frameHeight = 150.dp,
-            avatarSize = 48.dp,
-            avatarTopOffset = 23.dp,
+            frameWidth = 110.dp,
+            frameHeight = 135.dp,
+            avatarSize = 50.dp,
+            avatarTopOffset = 18.dp,
             accentColor = Color(0xFFE2E8F0),
             isCurrentUser = top2?.uid != null && top2.uid == currentUid,
             modifier = Modifier.weight(1f)
@@ -390,10 +391,10 @@ private fun TopThreeEditorialPodium(
             rank = 1,
             user = top1,
             borderUrl = FirebaseManager.TOP_1_BORDER_URL,
-            frameWidth = 148.dp,
+            frameWidth = 126.dp,
             frameHeight = 142.dp,
-            avatarSize = 52.dp,
-            avatarTopOffset = 10.5.dp,
+            avatarSize = 56.dp,
+            avatarTopOffset = 12.dp,
             accentColor = Color(0xFFF59E0B),
             isCurrentUser = top1?.uid != null && top1.uid == currentUid,
             modifier = Modifier.weight(1.15f)
@@ -404,10 +405,10 @@ private fun TopThreeEditorialPodium(
             rank = 3,
             user = top3,
             borderUrl = FirebaseManager.TOP_3_BORDER_URL,
-            frameWidth = 126.dp,
-            frameHeight = 128.dp,
-            avatarSize = 48.dp,
-            avatarTopOffset = 9.7.dp,
+            frameWidth = 110.dp,
+            frameHeight = 130.dp,
+            avatarSize = 50.dp,
+            avatarTopOffset = 16.dp,
             accentColor = Color(0xFFFB923C),
             isCurrentUser = top3?.uid != null && top3.uid == currentUid,
             modifier = Modifier.weight(1f)
@@ -430,31 +431,19 @@ private fun EditorialPodiumSpot(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                if (isCurrentUser) Color(0x33E11D48) else Color(0x2213151E)
-            )
-            .border(
-                width = if (isCurrentUser) 1.dp else 0.5.dp,
-                color = when {
-                    isCurrentUser -> Color(0xFFE11D48)
-                    rank == 1 -> Color(0x55F59E0B)
-                    else -> Color(0xFF1E2230)
-                },
-                shape = RoundedCornerShape(16.dp)
-            )
-            .padding(horizontal = 6.dp, vertical = 10.dp),
+            .padding(horizontal = 4.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Frame Avatar Konsentris
+        // Frame Avatar Konsentris (BEBAS KOTAK PEMBUNGKUS PODIUM!)
         Box(
             modifier = Modifier
                 .size(width = frameWidth, height = frameHeight),
             contentAlignment = Alignment.TopCenter
         ) {
-            // Layer 1: Avatar Lingkaran Pengguna ditempatkan pas di lubang cincin
+            // Layer Belakang (zIndex = 0f): Foto Profil Bulat Pengguna pas di lubang atas
             Box(
                 modifier = Modifier
+                    .zIndex(0f)
                     .offset(y = avatarTopOffset)
                     .size(avatarSize)
                     .clip(CircleShape)
@@ -476,17 +465,19 @@ private fun EditorialPodiumSpot(
                         color = if (user != null) Color.White else Color(0xFF475569),
                         fontSize = if (rank == 1) 22.sp else 18.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = OutfitDisplayFontFamily
+                        fontFamily = SfProFontFamily
                     )
                 }
             }
 
-            // Layer 2: Gambar Border Khusus Top 1 / Top 2 / Top 3 (Ornamen sayap/medali sudah terpasang)
+            // Layer Depan (zIndex = 1f): Gambar Bingkai PNG Transparan (Sayap & Pita Membingkai Sempurna)
             AsyncImage(
                 model = borderUrl,
                 contentDescription = "Border Podium Top $rank",
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.size(width = frameWidth, height = frameHeight)
+                modifier = Modifier
+                    .zIndex(1f)
+                    .size(width = frameWidth, height = frameHeight)
             )
         }
 
@@ -515,7 +506,7 @@ private fun EditorialPodiumSpot(
                 SleekHexChevronLevelTag(level = user.level)
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "#${user.userTag}",
+                    text = "#${user.userTag.removePrefix("@")}",
                     color = Color(0xFF64748B),
                     fontSize = 10.5.sp,
                     fontFamily = JetBrainsMonoFontFamily
@@ -660,7 +651,7 @@ private fun ModernLeaderboardRowItem(
                 )
                 Spacer(modifier = Modifier.width(5.dp))
                 Text(
-                    text = "#${user.userTag}",
+                    text = "#${user.userTag.removePrefix("@")}",
                     color = Color(0xFF64748B),
                     fontSize = 10.5.sp,
                     fontFamily = JetBrainsMonoFontFamily

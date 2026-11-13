@@ -95,9 +95,10 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
-    // Image loading with Coil
+    // Image loading with Coil & Native APNG Animation Decoder (60 FPS)
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-gif:2.7.0")
+    implementation("com.github.penfeizhou.android.animation:apng:3.0.2")
 
     // Video Player (Media3 / ExoPlayer)
     implementation("androidx.media3:media3-exoplayer:1.4.1")
