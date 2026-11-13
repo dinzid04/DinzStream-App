@@ -98,6 +98,7 @@ dependencies {
     // Image loading with Coil & Native APNG Animation Decoder (60 FPS)
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-gif:2.7.0")
+    implementation("androidx.vectordrawable:vectordrawable-animated:1.2.0")
     implementation("com.github.penfeizhou.android.animation:apng:3.0.2")
 
     // Video Player (Media3 / ExoPlayer)

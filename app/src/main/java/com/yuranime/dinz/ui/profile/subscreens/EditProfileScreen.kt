@@ -106,7 +106,7 @@ fun EditProfileScreen(
     val userPoints = currentProfile?.points ?: 0L
     val unlockedTitles = currentProfile?.unlockedTitles ?: listOf("WARGA YURANIME")
     val unlockedBorders = currentProfile?.unlockedBorders ?: emptyList()
-    val unlockedProfileEffects = currentProfile?.unlockedProfileEffects ?: emptyList()
+    val unlockedEffects = currentProfile?.unlockedEffects ?: emptyList()
 
     // Tab Kosmetik: 0 = Border Avatar (985), 1 = Profile Effect (396), 2 = Custom Title
     var cosmeticTab by remember { mutableIntStateOf(0) }
@@ -169,18 +169,19 @@ fun EditProfileScreen(
                 }
                 matchSearch && matchFilter
             }
-            .sortedByDescending { border ->
-                (border.imageUrl == selectedBorderUrl) to (unlockedBorders.contains(border.id))
-            }
+            .sortedWith(
+                compareByDescending<com.yuranime.dinz.data.repository.DiscordBorderCosmetic> { it.imageUrl == selectedBorderUrl }
+                    .thenByDescending { unlockedBorders.contains(it.id) }
+            )
     }
 
-    val sortedEffects = remember(allProfileEffects, unlockedProfileEffects, selectedProfileEffectUrl, searchQuery, filterTier) {
+    val sortedEffects = remember(allProfileEffects, unlockedEffects, selectedProfileEffectUrl, searchQuery, filterTier) {
         allProfileEffects
             .filter { effect ->
                 val matchSearch = searchQuery.isBlank() ||
                     effect.name.contains(searchQuery, ignoreCase = true) ||
                     effect.category.contains(searchQuery, ignoreCase = true)
-                val isOwned = unlockedProfileEffects.contains(effect.id) || effect.animationUrl == selectedProfileEffectUrl
+                val isOwned = unlockedEffects.contains(effect.id) || effect.animationUrl == selectedProfileEffectUrl
                 val matchFilter = when (filterTier) {
                     "Koleksiku" -> isOwned
                     "Starter" -> effect.tier == "A"
@@ -190,9 +191,10 @@ fun EditProfileScreen(
                 }
                 matchSearch && matchFilter
             }
-            .sortedByDescending { effect ->
-                (effect.animationUrl == selectedProfileEffectUrl) to (unlockedProfileEffects.contains(effect.id))
-            }
+            .sortedWith(
+                compareByDescending<com.yuranime.dinz.data.repository.DiscordProfileEffectCosmetic> { it.animationUrl == selectedProfileEffectUrl }
+                    .thenByDescending { unlockedEffects.contains(it.id) }
+            )
     }
 
     val textFieldColors = OutlinedTextFieldDefaults.colors(
@@ -753,7 +755,7 @@ fun EditProfileScreen(
                         ) {
                             pair.forEach { effect ->
                                 val isEquipped = effect.animationUrl == selectedProfileEffectUrl
-                                val isOwned = unlockedProfileEffects.contains(effect.id)
+                                val isOwned = unlockedEffects.contains(effect.id)
 
                                 EditCosmeticCard(
                                     name = effect.name,

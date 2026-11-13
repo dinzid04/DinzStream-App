@@ -72,6 +72,7 @@ fun AnimatedCosmeticImage(
     } else {
         // Mode Animasi 60 FPS: APNGDrawable untuk APNG / Coil Animatable untuk WebP/GIF
         var currentAnimatable by remember { mutableStateOf<Animatable?>(null) }
+        var currentApngDrawable by remember { mutableStateOf<APNGDrawable?>(null) }
         var apngFile by remember(url) { mutableStateOf<File?>(null) }
 
         // Prefetch & Cache APNG File ke local cache directory untuk pemutaran 60fps tanpa lag
@@ -111,8 +112,14 @@ fun AnimatedCosmeticImage(
 
         DisposableEffect(url) {
             onDispose {
-                currentAnimatable?.stop()
+                try {
+                    currentAnimatable?.stop()
+                    currentApngDrawable?.stop()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 currentAnimatable = null
+                currentApngDrawable = null
             }
         }
 
@@ -141,7 +148,10 @@ fun AnimatedCosmeticImage(
                                 drawable.setLoopLimit(0) // Infinite 60 FPS loop
                                 imageView.setImageDrawable(drawable)
                                 drawable.start()
-                                currentAnimatable = drawable
+                                currentApngDrawable = drawable
+                                if (drawable is Animatable) {
+                                    currentAnimatable = drawable
+                                }
                             }
                         } catch (e: Exception) {
                             e.printStackTrace()

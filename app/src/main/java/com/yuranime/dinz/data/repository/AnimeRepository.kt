@@ -54,7 +54,7 @@ class AnimeRepository(
             val day = getCurrentDayName()
             val response = api.getHomeData(day = day)
             val data = response.data
-            if (data != null && (!data.hotAnime.isNullOrEmpty() || !data.newEpisodes.isNullOrEmpty() || !data.popular.isNullOrEmpty())) {
+            if (data != null && (!data.hotAnime.isNullOrEmpty() || !data.newEpisodes.isNullOrEmpty() || !data.popularAnime.isNullOrEmpty())) {
                 memoryCachedHomeData = data
                 Result.success(data)
             } else {

@@ -129,7 +129,7 @@ fun PointsRewardsScreen(
     val exp = currentProfile?.exp ?: 0L
     val nextTargetExp = currentProfile?.nextLevelTargetExp ?: FirebaseManager.computeNextLevelTargetExp(level)
     val expProgress = currentProfile?.expProgress ?: FirebaseManager.computeExpProgress(exp, nextTargetExp)
-    val currentStreak = currentProfile?.currentStreak ?: 0
+    val currentStreak = currentProfile?.checkInStreak ?: 0
     val lastCheckInDate = currentProfile?.lastCheckInDate.orEmpty()
     val todayDate = remember { FirebaseManager.getTodayDateString() }
     val isCheckedInToday = lastCheckInDate == todayDate
@@ -141,7 +141,7 @@ fun PointsRewardsScreen(
 
     val unlockedBorders = currentProfile?.unlockedBorders ?: emptyList()
     val equippedBorderUrl = currentProfile?.equippedBorderUrl.orEmpty()
-    val unlockedEffects = currentProfile?.unlockedProfileEffects ?: emptyList()
+    val unlockedEffects = currentProfile?.unlockedEffects ?: emptyList()
     val equippedProfileEffectUrl = currentProfile?.equippedProfileEffectUrl.orEmpty()
     val cosmeticAnimate = currentProfile?.cosmeticAnimate ?: true
     val claimedRedeemCodes = currentProfile?.claimedRedeemCodes ?: emptyList()
@@ -268,6 +268,16 @@ fun PointsRewardsScreen(
             }
             matchSearch && matchFilter
         }
+    }
+
+    val chunkedBorders = remember(filteredBorders) { filteredBorders.take(60).chunked(2) }
+    val chunkedEffects = remember(filteredEffects) { filteredEffects.take(60).chunked(2) }
+    val publicEventCodes = remember {
+        listOf(
+            PublicEventCode("YURAVENOM", "Venom Limited Release", "Venom Symbiote Frame + Effect", 200, 100),
+            PublicEventCode("MYTHIC2026", "Event Launching Sovereign", "Gold Sovereign Crest + 500 Poin", 500, 500),
+            PublicEventCode("YURAUPDATE", "Kompensasi Update Server", "150 EXP & 100 Poin", 150, 100)
+        )
     }
 
     Column(
@@ -658,9 +668,7 @@ fun PointsRewardsScreen(
 
                 // SUB-TAB 0: AVATAR BORDERS (GRID 2 KOLOM ANIBI)
                 if (cosmeticSubTab == 0) {
-                    val displayBorders = remember(filteredBorders) { filteredBorders.take(60) }
-                    val chunked = displayBorders.chunked(2)
-                    items(chunked) { pair ->
+                    items(chunkedBorders) { pair ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -716,9 +724,7 @@ fun PointsRewardsScreen(
 
                 // SUB-TAB 1: PROFILE EFFECTS (GRID 2 KOLOM ANIBI)
                 if (cosmeticSubTab == 1) {
-                    val displayEffects = remember(filteredEffects) { filteredEffects.take(60) }
-                    val chunked = displayEffects.chunked(2)
-                    items(chunked) { pair ->
+                    items(chunkedEffects) { pair ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -942,15 +948,7 @@ fun PointsRewardsScreen(
                     )
                 }
 
-                val publicCodes = remember {
-                    listOf(
-                        PublicEventCode("YURAVENOM", "Venom Limited Release", "Venom Symbiote Frame + Effect", 200, 100),
-                        PublicEventCode("MYTHIC2026", "Event Launching Sovereign", "Gold Sovereign Crest + 500 Poin", 500, 500),
-                        PublicEventCode("YURAUPDATE", "Kompensasi Update Server", "150 EXP & 100 Poin", 150, 100)
-                    )
-                }
-
-                items(publicCodes, key = { it.code }) { itemCode ->
+                items(publicEventCodes, key = { it.code }) { itemCode ->
                     val isClaimed = claimedRedeemCodes.contains(itemCode.code)
 
                     Row(

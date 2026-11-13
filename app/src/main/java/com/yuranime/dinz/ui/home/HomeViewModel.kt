@@ -170,7 +170,14 @@ class HomeViewModel(
                         current.copy(
                             isLoading = false,
                             errorMessage = null,
-                            sliderItem = fallbackData?.slider?.firstOrNull() ?: newEp.firstOrNull(),
+                            sliderItem = fallbackData?.slider?.firstOrNull() ?: current.sliderItem ?: newEp.firstOrNull()?.let { 
+                                com.yuranime.dinz.data.model.SliderItem(
+                                    id = it.id,
+                                    title = it.title,
+                                    image = it.image,
+                                    synopsis = it.description
+                                )
+                            },
                             cuplixList = cuplixItems,
                             newEpisodesList = newEp,
                             hotAnimeList = hot,
