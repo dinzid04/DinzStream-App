@@ -64,7 +64,22 @@ data class BorderDefinition(
     val name: String,
     val imageUrl: String,
     val pointCost: Long,
-    val description: String
+    val description: String,
+    val staticImageUrl: String = "",
+    val tier: String = "A", // "A" (Starter), "B" (Exclusive Lv.35+), "C" (Redeem Only)
+    val requiredLevel: Int = 1,
+    val category: String = "General"
+)
+
+data class ProfileEffectDefinition(
+    val id: String,
+    val name: String,
+    val animationUrl: String,
+    val pointCost: Long,
+    val description: String,
+    val tier: String = "A", // "A", "B", "C"
+    val requiredLevel: Int = 1,
+    val category: String = "General"
 )
 
 data class UserProfile(
@@ -86,8 +101,12 @@ data class UserProfile(
     val equippedTitleTier: Int = 1,
     val equippedTitleVariant: Int = 0,
     val equippedBorderUrl: String = "",
+    val equippedProfileEffectUrl: String = "",
+    val cosmeticAnimate: Boolean = true,
     val unlockedTitles: List<String> = emptyList(),
     val unlockedBorders: List<String> = emptyList(),
+    val unlockedEffects: List<String> = emptyList(),
+    val claimedRedeemCodes: List<String> = emptyList(),
     val claimedMissions: Map<String, String> = emptyMap(),
     val lastCheckInDate: String = "",
     val checkInStreak: Int = 0,
@@ -113,7 +132,8 @@ data class LeaderboardUser(
     val equippedTitle: String = "",
     val equippedTitleTier: Int = 1,
     val equippedTitleVariant: Int = 0,
-    val equippedBorderUrl: String = ""
+    val equippedBorderUrl: String = "",
+    val equippedProfileEffectUrl: String = ""
 )
 
 data class GoogleSessionInfo(
@@ -245,26 +265,282 @@ object FirebaseManager {
     )
 
     val SHOP_BORDERS: List<BorderDefinition> = listOf(
+        // Podium Classics
         BorderDefinition(
             id = "border_bronze_crest",
             name = "Vanguard Bronze Frame",
             imageUrl = TOP_3_BORDER_URL,
             pointCost = 250L,
-            description = "Frame avatar bergaya mecha perunggu"
+            description = "Frame avatar bergaya mecha perunggu",
+            tier = "A",
+            category = "Podium"
         ),
         BorderDefinition(
             id = "border_silver_wings",
             name = "Valkyrie Silver Frame",
             imageUrl = TOP_2_BORDER_URL,
             pointCost = 450L,
-            description = "Frame avatar perak bersayap presisi"
+            description = "Frame avatar perak bersayap presisi",
+            tier = "A",
+            category = "Podium"
         ),
         BorderDefinition(
             id = "border_sovereign_gold",
             name = "Sovereign Gold Frame",
             imageUrl = TOP_1_BORDER_URL,
             pointCost = 750L,
-            description = "Frame avatar mahkota emas kasta tertinggi"
+            description = "Frame avatar mahkota emas kasta tertinggi",
+            tier = "A",
+            category = "Podium"
+        ),
+        // Tier A (Starter: 300-800 Poin)
+        BorderDefinition(
+            id = "border_rage_red",
+            name = "Rage Crimson Aura",
+            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_e1b0849ce324835695662bb368dca622.png?size=4096&passthrough=true",
+            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_e1b0849ce324835695662bb368dca622.png?size=4096&passthrough=false",
+            pointCost = 500L,
+            description = "Aura api merah berkobar penuh amarah petarung",
+            tier = "A",
+            category = "Anime"
+        ),
+        BorderDefinition(
+            id = "border_rage_purple",
+            name = "Rage Amethyst Aura",
+            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_8171a822bd51b5c00e6203cf65d08fc3.png?size=4096&passthrough=true",
+            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_8171a822bd51b5c00e6203cf65d08fc3.png?size=4096&passthrough=false",
+            pointCost = 550L,
+            description = "Aura petir ungu misterius kekuatan tersembunyi",
+            tier = "A",
+            category = "Anime"
+        ),
+        BorderDefinition(
+            id = "border_nova_surge",
+            name = "Nova Surge Cosmic",
+            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_4de86ce972cebc31f9e2b17f6505708a.png?size=4096&passthrough=true",
+            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_4de86ce972cebc31f9e2b17f6505708a.png?size=4096&passthrough=false",
+            pointCost = 650L,
+            description = "Pusaran energi supernova luar angkasa",
+            tier = "A",
+            category = "Cosmos"
+        ),
+        BorderDefinition(
+            id = "border_constellations",
+            name = "Constellations Dusk",
+            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_1fe04b503e91456565158a74c10a30b5.png?size=4096&passthrough=true",
+            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_1fe04b503e91456565158a74c10a30b5.png?size=4096&passthrough=false",
+            pointCost = 600L,
+            description = "Rasi bintang langit senja memukau",
+            tier = "A",
+            category = "Cosmos"
+        ),
+        BorderDefinition(
+            id = "border_spirit_embers",
+            name = "Spirit Embers",
+            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_10058ec0ffad8e4693b2a2656ca8018e.png?size=4096&passthrough=true",
+            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_10058ec0ffad8e4693b2a2656ca8018e.png?size=4096&passthrough=false",
+            pointCost = 450L,
+            description = "Percikan roh magis api suci melayang",
+            tier = "A",
+            category = "Fantasy"
+        ),
+        // Tier B (Exclusive: Lv. 35+ & 3,500 - 25,000 Poin)
+        BorderDefinition(
+            id = "border_arcane_sigil",
+            name = "Arcane Sigil",
+            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_ef8d91c10d3f25c2ceb90b8f58d0c0fc.png?size=4096&passthrough=true",
+            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_ef8d91c10d3f25c2ceb90b8f58d0c0fc.png?size=4096&passthrough=false",
+            pointCost = 5000L,
+            description = "Segel sihir kuno terlarang bagi penyihir agung",
+            tier = "B",
+            requiredLevel = 35,
+            category = "Dark Fantasy"
+        ),
+        BorderDefinition(
+            id = "border_cybernetic",
+            name = "Cybernetic Neural",
+            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_c6b3b5550a6e7889a9c40330dc372f51.png?size=4096&passthrough=true",
+            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_c6b3b5550a6e7889a9c40330dc372f51.png?size=4096&passthrough=false",
+            pointCost = 7500L,
+            description = "Implan neural sibernetik berkecepatan cahaya",
+            tier = "B",
+            requiredLevel = 35,
+            category = "Cyberpunk"
+        ),
+        BorderDefinition(
+            id = "border_digital_sunrise",
+            name = "Digital Sunrise",
+            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_cc83e95e86a51d957d47e447b966c5d1.png?size=4096&passthrough=true",
+            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_cc83e95e86a51d957d47e447b966c5d1.png?size=4096&passthrough=false",
+            pointCost = 12000L,
+            description = "Spektrum neon fajar neo-Tokyo abad 22",
+            tier = "B",
+            requiredLevel = 40,
+            category = "Cyberpunk"
+        ),
+        BorderDefinition(
+            id = "border_miyabi",
+            name = "Hoshimi Miyabi Blade",
+            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_c8092128806507a66067c174c7ec1fb7.png?size=4096&passthrough=true",
+            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_c8092128806507a66067c174c7ec1fb7.png?size=4096&passthrough=false",
+            pointCost = 20000L,
+            description = "Aura pedang void es pembelah Hollow Zenless",
+            tier = "B",
+            requiredLevel = 50,
+            category = "Zenless Zone Zero"
+        ),
+        BorderDefinition(
+            id = "border_ellen_joe",
+            name = "Ellen Joe Shark Hunter",
+            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_46317d74da81ae77c2e391bb7b607061.png?size=4096&passthrough=true",
+            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_46317d74da81ae77c2e391bb7b607061.png?size=4096&passthrough=false",
+            pointCost = 22500L,
+            description = "Gigi hiu predator maid Victoria Housekeeping",
+            tier = "B",
+            requiredLevel = 50,
+            category = "Zenless Zone Zero"
+        ),
+        // Tier C (Limited: Redeem Only)
+        BorderDefinition(
+            id = "border_venom_logo",
+            name = "Venom Symbiote Crest",
+            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_537adf38d27721432f062cc9d913e2af.png?size=4096&passthrough=true",
+            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_537adf38d27721432f062cc9d913e2af.png?size=4096&passthrough=false",
+            pointCost = 0L,
+            description = "Tendril simbiotik hitam lambang laba-laba putih legendaris",
+            tier = "C",
+            category = "Limited"
+        ),
+        BorderDefinition(
+            id = "border_venom_nologo",
+            name = "Venom Tendrils",
+            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_a7e2ab61c12d84c8b538573f28d58ae0.png?size=4096&passthrough=true",
+            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_a7e2ab61c12d84c8b538573f28d58ae0.png?size=4096&passthrough=false",
+            pointCost = 0L,
+            description = "Sulur simbiotik hitam merayap mengelilingi bingkai avatar",
+            tier = "C",
+            category = "Limited"
+        ),
+        BorderDefinition(
+            id = "border_mythic_emperor",
+            name = "Mythic Emperor Crest",
+            imageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_ef8d91c10d3f25c2ceb90b8f58d0c0fc.png?size=4096&passthrough=true",
+            staticImageUrl = "https://cdn.discordapp.com/avatar-decoration-presets/a_ef8d91c10d3f25c2ceb90b8f58d0c0fc.png?size=4096&passthrough=false",
+            pointCost = 0L,
+            description = "Mahkota keemasan penguasa mutlak kasta tertinggi",
+            tier = "C",
+            category = "Limited"
+        )
+    )
+
+    val SHOP_PROFILE_EFFECTS: List<ProfileEffectDefinition> = listOf(
+        // Tier A (Starter: 600-800 Poin)
+        ProfileEffectDefinition(
+            id = "effect_magic_hearts_gold",
+            name = "Magic Hearts Gold",
+            animationUrl = "https://cdn.discordapp.com/assets/content/2ecd952da0b1c00559d3e8e2b85e053f1469e3a6cbe70295db2ee3fa3ff55883",
+            pointCost = 600L,
+            description = "Hujan hati emas bersinar dengan aura magis",
+            tier = "A",
+            category = "Anime"
+        ),
+        ProfileEffectDefinition(
+            id = "effect_magic_hearts_blue",
+            name = "Magic Hearts Sapphire",
+            animationUrl = "https://cdn.discordapp.com/assets/content/8b756deca4bb1a5744fa1284d720b08db6faefc3a91e5cfb34d284e3e3b12361",
+            pointCost = 650L,
+            description = "Kilau partikel safir biru berkilau di kartu profil",
+            tier = "A",
+            category = "Anime"
+        ),
+        ProfileEffectDefinition(
+            id = "effect_starlight_wand",
+            name = "Starlight Sparkle",
+            animationUrl = "https://cdn.discordapp.com/media/v1/collectibles-shop/9cf28ca2b03623fa06b4725355a1532189d533dd04cfa886ef299a9a06144e5b",
+            pointCost = 750L,
+            description = "Pusaran tongkat bintang ajaib berkilau lembut",
+            tier = "A",
+            category = "Starlight Magic"
+        ),
+        // Tier B (Exclusive: Lv. 35+ & 3,500 - 25,000 Poin)
+        ProfileEffectDefinition(
+            id = "effect_cosmic_twilight",
+            name = "Cosmic Twilight",
+            animationUrl = "https://cdn.discordapp.com/assets/content/fcfa4926b8731b4c000f576e2c9efca1b27236b567d162bb6b8ec013be82bc72",
+            pointCost = 6500L,
+            description = "Aura kosmik nebula kecubung ungu yang megah",
+            tier = "B",
+            requiredLevel = 35,
+            category = "Cosmos"
+        ),
+        ProfileEffectDefinition(
+            id = "effect_cyberspace",
+            name = "Cyberspace Matrix",
+            animationUrl = "https://cdn.discordapp.com/assets/content/31fe6e737fc1773afa54c0db46235cebaea6989467d51ee2bc3a44d8b9ba58ea",
+            pointCost = 9500L,
+            description = "Aliran data biner matriks hijau neon berkecepatan tinggi",
+            tier = "B",
+            requiredLevel = 40,
+            category = "DISXCORE"
+        ),
+        ProfileEffectDefinition(
+            id = "effect_cosmic_guardian",
+            name = "Cosmic Guardian Nova",
+            animationUrl = "https://cdn.discordapp.com/media/v1/collectibles-shop/0350f55562d987e91d516248aa0c36b69512356598ea1b0b54060851ec690b2d",
+            pointCost = 15000L,
+            description = "Pancaran perisai pelindung nova penjaga galaksi",
+            tier = "B",
+            requiredLevel = 45,
+            category = "Starlight Magic"
+        ),
+        ProfileEffectDefinition(
+            id = "effect_shadow_strike",
+            name = "Shadow Strike Blade",
+            animationUrl = "https://cdn.discordapp.com/media/v1/collectibles-shop/819dcfaf0dd0a6723e7b1c3127dd3fa65239e088a85f81f1e0cfbaab4db3f677",
+            pointCost = 20000L,
+            description = "Tebasan pedang bayangan hitam membelah kartu profil",
+            tier = "B",
+            requiredLevel = 50,
+            category = "Zen Protocol"
+        ),
+        ProfileEffectDefinition(
+            id = "effect_miyabi_slash",
+            name = "Hoshimi Miyabi Slash",
+            animationUrl = "https://cdn.discordapp.com/media/v1/collectibles-shop/8d0841804c183f6bb5ee61befdb3c37c84413d33bcb4eed903841bea8878c665",
+            pointCost = 25000L,
+            description = "Tebasan pedang es klan Hoshimi pembelah waktu",
+            tier = "B",
+            requiredLevel = 50,
+            category = "Zenless Zone Zero"
+        ),
+        ProfileEffectDefinition(
+            id = "effect_ellen_chomp",
+            name = "Ellen Joe Shark Chomp",
+            animationUrl = "https://cdn.discordapp.com/media/v1/collectibles-shop/9d2f22c608f619b02213796d5b08ec8ae2376993ce615c829da49386c99c43d0",
+            pointCost = 25000L,
+            description = "Gigitan rahang hiu laut dalam mematikan",
+            tier = "B",
+            requiredLevel = 50,
+            category = "Zenless Zone Zero"
+        ),
+        // Tier C (Limited: Redeem Only)
+        ProfileEffectDefinition(
+            id = "effect_venom_symbiote",
+            name = "Venom Symbiote Surge",
+            animationUrl = "https://cdn.discordapp.com/media/v1/collectibles-shop/d272f4fc37857c23e9ea7217c35d202a363f8c585679dd2e87e9aa66388bdec2",
+            pointCost = 0L,
+            description = "Venom menerjang layar dengan raungan sulur simbiotik hitam liar",
+            tier = "C",
+            category = "Limited"
+        ),
+        ProfileEffectDefinition(
+            id = "effect_mythic_aurora",
+            name = "Mythic Sovereign Aurora",
+            animationUrl = "https://cdn.discordapp.com/media/v1/collectibles-shop/0350f55562d987e91d516248aa0c36b69512356598ea1b0b54060851ec690b2d",
+            pointCost = 0L,
+            description = "Gelombang aurora keemasan berkilau lambang penguasa",
+            tier = "C",
+            category = "Limited"
         )
     )
 
@@ -483,9 +759,15 @@ object FirebaseManager {
         val cachedEquippedTitle = prefs.getString("profile_title_${session.id}", "") ?: ""
         val cachedTitleDef = resolveTitleDefinition(cachedEquippedTitle, level)
         val cachedBorderUrl = prefs.getString("profile_border_${session.id}", "") ?: ""
+        val cachedEffectUrl = prefs.getString("profile_effect_${session.id}", "") ?: ""
+        val cachedCosmeticAnimate = prefs.getBoolean("cosmetic_animate_${session.id}", true)
         val cachedUnlockedTitles = prefs.getStringSet("profile_unlocked_titles_${session.id}", setOf("WARGA YURANIME"))
             ?.toList() ?: listOf("WARGA YURANIME")
         val cachedUnlockedBorders = prefs.getStringSet("profile_unlocked_borders_${session.id}", emptySet())
+            ?.toList() ?: emptyList()
+        val cachedUnlockedEffects = prefs.getStringSet("profile_unlocked_effects_${session.id}", emptySet())
+            ?.toList() ?: emptyList()
+        val cachedClaimedCodes = prefs.getStringSet("profile_claimed_codes_${session.id}", emptySet())
             ?.toList() ?: emptyList()
         val lastCheckIn = prefs.getString("last_checkin_${session.id}", "") ?: ""
         val streak = prefs.getInt("streak_${session.id}", 0)
@@ -509,8 +791,12 @@ object FirebaseManager {
             equippedTitleTier = cachedTitleDef?.tierLevel ?: level,
             equippedTitleVariant = cachedTitleDef?.styleVariant ?: 0,
             equippedBorderUrl = cachedBorderUrl,
+            equippedProfileEffectUrl = cachedEffectUrl,
+            cosmeticAnimate = cachedCosmeticAnimate,
             unlockedTitles = cachedUnlockedTitles,
             unlockedBorders = cachedUnlockedBorders,
+            unlockedEffects = cachedUnlockedEffects,
+            claimedRedeemCodes = cachedClaimedCodes,
             lastCheckInDate = lastCheckIn,
             checkInStreak = streak,
             nextLevelTargetExp = nextTarget,
@@ -534,8 +820,12 @@ object FirebaseManager {
             .putString("profile_joindate_${profile.uid}", profile.joinDate)
             .putString("profile_title_${profile.uid}", profile.equippedTitle)
             .putString("profile_border_${profile.uid}", profile.equippedBorderUrl)
+            .putString("profile_effect_${profile.uid}", profile.equippedProfileEffectUrl)
+            .putBoolean("cosmetic_animate_${profile.uid}", profile.cosmeticAnimate)
             .putStringSet("profile_unlocked_titles_${profile.uid}", profile.unlockedTitles.toSet())
             .putStringSet("profile_unlocked_borders_${profile.uid}", profile.unlockedBorders.toSet())
+            .putStringSet("profile_unlocked_effects_${profile.uid}", profile.unlockedEffects.toSet())
+            .putStringSet("profile_claimed_codes_${profile.uid}", profile.claimedRedeemCodes.toSet())
             .putLong("exp_${profile.uid}", profile.exp)
             .putLong("points_${profile.uid}", profile.points)
             .putString("last_checkin_${profile.uid}", profile.lastCheckInDate)
@@ -752,7 +1042,12 @@ object FirebaseManager {
             rankTitle = computeRankTitle(level),
             equippedTitle = prefs?.getString("profile_title_$uid", "") ?: "",
             equippedBorderUrl = prefs?.getString("profile_border_$uid", "") ?: "",
+            equippedProfileEffectUrl = prefs?.getString("profile_effect_$uid", "") ?: "",
+            cosmeticAnimate = prefs?.getBoolean("cosmetic_animate_$uid", true) ?: true,
             unlockedTitles = listOf("WARGA YURANIME"),
+            unlockedBorders = prefs?.getStringSet("profile_unlocked_borders_$uid", emptySet())?.toList() ?: emptyList(),
+            unlockedEffects = prefs?.getStringSet("profile_unlocked_effects_$uid", emptySet())?.toList() ?: emptyList(),
+            claimedRedeemCodes = prefs?.getStringSet("profile_claimed_codes_$uid", emptySet())?.toList() ?: emptyList(),
             lastCheckInDate = prefs?.getString("last_checkin_$uid", "") ?: "",
             checkInStreak = prefs?.getInt("streak_$uid", 0) ?: 0,
             nextLevelTargetExp = nextTarget,
@@ -789,8 +1084,12 @@ object FirebaseManager {
                     "rankTitle" to initialProfile.rankTitle,
                     "equippedTitle" to initialProfile.equippedTitle,
                     "equippedBorderUrl" to initialProfile.equippedBorderUrl,
+                    "equippedProfileEffectUrl" to initialProfile.equippedProfileEffectUrl,
+                    "cosmeticAnimate" to initialProfile.cosmeticAnimate,
                     "unlockedTitles" to initialProfile.unlockedTitles,
                     "unlockedBorders" to initialProfile.unlockedBorders,
+                    "unlockedEffects" to initialProfile.unlockedEffects,
+                    "claimedRedeemCodes" to initialProfile.claimedRedeemCodes,
                     "lastCheckInDate" to initialProfile.lastCheckInDate,
                     "checkInStreak" to initialProfile.checkInStreak,
                     "createdAt" to FieldValue.serverTimestamp(),
@@ -869,6 +1168,8 @@ object FirebaseManager {
             ?: titleDef?.styleVariant
             ?: 0
         val equippedBorderUrl = snapshot.getString("equippedBorderUrl")?.trim().orEmpty()
+        val equippedProfileEffectUrl = snapshot.getString("equippedProfileEffectUrl")?.trim().orEmpty()
+        val cosmeticAnimate = snapshot.getBoolean("cosmeticAnimate") ?: true
 
         val rawUnlockedTitles = (snapshot.get("unlockedTitles") as? List<*>)
             ?.mapNotNull { it?.toString()?.trim() }
@@ -881,6 +1182,16 @@ object FirebaseManager {
 
         val unlockedBorders = (snapshot.get("unlockedBorders") as? List<*>)
             ?.mapNotNull { it?.toString()?.trim() }
+            ?.filter { it.isNotEmpty() }
+            .orEmpty()
+
+        val unlockedEffects = (snapshot.get("unlockedEffects") as? List<*>)
+            ?.mapNotNull { it?.toString()?.trim() }
+            ?.filter { it.isNotEmpty() }
+            .orEmpty()
+
+        val claimedRedeemCodes = (snapshot.get("claimedRedeemCodes") as? List<*>)
+            ?.mapNotNull { it?.toString()?.trim()?.uppercase(Locale.ROOT) }
             ?.filter { it.isNotEmpty() }
             .orEmpty()
 
@@ -911,8 +1222,12 @@ object FirebaseManager {
             equippedTitleTier = equippedTitleTier,
             equippedTitleVariant = equippedTitleVariant,
             equippedBorderUrl = equippedBorderUrl,
+            equippedProfileEffectUrl = equippedProfileEffectUrl,
+            cosmeticAnimate = cosmeticAnimate,
             unlockedTitles = unlockedTitles,
             unlockedBorders = unlockedBorders,
+            unlockedEffects = unlockedEffects,
+            claimedRedeemCodes = claimedRedeemCodes,
             claimedMissions = rawClaimedMissions,
             lastCheckInDate = snapshot.getString("lastCheckInDate") ?: "",
             checkInStreak = (snapshot.getLong("checkInStreak") ?: 0L).toInt(),
@@ -989,6 +1304,7 @@ object FirebaseManager {
                             ?: titleDef?.styleVariant
                             ?: 0
                         val equippedBorderUrl = doc.getString("equippedBorderUrl")?.trim().orEmpty()
+                        val equippedProfileEffectUrl = doc.getString("equippedProfileEffectUrl")?.trim().orEmpty()
 
                         LeaderboardUser(
                             rank = 0,
@@ -1005,7 +1321,8 @@ object FirebaseManager {
                             equippedTitle = equippedTitle,
                             equippedTitleTier = equippedTitleTier,
                             equippedTitleVariant = equippedTitleVariant,
-                            equippedBorderUrl = equippedBorderUrl
+                            equippedBorderUrl = equippedBorderUrl,
+                            equippedProfileEffectUrl = equippedProfileEffectUrl
                         )
                     }
                         .sortedWith(
@@ -1039,7 +1356,8 @@ object FirebaseManager {
             equippedTitle = profile.equippedTitle,
             equippedTitleTier = profile.equippedTitleTier,
             equippedTitleVariant = profile.equippedTitleVariant,
-            equippedBorderUrl = profile.equippedBorderUrl
+            equippedBorderUrl = profile.equippedBorderUrl,
+            equippedProfileEffectUrl = profile.equippedProfileEffectUrl
         )
         if (existingIdx >= 0) {
             currentList[existingIdx] = updatedEntry
@@ -1331,6 +1649,14 @@ object FirebaseManager {
         }
 
         val alreadyUnlocked = current.unlockedBorders.contains(border.id)
+        if (border.tier == "B" && current.level < border.requiredLevel && !alreadyUnlocked) {
+            onComplete(false, "Frame ini butuh Level ${border.requiredLevel}! Tingkatkan level Anda terlebih dahulu.")
+            return
+        }
+        if (border.tier == "C" && !alreadyUnlocked) {
+            onComplete(false, "Item Limited ini hanya bisa didapatkan melalui Kode Redeem!")
+            return
+        }
         if (!alreadyUnlocked && current.points < border.pointCost) {
             onComplete(false, "Poin belum cukup! Butuh ${border.pointCost} Poin.")
             return
@@ -1363,6 +1689,269 @@ object FirebaseManager {
             } catch (e: Exception) {
                 CoroutineScope(Dispatchers.Main).launch {
                     onComplete(true, "Frame \"${border.name}\" berhasil dipasang!")
+                }
+            }
+        }
+    }
+
+    fun unlockOrEquipProfileEffect(
+        context: Context? = null,
+        effect: ProfileEffectDefinition?,
+        onComplete: (Boolean, String) -> Unit
+    ) {
+        val uid = getActiveUid()
+        if (uid == null) {
+            onComplete(false, "Silakan login terlebih dahulu")
+            return
+        }
+        val current = _userProfile.value ?: return
+
+        if (effect == null) {
+            val updated = current.copy(equippedProfileEffectUrl = "")
+            _userProfile.value = updated
+            if (context != null) saveProfileToPrefs(context, updated)
+            refreshLeaderboardWithCurrentUser(updated)
+            scope.launch {
+                try {
+                    firestore.collection("users").document(uid).set(
+                        mapOf("equippedProfileEffectUrl" to ""),
+                        SetOptions.merge()
+                    ).await()
+                } catch (_: Exception) {}
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, "Profile Effect dilepas")
+                }
+            }
+            return
+        }
+
+        val alreadyUnlocked = current.unlockedEffects.contains(effect.id)
+        if (effect.tier == "B" && current.level < effect.requiredLevel && !alreadyUnlocked) {
+            onComplete(false, "Efek ini butuh Level ${effect.requiredLevel}! Tingkatkan level Anda terlebih dahulu.")
+            return
+        }
+        if (effect.tier == "C" && !alreadyUnlocked) {
+            onComplete(false, "Efek Limited ini hanya bisa didapatkan melalui Kode Redeem!")
+            return
+        }
+        if (!alreadyUnlocked && current.points < effect.pointCost) {
+            onComplete(false, "Poin belum cukup! Butuh ${effect.pointCost} Poin.")
+            return
+        }
+
+        val newPoints = if (alreadyUnlocked) current.points else (current.points - effect.pointCost).coerceAtLeast(0L)
+        val newUnlockedEffects = (current.unlockedEffects + effect.id).distinct()
+        val updated = current.copy(
+            points = newPoints,
+            unlockedEffects = newUnlockedEffects,
+            equippedProfileEffectUrl = effect.animationUrl
+        )
+        _userProfile.value = updated
+        if (context != null) saveProfileToPrefs(context, updated)
+        refreshLeaderboardWithCurrentUser(updated)
+
+        scope.launch {
+            try {
+                firestore.collection("users").document(uid).set(
+                    mapOf(
+                        "points" to newPoints,
+                        "unlockedEffects" to newUnlockedEffects,
+                        "equippedProfileEffectUrl" to effect.animationUrl
+                    ),
+                    SetOptions.merge()
+                ).await()
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, "Profile Effect \"${effect.name}\" berhasil dipasang!")
+                }
+            } catch (e: Exception) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, "Profile Effect \"${effect.name}\" berhasil dipasang!")
+                }
+            }
+        }
+    }
+
+    fun setCosmeticAnimate(
+        context: Context? = null,
+        enabled: Boolean,
+        onComplete: ((Boolean) -> Unit)? = null
+    ) {
+        val uid = getActiveUid()
+        val current = _userProfile.value ?: return
+        val updated = current.copy(cosmeticAnimate = enabled)
+        _userProfile.value = updated
+        if (context != null) saveProfileToPrefs(context, updated)
+        if (uid != null) {
+            scope.launch {
+                try {
+                    firestore.collection("users").document(uid).set(
+                        mapOf("cosmeticAnimate" to enabled),
+                        SetOptions.merge()
+                    ).await()
+                } catch (_: Exception) {}
+                onComplete?.let { cb ->
+                    CoroutineScope(Dispatchers.Main).launch { cb(true) }
+                }
+            }
+        } else {
+            onComplete?.invoke(true)
+        }
+    }
+
+    fun claimRedeemCode(
+        context: Context? = null,
+        codeInput: String,
+        onComplete: (Boolean, String) -> Unit
+    ) {
+        val uid = getActiveUid()
+        if (uid == null) {
+            onComplete(false, "Silakan login terlebih dahulu")
+            return
+        }
+        val current = _userProfile.value ?: return
+        val cleanCode = codeInput.trim().uppercase(Locale.ROOT)
+        if (cleanCode.isBlank()) {
+            onComplete(false, "Masukkan kode redeem yang valid")
+            return
+        }
+
+        if (current.claimedRedeemCodes.contains(cleanCode)) {
+            onComplete(false, "Kode \"$cleanCode\" sudah pernah Anda klaim di akun ini!")
+            return
+        }
+
+        class CodeReward(
+            val exp: Long,
+            val points: Long,
+            val title: String? = null,
+            val borderId: String? = null,
+            val effectId: String? = null,
+            val message: String
+        )
+
+        val builtInRewards = mapOf(
+            "YURANIMEVIP" to CodeReward(
+                exp = 10000L,
+                points = 5000L,
+                title = "VIP YURANIME",
+                borderId = "border_sovereign_gold",
+                effectId = "effect_magic_hearts_gold",
+                message = "Selamat! Kode VIP Yuranime aktif: +10,000 EXP, +5,000 Poin, & Kosmetik Emas!"
+            ),
+            "DINZMYTHIC" to CodeReward(
+                exp = 25000L,
+                points = 15000L,
+                title = "MYTHIC SOVEREIGN",
+                borderId = "border_mythic_emperor",
+                effectId = "effect_mythic_aurora",
+                message = "Luar biasa! Paket Mythic Sovereign aktif: +25,000 EXP, +15,000 Poin & Mahkota Mythic!"
+            ),
+            "SEPUH2026" to CodeReward(
+                exp = 5000L,
+                points = 2500L,
+                title = "SEPUH YURANIME",
+                borderId = "border_bronze_crest",
+                message = "Kode Sepuh 2026 aktif: +5,000 EXP, +2,500 Poin & Title Sepuh!"
+            ),
+            "SOVEREIGN99" to CodeReward(
+                exp = 15000L,
+                points = 8000L,
+                title = "KHALIFAH ANIME",
+                borderId = "border_silver_wings",
+                message = "Kode Sovereign aktif: +15,000 EXP, +8,000 Poin & Sayap Perak!"
+            ),
+            "ANIMEKING" to CodeReward(
+                exp = 8000L,
+                points = 4000L,
+                title = "BANGSAWAN KOMIK",
+                effectId = "effect_cosmic_twilight",
+                message = "Kode Raja Anime aktif: +8,000 EXP, +4,000 Poin & Efek Cosmic Twilight!"
+            ),
+            "VENOMSYMBIOTE" to CodeReward(
+                exp = 12000L,
+                points = 6000L,
+                borderId = "border_venom_logo",
+                effectId = "effect_venom_symbiote",
+                message = "We Are Venom! +12,000 EXP, +6,000 Poin, Avatar Border & Profile Effect Venom didapatkan!"
+            )
+        )
+
+        fun applyReward(reward: CodeReward) {
+            val newExp = current.exp + reward.exp
+            val newPoints = current.points + reward.points
+            val newLevel = computeLevelFromExp(newExp)
+            val nextTarget = computeNextLevelTargetExp(newLevel)
+            val newProgress = computeExpProgress(newExp, nextTarget)
+
+            val newUnlockedTitles = (current.unlockedTitles + listOfNotNull(reward.title)).distinct()
+            val newUnlockedBorders = (current.unlockedBorders + listOfNotNull(reward.borderId)).distinct()
+            val newUnlockedEffects = (current.unlockedEffects + listOfNotNull(reward.effectId)).distinct()
+            val newClaimedCodes = (current.claimedRedeemCodes + cleanCode).distinct()
+
+            val updated = current.copy(
+                exp = newExp,
+                points = newPoints,
+                level = newLevel,
+                rankTitle = computeRankTitle(newLevel),
+                unlockedTitles = newUnlockedTitles,
+                unlockedBorders = newUnlockedBorders,
+                unlockedEffects = newUnlockedEffects,
+                claimedRedeemCodes = newClaimedCodes,
+                nextLevelTargetExp = nextTarget,
+                expProgress = newProgress
+            )
+            _userProfile.value = updated
+            if (context != null) saveProfileToPrefs(context, updated)
+            refreshLeaderboardWithCurrentUser(updated)
+
+            scope.launch {
+                try {
+                    firestore.collection("users").document(uid).set(
+                        mapOf(
+                            "exp" to newExp,
+                            "xp" to newExp,
+                            "points" to newPoints,
+                            "level" to newLevel,
+                            "rankTitle" to updated.rankTitle,
+                            "unlockedTitles" to newUnlockedTitles,
+                            "unlockedBorders" to newUnlockedBorders,
+                            "unlockedEffects" to newUnlockedEffects,
+                            "claimedRedeemCodes" to newClaimedCodes
+                        ),
+                        SetOptions.merge()
+                    ).await()
+                } catch (_: Exception) {}
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, reward.message)
+                }
+            }
+        }
+
+        val builtIn = builtInRewards[cleanCode]
+        if (builtIn != null) {
+            applyReward(builtIn)
+            return
+        }
+
+        scope.launch {
+            try {
+                val doc = firestore.collection("redeem_codes").document(cleanCode).get().await()
+                if (doc.exists() && (doc.getBoolean("active") ?: true)) {
+                    val exp = doc.getLong("exp") ?: 0L
+                    val points = doc.getLong("points") ?: 0L
+                    val title = doc.getString("title")
+                    val borderId = doc.getString("borderId")
+                    val effectId = doc.getString("effectId")
+                    val msg = doc.getString("message") ?: "Kode \"$cleanCode\" berhasil diklaim!"
+                    applyReward(CodeReward(exp, points, title, borderId, effectId, msg))
+                } else {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        onComplete(false, "Kode \"$cleanCode\" tidak valid atau sudah kedaluwarsa.")
+                    }
+                }
+            } catch (e: Exception) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(false, "Kode \"$cleanCode\" tidak ditemukan.")
                 }
             }
         }

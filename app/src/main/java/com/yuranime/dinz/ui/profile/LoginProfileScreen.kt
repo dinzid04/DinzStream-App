@@ -118,12 +118,16 @@ import com.yuranime.dinz.ui.components.BottomNavBar
 import com.yuranime.dinz.ui.components.EmptyTitleSlotBadge
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.NavTab
+import com.yuranime.dinz.ui.components.StatusMicroTitleTagRow
 import com.yuranime.dinz.ui.components.liquidGlassBackdrop
 import com.yuranime.dinz.ui.leaderboard.LeaderboardScreen
 import com.yuranime.dinz.ui.profile.subscreens.DownloadsScreen
 import com.yuranime.dinz.ui.profile.subscreens.EditProfileScreen
 import com.yuranime.dinz.ui.profile.subscreens.PointsRewardsScreen
 import com.yuranime.dinz.ui.profile.subscreens.SettingsScreen
+import com.yuranime.dinz.ui.theme.JakartaSansFontFamily
+import com.yuranime.dinz.ui.theme.JetBrainsMonoFontFamily
+import com.yuranime.dinz.ui.theme.OutfitDisplayFontFamily
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import com.yuranime.dinz.ui.theme.YuranimeLogoFontFamily
 
@@ -433,6 +437,15 @@ private fun UserProfileView(
     val equippedTitleTier = profile?.equippedTitleTier ?: level
     val equippedTitleVariant = profile?.equippedTitleVariant ?: 0
     val equippedBorderUrl = profile?.equippedBorderUrl.orEmpty()
+    val equippedProfileEffectUrl = profile?.equippedProfileEffectUrl.orEmpty()
+    val cosmeticAnimate = profile?.cosmeticAnimate ?: true
+    val resolvedBorderUrl = remember(equippedBorderUrl, cosmeticAnimate) {
+        if (!cosmeticAnimate && equippedBorderUrl.contains("passthrough=true")) {
+            equippedBorderUrl.replace("passthrough=true", "passthrough=false")
+        } else {
+            equippedBorderUrl
+        }
+    }
 
     val animatedExpProgress by animateFloatAsState(
         targetValue = expProgress.coerceIn(0f, 1f),
@@ -485,6 +498,16 @@ private fun UserProfileView(
                                     end = Offset(900f, 500f)
                                 )
                             )
+                    )
+                }
+
+                // Render Profile Effect Di Atas Banner (Jika Ada)
+                if (equippedProfileEffectUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = equippedProfileEffectUrl,
+                        contentDescription = "Profile Effect",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
 
@@ -620,9 +643,9 @@ private fun UserProfileView(
                     )
                 }
 
-                if (equippedBorderUrl.isNotBlank()) {
+                if (resolvedBorderUrl.isNotBlank()) {
                     AsyncImage(
-                        model = equippedBorderUrl,
+                        model = resolvedBorderUrl,
                         contentDescription = "Avatar Border",
                         contentScale = ContentScale.Fit,
                         modifier = Modifier.size(108.dp)
@@ -676,7 +699,7 @@ private fun UserProfileView(
                 .padding(horizontal = 20.dp)
                 .padding(top = 10.dp)
         ) {
-            // Baris 1: Username (SF Bold putih 22.sp) + #ID unik 4 digit (#64748B 16.sp)
+            // Baris 1: Username (Outfit Bold 22.sp) + #ID unik 4 digit (JetBrains Mono 15.sp)
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -685,7 +708,7 @@ private fun UserProfileView(
                     color = Color.White,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily,
+                    fontFamily = OutfitDisplayFontFamily,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.alignByBaseline()
@@ -694,73 +717,57 @@ private fun UserProfileView(
                 Text(
                     text = "#$userTag",
                     color = Color(0xFF64748B),
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
-                    fontFamily = SfProFontFamily,
+                    fontFamily = JetBrainsMonoFontFamily,
                     modifier = Modifier.alignByBaseline()
                 )
             }
 
             Spacer(modifier = Modifier.height(3.dp))
 
-            // Baris 2: Email asli akun pengguna (13.sp, warna #CBD5E1)
+            // Baris 2: Email asli akun pengguna (Jakarta Sans 13.sp)
             Text(
                 text = email,
                 color = Color(0xFFCBD5E1),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Normal,
-                fontFamily = SfProFontFamily,
+                fontFamily = JakartaSansFontFamily,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            // Baris 3: Tanggal Bergabung Asli (12.sp, warna #64748B)
+            // Baris 3: Tanggal Bergabung Asli (Jakarta Sans 12.sp)
             Text(
                 text = "Bergabung sejak $joinDate",
                 color = Color(0xFF64748B),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Normal,
-                fontFamily = SfProFontFamily
+                fontFamily = JakartaSansFontFamily
             )
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Baris 4: Bio pengguna dari database (14.sp, warna #E2E8F0)
+            // Baris 4: Bio pengguna dari database (Jakarta Sans 13.5.sp)
             Text(
                 text = bio,
                 color = Color(0xFFE2E8F0),
-                fontSize = 14.sp,
+                fontSize = 13.5.sp,
                 fontWeight = FontWeight.Normal,
-                fontFamily = SfProFontFamily,
-                lineHeight = 20.sp
+                fontFamily = JakartaSansFontFamily,
+                lineHeight = 19.sp
             )
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 3A. BARIS PILL STATUS (height = 26.dp, RoundedCornerShape(50), latar #161820 tanpa border kasar)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ProfileStatusPill(
-                    text = role,
-                    textColor = Color(0xFFE2E8F0)
-                )
-
-                ProfileStatusPill(
-                    leadingSymbol = "✦",
-                    leadingColor = Color(0xFFFF5722),
-                    text = "Lv. $level",
-                    textColor = Color.White
-                )
-
-                ProfileStatusPill(
-                    text = rankTitle,
-                    textColor = Color(0xFFF43F5E)
-                )
-            }
+            // 3A. BARIS MICRO-TITLE TAGS (Role Chamfered Tag, Level Chevron Hex Tag, Level Class Tag)
+            StatusMicroTitleTagRow(
+                role = role,
+                level = level,
+                rankTitle = rankTitle
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -789,16 +796,16 @@ private fun UserProfileView(
                 Text(
                     text = "EXP",
                     color = Color.White,
-                    fontSize = 13.sp,
+                    fontSize = 12.5.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
+                    fontFamily = OutfitDisplayFontFamily
                 )
                 Text(
                     text = "${FirebaseManager.formatNumber(exp)} / ${FirebaseManager.formatNumber(nextTargetExp)}",
                     color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = JetBrainsMonoFontFamily
                 )
             }
 
@@ -990,46 +997,39 @@ private fun SleekHighlightFeatureCard(
 ) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color(0xFF13151D))
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF0E1015))
+            .border(0.5.dp, Color(0xFF1E2028), RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 14.dp),
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(accentColor.copy(alpha = 0.14f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                tint = accentColor,
-                modifier = Modifier.size(20.dp)
-            )
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = title,
+            tint = accentColor,
+            modifier = Modifier.size(20.dp)
+        )
 
-        Spacer(modifier = Modifier.width(11.dp))
+        Spacer(modifier = Modifier.width(9.dp))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 color = Color.White,
                 fontSize = 13.5.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = SfProFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = OutfitDisplayFontFamily,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                softWrap = false
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = subtitle,
                 color = accentColor,
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = SfProFontFamily,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = JakartaSansFontFamily,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1192,22 +1192,45 @@ private fun QuickTitlePickerDialog(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color(0xFF14161E))
+                .clip(RoundedCornerShape(22.dp))
+                .background(Color(0xFF12141E))
+                .border(1.dp, Color(0xFF1E2230), RoundedCornerShape(22.dp))
                 .padding(20.dp)
         ) {
+            // iOS Drag Handle
+            Box(
+                modifier = Modifier
+                    .width(36.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFF2A2E40))
+                    .align(Alignment.CenterHorizontally)
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Pilih Custom Title",
-                    color = Color.White,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
-                )
+                Column {
+                    Text(
+                        text = "Pilih Custom Title",
+                        color = Color.White,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = OutfitDisplayFontFamily
+                    )
+                    Text(
+                        text = "${unlockedTitles.size} Title Terbuka",
+                        color = Color(0xFFFF5722),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = JetBrainsMonoFontFamily
+                    )
+                }
+
                 IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                     Icon(
                         imageVector = Icons.Default.Close,
@@ -1217,13 +1240,13 @@ private fun QuickTitlePickerDialog(
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "Ketuk Title yang sudah terbuka untuk langsung memasangnya ke profilmu.",
+                text = "Ketuk Title yang sudah Anda miliki untuk memasangnya ke profil.",
                 color = Color(0xFF94A3B8),
                 fontSize = 12.sp,
-                fontFamily = SfProFontFamily
+                fontFamily = JakartaSansFontFamily
             )
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -1241,7 +1264,12 @@ private fun QuickTitlePickerDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (isEquipped) Color(0x26E11D48) else Color(0xFF0F1118))
+                            .background(if (isEquipped) Color(0x26E11D48) else Color(0xFF0C0E15))
+                            .border(
+                                width = if (isEquipped) 1.dp else 0.5.dp,
+                                color = if (isEquipped) Color(0xFFE11D48) else Color(0xFF1B1E2B),
+                                shape = RoundedCornerShape(12.dp)
+                            )
                             .clickable {
                                 if (isUnlocked) {
                                     val target = if (isEquipped) null else titleDef
@@ -1261,7 +1289,8 @@ private fun QuickTitlePickerDialog(
                             titleName = titleDef.titleName,
                             tierLevel = titleDef.tierLevel,
                             styleVariant = titleDef.styleVariant,
-                            compact = true
+                            compact = true,
+                            scaleFactor = 0.82f
                         )
 
                         if (isUnlocked) {
@@ -1270,7 +1299,7 @@ private fun QuickTitlePickerDialog(
                                 color = if (isEquipped) Color(0xFFFF5722) else Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = SfProFontFamily
+                                fontFamily = JakartaSansFontFamily
                             )
                         } else {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1284,9 +1313,9 @@ private fun QuickTitlePickerDialog(
                                 Text(
                                     text = if (titleDef.pointCost > 0) "${titleDef.pointCost} Poin" else "Lv.${titleDef.requiredLevel}",
                                     color = Color(0xFF64748B),
-                                    fontSize = 11.5.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    fontFamily = SfProFontFamily
+                                    fontFamily = JetBrainsMonoFontFamily
                                 )
                             }
                         }
@@ -1314,7 +1343,7 @@ private fun QuickTitlePickerDialog(
                     color = Color.White,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
+                    fontFamily = JakartaSansFontFamily
                 )
             }
         }

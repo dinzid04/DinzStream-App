@@ -1329,3 +1329,57 @@ Mengacu pada tata letak referensi `WA_1794546770520.jpg` (`1002213252.jpg`) deng
    - Mengunggah file `.webp` ke endpoint CDN utama `POST https://cdn.dinzid.my.id/api/upload` (`multipart/form-data`, field `file`, menghasilkan URL publik permanen `https://url.dinzid.my.id/...` di jaringan Cloudflare CDN Dinz) dengan fallback otomatis ke node penyimpanan permanen + shortener `https://url.dinzid.my.id/add`.
 3. **Sinkronisasi Real-Time Firestore:**
    - Menyimpan URL publik `https://...` hasil upload ke dokumen `users/{uid}` pada field `avatar` & `photoUrl` (untuk foto profil) atau `banner` & `bannerUrl` (untuk cover banner) di Firebase Firestore sehingga langsung tampil di seluruh perangkat dan di Papan Peringkat.
+
+
+---
+
+## 45. SPESIFIKASI FITUR 42: Revisi Total & Redesign Minimalis Anti-Slop (ProfileScreen, 150+ Vektor Custom Title & 8 Animasi, Editorial Leaderboard, Points & Rewards + Kode Redeem, serta Integrasi Penuh Discord Assets Beranimasi & Statis)
+
+### A. TAHAP 1: Sistem Tipografi Baru & Pembersihan Total Tumpukan Overlay di `ProfileScreen`
+1. **Sistem Tipografi 3-Lapis (`ui/theme/Type.kt`):**
+   - **Display & Header (`OutfitDisplayFontFamily` — Outfit Variable/SemiBold/Bold, tracking `-0.02em`):** Digunakan untuk `Username`, `Angka Podium`, dan `Header Section`.
+   - **Body & UI Labels (`JakartaSansFontFamily` — Plus Jakarta Sans Regular/Medium/SemiBold):** Ukuran proporsional: Title section `15.sp`, Body/Menu `14.sp`, Sub-label `12.sp`, Micro-tag `10.5.sp`.
+   - **Monospace Tabular (`JetBrainsMonoFontFamily` — JetBrains Mono + `fontFeatureSettings = "tnum"`, SemiBold `12.sp`–`13.sp`):** Digunakan untuk seluruh angka metrik (`EXP`, `Level`, `Poin`, `#ID`, `Rank`) agar sejajar presisi secara vertikal.
+2. **Komponen `StatusMicroTitleTag` (Menggantikan Kapsul Abu-Abu di Bawah Bio):**
+   - Berbeda bentuk dari Main Custom Title Badge di bawahnya: menggunakan **Sleek Chamfered Tag** (`height = 22.dp`, sudut potong miring presisi `4.dp` di kiri-atas dan kanan-bawah, garis tepi metalik `0.75.dp`, tanpa background tebal kaku).
+   - **Tag 1 (`Role` — `MEMBER` / `ADMIN`):** Ikon perisai/mahkota vektor mikro di kiri + teks kapital `10.sp` tracking `0.6.sp`.
+   - **Tag 2 (`Level` — `LV. X`):** Lencana segienam memanjang dengan ikon *Rank Chevron* (garis pangkat militer yang naik sesuai level: 1 chevron di Lv.1–4, 2 chevron di Lv.5–14, 3 chevron bintang di Lv.15–30, mahkota chevron di Lv.31+) + teks `LV. [Nomor]`.
+   - **Tag 3 (`Level Class` — contoh: `PERINTIS ANIME`):** Pita tipis bergradasi halus dengan ikon vektor sesuai tingkatan kelas.
+3. **Panel Ringkas `Papan Peringkat` & `Points & Rewards` Anti-Kepotong:**
+   - Menghapus kotak ikon berwarna yang memakan ruang horizontal.
+   - Menggunakan 2 panel minimalis bergaris tepi halus (`0.5.dp` `#1E2028`, background `#0E1015`, `RoundedCornerShape(12.dp)`, padding dalam `12.dp`), ikon vektor tipis modern tanpa kotak latar, dan teks `13.5.sp` SemiBold (`maxLines = 1`) sehingga **`Papan Peringkat`** dan **`Points & Rewards`** tampil 100% utuh di segala ukuran layar.
+
+### B. TAHAP 2: Rombak Desain Custom Title Badge (150+ Ikon Vektor Unik, 8 Variasi Animasi & Teks Anti-Kepotong)
+1. **Geometri Dinamis Anti-Kepotong:**
+   - Menggunakan `Row(modifier = Modifier.wrapContentWidth().height(28.dp))` dengan `drawBehind` / `Canvas` yang membungkus ukuran aktual teks + ruang aman kanan minimal `16.dp` (`padding(start = 32.dp, end = 18.dp)`), sehingga teks panjang seperti `SEPUH YURANIME`, `BANGSAWAN KOMIK`, dan `MYTHIC SOVEREIGN` tidak pernah menabrak garis miring kanan dan tidak pernah terpotong `...`.
+2. **Library 150+ Ikon Vektor Unik (`TitleIconCatalog.kt`):**
+   - Menyediakan 150+ ikon vektor unik berbasis `Path` / `DrawScope` presisi (Katana Silang, Greatsword, Grim Reaper Scythe, Shuriken, Kunai, Tombak Naga, Panah Petir, Perisai Ksatria, Kapak Viking, Dragon Crest, Topeng Kitsune, Demon Horns, Angel Wings, Fallen Wings, Phoenix, Night Wolf, Ouroboros, Crowned Skull, Eye of Fate, Rune Crystal, Grimoire, Hourglass, Lotus, Sakura, Blood Crescent, Solar Eclipse, Mecha Core, Cyberpunk Visor, Saturn, Lightning Bolt, Spirit Flame, Symbiote Fang, Spider Web, Infinity Gauntlet, dll.) sehingga setiap Title memiliki ikon uniknya sendiri.
+3. **8 Jenis Animasi Custom Title Badge (`TitleAnimationType`):**
+   - `PLASMA_BORDER_FLOW`, `HOLOGRAPHIC_FOIL`, `CRIMSON_EMBER_DRIFT`, `LIGHTNING_ARC_SWEEP`, `CELESTIAL_ORBIT`, `LIQUID_GOLD_WAVE`, `CYBER_PULSE_GLOW`, dan `STARLIGHT_TWINKLE`.
+4. **Minimalist Bottom Sheet `Pilih Custom Title` (`#0B0C10`):**
+   - Menggantikan dialog kotak sempit dengan `ModalBottomSheet` bergaya iOS (`#0B0C10`), dilengkapi *drag handle*, area **Live Preview** (menampilkan simulasi nama + title yang dipilih), chip filter kategori (`Semua`, `Dimiliki`, `Level`, `Shop`, `Langka/Redeem`), dan daftar baris bersih.
+
+### C. TAHAP 3: Redesign Total `Papan Peringkat` (`LeaderboardScreen` — Minimalist Editorial Leaderboard)
+1. **Podium Terbuka Tanpa Kotak Kaku:**
+   - Menghapus kotak persegi panjang di bawah Top 1, Top 2, dan Top 3 di atas kanvas `#090A0D` dengan pendaran radial (*subtle radial spotlight* `8%` opacity) di belakang Top 1.
+2. **Presisi 100% Frame Border Top 1–3 dengan Lingkaran Foto Profil:**
+   - Menghapus kapsul `TOP 1`, `TOP 2`, `TOP 3` tambahan yang menutupi dagu border.
+   - Menyesuaikan ukuran dan `offsetY` lingkaran `AsyncImage` Avatar sesuai koordinat lubang cincin dari gambar `edTfBfx` (Top 1), `85MXtu1` (Top 2), dan `1KCdAyA` (Top 3), serta memotong/menyembunyikan perisai bawah kosong agar foto profil dan bingkai mahkota/sayapnya menyatu 100% tanpa celah putih/ungu yang bocor keluar.
+   - Menyusun secara vertikal di bawah avatar: Nama Pengguna (`14.sp` Bold), Level & Tag (`11.sp` `#94A3B8`), Custom Title Badge skala kompak (`0.82f`), dan Total EXP (`JetBrains Mono SemiBold` `12.sp` warna `#F3C663` / `#CBD5E1` / `#D97706`) yang tampil utuh.
+3. **Header 3 Kolom (`#` | `PENGGUNA` | `TOTAL EXP`) & Baris Minimalis #4+:**
+   - Kolom `#` (`width = 40.dp`), `PENGGUNA` (`weight(1f)`), dan `TOTAL EXP` (`11.sp` `#64748B` kapital ber-tracking rapi).
+   - Baris peringkat `#4+` setinggi `60.dp` dengan `HorizontalDivider(0.5.dp, #161820)` tanpa kotak abu-abu tebal, serta floating bar bawah ramping (`height = 58.dp`, `#E611131A`, border `0.5.dp` `#26FFFFFF`, sudut `16.dp`).
+
+### D. TAHAP 4 & 5: Redesign `Points & Rewards` + Integrasi Penuh `discord_assets` (Animasi & Statis, Level 35+, & Kode Redeem)
+1. **4 Tab Segmented Pill Minimalis (`#111318` / `#1C2029`):**
+   - `Misi & Check-In`, `Milestone`, `Shop & Kosmetik`, dan `Kode Redeem`.
+2. **Check-In Harian 7 Hari dengan Ikon Vektor Hadiah Berwarna:**
+   - Hari 1–3: *Ikon Kristal Poin Berkilau*; Hari 4–6: *Ikon Koin Emas Ganda + Orb EXP*; Hari 7: *Ikon Peti Harta / Mahkota Mythic*, disertai nilai monospasi (`20`..`50`).
+3. **Integrasi Katalog `discord_assets` (Avatar Borders, Profile Effects & Nameplates) + 2 Mode (Beranimasi & Statis):**
+   - Memuat katalog lengkap dari `/storage/emulated/0/termux/design/discord_assets/` (termasuk *Spider-Man vs. Venom*, *Deadpool & Wolverine*, *Zenless Zone Zero*, *My Hero Academia*, *Dragon Ball Daima*, *Arcane*, *Street Fighter 6*, *Star Wars*, *Anime 1–3*, *Dark Fantasy*, *Cyberpunk*, dll.).
+   - Menyediakan **Toggle Mode Kosmetik: Beranimasi (`Animated APNG/WebP`) vs Statis (`Static PNG/WebP`)** yang tersimpan secara persisten dan merender animasi APNG secara *real-time* di `ProfileScreen`, `LeaderboardScreen`, dan `PointsRewardsScreen`.
+   - Kesesuaian posisi: **Avatar Border** memeluk lingkaran avatar (`avatarSize * 1.22f` di dalam `Box(contentAlignment = Alignment.Center)`), dan **Profile Effect** dirender di atas area Banner & Header Profile (`ProfileScreen`) tanpa menghalangi keterbacaan teks.
+4. **3 Kategori Perolehan (Tier Dasar, Tier Eksklusif Lv. 35+, & Tier Langka Kode Redeem):**
+   - **Kategori A (Tier Dasar):** Terbuka di bawah Lv. 35 dengan harga `300` – `800 Poin`.
+   - **Kategori B (Tier Eksklusif Shop):** Wajib mencapai minimal **Level 35 (`userLevel >= 35`)** DAN harga poin tinggi (`3.500` – `25.000 Poin`). Jika belum Lv. 35, terkunci dengan label `🔒 Syarat Lv. 35 & [Harga] Poin`.
+   - **Kategori C (Tier Langka / Mythic / Limited — `✦ LIMITED • REDEEM ONLY`):** Hanya dapat dibuka melalui tab **`Kode Redeem`** (terhubung ke koleksi `redeem_codes` di Firestore + kode resmi seperti `YURANIMEVIP`, `DINZMYTHIC`, `SEPUH2026`, `SOVEREIGN99`, `ANIMEKING`, `VENOMSYMBIOTE`).

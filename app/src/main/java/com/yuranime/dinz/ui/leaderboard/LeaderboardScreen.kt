@@ -57,17 +57,21 @@ import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.firebase.LeaderboardUser
 import com.yuranime.dinz.data.firebase.UserProfile
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
-import com.yuranime.dinz.ui.theme.SfProFontFamily
+import com.yuranime.dinz.ui.components.SleekHexChevronLevelTag
+import com.yuranime.dinz.ui.theme.JakartaSansFontFamily
+import com.yuranime.dinz.ui.theme.JetBrainsMonoFontFamily
+import com.yuranime.dinz.ui.theme.OutfitDisplayFontFamily
 
 /**
- * TAHAP 3: Halaman Papan Peringkat Real-Time (`LeaderboardScreen`)
+ * Halaman Papan Peringkat Real-Time (`LeaderboardScreen`)
  * - 100% Data Asli dari koleksi `users` di Firebase Firestore (TANPA BOT / PLACEHOLDER PALSU).
- * - Podium Top 1, Top 2, Top 3 menggunakan Border Khusus Presisi di Tengah Avatar:
- *   Top 1: https://url.dinzid.my.id/edTfBfx
- *   Top 2: https://url.dinzid.my.id/85MXtu1
- *   Top 3: https://url.dinzid.my.id/1KCdAyA
- * - Header tabel "Peringkat" bebas terpotong (`maxLines = 1`, `softWrap = false`).
- * - Baris 4+ bersih dan modern tanpa siku kuning kaku.
+ * - Podium Top 1, Top 2, Top 3 Konsentris Presisi dengan Border Khusus (Tanpa Box Kaku & Tanpa Teks Terpotong):
+ *   Top 1: https://url.dinzid.my.id/edTfBfx (Hole center y=25.69%, diameter 35.32%)
+ *   Top 2: https://url.dinzid.my.id/85MXtu1 (Hole center y=32.00%, diameter 49.12%)
+ *   Top 3: https://url.dinzid.my.id/1KCdAyA (Hole center y=26.33%, diameter 37.72%)
+ * - Tipografi 3-Layer: Outfit (Display/Header), Jakarta Sans (Body), JetBrains Mono (Metrik/Angka).
+ * - Header tabel 3 kolom terpisah (# | PENGGUNA | TOTAL EXP).
+ * - Baris 4+ minimalis editorial modern tanpa siku kuning kaku.
  */
 @Composable
 fun LeaderboardScreen(
@@ -110,13 +114,13 @@ fun LeaderboardScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(320.dp)
+                .height(340.dp)
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0x24E11D48),
-                            Color(0x12FF5722),
-                            Color(0xFF0B0B0B)
+                            Color(0x28E11D48),
+                            Color(0x14FF5722),
+                            Color(0x000B0B0B)
                         )
                     )
                 )
@@ -158,13 +162,13 @@ fun LeaderboardScreen(
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
+                        fontFamily = OutfitDisplayFontFamily
                     )
                     Text(
                         text = "Sinkronisasi Real-Time Komunitas Yuranime",
                         color = Color(0xFF94A3B8),
                         fontSize = 11.5.sp,
-                        fontFamily = SfProFontFamily
+                        fontFamily = JakartaSansFontFamily
                     )
                 }
 
@@ -202,7 +206,7 @@ fun LeaderboardScreen(
                             text = "Memuat data peringkat asli dari database...",
                             color = Color(0xFF94A3B8),
                             fontSize = 13.sp,
-                            fontFamily = SfProFontFamily
+                            fontFamily = JakartaSansFontFamily
                         )
                     }
                 }
@@ -227,14 +231,14 @@ fun LeaderboardScreen(
                             color = Color.White,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
+                            fontFamily = OutfitDisplayFontFamily
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Jadilah member pertama yang menempati Podium Top 1 dengan menonton episode anime, membaca komik, atau klaim Check-In harian.",
+                            text = "Jadilah member pertama yang menempati Podium Top 1 dengan menonton anime, membaca komik, atau klaim Check-In harian.",
                             color = Color(0xFF94A3B8),
                             fontSize = 12.5.sp,
-                            fontFamily = SfProFontFamily,
+                            fontFamily = JakartaSansFontFamily,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -246,9 +250,9 @@ fun LeaderboardScreen(
                         .weight(1f),
                     contentPadding = PaddingValues(bottom = 112.dp)
                 ) {
-                    // 2. Podium TOP 1, TOP 2, TOP 3 dengan Border Khusus Presisi
+                    // 2. Podium TOP 1, TOP 2, TOP 3 dengan Presisi Konsentris
                     item {
-                        TopThreeLuxuryPodium(
+                        TopThreeEditorialPodium(
                             top1 = top1User,
                             top2 = top2User,
                             top3 = top3User,
@@ -256,58 +260,55 @@ fun LeaderboardScreen(
                         )
                     }
 
-                    // 3. Header Kolom Tabel (Peringkat | Pengguna | Total EXP) - Anti Terpotong!
+                    // 3. Header Kolom Tabel (# | PENGGUNA | TOTAL EXP) - Bersih & Anti Terpotong
                     item {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp)
-                                .padding(top = 8.dp)
+                                .padding(top = 10.dp, bottom = 4.dp)
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0xFF13151D))
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    .background(Color(0xFF10121A))
+                                    .padding(horizontal = 14.dp, vertical = 9.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Peringkat",
-                                    color = Color(0xFF94A3B8),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontFamily = SfProFontFamily,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    modifier = Modifier.width(68.dp)
+                                    text = "#",
+                                    color = Color(0xFF64748B),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = JetBrainsMonoFontFamily,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.width(36.dp)
                                 )
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = "Pengguna",
-                                    color = Color(0xFF94A3B8),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontFamily = SfProFontFamily,
-                                    maxLines = 1,
-                                    softWrap = false,
+                                    text = "PENGGUNA",
+                                    color = Color(0xFF64748B),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = JakartaSansFontFamily,
+                                    letterSpacing = 0.8.sp,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    text = "Total EXP",
-                                    color = Color(0xFF94A3B8),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontFamily = SfProFontFamily,
-                                    maxLines = 1,
-                                    softWrap = false,
+                                    text = "TOTAL EXP",
+                                    color = Color(0xFF64748B),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = JetBrainsMonoFontFamily,
+                                    letterSpacing = 0.8.sp,
                                     textAlign = TextAlign.End
                                 )
                             }
-                            Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
 
-                    // 4. Daftar Peringkat 4 ke Bawah (Bersih, Tanpa Siku Kuning Kaku)
+                    // 4. Daftar Peringkat 4 ke Bawah (Bersih, Minimalis Editorial)
                     if (remainingUsers.isEmpty()) {
                         item {
                             Box(
@@ -317,22 +318,19 @@ fun LeaderboardScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "Menampilkan seluruh ${leaderboardUsers.size} pengguna aktif yang terdaftar di database saat ini.",
+                                    text = "Menampilkan seluruh ${leaderboardUsers.size} pengguna aktif terdaftar saat ini.",
                                     color = Color(0xFF64748B),
                                     fontSize = 12.5.sp,
-                                    fontFamily = SfProFontFamily,
+                                    fontFamily = JakartaSansFontFamily,
                                     textAlign = TextAlign.Center
                                 )
                             }
                         }
                     } else {
-                        items(
-                            items = remainingUsers,
-                            key = { "${it.rank}_${it.uid}" }
-                        ) { user ->
+                        items(remainingUsers, key = { it.uid.ifBlank { "rank_${it.rank}" } }) { user ->
                             ModernLeaderboardRowItem(
                                 user = user,
-                                isCurrentUser = user.uid == currentUid
+                                isCurrentUser = user.uid.isNotBlank() && user.uid == currentUid
                             )
                         }
                     }
@@ -340,7 +338,7 @@ fun LeaderboardScreen(
             }
         }
 
-        // 5. Floating Bar Bawah "Posisi Peringkat Kamu"
+        // 5. Floating Bottom Bar "Posisi Peringkat Kamu"
         CurrentUserRankBottomBar(
             currentUserProfile = currentUserProfile,
             myRankEntry = myRankEntry,
@@ -353,10 +351,14 @@ fun LeaderboardScreen(
 }
 
 /**
- * TAHAP 3: Podium TOP 1, TOP 2, dan TOP 3 dengan Border Khusus Presisi Konsentris
+ * Podium TOP 1, TOP 2, dan TOP 3 Tanpa Kotak Kaku Pedestal
+ * Avatar ditempatkan konsentris di tengah cincin dekorasi border:
+ * - Top 1: hole center y = 25.69%
+ * - Top 2: hole center y = 32.00%
+ * - Top 3: hole center y = 26.33%
  */
 @Composable
-private fun TopThreeLuxuryPodium(
+private fun TopThreeEditorialPodium(
     top1: LeaderboardUser?,
     top2: LeaderboardUser?,
     top3: LeaderboardUser?,
@@ -365,42 +367,48 @@ private fun TopThreeLuxuryPodium(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 10.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.Bottom
     ) {
-        // Posisi Kiri: TOP 2
-        PodiumSpotColumn(
+        // TOP 2 (Kiri)
+        EditorialPodiumSpot(
             rank = 2,
             user = top2,
             borderUrl = FirebaseManager.TOP_2_BORDER_URL,
-            avatarSize = 58.dp,
-            accentColor = Color(0xFFCBD5E1),
-            pedestalHeight = 126.dp,
+            frameWidth = 100.dp,
+            frameHeight = 150.dp,
+            avatarSize = 48.dp,
+            avatarTopOffset = 23.dp,
+            accentColor = Color(0xFFE2E8F0),
             isCurrentUser = top2?.uid != null && top2.uid == currentUid,
             modifier = Modifier.weight(1f)
         )
 
-        // Posisi Tengah: TOP 1 (Lebih Tinggi & Menonjol)
-        PodiumSpotColumn(
+        // TOP 1 (Tengah - Terbesar & Paling Menonjol)
+        EditorialPodiumSpot(
             rank = 1,
             user = top1,
             borderUrl = FirebaseManager.TOP_1_BORDER_URL,
-            avatarSize = 72.dp,
+            frameWidth = 148.dp,
+            frameHeight = 142.dp,
+            avatarSize = 52.dp,
+            avatarTopOffset = 10.5.dp,
             accentColor = Color(0xFFF59E0B),
-            pedestalHeight = 148.dp,
             isCurrentUser = top1?.uid != null && top1.uid == currentUid,
-            modifier = Modifier.weight(1.12f)
+            modifier = Modifier.weight(1.15f)
         )
 
-        // Posisi Kanan: TOP 3
-        PodiumSpotColumn(
+        // TOP 3 (Kanan)
+        EditorialPodiumSpot(
             rank = 3,
             user = top3,
             borderUrl = FirebaseManager.TOP_3_BORDER_URL,
-            avatarSize = 58.dp,
+            frameWidth = 126.dp,
+            frameHeight = 128.dp,
+            avatarSize = 48.dp,
+            avatarTopOffset = 9.7.dp,
             accentColor = Color(0xFFFB923C),
-            pedestalHeight = 118.dp,
             isCurrentUser = top3?.uid != null && top3.uid == currentUid,
             modifier = Modifier.weight(1f)
         )
@@ -408,30 +416,46 @@ private fun TopThreeLuxuryPodium(
 }
 
 @Composable
-private fun PodiumSpotColumn(
+private fun EditorialPodiumSpot(
     rank: Int,
     user: LeaderboardUser?,
     borderUrl: String,
+    frameWidth: Dp,
+    frameHeight: Dp,
     avatarSize: Dp,
+    avatarTopOffset: Dp,
     accentColor: Color,
-    pedestalHeight: Dp,
     isCurrentUser: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val borderFrameSize = avatarSize * 1.38f
-
     Column(
-        modifier = modifier,
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                if (isCurrentUser) Color(0x33E11D48) else Color(0x2213151E)
+            )
+            .border(
+                width = if (isCurrentUser) 1.dp else 0.5.dp,
+                color = when {
+                    isCurrentUser -> Color(0xFFE11D48)
+                    rank == 1 -> Color(0x55F59E0B)
+                    else -> Color(0xFF1E2230)
+                },
+                shape = RoundedCornerShape(16.dp)
+            )
+            .padding(horizontal = 6.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Avatar + Custom Podium Border (100% Konsentris di Tengah)
+        // Frame Avatar Konsentris
         Box(
-            modifier = Modifier.size(borderFrameSize),
-            contentAlignment = Alignment.Center
+            modifier = Modifier
+                .size(width = frameWidth, height = frameHeight),
+            contentAlignment = Alignment.TopCenter
         ) {
-            // Layer Dalam: Foto Profil Bulat Pengguna
+            // Layer 1: Avatar Lingkaran Pengguna ditempatkan pas di lubang cincin
             Box(
                 modifier = Modifier
+                    .offset(y = avatarTopOffset)
                     .size(avatarSize)
                     .clip(CircleShape)
                     .background(Color(0xFF161820)),
@@ -450,154 +474,99 @@ private fun PodiumSpotColumn(
                     Text(
                         text = user?.name?.take(1)?.uppercase() ?: "-",
                         color = if (user != null) Color.White else Color(0xFF475569),
-                        fontSize = if (rank == 1) 24.sp else 18.sp,
+                        fontSize = if (rank == 1) 22.sp else 18.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
+                        fontFamily = OutfitDisplayFontFamily
                     )
                 }
             }
 
-            // Layer Luar: Gambar Border Khusus Top 1 / Top 2 / Top 3 (Alignment.Center, ContentScale.Fit)
+            // Layer 2: Gambar Border Khusus Top 1 / Top 2 / Top 3 (Ornamen sayap/medali sudah terpasang)
             AsyncImage(
                 model = borderUrl,
-                contentDescription = "Border Top $rank",
+                contentDescription = "Border Podium Top $rank",
                 contentScale = ContentScale.Fit,
-                alignment = Alignment.Center,
-                modifier = Modifier.size(borderFrameSize)
+                modifier = Modifier.size(width = frameWidth, height = frameHeight)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        if (user != null) {
+            // Nama Pengguna (Outfit Bold)
+            Text(
+                text = user.name,
+                color = Color.White,
+                fontSize = if (rank == 1) 14.sp else 12.5.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = OutfitDisplayFontFamily,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
             )
 
-            // Badge Nomor Peringkat di Bawah Frame
+            Spacer(modifier = Modifier.height(2.dp))
+
+            // Baris Tag Level & #ID
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                SleekHexChevronLevelTag(level = user.level)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "#${user.userTag}",
+                    color = Color(0xFF64748B),
+                    fontSize = 10.5.sp,
+                    fontFamily = JetBrainsMonoFontFamily
+                )
+            }
+
+            // Custom Title Badge (Jika Ada)
+            if (user.equippedTitle.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                GeometricTitleBadge(
+                    titleName = user.equippedTitle,
+                    tierLevel = user.equippedTitleTier,
+                    styleVariant = user.equippedTitleVariant,
+                    compact = true,
+                    scaleFactor = if (rank == 1) 0.82f else 0.76f
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Total EXP (JetBrains Mono - Anti Terpotong!)
+            Text(
+                text = "${FirebaseManager.formatNumber(user.exp)} EXP",
+                color = accentColor,
+                fontSize = if (rank == 1) 13.5.sp else 12.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = JetBrainsMonoFontFamily,
+                maxLines = 1,
+                softWrap = false,
+                textAlign = TextAlign.Center
+            )
+        } else {
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .offset(y = 4.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(Color(0xFF13151D))
-                    .border(1.dp, accentColor, RoundedCornerShape(50))
-                    .padding(horizontal = 8.dp, vertical = 1.5.dp),
+                    .fillMaxWidth()
+                    .height(52.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "TOP $rank",
-                    color = accentColor,
-                    fontSize = 9.5.sp,
-                    fontWeight = FontWeight.Black,
-                    fontFamily = SfProFontFamily
+                    text = "Kosong",
+                    color = Color(0xFF475569),
+                    fontSize = 11.5.sp,
+                    fontFamily = JakartaSansFontFamily
                 )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Kartu Pedestal Podium Bersih (Tanpa Pita Bertumpuk yang Memotong Angka)
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(pedestalHeight)
-                .clip(RoundedCornerShape(16.dp))
-                .background(
-                    Brush.verticalGradient(
-                        colors = if (rank == 1) {
-                            listOf(Color(0xFF221518), Color(0xFF13151D))
-                        } else {
-                            listOf(Color(0xFF171A24), Color(0xFF11131A))
-                        }
-                    )
-                )
-                .border(
-                    width = if (isCurrentUser || rank == 1) 1.dp else 0.5.dp,
-                    color = when {
-                        isCurrentUser -> Color(0xFFE11D48)
-                        rank == 1 -> Color(0x66F59E0B)
-                        else -> Color(0xFF1F2433)
-                    },
-                    shape = RoundedCornerShape(16.dp)
-                )
-                .padding(horizontal = 8.dp, vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            if (user != null) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = user.name,
-                        color = Color.White,
-                        fontSize = if (rank == 1) 13.5.sp else 12.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(2.dp))
-
-                    Text(
-                        text = "Lv. ${user.level} • #${user.userTag}",
-                        color = Color(0xFF94A3B8),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        fontFamily = SfProFontFamily,
-                        maxLines = 1
-                    )
-                }
-
-                // Title Badge Ringkas atau Gelar Level
-                if (user.equippedTitle.isNotBlank()) {
-                    GeometricTitleBadge(
-                        titleName = user.equippedTitle,
-                        tierLevel = maxOf(user.equippedTitleTier, if (rank == 1) 31 else user.level),
-                        styleVariant = user.equippedTitleVariant,
-                        compact = true
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(Color(0xFF1C202E))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                    ) {
-                        Text(
-                            text = user.rankTitle,
-                            color = Color(0xFFCBD5E1),
-                            fontSize = 9.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            fontFamily = SfProFontFamily,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                // Angka EXP Utuh dalam SF Bold (Tidak Terpotong)
-                Text(
-                    text = "${FirebaseManager.formatNumber(user.exp)} EXP",
-                    color = accentColor,
-                    fontSize = if (rank == 1) 13.sp else 11.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily,
-                    maxLines = 1,
-                    softWrap = false
-                )
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Kosong",
-                        color = Color(0xFF475569),
-                        fontSize = 11.5.sp,
-                        fontFamily = SfProFontFamily
-                    )
-                }
             }
         }
     }
 }
 
 /**
- * TAHAP 3: Baris Peringkat 4 ke Bawah (Bersih, Modern, Tanpa Siku Kuning Kaku)
+ * Baris Peringkat 4 ke Bawah (Sleek Minimalis Editorial)
  */
 @Composable
 private fun ModernLeaderboardRowItem(
@@ -607,41 +576,40 @@ private fun ModernLeaderboardRowItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (isCurrentUser) Color(0xFF1E1319) else Color(0xFF13151D))
+            .padding(horizontal = 16.dp, vertical = 3.5.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (isCurrentUser) Color(0xFF1F1218) else Color(0xFF11131B))
             .border(
                 width = if (isCurrentUser) 1.dp else 0.5.dp,
-                color = if (isCurrentUser) Color(0xFFE11D48) else Color(0xFF1B1F2C),
-                shape = RoundedCornerShape(14.dp)
+                color = if (isCurrentUser) Color(0xFFE11D48) else Color(0xFF1B1E2B),
+                shape = RoundedCornerShape(12.dp)
             )
-            .padding(horizontal = 14.dp, vertical = 11.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Kiri: Nomor Peringkat
-        Box(
-            modifier = Modifier.width(46.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Text(
-                text = "#${user.rank}",
-                color = if (isCurrentUser) Color(0xFFFF5722) else Color(0xFF94A3B8),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = SfProFontFamily,
-                maxLines = 1,
-                softWrap = false
-            )
-        }
+        // Kolom 1: Nomor Peringkat (#4, #5, ...)
+        Text(
+            text = "#${user.rank}",
+            color = if (isCurrentUser) Color(0xFFFF5722) else Color(0xFF94A3B8),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = JetBrainsMonoFontFamily,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.width(36.dp)
+        )
 
-        // Tengah: Avatar + Nama + Badge Level/Title
+        Spacer(modifier = Modifier.width(10.dp))
+
+        // Kolom 2: Avatar + Border Kosmetik
         Box(
-            modifier = Modifier.size(44.dp),
+            modifier = Modifier.size(42.dp),
             contentAlignment = Alignment.Center
         ) {
             Box(
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .background(Color(0xFF1C202E)),
                 contentAlignment = Alignment.Center
@@ -659,9 +627,9 @@ private fun ModernLeaderboardRowItem(
                     Text(
                         text = user.name.take(1).uppercase(),
                         color = Color.White,
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
+                        fontFamily = OutfitDisplayFontFamily
                     )
                 }
             }
@@ -671,21 +639,22 @@ private fun ModernLeaderboardRowItem(
                     model = user.equippedBorderUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(46.dp)
                 )
             }
         }
 
         Spacer(modifier = Modifier.width(12.dp))
 
+        // Kolom 3: Nama Pengguna + Title/Rank
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = user.name,
                     color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = OutfitDisplayFontFamily,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -693,45 +662,33 @@ private fun ModernLeaderboardRowItem(
                 Text(
                     text = "#${user.userTag}",
                     color = Color(0xFF64748B),
-                    fontSize = 11.5.sp,
-                    fontFamily = SfProFontFamily
+                    fontSize = 10.5.sp,
+                    fontFamily = JetBrainsMonoFontFamily
                 )
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(3.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(Color(0xFF1C202E))
-                        .padding(horizontal = 7.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "Lv. ${user.level}",
-                        color = Color(0xFFFF5722),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
-                    )
-                }
+                SleekHexChevronLevelTag(level = user.level)
 
                 if (user.equippedTitle.isNotBlank()) {
                     GeometricTitleBadge(
                         titleName = user.equippedTitle,
                         tierLevel = user.equippedTitleTier,
                         styleVariant = user.equippedTitleVariant,
-                        compact = true
+                        compact = true,
+                        scaleFactor = 0.78f
                     )
                 } else {
                     Text(
                         text = user.rankTitle,
                         color = Color(0xFF94A3B8),
                         fontSize = 11.sp,
-                        fontFamily = SfProFontFamily,
+                        fontFamily = JakartaSansFontFamily,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -739,24 +696,24 @@ private fun ModernLeaderboardRowItem(
             }
         }
 
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(10.dp))
 
-        // Kanan: Total EXP
+        // Kolom 4: Total EXP
         Column(horizontalAlignment = Alignment.End) {
             Text(
                 text = "${FirebaseManager.formatNumber(user.exp)} EXP",
                 color = Color.White,
-                fontSize = 13.5.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = SfProFontFamily,
+                fontFamily = JetBrainsMonoFontFamily,
                 maxLines = 1,
                 softWrap = false
             )
             Text(
                 text = "✦ ${FirebaseManager.formatNumber(user.points)}",
                 color = Color(0xFF64748B),
-                fontSize = 11.sp,
-                fontFamily = SfProFontFamily,
+                fontSize = 10.5.sp,
+                fontFamily = JetBrainsMonoFontFamily,
                 maxLines = 1,
                 softWrap = false
             )
@@ -765,7 +722,7 @@ private fun ModernLeaderboardRowItem(
 }
 
 /**
- * TAHAP 3: Floating Bar Bawah "Posisi Peringkat Kamu" yang Bersih & Sinkron Database
+ * Floating Bar Bawah "Posisi Peringkat Kamu"
  */
 @Composable
 private fun CurrentUserRankBottomBar(
@@ -789,17 +746,17 @@ private fun CurrentUserRankBottomBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF14161E))
-            .border(1.dp, Color(0x40E11D48), RoundedCornerShape(16.dp))
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .background(Color(0xF012141D))
+            .border(1.dp, Color(0x55E11D48), RoundedCornerShape(16.dp))
+            .padding(horizontal = 14.dp, vertical = 11.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Badge Posisi Peringkat Kamu
+            // Badge Posisi Peringkat
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
@@ -808,24 +765,24 @@ private fun CurrentUserRankBottomBar(
                             colors = listOf(Color(0xFFFF5722), Color(0xFFE11D48))
                         )
                     )
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = rankLabel,
                     color = Color.White,
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.Black,
-                    fontFamily = SfProFontFamily
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = JetBrainsMonoFontFamily
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(11.dp))
 
             // Foto Profil
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(38.dp)
                     .clip(CircleShape)
                     .background(Color(0xFF1E2230)),
                 contentAlignment = Alignment.Center
@@ -843,23 +800,23 @@ private fun CurrentUserRankBottomBar(
                     Text(
                         text = displayName.take(1).uppercase(),
                         color = Color.White,
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
+                        fontFamily = OutfitDisplayFontFamily
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(11.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = displayName,
                         color = Color.White,
-                        fontSize = 14.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily,
+                        fontFamily = OutfitDisplayFontFamily,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -867,15 +824,15 @@ private fun CurrentUserRankBottomBar(
                     Text(
                         text = "#$userTag",
                         color = Color(0xFF64748B),
-                        fontSize = 11.5.sp,
-                        fontFamily = SfProFontFamily
+                        fontSize = 10.5.sp,
+                        fontFamily = JetBrainsMonoFontFamily
                     )
                 }
                 Text(
-                    text = "Posisi Peringkat Kamu • $rankTitle",
+                    text = "Posisi Peringkat Anda • $rankTitle",
                     color = Color(0xFF94A3B8),
-                    fontSize = 11.5.sp,
-                    fontFamily = SfProFontFamily,
+                    fontSize = 11.sp,
+                    fontFamily = JakartaSansFontFamily,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -887,18 +844,18 @@ private fun CurrentUserRankBottomBar(
                 Text(
                     text = "${FirebaseManager.formatNumber(exp)} EXP",
                     color = Color(0xFFFF5722),
-                    fontSize = 14.sp,
+                    fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily,
+                    fontFamily = JetBrainsMonoFontFamily,
                     maxLines = 1,
                     softWrap = false
                 )
                 Text(
                     text = "Lv. $level",
                     color = Color(0xFFCBD5E1),
-                    fontSize = 11.5.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
-                    fontFamily = SfProFontFamily
+                    fontFamily = JetBrainsMonoFontFamily
                 )
             }
         }
@@ -928,7 +885,7 @@ private fun XpInfoModal(
                     color = Color.White,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
+                    fontFamily = OutfitDisplayFontFamily
                 )
                 IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                     Icon(
@@ -991,7 +948,7 @@ private fun XpInfoModal(
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    fontFamily = SfProFontFamily
+                    fontFamily = JakartaSansFontFamily
                 )
             }
         }
@@ -1014,14 +971,14 @@ private fun XpSourceRow(
                 color = Color.White,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
-                fontFamily = SfProFontFamily
+                fontFamily = OutfitDisplayFontFamily
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = desc,
                 color = Color(0xFF94A3B8),
                 fontSize = 11.5.sp,
-                fontFamily = SfProFontFamily
+                fontFamily = JakartaSansFontFamily
             )
         }
 
@@ -1030,9 +987,9 @@ private fun XpSourceRow(
         Text(
             text = xp,
             color = Color(0xFFFF5722),
-            fontSize = 13.5.sp,
+            fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
-            fontFamily = SfProFontFamily
+            fontFamily = JetBrainsMonoFontFamily
         )
     }
 }
