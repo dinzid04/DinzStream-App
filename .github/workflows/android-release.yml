@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "2.6.0"
+  APP_VERSION: "2.7.0"
 
 jobs:
   build:
@@ -63,37 +63,29 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Popup Promosi Dinamis, Web Admin & Bugfix UI (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Redesign Profile, Geometric Title Badge, Real-Time Leaderboard & R2 CDN Upload (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
             ### Pembaruan & Fitur Baru:
-            1. **Sistem Popup Notifikasi Promosi Dinamis (PromoPopupDialog):**
-               - 100% Sesuai gambar referensi `1002208488.jpg` dan kaidah Apple Design & Anti-Slop.
-               - Latar belakang meredup dengan scrim hitam pekat 78% semi-transparan (`Color.Black.copy(alpha = 0.78f)`) dan animasi iOS spring scale + fade.
-               - Tombol bulat Close (`✕`) berada di pojok kanan atas di luar gambar (jarak 8.dp dari poster).
-               - Poster gambar murni (lebar 84% layar, rounded corner 14.dp, shimmer loading) tanpa teks atau kotak putih tambahan di bawah gambar.
-               - Logika redirect opsional: jika `targetUrl` terisi di web admin, mengklik gambar langsung membuka browser. Jika kosong, bersifat gambar informatif.
-               - Konfigurasi frekuensi & interval 8 jam real-time dari Firebase Firestore (`app_config/promo_popup`).
-            
-            2. **Website Admin Panel (promo-web-admin) — Vercel & Local Ready:**
-               - UI Apple Dark Glassmorphism Obsidian Dark `#090A0F` dengan hairline border `1px solid rgba(255,255,255,0.08)`.
-               - Form kontrol lengkap (iOS toggle switch, URL poster, target link, interval jam, max impressions).
-               - Live interactive iPhone/Android mockup preview dengan simulasi 1:1.
-               - Tombol `Simpan & Terapkan` dan `Push sebagai Promo Baru (Reset Cooldown User)`.
-            
-            3. **Perbaikan Poster Histori Baca ("Lanjutkan Membaca") di Halaman Komik:**
-               - Metadata cover (`posterUrl` / `coverUrl`) selalu diteruskan ke `ComicReaderScreen` dan dilindungi dari penimpaan string kosong di SQLite database.
-               - Kartu `Lanjutkan Membaca` merender cover dengan header Referer yang tepat sehingga poster 100% selalu muncul.
+            1. **Redesign Total Halaman Profile (ProfileScreen):**
+               - Mengikuti tata letak referensi baru dengan palet Yuranime (Deep Obsidian `#0B0B0B` + Crimson `#E11D48` & Vibrant Orange `#FF5722`).
+               - Header Banner edge-to-edge (`195.dp`) dengan gradasi dark vignette halus dan 3 tombol ikon bulat minimalis di kanan atas (Preview Profil Publik, Edit Profil, Pengaturan).
+               - Avatar kiri (`86.dp`) dengan Circular EXP Progress Ring (`strokeWidth = 3.dp`) yang sinkron real-time dengan persentase EXP pengguna.
+               - Identitas rata kiri tanpa kotak overlay: Display Name + `#ID` 4 digit unik, Email asli, Tanggal Bergabung asli dari Firestore, Bio, Baris Pill (`Member | Lv. | Gelar Rank`), Slot Custom Title, dan Full-Width EXP Bar.
+               - Area menu bersih di bawah EXP Bar dengan 2 kartu highlight ringkas (`Papan Peringkat` & `Points & Rewards`) serta baris navigasi editorial (`Unduh`, `Koleksi & Riwayat`, `Info Aplikasi`, `Keluar Akun`).
 
-            4. **Perbaikan Posisi Header Chatroom & Maskot (1002209438.jpg):**
-               - Menggabungkan teks `| CHATROOM KOMUNITAS` dan Maskot Anime ke dalam satu container header tepat di atas kotak putih Cbox.
-               - Teks diletakkan di kiri bawah (10.dp di atas Cbox), dan Maskot di kanan bawah menempel di bibir kotak Cbox.
-               - Mengurangi jarak kosong di bawah `RILISAN TERBARU` sehingga baris komik turun mendekat secara proporsional.
+            2. **Sistem Custom Title Geometris (`GeometricTitleBadge`) & `Points & Rewards`:**
+               - Komponen vektor `GeometricTitleBadge` bergaya heksagon + sayap poligon meruncing dengan 4 kasta warna sesuai level (Starter Crimson Slate, Vanguard Blaze Orange-Red, Royal Amethyst, dan Mythic Sovereign Gold-Crimson).
+               - Sistem Misi Harian & Mingguan, Milestone Level Title (Lv. 1, 5, 10, 15, 25, 50), serta Katalog Tukar Poin & Frame Avatar yang 100% sinkron real-time dengan Firestore.
 
-            5. **Perbaikan Auto-Slide Hero Slider (Anime & Komik):**
-               - Auto-slide berjalan mulus setiap 4 detik menggunakan `pagerState.settledPage` dan `collectIsDraggedAsState()` dengan spring physics Apple.
-               - Bekerja sempurna pada Mode Slider Default, Clean Cover Mode, dan Slider Beranda Komik.
+            3. **Redesign Papan Peringkat (`LeaderboardScreen`) 100% Real-Time Tanpa Data Palsu:**
+               - Menghapus seluruh data bot/placeholder statis; menampilkan 100% pengguna asli dari koleksi `users` di Firebase Firestore.
+               - Podium Top 1, Top 2, dan Top 3 dilengkapi Custom Frame Border presisi konsentris di tengah avatar.
+               - Perbaikan header tabel `"Peringkat"` anti-terpotong, baris peringkat 4+ modern tanpa siku kuning kaku, serta floating bar bawah `"Posisi Peringkat Kamu"`.
+
+            4. **Kompresi WebP & Upload Avatar/Banner ke Cloudflare R2 / Dinz CDN (`R2CdnUploader`):**
+               - Gambar dari galeri otomatis di-resize dan dikompresi ke format WebP tajam (`< 150KB`) lalu diunggah ke CDN untuk disimpan sebagai URL publik permanen di Firestore.
           draft: false
           prerelease: false
           make_latest: true

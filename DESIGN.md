@@ -1238,3 +1238,94 @@ Dibangun di folder `/storage/emulated/0/termux/Workspace_uiApp/promo-web-admin/`
 
 
 
+---
+
+## 44. SPESIFIKASI FITUR 41: Redesign Total Halaman Profile (`ProfileScreen`), Sistem Custom Title Geometris (`Points & Rewards`), Papan Peringkat Real-Time (`LeaderboardScreen`) & Upload Media Cloudflare R2 / Dinz CDN
+
+### A. Palet & Prinsip Anti-Slop (Yuranime Obsidian + Crimson-Blaze)
+- **Background Utama:** Deep Obsidian `#0B0B0B` (menyatu dengan kanvas utama aplikasi, tanpa tumpukan kartu kotak ber-border tebal).
+- **Surface Sekunder (Pill & Kartu Ringkas):** `#14161E` / `#161820` dengan pembatas halus (`0.5.dp` `#1A1D26`).
+- **Aksen Utama:** Crimson `#E11D48` & Vibrant Orange `#FF5722` (menggantikan warna hijau dari referensi `WA_1794546770520.jpg` / `1002213252.jpg`).
+- **Tipografi:** `SfProFontFamily` (**SF Bold** untuk nama, level, dan angka metrik; **SF Medium/Regular** untuk email, tanggal bergabung, dan bio).
+- **Aturan Anti-Slop:**
+  - Nol data palsu/bot statis di seluruh halaman profil dan papan peringkat (100% real-time dari koleksi `users` di Firebase Firestore).
+  - Nol tanda hubung panjang (*em dash* `—`) pada teks UI.
+  - Nol border kartu kaku berlapis-lapis; gunakan hierarki tipografi dan ruang kosong (*whitespace*) berirama.
+
+### B. TAHAP 1: Redesign Halaman Profile (`ProfileScreen` / `UserProfileView`)
+Mengacu pada tata letak referensi `WA_1794546770520.jpg` (`1002213252.jpg`) dengan skema warna Yuranime:
+1. **Header Banner & 3 Tombol Ikon Kanan Atas:**
+   - Gambar **Banner/Cover pengguna** dari database (`banner` / `bannerUrl`) ditampilkan *edge-to-edge* menyatu ke *status bar* (`height = 195.dp`) dengan gradasi bawah (*smooth dark vignette*) yang memudar mulus ke `#0B0B0B`.
+   - Di pojok kanan atas di atas banner, terdapat **3 tombol ikon bulat minimalis** (`size = 36.dp`, latar `#730B0B0B` tanpa border tebal):
+     1. **Ikon Mata (Preview Profil Publik):** Membuka pratinjau profil sebagaimana dilihat oleh pengguna lain.
+     2. **Ikon Pensil (Edit Profil):** Membuka halaman `EditProfileScreen` (Nama, Bio, Foto Profil, Cover Banner, & Pilih Title).
+     3. **Ikon Gerigi (Pengaturan):** Membuka halaman `Pengaturan` aplikasi.
+2. **Avatar Kiri dengan Cincin Progres EXP & Identitas Pengguna (Sinkron Real-Time Database):**
+   - **Foto Profil & Cincin EXP:** Di sisi kiri (`padding(start = 20.dp)`), Avatar bulat (`size = 86.dp`) menumpuk (*overlap*) separuh di batas bawah banner. Di sekeliling lingkaran avatar, digambar **Circular EXP Progress Ring** (`strokeWidth = 3.dp`) dengan gradasi warna Oranye-Merah (`#FF5722` ke `#E11D48`) yang panjang busurnya 100% sinkron dengan persentase EXP level pengguna saat ini (serta mendukung render frame border dekorasi jika pengguna memasang border).
+   - **Tepat di Bawah Avatar (Rata Kiri, Tanpa Kotak Overlay):**
+     - **Baris 1 (Username & ID Unik):** `displayName` pengguna dengan font **SF Bold** putih `22.sp`, diikuti kode tag `#ID` unik 4 digit dari UID/database di sebelah kanannya (contoh: `Erinah #2219`, warna `#64748B`, `16.sp`).
+     - **Baris 2 (Email):** Email asli akun pengguna (`13.sp`, warna `#CBD5E1`).
+     - **Baris 3 (Tanggal Bergabung Asli):** `"Bergabung sejak [Tanggal Pertama Daftar/Login dari Firestore]"` (`12.sp`, warna `#64748B`).
+     - **Baris 4 (Bio):** Teks bio pengguna dari database (`14.sp`, warna `#E2E8F0`; jika belum diisi tampilkan bio default singkat yang dapat diedit).
+3. **Baris Pill Status, Slot Custom Title & Full-Width EXP Bar:**
+   - **Baris Pill Status:** Tepat di bawah bio, deretan kapsul kecil (`height = 26.dp`, `RoundedCornerShape(50)`, latar `#161820` tanpa border kasar):
+     1. **Pill Role:** `"Member"` (atau `"Admin"` / `"Moderator"` sesuai field database).
+     2. **Pill Level:** Ikon kristal/bintang kecil + `"Lv. [Level User]"` (sinkron real-time dengan total EXP).
+     3. **Pill Rank Level:** Gelar otomatis sesuai level (`Wibu Biasa`, `Perintis Anime`, `Penjelajah Komik`, `Sepuh Yuranime`).
+   - **Slot Custom Title Badge (Tepat di Bawah Baris Pill):**
+     - Jika pengguna **belum memasang Title khusus**, tampilkan kerangka heksagonal+kapsul bergaris putus-putus (*dashed outline* `#334155`, `height = 30.dp`) seperti pada referensi `1002213252.jpg` yang saat diklik membuka pemilih Title atau halaman `Points & Rewards`.
+     - Jika pengguna **sudah memasang Title**, tampilkan **Custom Geometric Title Badge** (`GeometricTitleBadge`).
+   - **Full-Width EXP Bar:**
+     - Di bawah slot Title, label **`EXP`** di kiri dan angka **`[EXP Saat Ini] / [Target EXP Level Berikutnya]`** di kanan (**SF Bold** `13.sp` putih).
+     - Progress bar horizontal ramping (`height = 6.dp`, `RoundedCornerShape(50)`, track `#1C1F2A`) dengan isi bar gradasi `#FF5722` -> `#E11D48` beranimasi *spring* halus.
+4. **Area Menu di Bawah EXP Bar (Tanpa Kotak Overlay Kaku & Ikon Vektor Bersih):**
+   - Mengalir di atas latar `#0B0B0B` dengan garis pemisah tipis (`0.5.dp` `#1A1D26`):
+   - **Baris Highlight Ringkas (2 Kartu Sleek Berdampingan):**
+     1. **`Papan Peringkat`**: Menampilkan posisi peringkat asli pengguna saat ini (`Rank #[Nomor]` / `TOP 100`) & ikon piala modern.
+     2. **`Points & Rewards`**: Menampilkan jumlah poin/crystal asli dari database (`✦ [Poin]`) & akses ke Misi/Title.
+   - **Daftar Navigasi Bersih (Clean Editorial Rows):**
+     - **`Unduh`** (*Kelola episode anime & chapter komik offline*)
+     - **`Koleksi & Riwayat`** (*Daftar favorit, riwayat tontonan & bacaan*)
+     - **`Info Aplikasi`** (*Tentang Yuranime & versi aplikasi*)
+     - **`Keluar Akun`** (*Teks aksen merah elegan `#F43F5E` dengan ikon keluar minimalis*)
+
+### C. TAHAP 2: Sistem Custom Title Geometris (`1002213249.jpg`), Level, Misi & Points Reward
+1. **Komponen Vektor `GeometricTitleBadge(titleName: String, tierLevel: Int)`:**
+   - Mengacu pada referensi `WA_1794555531387.jpg` (`1002213249.jpg`, `set:nAFID5xQYdM`): menggunakan Jetpack Compose `Canvas` / `Path` untuk menggambar **Emblem Heksagon Berlapis di sisi kiri yang menyatu dengan sayap banner poligon meruncing (`chevron/hexagonal tech banner`) di sisi kanan**.
+   - **Skema Warna Berdasarkan Tier Level:**
+     - **Level 1–5 (Starter Tier):** Aksen Crimson Slate (`#F43F5E` & `#881337`).
+     - **Level 6–15 (Vanguard Tier):** Aksen Blaze Orange-Red (`#FF5722` & `#E11D48`).
+     - **Level 16–30 (Royal Amethyst Tier):** Aksen Neon Violet-Crimson (`#A855F7` & `#EC4899`).
+     - **Level 31+ / Top Leaderboard (Mythic Sovereign Tier):** Aksen Gold-Crimson Berefek Shimmer Halus (`#F59E0B` & `#EF4444`).
+   - Di dalam heksagon kiri ditampilkan angka level atau simbol tier, sedangkan di dalam sayap banner kanan ditampilkan teks **Nama Title** (**SF Bold** huruf kapital dengan *letter-spacing* tegas).
+2. **Sistem Misi, Level Milestone & Tukar Title di `Points & Rewards` (`users/{uid}` Firestore):**
+   - **Milestone Level:** Membuka Title Geometris baru pada Lv. 1, Lv. 5, Lv. 10, Lv. 15, Lv. 25, dan Lv. 50 yang bisa diklaim dan langsung dipasang (`equippedTitle`) ke halaman Profile & Papan Peringkat.
+   - **Misi Harian & Mingguan:**
+     - *Check-in Harian (+50 EXP & +20 Poin)*
+     - *Tonton 1 Episode Anime (+100 EXP & +30 Poin)*
+     - *Baca 2 Chapter Komik (+100 EXP & +30 Poin)*
+     - *Kirim Komentar (+50 EXP & +15 Poin)*
+   - **Katalog Tukar Poin:** Menukarkan Poin dengan Title eksklusif atau dekorasi border profil dan langsung memasangnya secara real-time.
+
+### D. TAHAP 3: Redesign `Papan Peringkat` (`LeaderboardScreen`) + Border Podium Top 1–3
+1. **100% Data Asli Firestore (Hapus Semua Bot/Placeholder):**
+   - Menghapus `getFallbackLeaderboard()` dan seluruh nama statis/palsu.
+   - Query langsung dari koleksi `users` di Firebase Firestore diurutkan berdasarkan EXP tertinggi (`limit(100)`), menampilkan nama asli, foto profil asli, level asli, title asli, dan jumlah EXP asli.
+2. **Border Khusus Podium TOP 1, TOP 2, dan TOP 3 (Presisi Konsentris):**
+   - **Border TOP 1:** `https://url.dinzid.my.id/edTfBfx`
+   - **Border TOP 2:** `https://url.dinzid.my.id/85MXtu1`
+   - **Border TOP 3:** `https://url.dinzid.my.id/1KCdAyA`
+   - Dirender menggunakan `Box(contentAlignment = Alignment.Center)` dengan layer dalam `AsyncImage` bulat (`72.dp` untuk Top 1, `58.dp` untuk Top 2 & Top 3) dan layer luar `AsyncImage` border (`size = avatarSize * 1.38f`, `ContentScale.Fit`).
+3. **Tata Letak Podium, Header Tabel & Baris Peringkat 4+:**
+   - Podium bersih tanpa pita bertumpuk yang memotong angka EXP: menampilkan Avatar + Custom Border, Nama Pengguna, Title Badge ringkas, dan angka EXP (**SF Bold**).
+   - Header tabel `"Peringkat"` menggunakan `maxLines = 1` dan `softWrap = false` agar huruf `"t"` tidak pernah turun ke baris bawah.
+   - Menghapus siku kuning kaku pada daftar peringkat 4 ke bawah, diganti baris modern yang bersih.
+   - Floating bar bawah `"Posisi Peringkat Kamu"` dengan permukaan obsidian gelap elegan yang menampilkan posisi asli pengguna di database.
+
+### E. TAHAP 4: Upload Avatar & Banner ke Cloudflare R2 / Dinz CDN (`R2CdnUploader`)
+1. **Kompresi WebP Otomatis di Sisi Klien:**
+   - Saat pengguna memilih gambar dari galeri di `EditProfileScreen`, gambar di-decode, di-resize secara proporsional (`max 512x512` untuk avatar, `max 1200x600` untuk banner), dan dikompresi ke format **WebP** (`quality = 82`, ukuran `< 150KB`).
+2. **Upload ke Cloudflare R2 / Dinz CDN:**
+   - Mengunggah file `.webp` ke endpoint CDN utama `POST https://cdn.dinzid.my.id/api/upload` (`multipart/form-data`, field `file`, menghasilkan URL publik permanen `https://url.dinzid.my.id/...` di jaringan Cloudflare CDN Dinz) dengan fallback otomatis ke node penyimpanan permanen + shortener `https://url.dinzid.my.id/add`.
+3. **Sinkronisasi Real-Time Firestore:**
+   - Menyimpan URL publik `https://...` hasil upload ke dokumen `users/{uid}` pada field `avatar` & `photoUrl` (untuk foto profil) atau `banner` & `bannerUrl` (untuk cover banner) di Firebase Firestore sehingga langsung tampil di seluruh perangkat dan di Papan Peringkat.

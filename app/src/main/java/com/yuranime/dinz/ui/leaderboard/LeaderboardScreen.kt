@@ -1,10 +1,5 @@
 package com.yuranime.dinz.ui.leaderboard
 
-import android.app.Activity
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,16 +21,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.HelpOutline
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Stars
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.HelpOutline
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -49,165 +42,297 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import com.yuranime.dinz.R
 import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.firebase.LeaderboardUser
+import com.yuranime.dinz.data.firebase.UserProfile
+import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.theme.SfProFontFamily
-import java.text.NumberFormat
-import java.util.Locale
 
 /**
- * Shape perisai / panji runcing ke bawah (persis referensi TOP 1, TOP 2, TOP 3)
+ * TAHAP 3: Halaman Papan Peringkat Real-Time (`LeaderboardScreen`)
+ * - 100% Data Asli dari koleksi `users` di Firebase Firestore (TANPA BOT / PLACEHOLDER PALSU).
+ * - Podium Top 1, Top 2, Top 3 menggunakan Border Khusus Presisi di Tengah Avatar:
+ *   Top 1: https://url.dinzid.my.id/edTfBfx
+ *   Top 2: https://url.dinzid.my.id/85MXtu1
+ *   Top 3: https://url.dinzid.my.id/1KCdAyA
+ * - Header tabel "Peringkat" bebas terpotong (`maxLines = 1`, `softWrap = false`).
+ * - Baris 4+ bersih dan modern tanpa siku kuning kaku.
  */
-val ShieldBannerShape = GenericShape { size, _ ->
-    moveTo(0f, 0f)
-    lineTo(size.width, 0f)
-    lineTo(size.width, size.height * 0.76f)
-    lineTo(size.width * 0.5f, size.height)
-    lineTo(0f, size.height * 0.76f)
-    close()
-}
-
 @Composable
 fun LeaderboardScreen(
     onBackClick: () -> Unit
 ) {
-    val context = LocalContext.current
     val leaderboardUsers by FirebaseManager.leaderboard.collectAsState()
+    val isLoading by FirebaseManager.isLeaderboardLoading.collectAsState()
     val currentUserProfile by FirebaseManager.userProfile.collectAsState()
-    var showXpInfoDialog by remember { mutableStateOf(false) }
+    val currentUid = FirebaseManager.getCurrentUid()
+
+    var showXpInfoModal by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         FirebaseManager.startListeningLeaderboard()
     }
 
-    val top1 = leaderboardUsers.getOrNull(0)
-    val top2 = leaderboardUsers.getOrNull(1)
-    val top3 = leaderboardUsers.getOrNull(2)
-    val ranks4to100 = remember(leaderboardUsers) {
-        if (leaderboardUsers.size > 3) leaderboardUsers.drop(3) else emptyList()
+    val top1User = leaderboardUsers.getOrNull(0)
+    val top2User = leaderboardUsers.getOrNull(1)
+    val top3User = leaderboardUsers.getOrNull(2)
+    val remainingUsers = if (leaderboardUsers.size > 3) {
+        leaderboardUsers.subList(3, leaderboardUsers.size)
+    } else {
+        emptyList()
+    }
+
+    val myRankEntry = remember(leaderboardUsers, currentUid) {
+        leaderboardUsers.find { it.uid == currentUid }
+    }
+
+    if (showXpInfoModal) {
+        XpInfoModal(onDismiss = { showXpInfoModal = false })
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF090616),
-                        Color(0xFF0D0A22),
-                        Color(0xFF070512)
+            .background(Color(0xFF0B0B0B))
+    ) {
+        // Cahaya atmosferik halus di belakang podium atas
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(320.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0x24E11D48),
+                            Color(0x12FF5722),
+                            Color(0xFF0B0B0B)
+                        )
                     )
                 )
-            )
-    ) {
-        // Efek Bintang / Nebula Lembut di Latar Belakang
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0x337C3AED), Color(0x114C1D95), Color.Transparent),
-                    center = Offset(size.width * 0.5f, size.height * 0.22f),
-                    radius = size.width * 0.7f
-                )
-            )
-        }
+        )
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
-            // Top Bar
+            // 1. Header Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBackClick) {
+                IconButton(
+                    onClick = onBackClick,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF14161E))
+                ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Kembali",
-                        tint = Color.White
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
-                Text(
-                    text = "Papan Peringkat",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Papan Peringkat",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
+                    Text(
+                        text = "Sinkronisasi Real-Time Komunitas Yuranime",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 11.5.sp,
+                        fontFamily = SfProFontFamily
+                    )
+                }
 
-                // Info Dialog Button
-                IconButton(onClick = { showXpInfoDialog = true }) {
+                IconButton(
+                    onClick = { showXpInfoModal = true },
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF14161E))
+                ) {
                     Icon(
-                        imageVector = Icons.Default.HelpOutline,
-                        contentDescription = "Info XP",
-                        tint = Color(0xFFFDE68A)
+                        imageVector = Icons.Outlined.HelpOutline,
+                        contentDescription = "Cara Memperoleh EXP",
+                        tint = Color(0xFFCBD5E1),
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
 
-            // Scrollable Area (Podium + Table Header + LazyList)
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(bottom = 90.dp)
-            ) {
-                // 1. Area Podium TOP 1, TOP 2, TOP 3
-                item {
-                    PodiumView(
-                        top1 = top1,
-                        top2 = top2,
-                        top3 = top3
-                    )
+            if (isLoading && leaderboardUsers.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(
+                            color = Color(0xFFE11D48),
+                            modifier = Modifier.size(32.dp),
+                            strokeWidth = 2.5.dp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Memuat data peringkat asli dari database...",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 13.sp,
+                            fontFamily = SfProFontFamily
+                        )
+                    }
                 }
-
-                // 2. Baris Header Tabel
-                item {
-                    TableHeaderRow(onHelpClick = { showXpInfoDialog = true })
+            } else if (leaderboardUsers.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Outlined.EmojiEvents,
+                            contentDescription = null,
+                            tint = Color(0xFFFF5722),
+                            modifier = Modifier.size(44.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Belum Ada Data Peringkat",
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SfProFontFamily
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Jadilah member pertama yang menempati Podium Top 1 dengan menonton episode anime, membaca komik, atau klaim Check-In harian.",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 12.5.sp,
+                            fontFamily = SfProFontFamily,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
-
-                // 3. Daftar Kartu Peringkat 4 s/d 100
-                items(ranks4to100, key = { it.uid + it.rank }) { user ->
-                    LeaderboardCardItem(user = user)
-                }
-
-                if (ranks4to100.isEmpty()) {
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(bottom = 112.dp)
+                ) {
+                    // 2. Podium TOP 1, TOP 2, TOP 3 dengan Border Khusus Presisi
                     item {
-                        Box(
+                        TopThreeLuxuryPodium(
+                            top1 = top1User,
+                            top2 = top2User,
+                            top3 = top3User,
+                            currentUid = currentUid
+                        )
+                    }
+
+                    // 3. Header Kolom Tabel (Peringkat | Pengguna | Total EXP) - Anti Terpotong!
+                    item {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 32.dp),
-                            contentAlignment = Alignment.Center
+                                .padding(horizontal = 16.dp)
+                                .padding(top = 8.dp)
                         ) {
-                            Text(
-                                text = "Sedang memuat data peringkat...",
-                                color = Color(0xFF94A3B8),
-                                fontSize = 14.sp,
-                                fontFamily = SfProFontFamily
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF13151D))
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Peringkat",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.width(68.dp)
+                                )
+                                Text(
+                                    text = "Pengguna",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    text = "Total EXP",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    textAlign = TextAlign.End
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+
+                    // 4. Daftar Peringkat 4 ke Bawah (Bersih, Tanpa Siku Kuning Kaku)
+                    if (remainingUsers.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 28.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Menampilkan seluruh ${leaderboardUsers.size} pengguna aktif yang terdaftar di database saat ini.",
+                                    color = Color(0xFF64748B),
+                                    fontSize = 12.5.sp,
+                                    fontFamily = SfProFontFamily,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    } else {
+                        items(
+                            items = remainingUsers,
+                            key = { "${it.rank}_${it.uid}" }
+                        ) { user ->
+                            ModernLeaderboardRowItem(
+                                user = user,
+                                isCurrentUser = user.uid == currentUid
                             )
                         }
                     }
@@ -215,603 +340,348 @@ fun LeaderboardScreen(
             }
         }
 
-        // 4. Sticky Bottom Bar: Peringkat Pengguna Saat Ini
-        StickyCurrentUserBar(
-            currentUser = currentUserProfile,
-            leaderboard = leaderboardUsers,
-            modifier = Modifier.align(Alignment.BottomCenter)
+        // 5. Floating Bar Bawah "Posisi Peringkat Kamu"
+        CurrentUserRankBottomBar(
+            currentUserProfile = currentUserProfile,
+            myRankEntry = myRankEntry,
+            totalUsers = leaderboardUsers.size,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
         )
-
-        // Dialog Panduan Perolehan XP
-        if (showXpInfoDialog) {
-            XpInfoModal(onDismiss = { showXpInfoDialog = false })
-        }
     }
 }
 
 /**
- * Komponen Podium Atas: TOP 2 (Kiri), TOP 1 (Tengah Atas), TOP 3 (Kanan)
- * Persis mengacu tata letak gambar referensi!
+ * TAHAP 3: Podium TOP 1, TOP 2, dan TOP 3 dengan Border Khusus Presisi Konsentris
  */
 @Composable
-private fun PodiumView(
+private fun TopThreeLuxuryPodium(
     top1: LeaderboardUser?,
     top2: LeaderboardUser?,
-    top3: LeaderboardUser?
+    top3: LeaderboardUser?,
+    currentUid: String?
 ) {
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 12.dp)
-            .height(260.dp)
+            .padding(horizontal = 12.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Bottom
     ) {
-        // TOP 2 (Kiri)
-        if (top2 != null) {
-            PodiumPillarItem(
-                user = top2,
-                rank = 2,
-                avatarSize = 68.dp,
-                badgeText = "TOP2",
-                wingColor = Color(0xFFA5B4FC),
-                haloColor = Color(0xFF818CF8),
-                bannerGradient = listOf(Color(0xFFE0E7FF), Color(0xFFA5B4FC), Color(0xFF818CF8)),
-                textColor = Color(0xFF1E1B4B),
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 6.dp, bottom = 4.dp)
-                    .width(104.dp)
-            )
-        }
+        // Posisi Kiri: TOP 2
+        PodiumSpotColumn(
+            rank = 2,
+            user = top2,
+            borderUrl = FirebaseManager.TOP_2_BORDER_URL,
+            avatarSize = 58.dp,
+            accentColor = Color(0xFFCBD5E1),
+            pedestalHeight = 126.dp,
+            isCurrentUser = top2?.uid != null && top2.uid == currentUid,
+            modifier = Modifier.weight(1f)
+        )
 
-        // TOP 1 (Tengah - Paling Tinggi & Besar)
-        if (top1 != null) {
-            PodiumPillarItem(
-                user = top1,
-                rank = 1,
-                avatarSize = 84.dp,
-                badgeText = "TOP1",
-                wingColor = Color(0xFFFDE047),
-                haloColor = Color(0xFFF59E0B),
-                bannerGradient = listOf(Color(0xFFFFFBEB), Color(0xFFFDE68A), Color(0xFFF59E0B), Color(0xFFD97706)),
-                textColor = Color(0xFF451A03),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .width(124.dp)
-            )
-        }
+        // Posisi Tengah: TOP 1 (Lebih Tinggi & Menonjol)
+        PodiumSpotColumn(
+            rank = 1,
+            user = top1,
+            borderUrl = FirebaseManager.TOP_1_BORDER_URL,
+            avatarSize = 72.dp,
+            accentColor = Color(0xFFF59E0B),
+            pedestalHeight = 148.dp,
+            isCurrentUser = top1?.uid != null && top1.uid == currentUid,
+            modifier = Modifier.weight(1.12f)
+        )
 
-        // TOP 3 (Kanan - Sejajar TOP 2)
-        if (top3 != null) {
-            PodiumPillarItem(
-                user = top3,
-                rank = 3,
-                avatarSize = 68.dp,
-                badgeText = "TOP3",
-                wingColor = Color(0xFFFDA4AF),
-                haloColor = Color(0xFFFB7185),
-                bannerGradient = listOf(Color(0xFFFFF1F2), Color(0xFFFECDD3), Color(0xFFFB7185), Color(0xFFE11D48)),
-                textColor = Color(0xFF4C0519),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 6.dp, bottom = 4.dp)
-                    .width(104.dp)
-            )
-        }
+        // Posisi Kanan: TOP 3
+        PodiumSpotColumn(
+            rank = 3,
+            user = top3,
+            borderUrl = FirebaseManager.TOP_3_BORDER_URL,
+            avatarSize = 58.dp,
+            accentColor = Color(0xFFFB923C),
+            pedestalHeight = 118.dp,
+            isCurrentUser = top3?.uid != null && top3.uid == currentUid,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
-/**
- * Satu Pilar Podium (Avatar Bulat + Ornamen Sayap + Badge Pelat + Panji Perisai Runcing)
- */
 @Composable
-private fun PodiumPillarItem(
-    user: LeaderboardUser,
+private fun PodiumSpotColumn(
     rank: Int,
-    avatarSize: androidx.compose.ui.unit.Dp,
-    badgeText: String,
-    wingColor: Color,
-    haloColor: Color,
-    bannerGradient: List<Color>,
-    textColor: Color,
+    user: LeaderboardUser?,
+    borderUrl: String,
+    avatarSize: Dp,
+    accentColor: Color,
+    pedestalHeight: Dp,
+    isCurrentUser: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val formattedExp = remember(user.exp) {
-        NumberFormat.getNumberInstance(Locale.US).format(user.exp).replace(",", "")
-    }
+    val borderFrameSize = avatarSize * 1.38f
 
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Container Avatar & Sayap
+        // Avatar + Custom Podium Border (100% Konsentris di Tengah)
         Box(
-            modifier = Modifier.size(avatarSize + 32.dp),
+            modifier = Modifier.size(borderFrameSize),
             contentAlignment = Alignment.Center
         ) {
-            // Ornamen Sayap & Cahaya Belakang (Canvas Custom Angel Wings)
-            PodiumWingsCanvas(
-                wingColor = wingColor,
-                haloColor = haloColor,
-                modifier = Modifier.fillMaxSize()
-            )
-
-            // Foto Profil Bulat
+            // Layer Dalam: Foto Profil Bulat Pengguna
             Box(
                 modifier = Modifier
                     .size(avatarSize)
                     .clip(CircleShape)
-                    .border(2.5.dp, wingColor, CircleShape)
-                    .background(Color(0xFF1E1B4B)),
+                    .background(Color(0xFF161820)),
                 contentAlignment = Alignment.Center
             ) {
-                if (user.avatar.isNotBlank()) {
+                if (user != null && user.avatar.isNotBlank()) {
                     AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(user.avatar)
-                            .crossfade(true)
-                            .placeholder(R.drawable.ic_yuranime_monochrome)
-                            .error(R.drawable.ic_yuranime_monochrome)
-                            .build(),
+                        model = user.avatar,
                         contentDescription = user.name,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
                     )
                 } else {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_yuranime_monochrome),
-                        contentDescription = null,
-                        tint = wingColor,
-                        modifier = Modifier.size(avatarSize * 0.55f)
+                    Text(
+                        text = user?.name?.take(1)?.uppercase() ?: "-",
+                        color = if (user != null) Color.White else Color(0xFF475569),
+                        fontSize = if (rank == 1) 24.sp else 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
                     )
                 }
             }
 
-            // Pelat Logam Badge "TOP 1", "TOP 2", "TOP 3" di Bawah Avatar
+            // Layer Luar: Gambar Border Khusus Top 1 / Top 2 / Top 3 (Alignment.Center, ContentScale.Fit)
+            AsyncImage(
+                model = borderUrl,
+                contentDescription = "Border Top $rank",
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.Center,
+                modifier = Modifier.size(borderFrameSize)
+            )
+
+            // Badge Nomor Peringkat di Bawah Frame
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .offset(y = 4.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(wingColor, haloColor)
-                        )
-                    )
-                    .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 6.dp, vertical = 1.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFF13151D))
+                    .border(1.dp, accentColor, RoundedCornerShape(50))
+                    .padding(horizontal = 8.dp, vertical = 1.5.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = badgeText,
-                    color = textColor,
-                    fontSize = if (rank == 1) 10.sp else 9.sp,
+                    text = "TOP $rank",
+                    color = accentColor,
+                    fontSize = 9.5.sp,
                     fontWeight = FontWeight.Black,
                     fontFamily = SfProFontFamily
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Panji Perisai Runcing ke Bawah (Shield Banner)
-        Box(
+        // Kartu Pedestal Podium Bersih (Tanpa Pita Bertumpuk yang Memotong Angka)
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(if (rank == 1) 78.dp else 68.dp)
-                .clip(ShieldBannerShape)
-                .background(Brush.verticalGradient(bannerGradient))
-                .border(1.dp, Color.White.copy(alpha = 0.4f), ShieldBannerShape)
-                .padding(horizontal = 4.dp, vertical = 6.dp),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = user.name,
-                    color = textColor,
-                    fontSize = if (rank == 1) 12.sp else 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                .height(pedestalHeight)
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    Brush.verticalGradient(
+                        colors = if (rank == 1) {
+                            listOf(Color(0xFF221518), Color(0xFF13151D))
+                        } else {
+                            listOf(Color(0xFF171A24), Color(0xFF11131A))
+                        }
+                    )
                 )
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                Text(
-                    text = formattedExp,
-                    color = textColor,
-                    fontSize = if (rank == 1) 13.sp else 11.5.sp,
-                    fontWeight = FontWeight.Black,
-                    fontFamily = SfProFontFamily,
-                    maxLines = 1
+                .border(
+                    width = if (isCurrentUser || rank == 1) 1.dp else 0.5.dp,
+                    color = when {
+                        isCurrentUser -> Color(0xFFE11D48)
+                        rank == 1 -> Color(0x66F59E0B)
+                        else -> Color(0xFF1F2433)
+                    },
+                    shape = RoundedCornerShape(16.dp)
                 )
-            }
-
-            // Belah Ketupat Emas Kecil di Titik Bawah Perisai
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .offset(y = (-4).dp)
-                    .size(6.dp)
-                    .rotate(45f)
-                    .background(Color.White)
-            )
-        }
-    }
-}
-
-/**
- * Menggambar Sayap & Halo Bercahaya Lembut di Belakang Avatar Podium
- */
-@Composable
-private fun PodiumWingsCanvas(
-    wingColor: Color,
-    haloColor: Color,
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val cx = w * 0.5f
-        val cy = h * 0.5f
-
-        // Lingkaran Halo
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(haloColor.copy(alpha = 0.5f), Color.Transparent),
-                center = Offset(cx, cy),
-                radius = w * 0.46f
-            )
-        )
-
-        // Sayap Kiri
-        val leftWingPath = Path().apply {
-            moveTo(cx - 10f, cy - 20f)
-            cubicTo(cx - w * 0.45f, cy - h * 0.45f, cx - w * 0.5f, cy, cx - 18f, cy + 12f)
-            cubicTo(cx - w * 0.38f, cy + 6f, cx - w * 0.25f, cy - 8f, cx - 10f, cy - 20f)
-            close()
-        }
-        drawPath(
-            path = leftWingPath,
-            brush = Brush.linearGradient(
-                colors = listOf(Color.White.copy(alpha = 0.9f), wingColor),
-                start = Offset(cx, cy - 20f),
-                end = Offset(cx - w * 0.45f, cy - h * 0.4f)
-            )
-        )
-
-        // Sayap Kanan
-        val rightWingPath = Path().apply {
-            moveTo(cx + 10f, cy - 20f)
-            cubicTo(cx + w * 0.45f, cy - h * 0.45f, cx + w * 0.5f, cy, cx + 18f, cy + 12f)
-            cubicTo(cx + w * 0.38f, cy + 6f, cx + w * 0.25f, cy - 8f, cx + 10f, cy - 20f)
-            close()
-        }
-        drawPath(
-            path = rightWingPath,
-            brush = Brush.linearGradient(
-                colors = listOf(Color.White.copy(alpha = 0.9f), wingColor),
-                start = Offset(cx, cy - 20f),
-                end = Offset(cx + w * 0.45f, cy - h * 0.4f)
-            )
-        )
-    }
-}
-
-/**
- * Baris Pembatas Tabel (Peringkat, Pengguna, Total XP ?)
- */
-@Composable
-private fun TableHeaderRow(
-    onHelpClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Label Kiri
-        Text(
-            text = "Peringkat",
-            color = Color(0xFFA5B4FC).copy(alpha = 0.8f),
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = SfProFontFamily,
-            modifier = Modifier.width(72.dp)
-        )
-
-        // Label Tengah
-        Text(
-            text = "Pengguna",
-            color = Color(0xFFA5B4FC).copy(alpha = 0.8f),
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = SfProFontFamily,
-            modifier = Modifier.weight(1f)
-        )
-
-        // Label Kanan + Ikon Belah Ketupat ?
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clickable { onHelpClick() }
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = "Total XP",
-                color = Color(0xFFA5B4FC).copy(alpha = 0.8f),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                fontFamily = SfProFontFamily
-            )
-
-            Spacer(modifier = Modifier.width(6.dp))
-
-            // Belah Ketupat ?
-            Box(
-                modifier = Modifier
-                    .size(16.dp)
-                    .rotate(45f)
-                    .border(1.dp, Color(0xFFFDE68A), RoundedCornerShape(2.dp))
-                    .background(Color(0xFF1E1B4B)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "?",
-                    color = Color(0xFFFDE68A),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.rotate(-45f)
-                )
-            }
-        }
-    }
-}
-
-/**
- * Kartu Baris Peringkat 4 s/d 100
- * Ornamen Sudut Emas Tipis + Belah Ketupat Putih + Avatar Bulat + Nama + Skor Emas
- */
-@Composable
-private fun LeaderboardCardItem(
-    user: LeaderboardUser
-) {
-    val context = LocalContext.current
-    val formattedExp = remember(user.exp) {
-        NumberFormat.getNumberInstance(Locale.US).format(user.exp).replace(",", "")
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 4.5.dp)
-    ) {
-        // Kartu Utama
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF141026))
-                .border(0.7.dp, Color(0xFF382A6E), RoundedCornerShape(8.dp))
-                .padding(horizontal = 12.dp, vertical = 9.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 1. Belah Ketupat Putih Rotasi 45° dengan Angka Peringkat
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .rotate(45f)
-                        .background(Color.White)
-                        .shadow(4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+            if (user != null) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = user.rank.toString(),
-                        color = Color(0xFF0F0B1E),
-                        fontSize = if (user.rank > 99) 11.sp else 13.sp,
-                        fontWeight = FontWeight.Black,
+                        text = user.name,
+                        color = Color.White,
+                        fontSize = if (rank == 1) 13.5.sp else 12.5.sp,
+                        fontWeight = FontWeight.Bold,
                         fontFamily = SfProFontFamily,
-                        modifier = Modifier.rotate(-45f)
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    Text(
+                        text = "Lv. ${user.level} • #${user.userTag}",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = SfProFontFamily,
+                        maxLines = 1
                     )
                 }
 
-                Spacer(modifier = Modifier.width(14.dp))
-
-                // 2. Avatar Pengguna Bulat (46.dp)
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .border(1.5.dp, Color(0xFF818CF8).copy(alpha = 0.6f), CircleShape)
-                        .background(Color(0xFF1F1A3A)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (user.avatar.isNotBlank()) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(user.avatar)
-                                .crossfade(true)
-                                .placeholder(R.drawable.ic_yuranime_monochrome)
-                                .error(R.drawable.ic_yuranime_monochrome)
-                                .build(),
-                            contentDescription = user.name,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_yuranime_monochrome),
-                            contentDescription = null,
-                            tint = Color(0xFFC7D2FE),
-                            modifier = Modifier.size(24.dp)
+                // Title Badge Ringkas atau Gelar Level
+                if (user.equippedTitle.isNotBlank()) {
+                    GeometricTitleBadge(
+                        titleName = user.equippedTitle,
+                        tierLevel = maxOf(user.equippedTitleTier, if (rank == 1) 31 else user.level),
+                        styleVariant = user.equippedTitleVariant,
+                        compact = true
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(Color(0xFF1C202E))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = user.rankTitle,
+                            color = Color(0xFFCBD5E1),
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = SfProFontFamily,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // 3. Nama Pengguna (SF Bold Putih 15.sp)
+                // Angka EXP Utuh dalam SF Bold (Tidak Terpotong)
                 Text(
-                    text = user.name,
-                    color = Color.White,
-                    fontSize = 15.sp,
+                    text = "${FirebaseManager.formatNumber(user.exp)} EXP",
+                    color = accentColor,
+                    fontSize = if (rank == 1) 13.sp else 11.5.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = SfProFontFamily,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+                    softWrap = false
                 )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // 4. Skor XP Emas Terang (SF Bold #FDE68A)
-                Text(
-                    text = formattedExp,
-                    color = Color(0xFFFDE68A),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
-                )
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Kosong",
+                        color = Color(0xFF475569),
+                        fontSize = 11.5.sp,
+                        fontFamily = SfProFontFamily
+                    )
+                }
             }
         }
-
-        // Aksen Ornamen Sudut Emas di 4 Pojok Kartu (Persis Referensi Gambar)
-        GildedCornersCanvas(
-            modifier = Modifier.matchParentSize()
-        )
     }
 }
 
 /**
- * Garis Aksen Sudut Emas Tipis pada Keempat Pojok Kartu
+ * TAHAP 3: Baris Peringkat 4 ke Bawah (Bersih, Modern, Tanpa Siku Kuning Kaku)
  */
 @Composable
-private fun GildedCornersCanvas(
-    modifier: Modifier = Modifier
+private fun ModernLeaderboardRowItem(
+    user: LeaderboardUser,
+    isCurrentUser: Boolean
 ) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val cornerLen = 14.dp.toPx()
-        val goldColor = Color(0xFFFACC15)
-        val strokeWidth = 1.3.dp.toPx()
-
-        // Pojok Kiri Atas
-        drawLine(goldColor, Offset(0f, cornerLen), Offset(0f, 0f), strokeWidth)
-        drawLine(goldColor, Offset(0f, 0f), Offset(cornerLen, 0f), strokeWidth)
-
-        // Pojok Kanan Atas
-        drawLine(goldColor, Offset(w - cornerLen, 0f), Offset(w, 0f), strokeWidth)
-        drawLine(goldColor, Offset(w, 0f), Offset(w, cornerLen), strokeWidth)
-
-        // Pojok Kiri Bawah
-        drawLine(goldColor, Offset(0f, h - cornerLen), Offset(0f, h), strokeWidth)
-        drawLine(goldColor, Offset(0f, h), Offset(cornerLen, h), strokeWidth)
-
-        // Pojok Kanan Bawah
-        drawLine(goldColor, Offset(w - cornerLen, h), Offset(w, h), strokeWidth)
-        drawLine(goldColor, Offset(w, h), Offset(w, h - cornerLen), strokeWidth)
-    }
-}
-
-/**
- * Sticky Bottom Bar: Peringkat Pengguna Saat Ini
- */
-@Composable
-private fun StickyCurrentUserBar(
-    currentUser: com.yuranime.dinz.data.firebase.UserProfile?,
-    leaderboard: List<LeaderboardUser>,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val currentUid = FirebaseManager.getCurrentUid()
-
-    val myRank = remember(currentUser, leaderboard) {
-        if (currentUid == null) null
-        else leaderboard.indexOfFirst { it.uid == currentUid }.takeIf { it >= 0 }?.plus(1) ?: 99
-    }
-
-    Box(
-        modifier = modifier
+    Row(
+        modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                Brush.horizontalGradient(
-                    listOf(
-                        Color(0xFF24164A),
-                        Color(0xFF3B1D78),
-                        Color(0xFF24164A)
-                    )
-                )
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (isCurrentUser) Color(0xFF1E1319) else Color(0xFF13151D))
+            .border(
+                width = if (isCurrentUser) 1.dp else 0.5.dp,
+                color = if (isCurrentUser) Color(0xFFE11D48) else Color(0xFF1B1F2C),
+                shape = RoundedCornerShape(14.dp)
             )
-            .border(1.dp, Color(0xFFFDE68A).copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        // Kiri: Nomor Peringkat
+        Box(
+            modifier = Modifier.width(46.dp),
+            contentAlignment = Alignment.CenterStart
         ) {
-            // Belah Ketupat Peringkat Pengguna
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .rotate(45f)
-                    .background(Color(0xFFFDE68A)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "${myRank ?: "-"}",
-                    color = Color(0xFF3B1D78),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Black,
-                    modifier = Modifier.rotate(-45f)
-                )
-            }
+            Text(
+                text = "#${user.rank}",
+                color = if (isCurrentUser) Color(0xFFFF5722) else Color(0xFF94A3B8),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = SfProFontFamily,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Avatar Pengguna
+        // Tengah: Avatar + Nama + Badge Level/Title
+        Box(
+            modifier = Modifier.size(44.dp),
+            contentAlignment = Alignment.Center
+        ) {
             Box(
                 modifier = Modifier
                     .size(38.dp)
                     .clip(CircleShape)
-                    .border(1.5.dp, Color(0xFFFDE68A), CircleShape)
-                    .background(Color(0xFF1E1B4B)),
+                    .background(Color(0xFF1C202E)),
                 contentAlignment = Alignment.Center
             ) {
-                if (!currentUser?.avatar.isNullOrBlank()) {
+                if (user.avatar.isNotBlank()) {
                     AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(currentUser?.avatar)
-                            .crossfade(true)
-                            .placeholder(R.drawable.ic_yuranime_monochrome)
-                            .error(R.drawable.ic_yuranime_monochrome)
-                            .build(),
-                        contentDescription = "Avatar Pengguna",
+                        model = user.avatar,
+                        contentDescription = user.name,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
                     )
                 } else {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_yuranime_monochrome),
-                        contentDescription = null,
-                        tint = Color(0xFFFDE68A),
-                        modifier = Modifier.size(20.dp)
+                    Text(
+                        text = user.name.take(1).uppercase(),
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(10.dp))
+            if (user.equippedBorderUrl.isNotBlank()) {
+                AsyncImage(
+                    model = user.equippedBorderUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+        }
 
-            Column(modifier = Modifier.weight(1f)) {
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = currentUser?.name ?: "Kamu",
+                    text = user.name,
                     color = Color.White,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
@@ -819,28 +689,215 @@ private fun StickyCurrentUserBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                Spacer(modifier = Modifier.width(5.dp))
                 Text(
-                    text = "Posisi Peringkat Kamu",
-                    color = Color(0xFFCBD5E1),
-                    fontSize = 11.sp,
+                    text = "#${user.userTag}",
+                    color = Color(0xFF64748B),
+                    fontSize = 11.5.sp,
                     fontFamily = SfProFontFamily
                 )
             }
 
-            // Total XP Pengguna
-            Column(horizontalAlignment = Alignment.End) {
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0xFF1C202E))
+                        .padding(horizontal = 7.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "Lv. ${user.level}",
+                        color = Color(0xFFFF5722),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
+                }
+
+                if (user.equippedTitle.isNotBlank()) {
+                    GeometricTitleBadge(
+                        titleName = user.equippedTitle,
+                        tierLevel = user.equippedTitleTier,
+                        styleVariant = user.equippedTitleVariant,
+                        compact = true
+                    )
+                } else {
+                    Text(
+                        text = user.rankTitle,
+                        color = Color(0xFF94A3B8),
+                        fontSize = 11.sp,
+                        fontFamily = SfProFontFamily,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // Kanan: Total EXP
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = "${FirebaseManager.formatNumber(user.exp)} EXP",
+                color = Color.White,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = SfProFontFamily,
+                maxLines = 1,
+                softWrap = false
+            )
+            Text(
+                text = "✦ ${FirebaseManager.formatNumber(user.points)}",
+                color = Color(0xFF64748B),
+                fontSize = 11.sp,
+                fontFamily = SfProFontFamily,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
+    }
+}
+
+/**
+ * TAHAP 3: Floating Bar Bawah "Posisi Peringkat Kamu" yang Bersih & Sinkron Database
+ */
+@Composable
+private fun CurrentUserRankBottomBar(
+    currentUserProfile: UserProfile?,
+    myRankEntry: LeaderboardUser?,
+    totalUsers: Int,
+    modifier: Modifier = Modifier
+) {
+    val rankLabel = when {
+        myRankEntry != null -> "#${myRankEntry.rank}"
+        currentUserProfile != null && totalUsers > 0 -> "#${totalUsers + 1}"
+        else -> "-"
+    }
+    val displayName = currentUserProfile?.name ?: myRankEntry?.name ?: "Kamu"
+    val userTag = currentUserProfile?.userTag ?: myRankEntry?.userTag ?: "1001"
+    val avatarUrl = currentUserProfile?.avatar ?: myRankEntry?.avatar ?: ""
+    val exp = currentUserProfile?.exp ?: myRankEntry?.exp ?: 0L
+    val level = currentUserProfile?.level ?: myRankEntry?.level ?: 1
+    val rankTitle = currentUserProfile?.rankTitle ?: FirebaseManager.computeRankTitle(level)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF14161E))
+            .border(1.dp, Color(0x40E11D48), RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Badge Posisi Peringkat Kamu
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(Color(0xFFFF5722), Color(0xFFE11D48))
+                        )
+                    )
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = "${currentUser?.exp ?: 0L} XP",
-                    color = Color(0xFFFDE68A),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
+                    text = rankLabel,
+                    color = Color.White,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Black,
                     fontFamily = SfProFontFamily
                 )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Foto Profil
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1E2230)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (avatarUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = avatarUrl,
+                        contentDescription = displayName,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                    )
+                } else {
+                    Text(
+                        text = displayName.take(1).uppercase(),
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(11.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = displayName,
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = "#$userTag",
+                        color = Color(0xFF64748B),
+                        fontSize = 11.5.sp,
+                        fontFamily = SfProFontFamily
+                    )
+                }
                 Text(
-                    text = "Lv. ${currentUser?.level ?: 1}",
-                    color = Color(0xFFA5B4FC),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
+                    text = "Posisi Peringkat Kamu • $rankTitle",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 11.5.sp,
+                    fontFamily = SfProFontFamily,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "${FirebaseManager.formatNumber(exp)} EXP",
+                    color = Color(0xFFFF5722),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily,
+                    maxLines = 1,
+                    softWrap = false
+                )
+                Text(
+                    text = "Lv. $level",
+                    color = Color(0xFFCBD5E1),
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold,
                     fontFamily = SfProFontFamily
                 )
             }
@@ -848,73 +905,94 @@ private fun StickyCurrentUserBar(
     }
 }
 
-/**
- * Modal Dialog Penjelasan Cara Mendapatkan XP
- */
 @Composable
 private fun XpInfoModal(
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
-        Card(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF17132B)),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF4C3682))
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFF14161E))
+                .border(1.dp, Color(0xFF1F2433), RoundedCornerShape(20.dp))
+                .padding(20.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(20.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Cara Memperoleh XP",
-                        color = Color.White,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
+                Text(
+                    text = "Cara Memperoleh EXP",
+                    color = Color.White,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
+                )
+                IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Tutup",
+                        tint = Color(0xFF94A3B8)
                     )
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Tutup",
-                            tint = Color.White.copy(alpha = 0.7f)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            XpSourceRow(
+                title = "Check-In Harian",
+                xp = "+50 EXP",
+                desc = "Klaim kehadiran setiap hari di halaman Points & Rewards"
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(thickness = 0.5.dp, color = Color(0xFF1F2433))
+            Spacer(modifier = Modifier.height(10.dp))
+            XpSourceRow(
+                title = "Tonton Episode Anime",
+                xp = "+100 EXP",
+                desc = "Tonton episode anime dan klaim misi harianmu"
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(thickness = 0.5.dp, color = Color(0xFF1F2433))
+            Spacer(modifier = Modifier.height(10.dp))
+            XpSourceRow(
+                title = "Baca Chapter Komik",
+                xp = "+100 EXP",
+                desc = "Baca chapter manga, manhwa, atau manhua favorit"
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(thickness = 0.5.dp, color = Color(0xFF1F2433))
+            Spacer(modifier = Modifier.height(10.dp))
+            XpSourceRow(
+                title = "Kirim Komentar & Diskusi",
+                xp = "+50 EXP",
+                desc = "Berinteraksi aktif di kolom komentar episode"
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(Color(0xFFFF5722), Color(0xFFE11D48))
                         )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                XpSourceRow(title = "Nonton 1 Episode", xp = "+20 XP", desc = "Dapatkan XP setiap kali menyelesaikan tontonan")
-                Spacer(modifier = Modifier.height(10.dp))
-                XpSourceRow(title = "Check-in Harian", xp = "+50 XP", desc = "Klaim check-in setiap hari di halaman Points & Rewards")
-                Spacer(modifier = Modifier.height(10.dp))
-                XpSourceRow(title = "Beri Komentar & Reaksi", xp = "+10 XP", desc = "Berinteraksi aktif di kolom diskusi episode")
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF251B47))
-                        .clickable { onDismiss() }
-                        .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Mengerti",
-                        color = Color(0xFFFDE68A),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        fontFamily = SfProFontFamily
                     )
-                }
+                    .clickable { onDismiss() }
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Mengerti",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    fontFamily = SfProFontFamily
+                )
             }
         }
     }
@@ -930,23 +1008,6 @@ private fun XpSourceRow(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF2B1F57)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Stars,
-                contentDescription = null,
-                tint = Color(0xFFFDE68A),
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
@@ -955,6 +1016,7 @@ private fun XpSourceRow(
                 fontWeight = FontWeight.SemiBold,
                 fontFamily = SfProFontFamily
             )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = desc,
                 color = Color(0xFF94A3B8),
@@ -963,10 +1025,12 @@ private fun XpSourceRow(
             )
         }
 
+        Spacer(modifier = Modifier.width(10.dp))
+
         Text(
             text = xp,
-            color = Color(0xFFFDE68A),
-            fontSize = 14.sp,
+            color = Color(0xFFFF5722),
+            fontSize = 13.5.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = SfProFontFamily
         )

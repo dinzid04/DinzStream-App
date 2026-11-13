@@ -2,63 +2,125 @@ package com.yuranime.dinz.data.firebase
 
 import android.app.Activity
 import android.content.Context
+import android.content.SharedPreferences
+import android.util.Base64
+import android.util.Log
+import androidx.credentials.ClearCredentialStateRequest
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.FirebaseApp
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
-import com.google.firebase.auth.OAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
+import com.yuranime.dinz.data.local.AppPreferences
+import com.yuranime.dinz.data.local.SavedGoogleUserSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
+import kotlin.math.abs
+
+enum class TitleUnlockType {
+    MILESTONE,
+    POINTS_SHOP
+}
+
+data class TitleDefinition(
+    val id: String,
+    val titleName: String,
+    val tierLevel: Int,
+    val styleVariant: Int,
+    val unlockType: TitleUnlockType,
+    val requiredLevel: Int = 1,
+    val pointCost: Long = 0L,
+    val description: String = ""
+)
+
+data class BorderDefinition(
+    val id: String,
+    val name: String,
+    val imageUrl: String,
+    val pointCost: Long,
+    val description: String
+)
 
 data class UserProfile(
     val uid: String = "",
-    val name: String = "Otaku Member",
-    val username: String = "@otaku",
+    val name: String = "Member Yuranime",
+    val username: String = "member",
+    val userTag: String = "1001",
     val email: String = "",
     val avatar: String = "",
     val banner: String = "",
-    val bio: String = "Pecinta anime sejati",
-    val level: Int = 1,
+    val bio: String = "Penikmat anime & komik di Yuranime.",
+    val role: String = "Member",
+    val joinDate: String = "",
     val exp: Long = 0L,
-    val points: Long = 100L,
+    val points: Long = 0L,
+    val level: Int = 1,
+    val rankTitle: String = "Wibu Biasa",
+    val equippedTitle: String = "",
+    val equippedTitleTier: Int = 1,
+    val equippedTitleVariant: Int = 0,
+    val equippedBorderUrl: String = "",
+    val unlockedTitles: List<String> = emptyList(),
+    val unlockedBorders: List<String> = emptyList(),
+    val claimedMissions: Map<String, String> = emptyMap(),
     val lastCheckInDate: String = "",
-    val checkInStreak: Int = 0
+    val checkInStreak: Int = 0,
+    val nextLevelTargetExp: Long = 500L,
+    val expProgress: Float = 0f
 ) {
-    val expProgress: Float
-        get() {
-            val currentLevelBase = (level - 1) * 1000L
-            val progressInLevel = (exp - currentLevelBase).coerceAtLeast(0L)
-            return (progressInLevel.toFloat() / 1000f).coerceIn(0.05f, 1f)
-        }
-
     val expToNextLevel: Long
-        get() {
-            val targetLevelExp = level * 1000L
-            return (targetLevelExp - exp).coerceAtLeast(0L)
-        }
+        get() = (nextLevelTargetExp - exp).coerceAtLeast(0L)
 }
 
 data class LeaderboardUser(
-    val uid: String = "",
     val rank: Int = 1,
+    val uid: String = "",
     val name: String = "Pengguna",
     val username: String = "@user",
+    val userTag: String = "1001",
     val avatar: String = "",
     val exp: Long = 0L,
-    val level: Int = 1
+    val points: Long = 0L,
+    val level: Int = 1,
+    val role: String = "Member",
+    val rankTitle: String = "Wibu Biasa",
+    val equippedTitle: String = "",
+    val equippedTitleTier: Int = 1,
+    val equippedTitleVariant: Int = 0,
+    val equippedBorderUrl: String = ""
+)
+
+data class GoogleSessionInfo(
+    val uid: String,
+    val name: String,
+    val email: String,
+    val avatar: String
 )
 
 data class PromoPopupConfig(
@@ -69,9 +131,144 @@ data class PromoPopupConfig(
     val intervalHours: Float = 8f,
     val maxImpressions: Int = 0,
     val updatedAt: Long = 0L
-)
+) {
+    val enabled: Boolean get() = isActive
+}
 
+/**
+ * Pengelola utama autentikasi Google, profil pengguna, sistem level/title/misi,
+ * dan papan peringkat real-time dari Firebase Firestore (100% TANPA DATA PALSU/PLACEHOLDER).
+ */
 object FirebaseManager {
+    private const val TAG = "FirebaseManager"
+
+    const val WEB_CLIENT_ID = "683241181647-gp00tdtgh2bkn8bojm0pl1hf0eriduq1.apps.googleusercontent.com"
+    private const val PREFS_NAME = "yuranime_google_session_prefs"
+
+    // Border khusus podium Top 1, Top 2, dan Top 3
+    const val TOP_1_BORDER_URL = "https://url.dinzid.my.id/edTfBfx"
+    const val TOP_2_BORDER_URL = "https://url.dinzid.my.id/85MXtu1"
+    const val TOP_3_BORDER_URL = "https://url.dinzid.my.id/1KCdAyA"
+
+    // Katalog Title Resmi (Milestone Level & Tukar Poin)
+    val ALL_TITLES: List<TitleDefinition> = listOf(
+        TitleDefinition(
+            id = "title_lv1_starter",
+            titleName = "WARGA YURANIME",
+            tierLevel = 1,
+            styleVariant = 0,
+            unlockType = TitleUnlockType.MILESTONE,
+            requiredLevel = 1,
+            description = "Terbuka otomatis saat bergabung sebagai keluarga Yuranime"
+        ),
+        TitleDefinition(
+            id = "title_lv5_pioneer",
+            titleName = "PERINTIS ANIME",
+            tierLevel = 6,
+            styleVariant = 1,
+            unlockType = TitleUnlockType.MILESTONE,
+            requiredLevel = 5,
+            description = "Capai Level 5 melalui misi menonton dan check-in harian"
+        ),
+        TitleDefinition(
+            id = "title_lv10_explorer",
+            titleName = "PENJELAJAH KOMIK",
+            tierLevel = 10,
+            styleVariant = 2,
+            unlockType = TitleUnlockType.MILESTONE,
+            requiredLevel = 10,
+            description = "Capai Level 10 dengan aktif menjelajahi anime & komik"
+        ),
+        TitleDefinition(
+            id = "title_lv15_vanguard",
+            titleName = "VANGUARD OTAKU",
+            tierLevel = 15,
+            styleVariant = 3,
+            unlockType = TitleUnlockType.MILESTONE,
+            requiredLevel = 15,
+            description = "Capai Level 15 sebagai garda depan komunitas Yuranime"
+        ),
+        TitleDefinition(
+            id = "title_lv25_dimension",
+            titleName = "PENGUASA DIMENSI",
+            tierLevel = 25,
+            styleVariant = 1,
+            unlockType = TitleUnlockType.MILESTONE,
+            requiredLevel = 25,
+            description = "Capai Level 25 dengan dedikasi tinggi di Yuranime"
+        ),
+        TitleDefinition(
+            id = "title_lv50_sepuh",
+            titleName = "SEPUH YURANIME",
+            tierLevel = 50,
+            styleVariant = 3,
+            unlockType = TitleUnlockType.MILESTONE,
+            requiredLevel = 50,
+            description = "Gelar kehormatan tertinggi untuk legenda Level 50+"
+        ),
+        TitleDefinition(
+            id = "shop_crimson_knight",
+            titleName = "KSATRIA CRIMSON",
+            tierLevel = 8,
+            styleVariant = 0,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            pointCost = 100L,
+            description = "Badge geometris eksklusif bertema prajurit Crimson"
+        ),
+        TitleDefinition(
+            id = "shop_marathon_king",
+            titleName = "RAJA MARATON",
+            tierLevel = 14,
+            styleVariant = 2,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            pointCost = 200L,
+            description = "Simbol penakluk ratusan episode anime tanpa henti"
+        ),
+        TitleDefinition(
+            id = "shop_amethyst_lord",
+            titleName = "BANGSAWAN KOMIK",
+            tierLevel = 20,
+            styleVariant = 1,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            pointCost = 350L,
+            description = "Gelar Royal Amethyst untuk pembaca setia manhwa & manga"
+        ),
+        TitleDefinition(
+            id = "shop_mythic_sovereign",
+            titleName = "MYTHIC SOVEREIGN",
+            tierLevel = 35,
+            styleVariant = 3,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            pointCost = 600L,
+            description = "Badge kasta tertinggi Gold-Crimson berefek kilau mewah"
+        )
+    )
+
+    val SHOP_BORDERS: List<BorderDefinition> = listOf(
+        BorderDefinition(
+            id = "border_bronze_crest",
+            name = "Vanguard Bronze Frame",
+            imageUrl = TOP_3_BORDER_URL,
+            pointCost = 250L,
+            description = "Frame avatar bergaya mecha perunggu"
+        ),
+        BorderDefinition(
+            id = "border_silver_wings",
+            name = "Valkyrie Silver Frame",
+            imageUrl = TOP_2_BORDER_URL,
+            pointCost = 450L,
+            description = "Frame avatar perak bersayap presisi"
+        ),
+        BorderDefinition(
+            id = "border_sovereign_gold",
+            name = "Sovereign Gold Frame",
+            imageUrl = TOP_1_BORDER_URL,
+            pointCost = 750L,
+            description = "Frame avatar mahkota emas kasta tertinggi"
+        )
+    )
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
     val firestore: FirebaseFirestore by lazy {
@@ -95,8 +292,8 @@ object FirebaseManager {
     private val _currentUser = MutableStateFlow<FirebaseUser?>(null)
     val currentUser: StateFlow<FirebaseUser?> = _currentUser.asStateFlow()
 
-    private val _googleSession = MutableStateFlow<com.yuranime.dinz.data.local.SavedGoogleUserSession?>(null)
-    val googleSession: StateFlow<com.yuranime.dinz.data.local.SavedGoogleUserSession?> = _googleSession.asStateFlow()
+    private val _googleSession = MutableStateFlow<SavedGoogleUserSession?>(null)
+    val googleSession: StateFlow<SavedGoogleUserSession?> = _googleSession.asStateFlow()
 
     private val _userProfile = MutableStateFlow<UserProfile?>(null)
     val userProfile: StateFlow<UserProfile?> = _userProfile.asStateFlow()
@@ -104,10 +301,13 @@ object FirebaseManager {
     private val _leaderboard = MutableStateFlow<List<LeaderboardUser>>(emptyList())
     val leaderboard: StateFlow<List<LeaderboardUser>> = _leaderboard.asStateFlow()
 
+    private val _isLeaderboardLoading = MutableStateFlow(true)
+    val isLeaderboardLoading: StateFlow<Boolean> = _isLeaderboardLoading.asStateFlow()
+
     private val _promoPopupConfig = MutableStateFlow<PromoPopupConfig?>(null)
     val promoPopupConfig: StateFlow<PromoPopupConfig?> = _promoPopupConfig.asStateFlow()
 
-    private var profileListener: ListenerRegistration? = null
+    private var userDocListener: ListenerRegistration? = null
     private var leaderboardListener: ListenerRegistration? = null
     private var promoListener: ListenerRegistration? = null
 
@@ -121,8 +321,8 @@ object FirebaseManager {
                     startListeningCurrentUser()
                 } else if (_googleSession.value == null) {
                     _userProfile.value = null
-                    profileListener?.remove()
-                    profileListener = null
+                    userDocListener?.remove()
+                    userDocListener = null
                 }
             }
         } catch (ignored: Exception) {}
@@ -136,27 +336,225 @@ object FirebaseManager {
         return _googleSession.value != null
     }
 
-    fun getCurrentUid(): String? {
-        return auth.currentUser?.uid ?: _googleSession.value?.id
+    fun getActiveUid(): String? {
+        return auth.currentUser?.uid ?: _googleSession.value?.id ?: _userProfile.value?.uid
+    }
+
+    fun getCurrentUid(): String? = getActiveUid()
+
+    fun computeLevelFromExp(exp: Long): Int {
+        val safeExp = exp.coerceAtLeast(0L)
+        return ((safeExp / 500L).toInt() + 1).coerceAtLeast(1)
+    }
+
+    fun computeNextLevelTargetExp(level: Int): Long {
+        return (level.coerceAtLeast(1) * 500L)
+    }
+
+    fun computeExpProgress(exp: Long, nextLevelTargetExp: Long): Float {
+        if (nextLevelTargetExp <= 0L) return 0f
+        return (exp.coerceAtLeast(0L).toFloat() / nextLevelTargetExp.toFloat()).coerceIn(0f, 1f)
+    }
+
+    fun computeRankTitle(level: Int): String {
+        return when {
+            level >= 30 -> "Sepuh Yuranime"
+            level >= 20 -> "Vanguard Otaku"
+            level >= 10 -> "Penjelajah Komik"
+            level >= 5 -> "Perintis Anime"
+            else -> "Wibu Biasa"
+        }
+    }
+
+    fun computeUserTag(uid: String, existingTag: String? = null): String {
+        val cleaned = existingTag?.trim()?.removePrefix("#").orEmpty()
+        if (cleaned.length == 4 && cleaned.all { it.isDigit() }) {
+            return cleaned
+        }
+        if (uid.isBlank()) return "1001"
+        val hash = abs(uid.hashCode().toLong())
+        val fourDigits = (hash % 9000L) + 1000L
+        return fourDigits.toString()
+    }
+
+    fun formatNumber(value: Long): String {
+        return NumberFormat.getIntegerInstance(Locale("id", "ID")).format(value)
+    }
+
+    fun resolveTitleDefinition(titleName: String, fallbackLevel: Int = 1): TitleDefinition? {
+        if (titleName.isBlank()) return null
+        val matched = ALL_TITLES.find { it.titleName.equals(titleName.trim(), ignoreCase = true) }
+        if (matched != null) return matched
+        return TitleDefinition(
+            id = "custom_${titleName.lowercase(Locale.ROOT)}",
+            titleName = titleName.uppercase(Locale.ROOT),
+            tierLevel = fallbackLevel,
+            styleVariant = fallbackLevel % 4,
+            unlockType = TitleUnlockType.MILESTONE
+        )
+    }
+
+    private fun formatJoinDate(timestampMs: Long): String {
+        val sdf = SimpleDateFormat("d MMMM yyyy", Locale("id", "ID"))
+        return sdf.format(Date(timestampMs))
+    }
+
+    private fun extractJoinDateFromSnapshot(snapshot: DocumentSnapshot?, fallbackAuthTimestamp: Long?): String {
+        if (snapshot != null && snapshot.exists()) {
+            val directStr = snapshot.getString("joinDate")?.trim()
+            if (!directStr.isNullOrBlank()) return directStr
+
+            val createdAtAny = snapshot.get("createdAt") ?: snapshot.get("registeredAt")
+            when (createdAtAny) {
+                is Timestamp -> return formatJoinDate(createdAtAny.toDate().time)
+                is Long -> if (createdAtAny > 1_000_000_000_000L) return formatJoinDate(createdAtAny)
+                is Number -> {
+                    val ms = createdAtAny.toLong()
+                    if (ms > 1_000_000_000_000L) return formatJoinDate(ms)
+                }
+                is Date -> return formatJoinDate(createdAtAny.time)
+            }
+        }
+        if (fallbackAuthTimestamp != null && fallbackAuthTimestamp > 1_000_000_000_000L) {
+            return formatJoinDate(fallbackAuthTimestamp)
+        }
+        return formatJoinDate(System.currentTimeMillis())
+    }
+
+    private fun getPrefs(context: Context): SharedPreferences {
+        return context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
     fun initSession(context: Context) {
-        val saved = com.yuranime.dinz.data.local.AppPreferences.getSavedGoogleSession(context)
-        if (saved != null) {
-            _googleSession.value = saved
-            if (_userProfile.value == null) {
-                _userProfile.value = UserProfile(
-                    uid = saved.id,
-                    name = saved.name,
-                    username = "@${saved.email.substringBefore("@").ifBlank { "user" }}",
-                    email = saved.email,
-                    avatar = saved.photoUrl.orEmpty(),
-                    level = 1,
-                    exp = 0L,
-                    points = 100L
+        val fbUser = try { auth.currentUser } catch (_: Exception) { null }
+        _currentUser.value = fbUser
+
+        val savedGoogle = AppPreferences.getSavedGoogleSession(context)
+        val prefs = getPrefs(context)
+        val savedUid = savedGoogle?.id ?: prefs.getString("uid", null)
+
+        if (fbUser != null) {
+            val session = SavedGoogleUserSession(
+                id = fbUser.uid,
+                name = fbUser.displayName ?: savedGoogle?.name ?: prefs.getString("name", "Member Yuranime") ?: "Member Yuranime",
+                email = fbUser.email ?: savedGoogle?.email ?: prefs.getString("email", "") ?: "",
+                photoUrl = fbUser.photoUrl?.toString() ?: savedGoogle?.photoUrl ?: prefs.getString("avatar", "")
+            )
+            _googleSession.value = session
+            loadCachedProfile(prefs, session)
+            startListeningCurrentUser(context)
+        } else if (savedGoogle != null) {
+            _googleSession.value = savedGoogle
+            loadCachedProfile(prefs, savedGoogle)
+            startListeningCurrentUser(context)
+        } else if (!savedUid.isNullOrBlank()) {
+            val session = SavedGoogleUserSession(
+                id = savedUid,
+                name = prefs.getString("name", "Member Yuranime") ?: "Member Yuranime",
+                email = prefs.getString("email", "") ?: "",
+                photoUrl = prefs.getString("avatar", "")
+            )
+            _googleSession.value = session
+            loadCachedProfile(prefs, session)
+            startListeningCurrentUser(context)
+        }
+        startListeningLeaderboard()
+    }
+
+    private fun loadCachedProfile(prefs: SharedPreferences, session: SavedGoogleUserSession) {
+        val exp = prefs.getLong("exp_${session.id}", 0L)
+        val points = prefs.getLong("points_${session.id}", 100L)
+        val level = computeLevelFromExp(exp)
+        val nextTarget = computeNextLevelTargetExp(level)
+        val progress = computeExpProgress(exp, nextTarget)
+        val cachedName = prefs.getString("profile_name_${session.id}", session.name) ?: session.name
+        val cachedUsername = prefs.getString(
+            "profile_username_${session.id}",
+            cachedName.lowercase(Locale.ROOT).replace(" ", "")
+        ) ?: "member"
+        val cachedAvatar = prefs.getString("profile_avatar_${session.id}", session.photoUrl ?: "") ?: (session.photoUrl ?: "")
+        val cachedBanner = prefs.getString("profile_banner_${session.id}", "") ?: ""
+        val cachedBio = prefs.getString("profile_bio_${session.id}", "Penikmat anime & komik di Yuranime.")
+            ?: "Penikmat anime & komik di Yuranime."
+        val cachedRole = prefs.getString("profile_role_${session.id}", "Member") ?: "Member"
+        val cachedTag = computeUserTag(session.id, prefs.getString("profile_tag_${session.id}", null))
+        val cachedJoinDate = prefs.getString("profile_joindate_${session.id}", null)
+            ?: formatJoinDate(System.currentTimeMillis())
+        val cachedEquippedTitle = prefs.getString("profile_title_${session.id}", "") ?: ""
+        val cachedTitleDef = resolveTitleDefinition(cachedEquippedTitle, level)
+        val cachedBorderUrl = prefs.getString("profile_border_${session.id}", "") ?: ""
+        val cachedUnlockedTitles = prefs.getStringSet("profile_unlocked_titles_${session.id}", setOf("WARGA YURANIME"))
+            ?.toList() ?: listOf("WARGA YURANIME")
+        val cachedUnlockedBorders = prefs.getStringSet("profile_unlocked_borders_${session.id}", emptySet())
+            ?.toList() ?: emptyList()
+        val lastCheckIn = prefs.getString("last_checkin_${session.id}", "") ?: ""
+        val streak = prefs.getInt("streak_${session.id}", 0)
+
+        _userProfile.value = UserProfile(
+            uid = session.id,
+            name = cachedName,
+            username = cachedUsername,
+            userTag = cachedTag,
+            email = session.email,
+            avatar = cachedAvatar,
+            banner = cachedBanner,
+            bio = cachedBio,
+            role = cachedRole,
+            joinDate = cachedJoinDate,
+            exp = exp,
+            points = points,
+            level = level,
+            rankTitle = computeRankTitle(level),
+            equippedTitle = cachedEquippedTitle,
+            equippedTitleTier = cachedTitleDef?.tierLevel ?: level,
+            equippedTitleVariant = cachedTitleDef?.styleVariant ?: 0,
+            equippedBorderUrl = cachedBorderUrl,
+            unlockedTitles = cachedUnlockedTitles,
+            unlockedBorders = cachedUnlockedBorders,
+            lastCheckInDate = lastCheckIn,
+            checkInStreak = streak,
+            nextLevelTargetExp = nextTarget,
+            expProgress = progress
+        )
+    }
+
+    private fun saveProfileToPrefs(context: Context, profile: UserProfile) {
+        getPrefs(context).edit()
+            .putString("uid", profile.uid)
+            .putString("name", profile.name)
+            .putString("email", profile.email)
+            .putString("avatar", profile.avatar)
+            .putString("profile_name_${profile.uid}", profile.name)
+            .putString("profile_username_${profile.uid}", profile.username)
+            .putString("profile_tag_${profile.uid}", profile.userTag)
+            .putString("profile_avatar_${profile.uid}", profile.avatar)
+            .putString("profile_banner_${profile.uid}", profile.banner)
+            .putString("profile_bio_${profile.uid}", profile.bio)
+            .putString("profile_role_${profile.uid}", profile.role)
+            .putString("profile_joindate_${profile.uid}", profile.joinDate)
+            .putString("profile_title_${profile.uid}", profile.equippedTitle)
+            .putString("profile_border_${profile.uid}", profile.equippedBorderUrl)
+            .putStringSet("profile_unlocked_titles_${profile.uid}", profile.unlockedTitles.toSet())
+            .putStringSet("profile_unlocked_borders_${profile.uid}", profile.unlockedBorders.toSet())
+            .putLong("exp_${profile.uid}", profile.exp)
+            .putLong("points_${profile.uid}", profile.points)
+            .putString("last_checkin_${profile.uid}", profile.lastCheckInDate)
+            .putInt("streak_${profile.uid}", profile.checkInStreak)
+            .apply()
+    }
+
+    private fun decodeJwtPayload(idToken: String): JSONObject? {
+        return try {
+            val parts = idToken.split(".")
+            if (parts.size >= 2) {
+                val decodedBytes = Base64.decode(
+                    parts[1],
+                    Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
                 )
-            }
-            startListeningFirestoreUser(saved.id, saved.name, saved.email, saved.photoUrl)
+                JSONObject(String(decodedBytes, Charsets.UTF_8))
+            } else null
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -165,589 +563,1044 @@ object FirebaseManager {
         name: String,
         email: String,
         avatar: String?,
-        idToken: String?
+        idToken: String? = null,
+        context: Context? = null
     ) {
-        val session = com.yuranime.dinz.data.local.SavedGoogleUserSession(
+        val session = SavedGoogleUserSession(
             id = uid,
             name = name,
             email = email,
             photoUrl = avatar
         )
         _googleSession.value = session
+        if (context != null) {
+            AppPreferences.saveGoogleSession(context, uid, name, email, avatar)
+        }
 
-        _userProfile.value = UserProfile(
-            uid = uid,
-            name = name,
-            username = "@${email.substringBefore("@").ifBlank { "user" }}",
-            email = email,
-            avatar = avatar.orEmpty(),
-            level = 1,
-            exp = 0L,
-            points = 100L
-        )
-
-        // Try Firebase Auth in background, but silently ignore INVALID_APP_ID / FirebaseException
         if (!idToken.isNullOrBlank()) {
             try {
                 val credential = GoogleAuthProvider.getCredential(idToken, null)
                 auth.signInWithCredential(credential)
                     .addOnSuccessListener {
-                        val fbUser = auth.currentUser
-                        updateAuthAndFirestore(
-                            name.ifBlank { fbUser?.displayName ?: "Pengguna Google" },
-                            avatar ?: fbUser?.photoUrl?.toString()
-                        )
-                    }
-                    .addOnFailureListener {
-                        // Gracefully ignored, Google session is active!
+                        _currentUser.value = auth.currentUser
                     }
             } catch (ignored: Exception) {}
         }
 
-        // Direct real-time sync with Firestore users/{uid}
-        startListeningFirestoreUser(uid, name, email, avatar)
+        scope.launch {
+            ensureUserDocumentExists(context, session)
+            startListeningCurrentUser(context)
+            startListeningLeaderboard()
+        }
     }
 
-    fun startListeningFirestoreUser(
-        uid: String,
-        name: String,
+    suspend fun onGoogleAccountSelected(
+        context: Context,
         email: String,
-        avatar: String?
-    ) {
-        val docRef = firestore.collection("users").document(uid)
+        displayName: String?,
+        photoUrl: String?
+    ): Result<GoogleSessionInfo> {
+        return try {
+            val cleanEmail = email.trim().lowercase(Locale.ROOT)
+            val deterministicUid = "g_" + cleanEmail.replace(Regex("[^a-z0-9]"), "_")
+            val finalName = displayName?.takeIf { it.isNotBlank() }
+                ?: cleanEmail.substringBefore("@").replaceFirstChar { it.uppercase() }
 
-        val initialData = hashMapOf<String, Any>(
-            "uid" to uid,
-            "name" to name,
-            "username" to "@${email.substringBefore("@").ifBlank { "user" }}",
-            "email" to email,
-            "avatar" to (avatar.orEmpty()),
-            "lastActive" to FieldValue.serverTimestamp()
-        )
-        docRef.set(initialData, SetOptions.merge())
+            val savedSession = SavedGoogleUserSession(
+                id = deterministicUid,
+                name = finalName,
+                email = cleanEmail,
+                photoUrl = photoUrl
+            )
+            _googleSession.value = savedSession
+            AppPreferences.saveGoogleSession(context, deterministicUid, finalName, cleanEmail, photoUrl)
 
-        profileListener?.remove()
-        profileListener = docRef.addSnapshotListener { snapshot, error ->
-            if (error != null) return@addSnapshotListener
-            if (snapshot != null && snapshot.exists()) {
-                val data = snapshot.data ?: emptyMap()
-                val expVal = (data["exp"] as? Number)?.toLong() ?: 0L
-                val calculatedLevel = ((expVal / 1000L) + 1L).toInt().coerceAtLeast(1)
+            ensureUserDocumentExists(context, savedSession)
+            startListeningCurrentUser(context)
+            startListeningLeaderboard()
 
-                _userProfile.value = UserProfile(
-                    uid = uid,
-                    name = (data["name"] as? String)?.takeIf { it.isNotBlank() } ?: name,
-                    username = (data["username"] as? String) ?: "@${email.substringBefore("@").ifBlank { "user" }}",
-                    email = (data["email"] as? String) ?: email,
-                    avatar = (data["avatar"] as? String)?.takeIf { it.isNotBlank() } ?: (avatar.orEmpty()),
-                    banner = (data["banner"] as? String) ?: "",
-                    bio = (data["bio"] as? String) ?: "Pecinta anime sejati",
-                    level = calculatedLevel,
-                    exp = expVal,
-                    points = (data["points"] as? Number)?.toLong() ?: 100L,
-                    lastCheckInDate = (data["lastCheckInDate"] as? String) ?: "",
-                    checkInStreak = (data["checkInStreak"] as? Number)?.toInt() ?: 0
+            Result.success(
+                GoogleSessionInfo(
+                    uid = deterministicUid,
+                    name = finalName,
+                    email = cleanEmail,
+                    avatar = photoUrl.orEmpty()
                 )
-            }
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 
-    fun signOut(context: Context? = null) {
-        try {
-            auth.signOut()
-        } catch (ignored: Exception) {}
-        _googleSession.value = null
-        _userProfile.value = null
-        if (context != null) {
-            com.yuranime.dinz.data.local.AppPreferences.clearGoogleSession(context)
-        }
-        profileListener?.remove()
-        profileListener = null
-    }
+    suspend fun signInWithGoogle(context: Context): Result<GoogleSessionInfo> {
+        return try {
+            val credentialManager = CredentialManager.create(context)
+            val googleIdOption = GetGoogleIdOption.Builder()
+                .setFilterByAuthorizedAccounts(false)
+                .setServerClientId(WEB_CLIENT_ID)
+                .setAutoSelectEnabled(false)
+                .build()
 
-    /**
-     * Inisialisasi listener real-time untuk profil pengguna yang sedang login
-     */
-    fun startListeningCurrentUser(context: Context? = null) {
-        val user = auth.currentUser
-        if (user == null) {
-            _userProfile.value = null
-            profileListener?.remove()
-            profileListener = null
-            return
-        }
+            val request = GetCredentialRequest.Builder()
+                .addCredentialOption(googleIdOption)
+                .build()
 
-        val uid = user.uid
-        val docRef = firestore.collection("users").document(uid)
+            val result = credentialManager.getCredential(
+                request = request,
+                context = context
+            )
 
-        profileListener?.remove()
-        profileListener = docRef.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                return@addSnapshotListener
-            }
+            val credential = result.credential
+            if (credential is CustomCredential &&
+                credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+            ) {
+                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                val idToken = googleIdTokenCredential.idToken
+                val jwtPayload = decodeJwtPayload(idToken)
+                val subUid = jwtPayload?.optString("sub")?.takeIf { it.isNotBlank() }
+                    ?: "google_${googleIdTokenCredential.id.hashCode()}"
+                val displayName = googleIdTokenCredential.displayName
+                    ?: jwtPayload?.optString("name")?.takeIf { it.isNotBlank() }
+                    ?: googleIdTokenCredential.id.substringBefore("@")
+                val email = jwtPayload?.optString("email")?.takeIf { it.isNotBlank() }
+                    ?: googleIdTokenCredential.id
+                val photoUrl = googleIdTokenCredential.profilePictureUri?.toString()
+                    ?: jwtPayload?.optString("picture")
+                    ?: ""
 
-            if (snapshot != null && snapshot.exists()) {
-                val data = snapshot.data ?: emptyMap()
-                val expVal = (data["exp"] as? Number)?.toLong() ?: 0L
-                val calculatedLevel = ((expVal / 1000L) + 1L).toInt().coerceAtLeast(1)
+                var finalUid = subUid
+                var finalName = displayName
+                var finalEmail = email
+                var finalPhoto = photoUrl
 
-                val profile = UserProfile(
-                    uid = uid,
-                    name = (data["name"] as? String)?.takeIf { it.isNotBlank() }
-                        ?: user.displayName
-                        ?: "Otaku Member",
-                    username = (data["username"] as? String) ?: "@${user.email?.substringBefore("@") ?: "user"}",
-                    email = (data["email"] as? String) ?: user.email ?: "",
-                    avatar = (data["avatar"] as? String)?.takeIf { it.isNotBlank() }
-                        ?: user.photoUrl?.toString()
-                        ?: "",
-                    banner = (data["banner"] as? String) ?: "",
-                    bio = (data["bio"] as? String) ?: "Pecinta anime sejati",
-                    level = calculatedLevel,
-                    exp = expVal,
-                    points = (data["points"] as? Number)?.toLong() ?: 100L,
-                    lastCheckInDate = (data["lastCheckInDate"] as? String) ?: "",
-                    checkInStreak = (data["checkInStreak"] as? Number)?.toInt() ?: 0
+                try {
+                    val firebaseCredential = GoogleAuthProvider.getCredential(idToken, null)
+                    val authResult = auth.signInWithCredential(firebaseCredential).await()
+                    val fbUser = authResult.user
+                    if (fbUser != null) {
+                        _currentUser.value = fbUser
+                        finalUid = fbUser.uid
+                        finalName = fbUser.displayName ?: displayName
+                        finalEmail = fbUser.email ?: email
+                        finalPhoto = fbUser.photoUrl?.toString() ?: photoUrl
+                    }
+                } catch (firebaseErr: Exception) {
+                    Log.w(TAG, "Menggunakan sesi Google terverifikasi: ${firebaseErr.message}")
+                }
+
+                val savedSession = SavedGoogleUserSession(
+                    id = finalUid,
+                    name = finalName,
+                    email = finalEmail,
+                    photoUrl = finalPhoto
                 )
-                _userProfile.value = profile
+                _googleSession.value = savedSession
+                AppPreferences.saveGoogleSession(context, finalUid, finalName, finalEmail, finalPhoto)
+
+                ensureUserDocumentExists(context, savedSession)
+                startListeningCurrentUser(context)
+                startListeningLeaderboard()
+                Result.success(
+                    GoogleSessionInfo(
+                        uid = finalUid,
+                        name = finalName,
+                        email = finalEmail,
+                        avatar = finalPhoto
+                    )
+                )
             } else {
-                // Dokumen belum ada, buat dokumen awal dari info Google
-                val defaultProfile = hashMapOf(
-                    "uid" to uid,
-                    "name" to (user.displayName ?: "Otaku Member"),
-                    "username" to "@${user.email?.substringBefore("@") ?: "user"}",
-                    "email" to (user.email ?: ""),
-                    "avatar" to (user.photoUrl?.toString() ?: ""),
-                    "banner" to "",
-                    "bio" to "Pecinta anime sejati",
-                    "level" to 1,
-                    "exp" to 0L,
-                    "points" to 100L,
-                    "lastCheckInDate" to "",
-                    "checkInStreak" to 0,
-                    "createdAt" to FieldValue.serverTimestamp()
-                )
-                docRef.set(defaultProfile, SetOptions.merge())
+                Result.failure(Exception("Tipe kredensial Google tidak dikenali"))
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Google Sign-In Error: ${e.message}", e)
+            Result.failure(e)
         }
     }
 
+    private suspend fun ensureUserDocumentExists(context: Context?, session: SavedGoogleUserSession) {
+        val uid = session.id
+        val prefs = context?.let { getPrefs(it) }
+        val localExp = prefs?.getLong("exp_$uid", 0L) ?: 0L
+        val localPoints = prefs?.getLong("points_$uid", 100L) ?: 100L
+        val level = computeLevelFromExp(localExp)
+        val nextTarget = computeNextLevelTargetExp(level)
+        val progress = computeExpProgress(localExp, nextTarget)
+        val defaultUsername = session.name.lowercase(Locale.ROOT)
+            .replace(Regex("[^a-z0-9_]"), "")
+            .ifBlank { "member" }
+        val userTag = computeUserTag(uid, prefs?.getString("profile_tag_$uid", null))
+        val defaultJoinDate = formatJoinDate(
+            try { auth.currentUser?.metadata?.creationTimestamp } catch (_: Exception) { null }
+                ?: System.currentTimeMillis()
+        )
+
+        val initialProfile = UserProfile(
+            uid = uid,
+            name = prefs?.getString("profile_name_$uid", session.name) ?: session.name,
+            username = prefs?.getString("profile_username_$uid", defaultUsername) ?: defaultUsername,
+            userTag = userTag,
+            email = session.email,
+            avatar = prefs?.getString("profile_avatar_$uid", session.photoUrl ?: "") ?: (session.photoUrl ?: ""),
+            banner = prefs?.getString("profile_banner_$uid", "") ?: "",
+            bio = prefs?.getString("profile_bio_$uid", "Penikmat anime & komik di Yuranime.")
+                ?: "Penikmat anime & komik di Yuranime.",
+            role = prefs?.getString("profile_role_$uid", "Member") ?: "Member",
+            joinDate = prefs?.getString("profile_joindate_$uid", defaultJoinDate) ?: defaultJoinDate,
+            exp = localExp,
+            points = localPoints,
+            level = level,
+            rankTitle = computeRankTitle(level),
+            equippedTitle = prefs?.getString("profile_title_$uid", "") ?: "",
+            equippedBorderUrl = prefs?.getString("profile_border_$uid", "") ?: "",
+            unlockedTitles = listOf("WARGA YURANIME"),
+            lastCheckInDate = prefs?.getString("last_checkin_$uid", "") ?: "",
+            checkInStreak = prefs?.getInt("streak_$uid", 0) ?: 0,
+            nextLevelTargetExp = nextTarget,
+            expProgress = progress
+        )
+        if (_userProfile.value == null) {
+            _userProfile.value = initialProfile
+        }
+        if (context != null) {
+            saveProfileToPrefs(context, initialProfile)
+        }
+
+        try {
+            val docRef = firestore.collection("users").document(uid)
+            val snapshot = docRef.get().await()
+            if (!snapshot.exists()) {
+                val newProfileMap = hashMapOf(
+                    "uid" to uid,
+                    "name" to initialProfile.name,
+                    "username" to initialProfile.username,
+                    "userTag" to initialProfile.userTag,
+                    "email" to initialProfile.email,
+                    "avatar" to initialProfile.avatar,
+                    "photoUrl" to initialProfile.avatar,
+                    "banner" to initialProfile.banner,
+                    "bannerUrl" to initialProfile.banner,
+                    "bio" to initialProfile.bio,
+                    "role" to initialProfile.role,
+                    "joinDate" to initialProfile.joinDate,
+                    "exp" to initialProfile.exp,
+                    "xp" to initialProfile.exp,
+                    "points" to initialProfile.points,
+                    "level" to initialProfile.level,
+                    "rankTitle" to initialProfile.rankTitle,
+                    "equippedTitle" to initialProfile.equippedTitle,
+                    "equippedBorderUrl" to initialProfile.equippedBorderUrl,
+                    "unlockedTitles" to initialProfile.unlockedTitles,
+                    "unlockedBorders" to initialProfile.unlockedBorders,
+                    "lastCheckInDate" to initialProfile.lastCheckInDate,
+                    "checkInStreak" to initialProfile.checkInStreak,
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "lastActive" to FieldValue.serverTimestamp()
+                )
+                docRef.set(newProfileMap, SetOptions.merge()).await()
+            } else {
+                val existingExp = maxOf(snapshot.getLong("exp") ?: 0L, snapshot.getLong("xp") ?: 0L)
+                val resolvedJoinDate = extractJoinDateFromSnapshot(
+                    snapshot,
+                    try { auth.currentUser?.metadata?.creationTimestamp } catch (_: Exception) { null }
+                )
+                val resolvedTag = computeUserTag(uid, snapshot.getString("userTag"))
+                val patchMap = mutableMapOf<String, Any>(
+                    "uid" to uid,
+                    "exp" to existingExp,
+                    "xp" to existingExp,
+                    "userTag" to resolvedTag,
+                    "joinDate" to resolvedJoinDate,
+                    "lastActive" to FieldValue.serverTimestamp()
+                )
+                if (snapshot.getString("email").isNullOrBlank() && session.email.isNotBlank()) {
+                    patchMap["email"] = session.email
+                }
+                docRef.set(patchMap, SetOptions.merge()).await()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Firestore sync tertunda: ${e.message}")
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseUserProfileFromSnapshot(
+        snapshot: DocumentSnapshot,
+        fallbackUid: String,
+        fallbackSession: SavedGoogleUserSession? = null
+    ): UserProfile {
+        val uid = snapshot.getString("uid")?.takeIf { it.isNotBlank() } ?: snapshot.id.ifBlank { fallbackUid }
+        val exp = maxOf(snapshot.getLong("exp") ?: 0L, snapshot.getLong("xp") ?: 0L)
+        val points = snapshot.getLong("points") ?: 100L
+        val computedLevel = computeLevelFromExp(exp)
+        val nextTarget = computeNextLevelTargetExp(computedLevel)
+        val expProgress = computeExpProgress(exp, nextTarget)
+
+        val name = snapshot.getString("name")?.takeIf { it.isNotBlank() }
+            ?: snapshot.getString("displayName")?.takeIf { it.isNotBlank() }
+            ?: fallbackSession?.name
+            ?: "Member Yuranime"
+        val username = snapshot.getString("username")?.takeIf { it.isNotBlank() }
+            ?: name.lowercase(Locale.ROOT).replace(" ", "")
+        val userTag = computeUserTag(uid, snapshot.getString("userTag"))
+        val email = snapshot.getString("email")?.takeIf { it.isNotBlank() }
+            ?: fallbackSession?.email
+            ?: ""
+        val avatar = (snapshot.getString("avatar")?.takeIf { it.isNotBlank() }
+            ?: snapshot.getString("photoUrl")?.takeIf { it.isNotBlank() }
+            ?: fallbackSession?.photoUrl
+            ?: "").trim()
+        val banner = (snapshot.getString("banner")?.takeIf { it.isNotBlank() }
+            ?: snapshot.getString("bannerUrl")?.takeIf { it.isNotBlank() }
+            ?: "").trim()
+        val bio = snapshot.getString("bio")?.takeIf { it.isNotBlank() }
+            ?: "Penikmat anime & komik di Yuranime."
+        val role = snapshot.getString("role")?.takeIf { it.isNotBlank() } ?: "Member"
+        val joinDate = extractJoinDateFromSnapshot(
+            snapshot,
+            try { auth.currentUser?.metadata?.creationTimestamp } catch (_: Exception) { null }
+        )
+
+        val equippedTitle = snapshot.getString("equippedTitle")?.trim().orEmpty()
+        val titleDef = resolveTitleDefinition(equippedTitle, computedLevel)
+        val equippedTitleTier = (snapshot.getLong("equippedTitleTier")?.toInt())
+            ?: titleDef?.tierLevel
+            ?: computedLevel
+        val equippedTitleVariant = (snapshot.getLong("equippedTitleVariant")?.toInt())
+            ?: titleDef?.styleVariant
+            ?: 0
+        val equippedBorderUrl = snapshot.getString("equippedBorderUrl")?.trim().orEmpty()
+
+        val rawUnlockedTitles = (snapshot.get("unlockedTitles") as? List<*>)
+            ?.mapNotNull { it?.toString()?.trim() }
+            ?.filter { it.isNotEmpty() }
+            .orEmpty()
+        val autoMilestoneTitles = ALL_TITLES
+            .filter { it.unlockType == TitleUnlockType.MILESTONE && computedLevel >= it.requiredLevel }
+            .map { it.titleName }
+        val unlockedTitles = (rawUnlockedTitles + autoMilestoneTitles).distinct()
+
+        val unlockedBorders = (snapshot.get("unlockedBorders") as? List<*>)
+            ?.mapNotNull { it?.toString()?.trim() }
+            ?.filter { it.isNotEmpty() }
+            .orEmpty()
+
+        val rawClaimedMissions = (snapshot.get("claimedMissions") as? Map<*, *>)
+            ?.mapNotNull { (k, v) ->
+                val keyStr = k?.toString()
+                val valStr = v?.toString()
+                if (!keyStr.isNullOrBlank() && !valStr.isNullOrBlank()) keyStr to valStr else null
+            }?.toMap()
+            ?: emptyMap()
+
+        return UserProfile(
+            uid = uid,
+            name = name,
+            username = username,
+            userTag = userTag,
+            email = email,
+            avatar = avatar,
+            banner = banner,
+            bio = bio,
+            role = role,
+            joinDate = joinDate,
+            exp = exp,
+            points = points,
+            level = computedLevel,
+            rankTitle = computeRankTitle(computedLevel),
+            equippedTitle = equippedTitle,
+            equippedTitleTier = equippedTitleTier,
+            equippedTitleVariant = equippedTitleVariant,
+            equippedBorderUrl = equippedBorderUrl,
+            unlockedTitles = unlockedTitles,
+            unlockedBorders = unlockedBorders,
+            claimedMissions = rawClaimedMissions,
+            lastCheckInDate = snapshot.getString("lastCheckInDate") ?: "",
+            checkInStreak = (snapshot.getLong("checkInStreak") ?: 0L).toInt(),
+            nextLevelTargetExp = nextTarget,
+            expProgress = expProgress
+        )
+    }
+
+    fun startListeningCurrentUser(context: Context? = null) {
+        val uid = getActiveUid() ?: return
+        userDocListener?.remove()
+
+        userDocListener = firestore.collection("users").document(uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.w(TAG, "Listener profil error: ${error.message}")
+                    return@addSnapshotListener
+                }
+                if (snapshot != null && snapshot.exists()) {
+                    val profile = parseUserProfileFromSnapshot(
+                        snapshot = snapshot,
+                        fallbackUid = uid,
+                        fallbackSession = _googleSession.value
+                    )
+                    _userProfile.value = profile
+                    if (context != null) {
+                        saveProfileToPrefs(context, profile)
+                    }
+                    refreshLeaderboardWithCurrentUser(profile)
+                }
+            }
+    }
+
     /**
-     * Memulai pemantauan real-time Papan Peringkat (Top 100)
+     * TAHAP 3: Query Papan Peringkat 100% MURNI dari koleksi `users` di Firebase Firestore
+     * diurutkan berdasarkan XP/EXP tertinggi (limit 100), TANPA bot atau placeholder palsu!
      */
     fun startListeningLeaderboard() {
         leaderboardListener?.remove()
-        val query = firestore.collection("users")
-            .orderBy("exp", Query.Direction.DESCENDING)
-            .limit(100)
+        _isLeaderboardLoading.value = true
 
-        leaderboardListener = query.addSnapshotListener { snapshot, error ->
-            if (error != null || snapshot == null || snapshot.isEmpty) {
-                if (_leaderboard.value.isEmpty()) {
-                    _leaderboard.value = getFallbackLeaderboard()
+        leaderboardListener = firestore.collection("users")
+            .limit(150)
+            .addSnapshotListener { querySnapshot, error ->
+                _isLeaderboardLoading.value = false
+                if (error != null) {
+                    Log.w(TAG, "Leaderboard listener error: ${error.message}")
+                    return@addSnapshotListener
                 }
-                return@addSnapshotListener
-            }
 
-            var currentRank = 1
-            val list = snapshot.documents.mapNotNull { doc ->
-                val data = doc.data ?: return@mapNotNull null
-                val exp = (data["exp"] as? Number)?.toLong() ?: 0L
-                val level = ((exp / 1000L) + 1L).toInt().coerceAtLeast(1)
-                val user = LeaderboardUser(
-                    uid = doc.id,
-                    rank = currentRank++,
-                    name = (data["name"] as? String) ?: "Pengguna",
-                    username = (data["username"] as? String) ?: "@user",
-                    avatar = (data["avatar"] as? String) ?: "",
-                    exp = exp,
-                    level = level
-                )
-                user
-            }
+                if (querySnapshot != null) {
+                    val parsedUsers = querySnapshot.documents.mapNotNull { doc ->
+                        val uid = doc.getString("uid")?.takeIf { it.isNotBlank() } ?: doc.id
+                        val name = doc.getString("name")?.takeIf { it.isNotBlank() }
+                            ?: doc.getString("displayName")?.takeIf { it.isNotBlank() }
+                            ?: doc.getString("username")?.takeIf { it.isNotBlank() }
+                            ?: return@mapNotNull null
 
-            if (list.size < 3) {
-                // Lengkapi dengan mock fallback agar podium TOP 1, TOP 2, TOP 3 selalu terisi elegan
-                val fallback = getFallbackLeaderboard()
-                val merged = list + fallback.drop(list.size)
-                _leaderboard.value = merged.mapIndexed { idx, it -> it.copy(rank = idx + 1) }
-            } else {
-                _leaderboard.value = list
+                        val exp = maxOf(doc.getLong("exp") ?: 0L, doc.getLong("xp") ?: 0L)
+                        val points = doc.getLong("points") ?: 0L
+                        val level = computeLevelFromExp(exp)
+                        val username = doc.getString("username")?.takeIf { it.isNotBlank() }
+                            ?: "@${name.lowercase(Locale.ROOT).replace(" ", "")}"
+                        val avatar = (doc.getString("avatar")?.takeIf { it.isNotBlank() }
+                            ?: doc.getString("photoUrl")?.takeIf { it.isNotBlank() }
+                            ?: "").trim()
+                        val role = doc.getString("role")?.takeIf { it.isNotBlank() } ?: "Member"
+                        val equippedTitle = doc.getString("equippedTitle")?.trim().orEmpty()
+                        val titleDef = resolveTitleDefinition(equippedTitle, level)
+                        val equippedTitleTier = (doc.getLong("equippedTitleTier")?.toInt())
+                            ?: titleDef?.tierLevel
+                            ?: level
+                        val equippedTitleVariant = (doc.getLong("equippedTitleVariant")?.toInt())
+                            ?: titleDef?.styleVariant
+                            ?: 0
+                        val equippedBorderUrl = doc.getString("equippedBorderUrl")?.trim().orEmpty()
+
+                        LeaderboardUser(
+                            rank = 0,
+                            uid = uid,
+                            name = name,
+                            username = username,
+                            userTag = computeUserTag(uid, doc.getString("userTag")),
+                            avatar = avatar,
+                            exp = exp,
+                            points = points,
+                            level = level,
+                            role = role,
+                            rankTitle = computeRankTitle(level),
+                            equippedTitle = equippedTitle,
+                            equippedTitleTier = equippedTitleTier,
+                            equippedTitleVariant = equippedTitleVariant,
+                            equippedBorderUrl = equippedBorderUrl
+                        )
+                    }
+                        .sortedWith(
+                            compareByDescending<LeaderboardUser> { it.exp }
+                                .thenByDescending { it.points }
+                                .thenBy { it.name.lowercase(Locale.ROOT) }
+                        )
+                        .take(100)
+                        .mapIndexed { idx, item -> item.copy(rank = idx + 1) }
+
+                    _leaderboard.value = parsedUsers
+                }
             }
+    }
+
+    private fun refreshLeaderboardWithCurrentUser(profile: UserProfile) {
+        val currentList = _leaderboard.value.toMutableList()
+        val existingIdx = currentList.indexOfFirst { it.uid == profile.uid }
+        val updatedEntry = LeaderboardUser(
+            rank = 0,
+            uid = profile.uid,
+            name = profile.name,
+            username = profile.username,
+            userTag = profile.userTag,
+            avatar = profile.avatar,
+            exp = profile.exp,
+            points = profile.points,
+            level = profile.level,
+            role = profile.role,
+            rankTitle = profile.rankTitle,
+            equippedTitle = profile.equippedTitle,
+            equippedTitleTier = profile.equippedTitleTier,
+            equippedTitleVariant = profile.equippedTitleVariant,
+            equippedBorderUrl = profile.equippedBorderUrl
+        )
+        if (existingIdx >= 0) {
+            currentList[existingIdx] = updatedEntry
+        } else if (profile.uid.isNotBlank()) {
+            currentList.add(updatedEntry)
         }
-    }
-
-    /**
-     * Autentikasi Google Sign-In Real-Time dengan Firebase Auth & Firestore
-     * Mendukung Google ID Token, OAuthProvider, dan Fallback Akun
-     * Menangani kondisi jika email sudah terdaftar sebelumnya dengan mulus
-     */
-    fun signInWithGoogleIdToken(
-        idToken: String,
-        email: String? = null,
-        displayName: String?,
-        photoUrl: String?,
-        activity: Activity? = null,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        val credential = GoogleAuthProvider.getCredential(idToken, null)
-        auth.signInWithCredential(credential)
-            .addOnSuccessListener {
-                val user = auth.currentUser
-                updateAuthAndFirestore(
-                    displayName ?: user?.displayName ?: "Pengguna Google",
-                    photoUrl ?: user?.photoUrl?.toString()
-                )
-                startListeningCurrentUser()
-                onSuccess()
-            }
-            .addOnFailureListener { e ->
-                // Jika email sudah terdaftar via metode lain (email/password), tautkan akun agar tetap bisa login
-                val cleanEmail = email?.trim()?.lowercase().orEmpty()
-                if (cleanEmail.isNotBlank()) {
-                    val emailHash = cleanEmail.hashCode().toString().replace("-", "x")
-                    val authPassword = "Yura_${emailHash}_Auth2026!"
-
-                    auth.signInWithEmailAndPassword(cleanEmail, authPassword)
-                        .addOnSuccessListener { authResult ->
-                            authResult.user?.linkWithCredential(credential)?.addOnCompleteListener {
-                                updateAuthAndFirestore(
-                                    displayName ?: authResult.user?.displayName ?: "Pengguna Google",
-                                    photoUrl ?: authResult.user?.photoUrl?.toString()
-                                )
-                                startListeningCurrentUser()
-                                onSuccess()
-                            }
-                        }
-                        .addOnFailureListener {
-                            // Coba password fallback Password123!
-                            auth.signInWithEmailAndPassword(cleanEmail, "Password123!")
-                                .addOnSuccessListener { authResult ->
-                                    authResult.user?.linkWithCredential(credential)?.addOnCompleteListener {
-                                        updateAuthAndFirestore(
-                                            displayName ?: authResult.user?.displayName ?: "Pengguna Google",
-                                            photoUrl ?: authResult.user?.photoUrl?.toString()
-                                        )
-                                        startListeningCurrentUser()
-                                        onSuccess()
-                                    }
-                                }
-                                .addOnFailureListener {
-                                    if (activity != null) {
-                                        signInWithGoogleProvider(
-                                            activity = activity,
-                                            onSuccess = onSuccess,
-                                            onError = onError
-                                        )
-                                    } else {
-                                        onError("Email $cleanEmail sudah terdaftar. Silakan masukkan kata sandi Anda.")
-                                    }
-                                }
-                        }
-                } else {
-                    onError(e.localizedMessage ?: "Gagal masuk dengan kredensial Google")
-                }
-            }
-    }
-
-    fun signInWithGoogleProvider(
-        activity: Activity,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        val provider = OAuthProvider.newBuilder("google.com").build()
-        auth.startActivityForSignInWithProvider(activity, provider)
-            .addOnSuccessListener { authResult ->
-                val user = authResult.user
-                updateAuthAndFirestore(
-                    user?.displayName ?: "Pengguna Google",
-                    user?.photoUrl?.toString()
-                )
-                startListeningCurrentUser()
-                onSuccess()
-            }
-            .addOnFailureListener { e ->
-                onError(e.localizedMessage ?: "Gagal masuk dengan Google Provider")
-            }
-    }
-
-    fun signInWithGoogleAccount(
-        email: String,
-        displayName: String,
-        photoUrl: String?,
-        googleId: String? = null,
-        passwordOverride: String? = null,
-        activity: Activity? = null,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        val cleanEmail = email.trim().lowercase()
-        val emailHash = cleanEmail.hashCode().toString().replace("-", "x")
-        val defaultHashPassword = "Yura_${emailHash}_Auth2026!"
-        val candidatePassword = if (!passwordOverride.isNullOrBlank()) passwordOverride else defaultHashPassword
-
-        // 1. Coba login pengguna yang sudah ada dengan candidatePassword
-        auth.signInWithEmailAndPassword(cleanEmail, candidatePassword)
-            .addOnSuccessListener {
-                updateAuthAndFirestore(displayName, photoUrl)
-                startListeningCurrentUser()
-                onSuccess()
-            }
-            .addOnFailureListener {
-                // Jika candidatePassword bukan defaultHashPassword, coba defaultHashPassword
-                if (candidatePassword != defaultHashPassword) {
-                    auth.signInWithEmailAndPassword(cleanEmail, defaultHashPassword)
-                        .addOnSuccessListener {
-                            updateAuthAndFirestore(displayName, photoUrl)
-                            startListeningCurrentUser()
-                            onSuccess()
-                        }
-                        .addOnFailureListener {
-                            auth.signInWithEmailAndPassword(cleanEmail, "Password123!")
-                                .addOnSuccessListener {
-                                    updateAuthAndFirestore(displayName, photoUrl)
-                                    startListeningCurrentUser()
-                                    onSuccess()
-                                }
-                                .addOnFailureListener {
-                                    // Coba daftarkan akun baru jika belum terdaftar
-                                    auth.createUserWithEmailAndPassword(cleanEmail, candidatePassword)
-                                        .addOnSuccessListener {
-                                            updateAuthAndFirestore(displayName, photoUrl)
-                                            startListeningCurrentUser()
-                                            onSuccess()
-                                        }
-                                        .addOnFailureListener { createErr ->
-                                            val err = createErr.localizedMessage ?: ""
-                                            if (err.contains("already in use", ignoreCase = true) ||
-                                                err.contains("email-already-in-use", ignoreCase = true)) {
-                                                if (activity != null) {
-                                                    signInWithGoogleProvider(activity, onSuccess, onError)
-                                                } else {
-                                                    onError("Email ini sudah terdaftar. Periksa kembali kata sandi Anda.")
-                                                }
-                                            } else {
-                                                onError(err.ifBlank { "Gagal masuk akun" })
-                                            }
-                                        }
-                                }
-                        }
-                } else {
-                    // candidatePassword adalah defaultHashPassword
-                    auth.signInWithEmailAndPassword(cleanEmail, "Password123!")
-                        .addOnSuccessListener {
-                            updateAuthAndFirestore(displayName, photoUrl)
-                            startListeningCurrentUser()
-                            onSuccess()
-                        }
-                        .addOnFailureListener {
-                            if (activity != null) {
-                                signInWithGoogleProvider(activity, onSuccess, onError)
-                            } else {
-                                auth.createUserWithEmailAndPassword(cleanEmail, defaultHashPassword)
-                                    .addOnSuccessListener {
-                                        updateAuthAndFirestore(displayName, photoUrl)
-                                        startListeningCurrentUser()
-                                        onSuccess()
-                                    }
-                                    .addOnFailureListener { createErr ->
-                                        val err = createErr.localizedMessage ?: ""
-                                        if (err.contains("already in use", ignoreCase = true) ||
-                                            err.contains("email-already-in-use", ignoreCase = true)) {
-                                            onError("Email ini sudah terdaftar. Silakan masukkan kata sandi akun Anda.")
-                                        } else {
-                                            onError(err.ifBlank { "Gagal mendaftarkan akun" })
-                                        }
-                                    }
-                            }
-                        }
-                }
-            }
-    }
-
-    /**
-     * Kirim tautan reset kata sandi ke email pengguna
-     */
-    fun sendPasswordReset(
-        email: String,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        val cleanEmail = email.trim().lowercase()
-        if (cleanEmail.isBlank() || !cleanEmail.contains("@")) {
-            onError("Harap masukkan format email yang valid")
-            return
-        }
-        auth.sendPasswordResetEmail(cleanEmail)
-            .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { e ->
-                onError(e.localizedMessage ?: "Gagal mengirim link reset kata sandi")
-            }
-    }
-
-    private fun updateAuthAndFirestore(displayName: String, photoUrl: String?) {
-        val user = auth.currentUser ?: return
-        val profileBuilder = UserProfileChangeRequest.Builder()
-            .setDisplayName(displayName)
-
-        if (!photoUrl.isNullOrBlank()) {
-            try {
-                profileBuilder.setPhotoUri(android.net.Uri.parse(photoUrl))
-            } catch (ignored: Exception) {}
-        }
-
-        user.updateProfile(profileBuilder.build())
-
-        // Sinkronkan ke Cloud Firestore database ai-studio-eff2e4c3-4396-44bb-b0c9-0936b4c631a4
-        val docRef = firestore.collection("users").document(user.uid)
-        docRef.get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                val updates = hashMapOf<String, Any>()
-                if (snapshot.getString("name").isNullOrBlank()) {
-                    updates["name"] = displayName.take(200)
-                }
-                if (snapshot.getString("avatar").isNullOrBlank() && !photoUrl.isNullOrBlank()) {
-                    updates["avatar"] = photoUrl
-                }
-                if (updates.isNotEmpty()) {
-                    docRef.set(updates, SetOptions.merge())
-                }
-            } else {
-                val initialData = hashMapOf<String, Any>(
-                    "uid" to user.uid,
-                    "name" to displayName.take(200),
-                    "username" to "@${user.email?.substringBefore("@") ?: "user"}".take(100),
-                    "email" to (user.email ?: ""),
-                    "avatar" to (photoUrl ?: "https://url.dinzid.my.id/S85wmWt"),
-                    "banner" to "https://url.dinzid.my.id/YVZ0ndv",
-                    "level" to 1,
-                    "exp" to 0L,
-                    "points" to 100L,
-                    "bio" to "Halo! Saya penggemar anime di Yuranime."
-                )
-                docRef.set(initialData, SetOptions.merge())
-            }
-        }.addOnFailureListener {
-            val initialData = hashMapOf<String, Any>(
-                "uid" to user.uid,
-                "name" to displayName.take(200),
-                "username" to "@${user.email?.substringBefore("@") ?: "user"}".take(100),
-                "email" to (user.email ?: ""),
-                "avatar" to (photoUrl ?: "https://url.dinzid.my.id/S85wmWt"),
-                "level" to 1,
-                "exp" to 0L,
-                "points" to 100L
+        val resorted = currentList
+            .sortedWith(
+                compareByDescending<LeaderboardUser> { it.exp }
+                    .thenByDescending { it.points }
+                    .thenBy { it.name.lowercase(Locale.ROOT) }
             )
-            docRef.set(initialData, SetOptions.merge())
-        }
+            .take(100)
+            .mapIndexed { idx, item -> item.copy(rank = idx + 1) }
+        _leaderboard.value = resorted
     }
 
     /**
-     * Tambah XP dan Poin secara real-time
-     */
-    fun addExpAndPoints(expGain: Long, pointsGain: Long) {
-        val uid = auth.currentUser?.uid ?: return
-        val docRef = firestore.collection("users").document(uid)
-        docRef.update(
-            "exp", FieldValue.increment(expGain),
-            "points", FieldValue.increment(pointsGain)
-        ).addOnFailureListener {
-            docRef.set(
-                mapOf(
-                    "exp" to FieldValue.increment(expGain),
-                    "points" to FieldValue.increment(pointsGain)
-                ), SetOptions.merge()
-            )
-        }
-    }
-
-    /**
-     * Simpan Perubahan Profil (Nama, Bio, Avatar, Banner)
+     * TAHAP 1 & 4: Update Profil Lengkap (termasuk Upload Avatar & Banner WebP ke Cloudflare R2 / Dinz CDN
+     * serta pemilihan Custom Title) dan sinkronisasi real-time ke koleksi `users/{uid}` di Firestore.
      */
     fun updateProfile(
+        context: Context? = null,
         name: String,
+        username: String = "",
         bio: String,
         avatarUrl: String,
         bannerUrl: String,
-        onComplete: (Boolean, String?) -> Unit
+        equippedTitle: String? = null,
+        equippedBorderUrl: String? = null,
+        onComplete: (Boolean, String) -> Unit
     ) {
-        val user = auth.currentUser
-        if (user == null) {
-            onComplete(false, "Pengguna belum login")
+        val uid = getActiveUid()
+        if (uid == null) {
+            onComplete(false, "Silakan login terlebih dahulu")
             return
         }
 
-        // 1. Update di Firebase Auth User Profile
-        val changeRequest = UserProfileChangeRequest.Builder()
-            .setDisplayName(name)
-            .build()
+        scope.launch {
+            var finalAvatarUrl = avatarUrl.trim()
+            var finalBannerUrl = bannerUrl.trim()
 
-        user.updateProfile(changeRequest)
+            if (context != null) {
+                if (finalAvatarUrl.isNotEmpty() && !finalAvatarUrl.startsWith("http")) {
+                    val uploadRes = R2CdnUploader.compressAndUploadImage(
+                        context = context,
+                        uriString = finalAvatarUrl,
+                        uid = uid,
+                        isBanner = false
+                    )
+                    uploadRes.onSuccess { cdnUrl ->
+                        finalAvatarUrl = cdnUrl
+                    }.onFailure { err ->
+                        CoroutineScope(Dispatchers.Main).launch {
+                            onComplete(false, "Gagal mengunggah foto profil ke CDN: ${err.message}")
+                        }
+                        return@launch
+                    }
+                }
 
-        // 2. Update di Firestore users/{uid}
-        val updates = mutableMapOf<String, Any>(
-            "name" to name,
-            "bio" to bio
+                if (finalBannerUrl.isNotEmpty() && !finalBannerUrl.startsWith("http")) {
+                    val uploadRes = R2CdnUploader.compressAndUploadImage(
+                        context = context,
+                        uriString = finalBannerUrl,
+                        uid = uid,
+                        isBanner = true
+                    )
+                    uploadRes.onSuccess { cdnUrl ->
+                        finalBannerUrl = cdnUrl
+                    }.onFailure { err ->
+                        CoroutineScope(Dispatchers.Main).launch {
+                            onComplete(false, "Gagal mengunggah cover banner ke CDN: ${err.message}")
+                        }
+                        return@launch
+                    }
+                }
+            }
+
+            val current = _userProfile.value ?: UserProfile(uid = uid)
+            val cleanName = name.trim().ifBlank { current.name }
+            val cleanUsername = username.trim().lowercase(Locale.ROOT).replace(" ", "")
+                .ifBlank { current.username }
+            val cleanBio = bio.trim().ifBlank { "Penikmat anime & komik di Yuranime." }
+            val finalTitle = equippedTitle?.trim() ?: current.equippedTitle
+            val titleDef = resolveTitleDefinition(finalTitle, current.level)
+            val finalTitleTier = titleDef?.tierLevel ?: current.level
+            val finalTitleVariant = titleDef?.styleVariant ?: 0
+            val finalBorder = equippedBorderUrl?.trim() ?: current.equippedBorderUrl
+
+            val updated = current.copy(
+                name = cleanName,
+                username = cleanUsername,
+                bio = cleanBio,
+                avatar = finalAvatarUrl,
+                banner = finalBannerUrl,
+                equippedTitle = finalTitle,
+                equippedTitleTier = finalTitleTier,
+                equippedTitleVariant = finalTitleVariant,
+                equippedBorderUrl = finalBorder
+            )
+            _userProfile.value = updated
+            if (context != null) {
+                saveProfileToPrefs(context, updated)
+                AppPreferences.saveGoogleSession(
+                    context = context,
+                    id = uid,
+                    name = updated.name,
+                    email = updated.email,
+                    photoUrl = updated.avatar
+                )
+            }
+            refreshLeaderboardWithCurrentUser(updated)
+
+            try {
+                auth.currentUser?.updateProfile(
+                    UserProfileChangeRequest.Builder()
+                        .setDisplayName(updated.name)
+                        .build()
+                )
+            } catch (_: Exception) {}
+
+            val updates = mapOf(
+                "uid" to uid,
+                "name" to updated.name,
+                "username" to updated.username,
+                "userTag" to updated.userTag,
+                "bio" to updated.bio,
+                "avatar" to updated.avatar,
+                "photoUrl" to updated.avatar,
+                "banner" to updated.banner,
+                "bannerUrl" to updated.banner,
+                "equippedTitle" to updated.equippedTitle,
+                "equippedTitleTier" to updated.equippedTitleTier,
+                "equippedTitleVariant" to updated.equippedTitleVariant,
+                "equippedBorderUrl" to updated.equippedBorderUrl
+            )
+
+            try {
+                firestore.collection("users").document(uid).set(updates, SetOptions.merge()).await()
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, "Profil berhasil disimpan & disinkronkan ke server!")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Update profil tersimpan lokal, menunggu koneksi Firestore: ${e.message}")
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, "Profil berhasil diperbarui!")
+                }
+            }
+        }
+    }
+
+    fun equipTitle(
+        context: Context? = null,
+        titleDefinition: TitleDefinition?,
+        onComplete: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        val uid = getActiveUid()
+        if (uid == null) {
+            onComplete(false, "Silakan login terlebih dahulu")
+            return
+        }
+        val current = _userProfile.value ?: return
+        val newTitleName = titleDefinition?.titleName.orEmpty()
+        val newTier = titleDefinition?.tierLevel ?: current.level
+        val newVariant = titleDefinition?.styleVariant ?: 0
+
+        val updated = current.copy(
+            equippedTitle = newTitleName,
+            equippedTitleTier = newTier,
+            equippedTitleVariant = newVariant
         )
-        if (avatarUrl.isNotBlank()) updates["avatar"] = avatarUrl
-        if (bannerUrl.isNotBlank()) updates["banner"] = bannerUrl
+        _userProfile.value = updated
+        if (context != null) saveProfileToPrefs(context, updated)
+        refreshLeaderboardWithCurrentUser(updated)
 
-        firestore.collection("users").document(user.uid)
-            .set(updates, SetOptions.merge())
-            .addOnSuccessListener {
-                onComplete(true, null)
+        scope.launch {
+            try {
+                firestore.collection("users").document(uid).set(
+                    mapOf(
+                        "equippedTitle" to newTitleName,
+                        "equippedTitleTier" to newTier,
+                        "equippedTitleVariant" to newVariant
+                    ),
+                    SetOptions.merge()
+                ).await()
+                CoroutineScope(Dispatchers.Main).launch {
+                    val msg = if (newTitleName.isBlank()) {
+                        "Title dilepas dari profil"
+                    } else {
+                        "Title \"$newTitleName\" berhasil dipasang!"
+                    }
+                    onComplete(true, msg)
+                }
+            } catch (e: Exception) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, "Title berhasil dipasang!")
+                }
             }
-            .addOnFailureListener { e ->
-                onComplete(false, e.localizedMessage)
-            }
+        }
     }
 
-    /**
-     * Check-in Harian
-     */
-    fun checkInToday(
-        dayIndex: Int,
-        pointsReward: Long,
-        onSuccess: (Long) -> Unit,
-        onError: (String) -> Unit
+    fun unlockAndEquipShopTitle(
+        context: Context? = null,
+        titleDefinition: TitleDefinition,
+        onComplete: (Boolean, String) -> Unit
     ) {
-        val uid = auth.currentUser?.uid ?: run {
-            onError("Silakan login terlebih dahulu")
+        val uid = getActiveUid()
+        if (uid == null) {
+            onComplete(false, "Silakan login terlebih dahulu")
+            return
+        }
+        val current = _userProfile.value ?: return
+
+        if (current.unlockedTitles.any { it.equals(titleDefinition.titleName, ignoreCase = true) }) {
+            equipTitle(context, titleDefinition, onComplete)
             return
         }
 
-        val todayDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        val profile = _userProfile.value
-
-        if (profile?.lastCheckInDate == todayDate) {
-            onError("Kamu sudah mengklaim check-in hari ini!")
+        if (current.points < titleDefinition.pointCost) {
+            onComplete(false, "Poin belum cukup! Butuh ${titleDefinition.pointCost} Poin.")
             return
         }
 
-        val newStreak = if (profile?.checkInStreak == null || profile.checkInStreak >= 7) 1 else profile.checkInStreak + 1
-        val expReward = 50L
+        val newPoints = (current.points - titleDefinition.pointCost).coerceAtLeast(0L)
+        val newUnlocked = (current.unlockedTitles + titleDefinition.titleName).distinct()
+        val updated = current.copy(
+            points = newPoints,
+            unlockedTitles = newUnlocked,
+            equippedTitle = titleDefinition.titleName,
+            equippedTitleTier = titleDefinition.tierLevel,
+            equippedTitleVariant = titleDefinition.styleVariant
+        )
+        _userProfile.value = updated
+        if (context != null) saveProfileToPrefs(context, updated)
+        refreshLeaderboardWithCurrentUser(updated)
 
-        firestore.collection("users").document(uid).update(
-            "points", FieldValue.increment(pointsReward),
-            "exp", FieldValue.increment(expReward),
-            "lastCheckInDate", todayDate,
-            "checkInStreak", newStreak
-        ).addOnSuccessListener {
-            onSuccess(pointsReward)
-        }.addOnFailureListener { e ->
-            onError(e.localizedMessage ?: "Gagal melakukan check-in")
+        scope.launch {
+            try {
+                firestore.collection("users").document(uid).set(
+                    mapOf(
+                        "points" to newPoints,
+                        "unlockedTitles" to newUnlocked,
+                        "equippedTitle" to titleDefinition.titleName,
+                        "equippedTitleTier" to titleDefinition.tierLevel,
+                        "equippedTitleVariant" to titleDefinition.styleVariant
+                    ),
+                    SetOptions.merge()
+                ).await()
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, "Title \"${titleDefinition.titleName}\" berhasil ditukar & dipasang!")
+                }
+            } catch (e: Exception) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, "Title \"${titleDefinition.titleName}\" berhasil dipasang!")
+                }
+            }
+        }
+    }
+
+    fun unlockOrEquipBorder(
+        context: Context? = null,
+        border: BorderDefinition?,
+        onComplete: (Boolean, String) -> Unit
+    ) {
+        val uid = getActiveUid()
+        if (uid == null) {
+            onComplete(false, "Silakan login terlebih dahulu")
+            return
+        }
+        val current = _userProfile.value ?: return
+
+        if (border == null) {
+            val updated = current.copy(equippedBorderUrl = "")
+            _userProfile.value = updated
+            if (context != null) saveProfileToPrefs(context, updated)
+            refreshLeaderboardWithCurrentUser(updated)
+            scope.launch {
+                try {
+                    firestore.collection("users").document(uid).set(
+                        mapOf("equippedBorderUrl" to ""),
+                        SetOptions.merge()
+                    ).await()
+                } catch (_: Exception) {}
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, "Frame border avatar dilepas")
+                }
+            }
+            return
+        }
+
+        val alreadyUnlocked = current.unlockedBorders.contains(border.id)
+        if (!alreadyUnlocked && current.points < border.pointCost) {
+            onComplete(false, "Poin belum cukup! Butuh ${border.pointCost} Poin.")
+            return
+        }
+
+        val newPoints = if (alreadyUnlocked) current.points else (current.points - border.pointCost).coerceAtLeast(0L)
+        val newUnlockedBorders = (current.unlockedBorders + border.id).distinct()
+        val updated = current.copy(
+            points = newPoints,
+            unlockedBorders = newUnlockedBorders,
+            equippedBorderUrl = border.imageUrl
+        )
+        _userProfile.value = updated
+        if (context != null) saveProfileToPrefs(context, updated)
+        refreshLeaderboardWithCurrentUser(updated)
+
+        scope.launch {
+            try {
+                firestore.collection("users").document(uid).set(
+                    mapOf(
+                        "points" to newPoints,
+                        "unlockedBorders" to newUnlockedBorders,
+                        "equippedBorderUrl" to border.imageUrl
+                    ),
+                    SetOptions.merge()
+                ).await()
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, "Frame \"${border.name}\" berhasil dipasang!")
+                }
+            } catch (e: Exception) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, "Frame \"${border.name}\" berhasil dipasang!")
+                }
+            }
+        }
+    }
+
+    fun claimMissionReward(
+        context: Context? = null,
+        missionId: String,
+        missionTitle: String,
+        expReward: Long,
+        pointsReward: Long,
+        periodKey: String = getTodayDateString(),
+        onComplete: (Boolean, String) -> Unit
+    ) {
+        val uid = getActiveUid()
+        if (uid == null) {
+            onComplete(false, "Silakan login terlebih dahulu")
+            return
+        }
+        val current = _userProfile.value ?: UserProfile(uid = uid)
+        if (current.claimedMissions[missionId] == periodKey) {
+            onComplete(false, "Misi \"$missionTitle\" sudah diklaim untuk periode ini!")
+            return
+        }
+
+        val newExp = current.exp + expReward
+        val newPoints = current.points + pointsReward
+        val newLevel = computeLevelFromExp(newExp)
+        val nextTarget = computeNextLevelTargetExp(newLevel)
+        val newProgress = computeExpProgress(newExp, nextTarget)
+        val newClaimed = current.claimedMissions.toMutableMap().apply {
+            put(missionId, periodKey)
+        }
+        val autoMilestoneTitles = ALL_TITLES
+            .filter { it.unlockType == TitleUnlockType.MILESTONE && newLevel >= it.requiredLevel }
+            .map { it.titleName }
+        val newUnlockedTitles = (current.unlockedTitles + autoMilestoneTitles).distinct()
+
+        val updated = current.copy(
+            exp = newExp,
+            points = newPoints,
+            level = newLevel,
+            rankTitle = computeRankTitle(newLevel),
+            unlockedTitles = newUnlockedTitles,
+            claimedMissions = newClaimed,
+            nextLevelTargetExp = nextTarget,
+            expProgress = newProgress
+        )
+        _userProfile.value = updated
+        if (context != null) saveProfileToPrefs(context, updated)
+        refreshLeaderboardWithCurrentUser(updated)
+
+        scope.launch {
+            try {
+                firestore.collection("users").document(uid).set(
+                    mapOf(
+                        "exp" to newExp,
+                        "xp" to newExp,
+                        "points" to newPoints,
+                        "level" to newLevel,
+                        "rankTitle" to updated.rankTitle,
+                        "unlockedTitles" to newUnlockedTitles,
+                        "claimedMissions" to newClaimed
+                    ),
+                    SetOptions.merge()
+                ).await()
+                CoroutineScope(Dispatchers.Main).launch {
+                    val rewardText = buildString {
+                        append("+$expReward EXP")
+                        if (pointsReward > 0) append(" & +$pointsReward Poin")
+                    }
+                    onComplete(true, "Misi selesai! Kamu mendapatkan $rewardText")
+                }
+            } catch (e: Exception) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, "Misi berhasil diklaim! +$expReward EXP")
+                }
+            }
+        }
+    }
+
+    fun checkInToday(context: Context? = null, onComplete: (Boolean, String) -> Unit) {
+        val uid = getActiveUid()
+        if (uid == null) {
+            onComplete(false, "Silakan login terlebih dahulu")
+            return
+        }
+
+        val todayStr = getTodayDateString()
+        val yesterdayStr = getYesterdayDateString()
+        val current = _userProfile.value ?: UserProfile(uid = uid)
+
+        if (current.lastCheckInDate == todayStr) {
+            onComplete(false, "Kamu sudah klaim Check-In hari ini!")
+            return
+        }
+
+        val newStreak = if (current.lastCheckInDate == yesterdayStr) {
+            (current.checkInStreak % 7) + 1
+        } else {
+            1
+        }
+
+        val rewardExp = if (newStreak == 7) 100L else 50L
+        val rewardPoints = if (newStreak == 7) 50L else 20L
+        val newExp = current.exp + rewardExp
+        val newPoints = current.points + rewardPoints
+        val newLevel = computeLevelFromExp(newExp)
+        val nextTarget = computeNextLevelTargetExp(newLevel)
+        val newProgress = computeExpProgress(newExp, nextTarget)
+
+        val newClaimed = current.claimedMissions.toMutableMap().apply {
+            put("daily_checkin", todayStr)
+        }
+        val autoMilestoneTitles = ALL_TITLES
+            .filter { it.unlockType == TitleUnlockType.MILESTONE && newLevel >= it.requiredLevel }
+            .map { it.titleName }
+        val newUnlockedTitles = (current.unlockedTitles + autoMilestoneTitles).distinct()
+
+        val updated = current.copy(
+            exp = newExp,
+            points = newPoints,
+            level = newLevel,
+            rankTitle = computeRankTitle(newLevel),
+            unlockedTitles = newUnlockedTitles,
+            claimedMissions = newClaimed,
+            lastCheckInDate = todayStr,
+            checkInStreak = newStreak,
+            nextLevelTargetExp = nextTarget,
+            expProgress = newProgress
+        )
+        _userProfile.value = updated
+        if (context != null) {
+            saveProfileToPrefs(context, updated)
+        }
+        refreshLeaderboardWithCurrentUser(updated)
+
+        val updates = mapOf(
+            "uid" to uid,
+            "name" to updated.name,
+            "avatar" to updated.avatar,
+            "photoUrl" to updated.avatar,
+            "exp" to newExp,
+            "xp" to newExp,
+            "points" to newPoints,
+            "level" to newLevel,
+            "rankTitle" to updated.rankTitle,
+            "unlockedTitles" to newUnlockedTitles,
+            "claimedMissions" to newClaimed,
+            "lastCheckInDate" to todayStr,
+            "checkInStreak" to newStreak
+        )
+
+        scope.launch {
+            try {
+                firestore.collection("users").document(uid).set(updates, SetOptions.merge()).await()
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(
+                        true,
+                        "Check-In Hari ke-$newStreak berhasil! +$rewardExp EXP & +$rewardPoints Poin"
+                    )
+                }
+            } catch (e: Exception) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(
+                        true,
+                        "Check-In Hari ke-$newStreak berhasil! +$rewardExp EXP & +$rewardPoints Poin"
+                    )
+                }
+            }
+        }
+    }
+
+    fun addExpAndPoints(expDelta: Long, pointsDelta: Long, context: Context? = null) {
+        val uid = getActiveUid() ?: return
+        val current = _userProfile.value
+        if (current != null) {
+            val newExp = (current.exp + expDelta).coerceAtLeast(0L)
+            val newPoints = (current.points + pointsDelta).coerceAtLeast(0L)
+            val newLevel = computeLevelFromExp(newExp)
+            val nextTarget = computeNextLevelTargetExp(newLevel)
+            val newProgress = computeExpProgress(newExp, nextTarget)
+
+            val autoMilestoneTitles = ALL_TITLES
+                .filter { it.unlockType == TitleUnlockType.MILESTONE && newLevel >= it.requiredLevel }
+                .map { it.titleName }
+            val newUnlockedTitles = (current.unlockedTitles + autoMilestoneTitles).distinct()
+
+            val updated = current.copy(
+                exp = newExp,
+                points = newPoints,
+                level = newLevel,
+                rankTitle = computeRankTitle(newLevel),
+                unlockedTitles = newUnlockedTitles,
+                nextLevelTargetExp = nextTarget,
+                expProgress = newProgress
+            )
+            _userProfile.value = updated
+            if (context != null) {
+                saveProfileToPrefs(context, updated)
+            }
+            refreshLeaderboardWithCurrentUser(updated)
+
+            scope.launch {
+                try {
+                    firestore.collection("users").document(uid).set(
+                        mapOf(
+                            "exp" to newExp,
+                            "xp" to newExp,
+                            "points" to newPoints,
+                            "level" to newLevel,
+                            "rankTitle" to updated.rankTitle,
+                            "unlockedTitles" to newUnlockedTitles
+                        ),
+                        SetOptions.merge()
+                    ).await()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Gagal sinkronisasi addExpAndPoints ke Firestore: ${e.message}")
+                }
+            }
+        } else {
+            val docRef = firestore.collection("users").document(uid)
+            docRef.set(
+                mapOf(
+                    "exp" to FieldValue.increment(expDelta),
+                    "xp" to FieldValue.increment(expDelta),
+                    "points" to FieldValue.increment(pointsDelta)
+                ),
+                SetOptions.merge()
+            )
         }
     }
 
     /**
-     * Listener Real-Time Konfigurasi Promo Popup Dinamis (app_config/promo_popup)
-     * Langsung membaca konfigurasi yang diatur oleh Admin dari Web Admin (dinz-62119)!
+     * Listener Real-Time Konfigurasi Promo Popup Dinamis (`app_config/promo_popup`)
      */
     fun startListeningPromoConfig() {
         if (promoListener != null) return
-
-        // Panggil fetch awal langsung dari REST Firestore dinz-62119
         fetchLivePromoConfigFromRest()
 
         try {
@@ -761,10 +1614,16 @@ object FirebaseManager {
                         _promoPopupConfig.value = null
                         return@addSnapshotListener
                     }
-                    val isActive = snapshot.getBoolean("isActive") ?: false
+                    val isActive = snapshot.getBoolean("isActive")
+                        ?: snapshot.getBoolean("enabled")
+                        ?: false
                     val promoId = snapshot.getString("promoId").orEmpty()
-                    val imageUrl = snapshot.getString("imageUrl").orEmpty()
-                    val targetUrl = snapshot.getString("targetUrl").orEmpty()
+                    val imageUrl = snapshot.getString("imageUrl")
+                        ?: snapshot.getString("posterUrl")
+                        ?: ""
+                    val targetUrl = snapshot.getString("targetUrl")
+                        ?: snapshot.getString("linkUrl")
+                        ?: ""
                     val interval = snapshot.getDouble("intervalHours")
                         ?: snapshot.getLong("intervalHours")?.toDouble()
                         ?: 8.0
@@ -791,43 +1650,44 @@ object FirebaseManager {
     }
 
     private fun fetchLivePromoConfigFromRest() {
-        CoroutineScope(Dispatchers.IO).launch {
+        scope.launch {
             try {
                 val url = "https://firestore.googleapis.com/v1/projects/dinz-62119/databases/(default)/documents/app_config/promo_popup"
-                val client = okhttp3.OkHttpClient.Builder()
-                    .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(5, TimeUnit.SECONDS)
+                    .readTimeout(5, TimeUnit.SECONDS)
                     .build()
 
-                val req = okhttp3.Request.Builder().url(url).build()
-                val res = client.newCall(req).execute()
-                if (res.isSuccessful) {
-                    val body = res.body?.string()
-                    if (!body.isNullOrBlank()) {
-                        val json = org.json.JSONObject(body)
-                        val fields = json.optJSONObject("fields") ?: return@launch
-                        val isActive = fields.optJSONObject("isActive")?.optBoolean("booleanValue", false) ?: false
-                        val promoId = fields.optJSONObject("promoId")?.optString("stringValue", "") ?: ""
-                        val imageUrl = fields.optJSONObject("imageUrl")?.optString("stringValue", "") ?: ""
-                        val targetUrl = fields.optJSONObject("targetUrl")?.optString("stringValue", "") ?: ""
-                        val interval = (fields.optJSONObject("intervalHours")?.optDouble("doubleValue", 8.0)
-                            ?: fields.optJSONObject("intervalHours")?.optLong("integerValue", 8L)?.toDouble()
-                            ?: 8.0).toFloat()
-                        val maxImp = fields.optJSONObject("maxImpressions")?.optInt("integerValue", 0) ?: 0
-                        val updatedAt = fields.optJSONObject("updatedAt")?.optLong("integerValue", 0L) ?: 0L
+                val req = Request.Builder().url(url).build()
+                client.newCall(req).execute().use { res ->
+                    if (res.isSuccessful) {
+                        val body = res.body?.string()
+                        if (!body.isNullOrBlank()) {
+                            val json = JSONObject(body)
+                            val fields = json.optJSONObject("fields") ?: return@use
+                            val isActive = fields.optJSONObject("isActive")?.optBoolean("booleanValue", false) ?: false
+                            val promoId = fields.optJSONObject("promoId")?.optString("stringValue", "") ?: ""
+                            val imageUrl = fields.optJSONObject("imageUrl")?.optString("stringValue", "") ?: ""
+                            val targetUrl = fields.optJSONObject("targetUrl")?.optString("stringValue", "") ?: ""
+                            val interval = (fields.optJSONObject("intervalHours")?.optDouble("doubleValue", 8.0)
+                                ?: fields.optJSONObject("intervalHours")?.optLong("integerValue", 8L)?.toDouble()
+                                ?: 8.0).toFloat()
+                            val maxImp = fields.optJSONObject("maxImpressions")?.optInt("integerValue", 0) ?: 0
+                            val updatedAt = fields.optJSONObject("updatedAt")?.optLong("integerValue", 0L) ?: 0L
 
-                        if (isActive && imageUrl.isNotBlank()) {
-                            _promoPopupConfig.value = PromoPopupConfig(
-                                isActive = true,
-                                promoId = promoId,
-                                imageUrl = imageUrl,
-                                targetUrl = targetUrl,
-                                intervalHours = interval,
-                                maxImpressions = maxImp,
-                                updatedAt = updatedAt
-                            )
-                        } else {
-                            _promoPopupConfig.value = null
+                            if (isActive && imageUrl.isNotBlank()) {
+                                _promoPopupConfig.value = PromoPopupConfig(
+                                    isActive = true,
+                                    promoId = promoId,
+                                    imageUrl = imageUrl,
+                                    targetUrl = targetUrl,
+                                    intervalHours = interval,
+                                    maxImpressions = maxImp,
+                                    updatedAt = updatedAt
+                                )
+                            } else {
+                                _promoPopupConfig.value = null
+                            }
                         }
                     }
                 }
@@ -835,36 +1695,41 @@ object FirebaseManager {
         }
     }
 
-    /**
-     * Logout Akun
-     */
-    fun signOut() {
+    fun signOut(context: Context? = null) {
+        userDocListener?.remove()
+        userDocListener = null
         try {
             auth.signOut()
-        } catch (ignored: Exception) {}
-        profileListener?.remove()
-        profileListener = null
-        promoListener?.remove()
-        promoListener = null
-        _userProfile.value = null
+        } catch (_: Exception) {}
+        if (context != null) {
+            AppPreferences.clearGoogleSession(context)
+            getPrefs(context).edit().remove("uid").apply()
+            scope.launch {
+                try {
+                    val credentialManager = CredentialManager.create(context)
+                    credentialManager.clearCredentialState(ClearCredentialStateRequest())
+                } catch (_: Exception) {}
+            }
+        }
         _currentUser.value = null
+        _googleSession.value = null
+        _userProfile.value = null
     }
 
-    /**
-     * Data Fallback Papan Peringkat (Menjaga agar podium TOP 1, TOP 2, TOP 3 dan rank selalu indah terisi)
-     */
-    private fun getFallbackLeaderboard(): List<LeaderboardUser> {
-        return listOf(
-            LeaderboardUser("top1", 1, "妖神超暖。", "@yaoshen", "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix", 22222828L, 22223),
-            LeaderboardUser("top2", 2, "i.'", "@ilovecat", "https://api.dicebear.com/7.x/adventurer/svg?seed=Mimi", 15210312L, 15210),
-            LeaderboardUser("top3", 3, "多渔のOnly be...", "@duoyu", "https://api.dicebear.com/7.x/adventurer/svg?seed=Kaito", 14508587L, 14508),
-            LeaderboardUser("top4", 4, "淘气鬼~", "@taoqigui", "https://api.dicebear.com/7.x/adventurer/svg?seed=Neko", 13091239L, 13091),
-            LeaderboardUser("top5", 5, "Sj.温凛", "@wenlin", "https://api.dicebear.com/7.x/adventurer/svg?seed=Rin", 13045944L, 13045),
-            LeaderboardUser("top6", 6, "晴天", "@qingtian", "https://api.dicebear.com/7.x/adventurer/svg?seed=Yuki", 12566371L, 12566),
-            LeaderboardUser("top7", 7, "Ciflorette", "@ciflorette", "https://api.dicebear.com/7.x/adventurer/svg?seed=Chloe", 10954067L, 10954),
-            LeaderboardUser("top8", 8, "还不睡", "@haibushui", "https://api.dicebear.com/7.x/adventurer/svg?seed=Shin", 10528192L, 10528),
-            LeaderboardUser("top9", 9, "Gading Kencana", "@gadingkencana", "https://api.dicebear.com/7.x/adventurer/svg?seed=Gading", 9850210L, 9850),
-            LeaderboardUser("top10", 10, "Yura Sepuh", "@yuradominant", "https://api.dicebear.com/7.x/adventurer/svg?seed=Yura", 8450100L, 8450)
-        )
+    fun getTodayDateString(): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        return sdf.format(Date())
+    }
+
+    fun getCurrentWeekKey(): String {
+        val cal = Calendar.getInstance()
+        return "${cal.get(Calendar.YEAR)}-W${cal.get(Calendar.WEEK_OF_YEAR)}"
+    }
+
+    private fun getYesterdayDateString(): String {
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.DAY_OF_YEAR, -1)
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        return sdf.format(cal.time)
     }
 }

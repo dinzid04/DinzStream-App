@@ -1,29 +1,25 @@
 package com.yuranime.dinz.ui.profile
 
 import android.app.Activity
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.widget.Toast
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,44 +43,48 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.outlined.Bookmarks
+import androidx.compose.material.icons.outlined.DownloadForOffline
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -95,7 +95,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -105,12 +104,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import com.yuranime.dinz.BuildConfig
 import com.yuranime.dinz.R
 import com.yuranime.dinz.data.firebase.FirebaseManager
+import com.yuranime.dinz.data.firebase.TitleUnlockType
+import com.yuranime.dinz.data.firebase.UserProfile
 import com.yuranime.dinz.data.local.AppPreferences
+import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.ui.components.BottomNavBar
+import com.yuranime.dinz.ui.components.EmptyTitleSlotBadge
+import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.NavTab
 import com.yuranime.dinz.ui.components.liquidGlassBackdrop
 import com.yuranime.dinz.ui.leaderboard.LeaderboardScreen
@@ -127,6 +133,7 @@ enum class ProfileSubScreen {
     LEADERBOARD,
     POINTS_REWARDS,
     DOWNLOADS,
+    COLLECTION_HISTORY,
     SETTINGS
 }
 
@@ -148,31 +155,37 @@ fun LoginProfileScreen(
     onComicChapterClick: ((chapterId: String) -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val activity = context as? Activity
+    val authDb = remember { LocalAuthDatabase(context) }
 
     var currentSubScreen by remember { mutableStateOf(ProfileSubScreen.MAIN) }
     var isLoggingIn by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
+    var showTitlePickerDialog by remember { mutableStateOf(false) }
     val isLiquidGlass by AppPreferences.liquidGlassEnabled.collectAsState()
 
-    // Inisialisasi sesi login tersimpan dari preferensi lokal
     LaunchedEffect(Unit) {
         FirebaseManager.initSession(context)
     }
 
-    // Real-Time Auth / Google Session State
     val currentUser by FirebaseManager.currentUser.collectAsState()
     val googleSession by FirebaseManager.googleSession.collectAsState()
     val isUserLoggedIn = currentUser != null || googleSession != null
     val userProfile by FirebaseManager.userProfile.collectAsState()
+    val leaderboardUsers by FirebaseManager.leaderboard.collectAsState()
 
-    // Google Sign-In Client (Standar Resmi Android dengan ID Token untuk Firebase Auth)
+    val userRankNumber = remember(leaderboardUsers, userProfile?.uid) {
+        val activeUid = userProfile?.uid ?: FirebaseManager.getCurrentUid()
+        val foundIndex = leaderboardUsers.indexOfFirst { it.uid == activeUid }
+        if (foundIndex >= 0) foundIndex + 1 else null
+    }
+
+    // Google Sign-In Client standar Android
     val webClientId = remember(context) {
         try {
             val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
-            if (resId != 0) context.getString(resId) else "683241181647-gp00tdtgh2bkn8bojm0pl1hf0eriduq1.apps.googleusercontent.com"
+            if (resId != 0) context.getString(resId) else FirebaseManager.WEB_CLIENT_ID
         } catch (e: Exception) {
-            "683241181647-gp00tdtgh2bkn8bojm0pl1hf0eriduq1.apps.googleusercontent.com"
+            FirebaseManager.WEB_CLIENT_ID
         }
     }
     val gso = remember(webClientId) {
@@ -203,16 +216,19 @@ fun LoginProfileScreen(
                         .ifBlank { "Pengguna Google" }
                 val photoUrl = account.photoUrl?.toString()
 
-                // Simpan sebagai sesi login aktif yang sah di aplikasi
                 AppPreferences.saveGoogleSession(context, googleId, displayName, email, photoUrl)
+                authDb.setLoggedIn(true, displayName)
+                if (!photoUrl.isNullOrBlank()) {
+                    authDb.setAvatarUrl(photoUrl)
+                }
 
-                // Aktifkan profil dan sinkronkan dokumen user ke Firestore real-time
                 FirebaseManager.onGoogleAccountSelected(
                     uid = googleId,
                     name = displayName,
                     email = email,
                     avatar = photoUrl,
-                    idToken = account.idToken
+                    idToken = account.idToken,
+                    context = context
                 )
 
                 isLoggingIn = false
@@ -231,9 +247,23 @@ fun LoginProfileScreen(
         }
     }
 
-    // Tangani Tombol Back untuk Sub-screen
     BackHandler(enabled = currentSubScreen != ProfileSubScreen.MAIN) {
         currentSubScreen = ProfileSubScreen.MAIN
+    }
+
+    if (showInfoDialog) {
+        AppInfoModal(onDismiss = { showInfoDialog = false })
+    }
+
+    if (showTitlePickerDialog) {
+        QuickTitlePickerDialog(
+            profile = userProfile,
+            onDismiss = { showTitlePickerDialog = false },
+            onOpenPointsRewards = {
+                showTitlePickerDialog = false
+                currentSubScreen = ProfileSubScreen.POINTS_REWARDS
+            }
+        )
     }
 
     AnimatedContent(
@@ -244,6 +274,7 @@ fun LoginProfileScreen(
         when (subScreen) {
             ProfileSubScreen.EDIT_PROFILE -> {
                 EditProfileScreen(
+                    authDb = authDb,
                     onBackClick = { currentSubScreen = ProfileSubScreen.MAIN }
                 )
             }
@@ -254,6 +285,7 @@ fun LoginProfileScreen(
             }
             ProfileSubScreen.POINTS_REWARDS -> {
                 PointsRewardsScreen(
+                    authDb = authDb,
                     onBackClick = { currentSubScreen = ProfileSubScreen.MAIN }
                 )
             }
@@ -265,6 +297,14 @@ fun LoginProfileScreen(
                     }
                 )
             }
+            ProfileSubScreen.COLLECTION_HISTORY -> {
+                CollectionAndHistorySubScreen(
+                    authDb = authDb,
+                    onBackClick = { currentSubScreen = ProfileSubScreen.MAIN },
+                    onEpisodeClick = onEpisodeClick,
+                    onComicChapterClick = onComicChapterClick
+                )
+            }
             ProfileSubScreen.SETTINGS -> {
                 SettingsScreen(
                     onBackClick = { currentSubScreen = ProfileSubScreen.MAIN },
@@ -273,7 +313,6 @@ fun LoginProfileScreen(
             }
             ProfileSubScreen.MAIN -> {
                 if (!isUserLoggedIn) {
-                    // LAYAR LOGIN (BottomNavBar 100% Tersembunyi)
                     LoginView(
                         isLoggingIn = isLoggingIn,
                         onBackToHomeClick = { onTabSelected(NavTab.HOME) },
@@ -305,28 +344,35 @@ fun LoginProfileScreen(
                         }
                     )
                 } else {
-                    // LAYAR PROFIL (Setelah Login Real-Time - Floating Clear Liquid Glass Navbar)
                     val backdropLayer = rememberGraphicsLayer()
                     Box(
                         modifier = modifier
                             .fillMaxSize()
-                            .background(Color(0xFF0E0F12))
+                            .background(Color(0xFF0B0B0B))
                     ) {
                         UserProfileView(
                             profile = userProfile,
-                            currentUser = currentUser,
+                            authDb = authDb,
+                            userRankNumber = userRankNumber,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .liquidGlassBackdrop(backdropLayer, enabled = isLiquidGlass),
                             onEditProfileClick = { currentSubScreen = ProfileSubScreen.EDIT_PROFILE },
-                            onDownloadMenuClick = { currentSubScreen = ProfileSubScreen.DOWNLOADS },
-                            onLeaderboardMenuClick = { currentSubScreen = ProfileSubScreen.LEADERBOARD },
-                            onRewardsMenuClick = { currentSubScreen = ProfileSubScreen.POINTS_REWARDS },
-                            onSettingsMenuClick = { currentSubScreen = ProfileSubScreen.SETTINGS },
-                            onInfoMenuClick = { showInfoDialog = true },
-                            onLogout = {
+                            onOpenLeaderboardClick = { currentSubScreen = ProfileSubScreen.LEADERBOARD },
+                            onOpenPointsRewardsClick = { currentSubScreen = ProfileSubScreen.POINTS_REWARDS },
+                            onOpenTitleSlotClick = { showTitlePickerDialog = true },
+                            onOpenDownloadsClick = { currentSubScreen = ProfileSubScreen.DOWNLOADS },
+                            onOpenCollectionHistoryClick = { currentSubScreen = ProfileSubScreen.COLLECTION_HISTORY },
+                            onOpenSettingsClick = { currentSubScreen = ProfileSubScreen.SETTINGS },
+                            onOpenInfoClick = { showInfoDialog = true },
+                            onSignOutClick = {
                                 FirebaseManager.signOut(context)
-                                Toast.makeText(context, "Akun berhasil keluar", Toast.LENGTH_SHORT).show()
+                                authDb.setLoggedIn(false)
+                                Toast.makeText(
+                                    context,
+                                    "Berhasil keluar dari akun",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         )
 
@@ -342,486 +388,1163 @@ fun LoginProfileScreen(
             }
         }
     }
-
-    if (showInfoDialog) {
-        AppInfoModal(onDismiss = { showInfoDialog = false })
-    }
 }
 
 /**
- * TAHAP 1 & 2: Halaman Profile Real-Time Setelah Login
- * - HAPUS sepenuhnya baris tombol media sosial!
- * - Rapatkan tata letak header & menu tanpa celah besar (Arrangement.spacedBy(8.dp))
+ * TAHAP 1: Redesign Halaman Profile (`ProfileScreen`)
+ * Mengikuti struktur tata letak referensi `1002213252.jpg` (`WA_1794546770520.jpg`)
+ * dengan palet Yuranime (Deep Obsidian `#0B0B0B` + Crimson `#E11D48` & Vibrant Orange `#FF5722`).
  */
 @Composable
 private fun UserProfileView(
-    profile: com.yuranime.dinz.data.firebase.UserProfile?,
-    currentUser: com.google.firebase.auth.FirebaseUser? = null,
+    profile: UserProfile?,
+    authDb: LocalAuthDatabase,
+    userRankNumber: Int?,
     modifier: Modifier = Modifier,
     onEditProfileClick: () -> Unit,
-    onDownloadMenuClick: () -> Unit,
-    onLeaderboardMenuClick: () -> Unit,
-    onRewardsMenuClick: () -> Unit,
-    onSettingsMenuClick: () -> Unit,
-    onInfoMenuClick: () -> Unit,
-    onLogout: () -> Unit
+    onOpenLeaderboardClick: () -> Unit,
+    onOpenPointsRewardsClick: () -> Unit,
+    onOpenTitleSlotClick: () -> Unit,
+    onOpenDownloadsClick: () -> Unit,
+    onOpenCollectionHistoryClick: () -> Unit,
+    onOpenSettingsClick: () -> Unit,
+    onOpenInfoClick: () -> Unit,
+    onSignOutClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val name = profile?.name?.takeIf { it.isNotBlank() }
-        ?: currentUser?.displayName?.takeIf { it.isNotBlank() }
-        ?: currentUser?.email?.substringBefore("@")
-        ?: "Otaku Member"
-    val avatarUrl = profile?.avatar?.takeIf { it.isNotBlank() }
-        ?: currentUser?.photoUrl?.toString()
-        ?: ""
-    val bannerUrl = profile?.banner ?: ""
-    val level = profile?.level ?: 1
-    val exp = profile?.exp ?: 0L
-    val points = profile?.points ?: 100L
-    val expProgress = profile?.expProgress ?: 0.1f
-    val expToNext = profile?.expToNextLevel ?: 1000L
+    var isPublicPreviewMode by remember { mutableStateOf(false) }
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp)
+    val displayName = profile?.name?.takeIf { it.isNotBlank() } ?: authDb.getUsername()
+    val userTag = profile?.userTag?.takeIf { it.isNotBlank() } ?: "1001"
+    val email = profile?.email?.takeIf { it.isNotBlank() } ?: "Akun Yuranime Terverifikasi"
+    val joinDate = profile?.joinDate?.takeIf { it.isNotBlank() } ?: "November 2026"
+    val bio = profile?.bio?.takeIf { it.isNotBlank() }
+        ?: "Penikmat anime & komik di Yuranime. Ketuk ikon pensil di kanan atas untuk menulis bio."
+    val role = profile?.role?.takeIf { it.isNotBlank() } ?: "Member"
+    val avatarUrl = profile?.avatar?.takeIf { it.isNotBlank() } ?: authDb.getAvatarUrl()
+    val bannerUrl = profile?.banner?.takeIf { it.isNotBlank() } ?: authDb.getCoverUrl()
+    val exp = profile?.exp ?: 0L
+    val points = profile?.points ?: 0L
+    val level = profile?.level ?: 1
+    val rankTitle = profile?.rankTitle ?: FirebaseManager.computeRankTitle(level)
+    val nextTargetExp = profile?.nextLevelTargetExp ?: FirebaseManager.computeNextLevelTargetExp(level)
+    val expProgress = profile?.expProgress ?: FirebaseManager.computeExpProgress(exp, nextTargetExp)
+    val equippedTitle = profile?.equippedTitle.orEmpty()
+    val equippedTitleTier = profile?.equippedTitleTier ?: level
+    val equippedTitleVariant = profile?.equippedTitleVariant ?: 0
+    val equippedBorderUrl = profile?.equippedBorderUrl.orEmpty()
+
+    val animatedExpProgress by animateFloatAsState(
+        targetValue = expProgress.coerceIn(0f, 1f),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "profileExpSpring"
+    )
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFF0B0B0B))
+            .verticalScroll(rememberScrollState())
+            .navigationBarsPadding()
+            .padding(bottom = 104.dp)
     ) {
-        // 1. Header Banner Landscape Anime dengan Avatar, Nama, & Bar XP
-        item {
+        // 1. HEADER BANNER (195.dp edge-to-edge) + AVATAR KIRI (86.dp overlap separuh) + 3 TOMBOL IKON KANAN ATAS
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(238.dp)
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(240.dp)
+                    .height(195.dp)
+                    .align(Alignment.TopCenter)
             ) {
-                // Background Cover / Banner
                 if (bannerUrl.isNotBlank()) {
                     AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(bannerUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "Cover Profil",
+                        model = bannerUrl,
+                        contentDescription = "Profile Cover Banner",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    Image(
-                        painter = painterResource(id = R.drawable.poster_login_01),
-                        contentDescription = "Cover Profil",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        Color(0xFF2B0E16),
+                                        Color(0xFF190E16),
+                                        Color(0xFF0F111A)
+                                    ),
+                                    start = Offset(0f, 0f),
+                                    end = Offset(900f, 500f)
+                                )
+                            )
                     )
                 }
 
-                // Gradasi Gelap Halus ke Warna Latar Utama (#0E0F12)
+                // Gradasi Bawah (Smooth Dark Vignette memudar mulus ke #0B0B0B)
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0x330E0F12),
-                                    Color(0x880E0F12),
-                                    Color(0xFF0E0F12)
+                                colorStops = arrayOf(
+                                    0.0f to Color(0x330B0B0B),
+                                    0.52f to Color(0x660B0B0B),
+                                    0.85f to Color(0xD90B0B0B),
+                                    1.0f to Color(0xFF0B0B0B)
                                 )
                             )
                         )
                 )
 
-                // Avatar, Nama & Level di Kiri Bawah Banner
+                // 3 Tombol Ikon Bulat Minimalis di Pojok Kanan Atas (size = 36.dp, latar #730B0B0B tanpa border tebal)
                 Row(
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = 20.dp, bottom = 12.dp, end = 20.dp),
+                        .align(Alignment.TopEnd)
+                        .statusBarsPadding()
+                        .padding(top = 12.dp, end = 18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Foto Profil Bulat dengan Border Oranye & Badge Kamera Biru
-                    Box(modifier = Modifier.size(76.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .size(76.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF1E2024))
-                                .border(2.dp, Color(0xFFFF5722), CircleShape)
-                                .clickable { onEditProfileClick() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (avatarUrl.isNotBlank()) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(context)
-                                        .data(avatarUrl)
-                                        .crossfade(true)
-                                        .placeholder(R.drawable.ic_yuranime_monochrome)
-                                        .error(R.drawable.ic_yuranime_monochrome)
-                                        .build(),
-                                    contentDescription = "Foto Profil",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                    TopHeaderCircleIconButton(
+                        icon = Icons.Outlined.Visibility,
+                        contentDescription = "Preview Profil Publik",
+                        isActive = isPublicPreviewMode,
+                        onClick = {
+                            isPublicPreviewMode = !isPublicPreviewMode
+                            val msg = if (isPublicPreviewMode) {
+                                "Menampilkan pratinjau profil publik"
                             } else {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_yuranime_monochrome),
-                                    contentDescription = "Foto Profil",
-                                    tint = Color(0xFFFF5722),
-                                    modifier = Modifier.size(44.dp)
-                                )
+                                "Kembali ke mode profil pribadi"
                             }
+                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                         }
+                    )
 
-                        // Badge Ikon Kamera Biru Kecil di Pojok Kanan Bawah
-                        Box(
+                    TopHeaderCircleIconButton(
+                        icon = Icons.Outlined.Edit,
+                        contentDescription = "Edit Profil",
+                        onClick = onEditProfileClick
+                    )
+
+                    TopHeaderCircleIconButton(
+                        icon = Icons.Outlined.Settings,
+                        contentDescription = "Pengaturan",
+                        onClick = onOpenSettingsClick
+                    )
+                }
+            }
+
+            // 2. Avatar Kiri (size = 86.dp, padding start = 20.dp) + Circular EXP Progress Ring (strokeWidth = 3.dp)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 20.dp)
+                    .size(94.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(92.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF0B0B0B))
+                )
+
+                Box(
+                    modifier = Modifier
+                        .size(78.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF161820))
+                        .clickable { if (!isPublicPreviewMode) onEditProfileClick() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (avatarUrl.isNotBlank()) {
+                        AsyncImage(
+                            model = avatarUrl,
+                            contentDescription = "Foto Profil $displayName",
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .size(24.dp)
+                                .fillMaxSize()
                                 .clip(CircleShape)
-                                .background(Color(0xFF3B82F6))
-                                .border(1.5.dp, Color(0xFF0E0F12), CircleShape)
-                                .clickable { onEditProfileClick() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "Ubah Foto",
-                                tint = Color.White,
-                                modifier = Modifier.size(13.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    // Sisi Kanan: Nama Pengguna + Ikon Pensil Edit + Lv + Bar XP
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = name,
-                                color = Color.White,
-                                fontSize = 19.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = SfProFontFamily,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = "Edit Profil",
-                                tint = Color(0xFF94A3B8),
-                                modifier = Modifier
-                                    .size(18.dp)
-                                    .clickable { onEditProfileClick() }
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(Color(0xFFFF5722).copy(alpha = 0.2f))
-                                    .border(0.7.dp, Color(0xFFFF5722), RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 6.dp, vertical = 1.dp)
-                            ) {
-                                Text(
-                                    text = "Lv. $level",
-                                    color = Color(0xFFFF5722),
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = SfProFontFamily
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            Text(
-                                text = "$exp XP",
-                                color = Color(0xFFFDE68A),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                fontFamily = SfProFontFamily
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Progress Bar XP Tipis Elegan
-                        LinearProgressIndicator(
-                            progress = { expProgress },
-                            modifier = Modifier
-                                .fillMaxWidth(0.9f)
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp)),
-                            color = Color(0xFFFF5722),
-                            trackColor = Color(0xFF2A2D34)
+                        )
+                    } else {
+                        Text(
+                            text = displayName.take(1).uppercase(),
+                            color = Color.White,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SfProFontFamily
                         )
                     }
+                }
+
+                // Circular EXP Progress Ring (size = 86.dp, strokeWidth = 3.dp, gradasi #FF5722 -> #E11D48)
+                Canvas(
+                    modifier = Modifier.size(86.dp)
+                ) {
+                    val strokePx = 3.dp.toPx()
+                    val diameter = size.minDimension - strokePx
+                    val topLeftOffset = Offset(strokePx / 2f, strokePx / 2f)
+                    val arcSize = Size(diameter, diameter)
+
+                    drawArc(
+                        color = Color(0xFF1C1F2A),
+                        startAngle = 0f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        topLeft = topLeftOffset,
+                        size = arcSize,
+                        style = Stroke(width = strokePx, cap = StrokeCap.Round)
+                    )
+
+                    val sweep = (360f * animatedExpProgress).coerceIn(6f, 360f)
+                    drawArc(
+                        brush = Brush.linearGradient(
+                            colors = listOf(Color(0xFFFF5722), Color(0xFFE11D48)),
+                            start = Offset(0f, 0f),
+                            end = Offset(size.width, size.height)
+                        ),
+                        startAngle = -90f,
+                        sweepAngle = if (animatedExpProgress <= 0.005f) 0f else sweep,
+                        useCenter = false,
+                        topLeft = topLeftOffset,
+                        size = arcSize,
+                        style = Stroke(width = strokePx, cap = StrokeCap.Round)
+                    )
+                }
+
+                if (equippedBorderUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = equippedBorderUrl,
+                        contentDescription = "Avatar Border",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(108.dp)
+                    )
                 }
             }
         }
 
-        // 2. Daftar Menu Profile (Tepat Menempel Rapat di Bawah Header, Bebas Celah Renggang!)
-        item {
+        AnimatedVisibility(visible = isPublicPreviewMode) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 6.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF161820))
+                    .clickable { isPublicPreviewMode = false }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.Visibility,
+                        contentDescription = null,
+                        tint = Color(0xFFFF5722),
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Mode Pratinjau Profil Publik",
+                        color = Color(0xFFE2E8F0),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = SfProFontFamily
+                    )
+                }
+                Text(
+                    text = "Tutup",
+                    color = Color(0xFFE11D48),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
+                )
+            }
+        }
+
+        // 2B. IDENTITAS PENGGUNA TEPAT DI BAWAH AVATAR (Rata Kiri, Tanpa Kotak Overlay)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(top = 10.dp)
+        ) {
+            // Baris 1: Username (SF Bold putih 22.sp) + #ID unik 4 digit (#64748B 16.sp)
+            Row(
+                verticalAlignment = Alignment.Baseline
+            ) {
+                Text(
+                    text = displayName,
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.width(7.dp))
+                Text(
+                    text = "#$userTag",
+                    color = Color(0xFF64748B),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = SfProFontFamily
+                )
+            }
+
+            Spacer(modifier = Modifier.height(3.dp))
+
+            // Baris 2: Email asli akun pengguna (13.sp, warna #CBD5E1)
+            Text(
+                text = email,
+                color = Color(0xFFCBD5E1),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Normal,
+                fontFamily = SfProFontFamily,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            // Baris 3: Tanggal Bergabung Asli (12.sp, warna #64748B)
+            Text(
+                text = "Bergabung sejak $joinDate",
+                color = Color(0xFF64748B),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Normal,
+                fontFamily = SfProFontFamily
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Baris 4: Bio pengguna dari database (14.sp, warna #E2E8F0)
+            Text(
+                text = bio,
+                color = Color(0xFFE2E8F0),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Normal,
+                fontFamily = SfProFontFamily,
+                lineHeight = 20.sp
+            )
+
             Spacer(modifier = Modifier.height(14.dp))
+
+            // 3A. BARIS PILL STATUS (height = 26.dp, RoundedCornerShape(50), latar #161820 tanpa border kasar)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ProfileStatusPill(
+                    text = role,
+                    textColor = Color(0xFFE2E8F0)
+                )
+
+                ProfileStatusPill(
+                    leadingSymbol = "✦",
+                    leadingColor = Color(0xFFFF5722),
+                    text = "Lv. $level",
+                    textColor = Color.White
+                )
+
+                ProfileStatusPill(
+                    text = rankTitle,
+                    textColor = Color(0xFFF43F5E)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 3B. SLOT CUSTOM TITLE BADGE (Tepat di Bawah Baris Pill)
+            if (equippedTitle.isNotBlank()) {
+                GeometricTitleBadge(
+                    titleName = equippedTitle,
+                    tierLevel = equippedTitleTier,
+                    styleVariant = equippedTitleVariant,
+                    onClick = { if (!isPublicPreviewMode) onOpenTitleSlotClick() }
+                )
+            } else {
+                EmptyTitleSlotBadge(
+                    onClick = { if (!isPublicPreviewMode) onOpenTitleSlotClick() }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 3C. FULL-WIDTH EXP BAR
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "EXP",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
+                )
+                Text(
+                    text = "${FirebaseManager.formatNumber(exp)} / ${FirebaseManager.formatNumber(nextTargetExp)}",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
+                )
+            }
+
+            Spacer(modifier = Modifier.height(7.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFF1C1F2A))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(animatedExpProgress.coerceAtLeast(if (exp > 0L) 0.03f else 0f))
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(Color(0xFFFF5722), Color(0xFFE11D48))
+                            )
+                        )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(22.dp))
+
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            thickness = 0.5.dp,
+            color = Color(0xFF1A1D26)
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        // 4. AREA MENU DI BAWAH EXP BAR (Bersih, Mengalir di atas #0B0B0B, Tanpa Kebanyakan Kotak Overlay)
+        if (isPublicPreviewMode) {
+            PublicProfileShowcaseSection(
+                authDb = authDb,
+                userRankNumber = userRankNumber,
+                points = points
+            )
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SleekHighlightFeatureCard(
+                    modifier = Modifier.weight(1f),
+                    title = "Papan Peringkat",
+                    subtitle = if (userRankNumber != null) "Rank #$userRankNumber • TOP 100" else "TOP 100 Global",
+                    accentColor = Color(0xFFFF5722),
+                    icon = Icons.Outlined.EmojiEvents,
+                    onClick = onOpenLeaderboardClick
+                )
+
+                SleekHighlightFeatureCard(
+                    modifier = Modifier.weight(1f),
+                    title = "Points & Rewards",
+                    subtitle = "✦ ${FirebaseManager.formatNumber(points)} Poin",
+                    accentColor = Color(0xFFE11D48),
+                    icon = Icons.Outlined.WorkspacePremium,
+                    onClick = onOpenPointsRewardsClick
+                )
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 20.dp)
             ) {
-                // 1. Edit Profil - Sub-teks: "Ganti Nama, Foto atau Cover"
-                ProfileMenuItem(
-                    icon = Icons.Default.Edit,
-                    iconTint = Color(0xFF94A3B8),
-                    title = "Edit Profil",
-                    subtitle = "Ganti Nama, Foto atau Cover",
-                    trailingType = TrailingType.CHEVRON,
-                    onClick = onEditProfileClick
-                )
+                HorizontalDivider(thickness = 0.5.dp, color = Color(0xFF1A1D26))
 
-                // 2. Unduh - Sub-teks: "Kelola konten yang diunduh"
-                ProfileMenuItem(
-                    icon = Icons.Default.FileDownload,
-                    iconTint = Color(0xFF94A3B8),
+                CleanEditorialNavRow(
+                    icon = Icons.Outlined.DownloadForOffline,
                     title = "Unduh",
-                    subtitle = "Kelola konten yang diunduh",
-                    trailingType = TrailingType.CHEVRON,
-                    onClick = onDownloadMenuClick
+                    subtitle = "Kelola episode anime & chapter komik offline",
+                    onClick = onOpenDownloadsClick
                 )
 
-                // 3. Papan Peringkat - Sub-teks: "Lihat peringkat XP bulanan" (badge: TOP 100)
-                ProfileMenuItem(
-                    icon = Icons.Default.EmojiEvents,
-                    iconTint = Color(0xFFFBBF24),
-                    title = "Papan Peringkat",
-                    subtitle = "Lihat peringkat XP bulanan",
-                    trailingType = TrailingType.BADGE_TOP_100,
-                    onClick = onLeaderboardMenuClick
+                HorizontalDivider(thickness = 0.5.dp, color = Color(0xFF1A1D26))
+
+                CleanEditorialNavRow(
+                    icon = Icons.Outlined.Bookmarks,
+                    title = "Koleksi & Riwayat",
+                    subtitle = "Daftar favorit, riwayat tontonan & bacaan",
+                    onClick = onOpenCollectionHistoryClick
                 )
 
-                // 4. Points & Rewards - Sub-teks: "Check-in harian & tukar poin" (badge: ★ [Jumlah Poin Real-time])
-                ProfileMenuItem(
-                    icon = Icons.Default.Star,
-                    iconTint = Color(0xFFFBBF24),
-                    title = "Points & Rewards",
-                    subtitle = "Check-in harian & tukar poin",
-                    trailingType = TrailingType.BADGE_COINS,
-                    coinsAmount = points.toInt(),
-                    onClick = onRewardsMenuClick
+                HorizontalDivider(thickness = 0.5.dp, color = Color(0xFF1A1D26))
+
+                CleanEditorialNavRow(
+                    icon = Icons.Outlined.Info,
+                    title = "Info Aplikasi",
+                    subtitle = "Tentang Yuranime & versi ${BuildConfig.VERSION_NAME}",
+                    onClick = onOpenInfoClick
                 )
 
-                // 5. Pengaturan - Sub-teks: "Atur tampilan slider & preferensi aplikasi"
-                ProfileMenuItem(
-                    icon = Icons.Default.Settings,
-                    iconTint = Color(0xFF94A3B8),
-                    title = "Pengaturan",
-                    subtitle = "Atur tampilan slider & preferensi aplikasi",
-                    trailingType = TrailingType.CHEVRON,
-                    onClick = onSettingsMenuClick
+                HorizontalDivider(thickness = 0.5.dp, color = Color(0xFF1A1D26))
+
+                CleanEditorialNavRow(
+                    icon = Icons.AutoMirrored.Outlined.Logout,
+                    title = "Keluar Akun",
+                    subtitle = "Akhiri sesi login pada perangkat ini",
+                    titleColor = Color(0xFFF43F5E),
+                    iconTint = Color(0xFFF43F5E),
+                    showChevron = false,
+                    onClick = onSignOutClick
                 )
 
-                // 6. Info - Sub-teks: "Simak Cerita Kami"
-                ProfileMenuItem(
-                    icon = Icons.Default.Info,
-                    iconTint = Color(0xFF94A3B8),
-                    title = "Info",
-                    subtitle = "Simak Cerita Kami",
-                    trailingType = TrailingType.CHEVRON,
-                    onClick = onInfoMenuClick
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // 6. Keluar Akun (Logout Bersih)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFF161B26))
-                        .border(0.7.dp, Color(0xFFEF4444).copy(alpha = 0.3f), RoundedCornerShape(14.dp))
-                        .clickable { onLogout() }
-                        .padding(horizontal = 16.dp, vertical = 14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFEF4444).copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Logout,
-                                contentDescription = "Keluar Akun",
-                                tint = Color(0xFFEF4444),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(14.dp))
-
-                        Column {
-                            Text(
-                                text = "Keluar Akun",
-                                color = Color(0xFFEF4444),
-                                fontSize = 14.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = SfProFontFamily
-                            )
-                            Text(
-                                text = "Keluar dari sesi Firebase & Google saat ini",
-                                color = Color(0xFF94A3B8),
-                                fontSize = 12.sp,
-                                fontFamily = SfProFontFamily
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(110.dp))
+                HorizontalDivider(thickness = 0.5.dp, color = Color(0xFF1A1D26))
             }
         }
     }
 }
 
-/**
- * Satu Baris Menu Profile Bersih & Rapat
- */
 @Composable
-private fun ProfileMenuItem(
+private fun TopHeaderCircleIconButton(
     icon: ImageVector,
-    iconTint: Color,
-    title: String,
-    subtitle: String,
-    trailingType: TrailingType,
-    coinsAmount: Int = 0,
+    contentDescription: String,
+    isActive: Boolean = false,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color(0xFF161B26))
-            .border(0.7.dp, Color(0x26FFFFFF), RoundedCornerShape(14.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 13.dp)
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(if (isActive) Color(0xCCFF5722) else Color(0x730B0B0B))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = Color.White,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+@Composable
+private fun ProfileStatusPill(
+    text: String,
+    textColor: Color,
+    leadingSymbol: String? = null,
+    leadingColor: Color = Color.White
+) {
+    Row(
+        modifier = Modifier
+            .height(26.dp)
+            .clip(RoundedCornerShape(50))
+            .background(Color(0xFF161820))
+            .padding(horizontal = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (leadingSymbol != null) {
+            Text(
+                text = leadingSymbol,
+                color = leadingColor,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = SfProFontFamily
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+        }
+        Text(
+            text = text,
+            color = textColor,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            fontFamily = SfProFontFamily
+        )
+    }
+}
+
+@Composable
+private fun SleekHighlightFeatureCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    subtitle: String,
+    accentColor: Color,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xFF13151D))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(accentColor.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = accentColor,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(11.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = Color.White,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = SfProFontFamily,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                color = accentColor,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = SfProFontFamily,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun CleanEditorialNavRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    titleColor: Color = Color.White,
+    iconTint: Color = Color(0xFFCBD5E1),
+    showChevron: Boolean = true,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 15.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = title,
+            tint = iconTint,
+            modifier = Modifier.size(22.dp)
+        )
+
+        Spacer(modifier = Modifier.width(15.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = titleColor,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = SfProFontFamily
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                color = Color(0xFF64748B),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Normal,
+                fontFamily = SfProFontFamily,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        if (showChevron) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = Color(0xFF475569),
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun PublicProfileShowcaseSection(
+    authDb: LocalAuthDatabase,
+    userRankNumber: Int?,
+    points: Long
+) {
+    val watchCount = remember { authDb.getWatchHistory().size }
+    val comicCount = remember { authDb.getComicReadHistory().size }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "Statistik Publik Komunitas",
+            color = Color.White,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = SfProFontFamily
+        )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF1E2024)),
-                contentAlignment = Alignment.Center
+            PublicStatMetricBox(
+                modifier = Modifier.weight(1f),
+                label = "Peringkat",
+                value = if (userRankNumber != null) "#$userRankNumber" else "TOP 100"
+            )
+            PublicStatMetricBox(
+                modifier = Modifier.weight(1f),
+                label = "Anime Ditonton",
+                value = "$watchCount"
+            )
+            PublicStatMetricBox(
+                modifier = Modifier.weight(1f),
+                label = "Komik Dibaca",
+                value = "$comicCount"
+            )
+            PublicStatMetricBox(
+                modifier = Modifier.weight(1f),
+                label = "Crystal Poin",
+                value = FirebaseManager.formatNumber(points)
+            )
+        }
+    }
+}
+
+@Composable
+private fun PublicStatMetricBox(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF13151D))
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = value,
+            color = Color.White,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = SfProFontFamily
+        )
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            text = label,
+            color = Color(0xFF64748B),
+            fontSize = 10.5.sp,
+            fontFamily = SfProFontFamily,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun QuickTitlePickerDialog(
+    profile: UserProfile?,
+    onDismiss: () -> Unit,
+    onOpenPointsRewards: () -> Unit
+) {
+    val context = LocalContext.current
+    val level = profile?.level ?: 1
+    val unlockedTitles = profile?.unlockedTitles ?: listOf("WARGA YURANIME")
+    val equippedTitle = profile?.equippedTitle.orEmpty()
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFF14161E))
+                .padding(20.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = iconTint,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = title,
+                    text = "Pilih Custom Title",
                     color = Color.White,
-                    fontSize = 14.5.sp,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = SfProFontFamily
                 )
-                Spacer(modifier = Modifier.height(1.dp))
+                IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Tutup",
+                        tint = Color(0xFF94A3B8)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "Ketuk Title yang sudah terbuka untuk langsung memasangnya ke profilmu.",
+                color = Color(0xFF94A3B8),
+                fontSize = 12.sp,
+                fontFamily = SfProFontFamily
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            LazyColumn(
+                modifier = Modifier.height(290.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(FirebaseManager.ALL_TITLES, key = { it.id }) { titleDef ->
+                    val isUnlocked = (titleDef.unlockType == TitleUnlockType.MILESTONE && level >= titleDef.requiredLevel) ||
+                        unlockedTitles.any { it.equals(titleDef.titleName, ignoreCase = true) }
+                    val isEquipped = equippedTitle.equals(titleDef.titleName, ignoreCase = true)
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isEquipped) Color(0x26E11D48) else Color(0xFF0F1118))
+                            .clickable {
+                                if (isUnlocked) {
+                                    val target = if (isEquipped) null else titleDef
+                                    FirebaseManager.equipTitle(context, target) { _, msg ->
+                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    }
+                                    onDismiss()
+                                } else {
+                                    onOpenPointsRewards()
+                                }
+                            }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        GeometricTitleBadge(
+                            titleName = titleDef.titleName,
+                            tierLevel = titleDef.tierLevel,
+                            styleVariant = titleDef.styleVariant,
+                            compact = true
+                        )
+
+                        if (isUnlocked) {
+                            Text(
+                                text = if (isEquipped) "Terpasang" else "Pasang",
+                                color = if (isEquipped) Color(0xFFFF5722) else Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SfProFontFamily
+                            )
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = null,
+                                    tint = Color(0xFF64748B),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (titleDef.pointCost > 0) "${titleDef.pointCost} Poin" else "Lv.${titleDef.requiredLevel}",
+                                    color = Color(0xFF64748B),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = SfProFontFamily
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(Color(0xFFFF5722), Color(0xFFE11D48))
+                        )
+                    )
+                    .clickable(onClick = onOpenPointsRewards),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = subtitle,
+                    text = "Buka Misi & Katalog Title",
+                    color = Color.White,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollectionAndHistorySubScreen(
+    authDb: LocalAuthDatabase,
+    onBackClick: () -> Unit,
+    onEpisodeClick: (episodeId: String, movieId: String) -> Unit,
+    onComicChapterClick: ((chapterId: String) -> Unit)?
+) {
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val watchHistory = remember { authDb.getWatchHistory() }
+    val comicHistory = remember { authDb.getComicReadHistory() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0B0B0B))
+            .statusBarsPadding()
+            .navigationBarsPadding()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onBackClick,
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF14161E))
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Kembali",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Koleksi & Riwayat",
+                    color = Color.White,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
+                )
+                Text(
+                    text = "Riwayat tontonan anime & bacaan komik tersimpan",
                     color = Color(0xFF94A3B8),
                     fontSize = 12.sp,
                     fontFamily = SfProFontFamily
                 )
             }
+        }
 
-            when (trailingType) {
-                TrailingType.BADGE_TOP_100 -> {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF281C3F))
-                            .border(1.dp, Color(0xFFFBBF24).copy(alpha = 0.6f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                    ) {
-                        Text(
-                            text = "TOP 100",
-                            color = Color(0xFFFDE68A),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Black,
-                            fontFamily = SfProFontFamily
-                        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF14161E))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            val tabs = listOf("Riwayat Anime (${watchHistory.size})", "Riwayat Komik (${comicHistory.size})")
+            tabs.forEachIndexed { index, title ->
+                val active = selectedTab == index
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (active) Color(0xFFE11D48) else Color.Transparent)
+                        .clickable { selectedTab = index }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = title,
+                        color = if (active) Color.White else Color(0xFF94A3B8),
+                        fontSize = 12.5.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                        fontFamily = SfProFontFamily
+                    )
+                }
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (selectedTab == 0) {
+                if (watchHistory.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 64.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Belum ada riwayat tontonan anime.\nMulai tonton episode di Beranda untuk mencatat progresmu.",
+                                color = Color(0xFF64748B),
+                                fontSize = 13.sp,
+                                fontFamily = SfProFontFamily,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = Color(0xFF64748B),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                TrailingType.BADGE_COINS -> {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF2E2211))
-                            .border(1.dp, Color(0xFFFBBF24).copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = null,
-                            tint = Color(0xFFFBBF24),
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "$coinsAmount",
-                            color = Color(0xFFFDE68A),
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
-                        )
+                } else {
+                    items(watchHistory, key = { it.movieId }) { item ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF14161E))
+                                .clickable { onEpisodeClick(item.episodeId, item.movieId) }
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(
+                                model = item.posterUrl,
+                                contentDescription = item.animeTitle,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .width(56.dp)
+                                    .height(76.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF1C1F2B))
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = item.animeTitle,
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = item.episodeTitle,
+                                    color = Color(0xFFFF5722),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = Color(0xFF64748B),
-                        modifier = Modifier.size(20.dp)
-                    )
                 }
-                TrailingType.CHEVRON -> {
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = Color(0xFF64748B),
-                        modifier = Modifier.size(20.dp)
-                    )
+            } else {
+                if (comicHistory.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 64.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Belum ada riwayat bacaan komik.\nBuka tab Komik untuk mulai membaca chapter favoritmu.",
+                                color = Color(0xFF64748B),
+                                fontSize = 13.sp,
+                                fontFamily = SfProFontFamily,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                } else {
+                    items(comicHistory, key = { it.comicId }) { item ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF14161E))
+                                .clickable { onComicChapterClick?.invoke(item.chapterId) }
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(
+                                model = item.coverUrl,
+                                contentDescription = item.comicTitle,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .width(56.dp)
+                                    .height(76.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF1C1F2B))
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = item.comicTitle,
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Chapter ${item.chapterNumber}",
+                                    color = Color(0xFFE11D48),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = SfProFontFamily
+                                )
+                            }
+                        }
+                    }
                 }
-                TrailingType.NONE -> {}
             }
         }
     }
 }
 
-/**
- * TAHAP 1: Layar Login Sinematik (Menggunakan Google Provider Real-Time Firebase)
- */
 @Composable
 private fun LoginView(
     isLoggingIn: Boolean,
@@ -836,10 +1559,8 @@ private fun LoginView(
             .fillMaxSize()
             .background(Color(0xFF0B0B0B))
     ) {
-        // 1. Kolase Poster Bergerak Lembut Miring (-12°)
         SeamlessTiltedPosterBackground()
 
-        // 2. Lapisan Overlay Hitam Transparan
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -855,7 +1576,6 @@ private fun LoginView(
                 )
         )
 
-        // 3. Tombol Aksi di Pojok Kanan Atas (Pengaturan & Kembali)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -901,7 +1621,6 @@ private fun LoginView(
             }
         }
 
-        // 4. Grup Branding Tengah & Tombol Aksi Bawah
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -912,7 +1631,6 @@ private fun LoginView(
         ) {
             Spacer(modifier = Modifier.weight(0.55f))
 
-            // Branding YURANIME
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -947,7 +1665,6 @@ private fun LoginView(
 
             Spacer(modifier = Modifier.weight(1.0f))
 
-            // Tombol "Masuk dengan Google"
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -987,19 +1704,18 @@ private fun LoginView(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Tombol Alternatif "Masuk dengan Email / Akun Dinz"
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF1E1B2E))
-                    .border(1.dp, Color(0x338B5CF6), CircleShape)
+                    .background(Color(0xFF161820))
+                    .border(1.dp, Color(0x33E11D48), CircleShape)
                     .clickable(enabled = !isLoggingIn) { onEmailLoginClick() },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Masuk dengan Email / Akun Dinz",
+                    text = "Pilih Akun Google Lainnya",
                     color = Color(0xFFE2E8F0),
                     fontSize = 14.5.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -1009,7 +1725,6 @@ private fun LoginView(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Tombol "Login Tanpa Akun"
             Text(
                 text = "Login Tanpa Akun",
                 color = Color(0xFF9CA3AF),
@@ -1023,7 +1738,6 @@ private fun LoginView(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Teks Kebijakan
             val agreementText = remember {
                 buildAnnotatedString {
                     append("Dengan melanjutkan, kamu menyetujui ")
@@ -1204,8 +1918,8 @@ private fun AppInfoModal(onDismiss: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
-                .background(Color(0xFF161B26))
-                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(20.dp))
+                .background(Color(0xFF14161E))
+                .border(1.dp, Color(0xFF1F2433), RoundedCornerShape(20.dp))
                 .padding(20.dp)
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1260,7 +1974,7 @@ private fun AppInfoModal(onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Yuranime adalah aplikasi streaming anime subtitle Indonesia gratis, bebas iklan mengganggu, dan didukung oleh komunitas anime Indonesia dengan database Firebase terintegrasi.",
+                    text = "Yuranime adalah aplikasi streaming anime dan baca komik subtitle Indonesia gratis, bebas iklan mengganggu, dengan sistem profil, title, dan papan peringkat real-time.",
                     color = Color(0xFFCBD5E1),
                     fontSize = 12.5.sp,
                     fontFamily = SfProFontFamily,
@@ -1274,7 +1988,11 @@ private fun AppInfoModal(onDismiss: () -> Unit) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFFF5722))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(Color(0xFFFF5722), Color(0xFFE11D48))
+                            )
+                        )
                         .clickable { onDismiss() }
                         .padding(vertical = 11.dp),
                     contentAlignment = Alignment.Center

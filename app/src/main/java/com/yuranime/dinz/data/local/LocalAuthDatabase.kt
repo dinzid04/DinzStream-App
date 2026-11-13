@@ -384,6 +384,17 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
             put("updated_at", System.currentTimeMillis())
         }
         db.insertWithOnConflict("comic_read_history", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+        if (existing?.chapterId != chapterId) {
+            com.yuranime.dinz.data.firebase.FirebaseManager.addExpAndPoints(15L, 5L)
+        }
+    }
+
+    fun getTotalCommentCount(): Int {
+        val db = readableDatabase
+        val cursor = db.rawQuery("SELECT COUNT(*) FROM local_comments", null)
+        return cursor.use {
+            if (it.moveToFirst()) it.getInt(0) else 0
+        }
     }
 
     fun getComicReadHistoryItem(comicId: String): com.yuranime.dinz.data.model.ComicReadHistoryItem? {
