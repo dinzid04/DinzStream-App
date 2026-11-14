@@ -487,7 +487,7 @@ private fun UserProfileView(
         if (equippedProfileEffectUrl.isNotBlank() && cosmeticAnimate) {
             ApngAnimationView(
                 url = equippedProfileEffectUrl,
-                scaleType = ImageView.ScaleType.FIT_TOP,
+                scaleType = ImageView.ScaleType.FIT_START,
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
