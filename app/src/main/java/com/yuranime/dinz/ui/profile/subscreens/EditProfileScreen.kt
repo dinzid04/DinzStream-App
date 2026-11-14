@@ -944,13 +944,20 @@ fun EditProfileScreen(
 
         // Live Preview Profile Effect di Luar/Depan Full Screen (zIndex = 50f)
         if (selectedProfileEffectUrl.isNotBlank()) {
+            val previewEffectDef = remember(selectedProfileEffectUrl) {
+                DiscordCosmeticsRepository.findEffect(context, selectedProfileEffectUrl)
+            }
+            val previewLayers = remember(previewEffectDef, selectedProfileEffectUrl) {
+                previewEffectDef?.layerUrls?.ifEmpty { listOf(selectedProfileEffectUrl) }
+                    ?: listOf(selectedProfileEffectUrl)
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .zIndex(50f)
             ) {
-                ApngAnimationView(
-                    url = selectedProfileEffectUrl,
+                ApngStackedEffectView(
+                    layerUrls = previewLayers,
                     scaleType = ImageView.ScaleType.FIT_START,
                     modifier = Modifier
                         .fillMaxSize()

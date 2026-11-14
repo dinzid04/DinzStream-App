@@ -137,10 +137,15 @@ fun GeometricTitleBadge(
         animationType ?: TitleAnimationType.resolveForTitle(titleName, tierLevel, styleVariant)
     }
 
-    val heightDp: Dp = if (compact) 23.dp else 28.dp
-    val fontSize: TextUnit = if (compact) 9.sp else 10.5.sp
-    val startTextPad: Dp = if (compact) 28.dp else 34.dp
-    val endSafePad: Dp = if (compact) 18.dp else 24.dp
+    val isLongCompact = compact && titleName.length > 12
+    val heightDp: Dp = if (compact) 21.dp else 28.dp
+    val fontSize: TextUnit = when {
+        isLongCompact -> 7.2.sp
+        compact -> 8.2.sp
+        else -> 10.5.sp
+    }
+    val startTextPad: Dp = if (compact) 21.5.dp else 34.dp
+    val endSafePad: Dp = if (compact) 10.5.dp else 24.dp
 
     val phase = if (isAnimated) {
         val transition = rememberInfiniteTransition(label = "titleBadgeAnim")
@@ -428,7 +433,11 @@ fun GeometricTitleBadge(
             fontSize = fontSize,
             fontWeight = FontWeight.Bold,
             fontFamily = OutfitDisplayFontFamily,
-            letterSpacing = if (compact) 0.6.sp else 0.9.sp,
+            letterSpacing = when {
+                isLongCompact -> 0.15.sp
+                compact -> 0.45.sp
+                else -> 0.9.sp
+            },
             maxLines = 1,
             softWrap = false
         )

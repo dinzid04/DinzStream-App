@@ -43,13 +43,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,8 +63,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
 import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.firebase.LeaderboardUser
 import com.yuranime.dinz.data.firebase.UserProfile
@@ -67,18 +74,18 @@ import com.yuranime.dinz.ui.components.PrimoPointIcon
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 
 /**
- * Halaman Papan Peringkat Real-Time 100% Persis Referensi 1000127571.png
- * - Aurora wave gradasi merah marun lembut di latar atas
- * - Ornamen Mahkota Merah ♛ dan garis hiasan simetris
- * - Podium Top 1, Top 2, Top 3 dengan PodiumLaurelCrownFrame & Curved Horizon Pedestal Arch
- * - Bar Header # Pengguna & Total EXP dengan pendaran neon merah
- * - Baris 4+ bersih dengan PrimoPointIcon
- * - Sticky Bottom Bar Posisi Peringkat Anda ber-border merah menyala
+ * Halaman Papan Peringkat Real-Time (URUTAN 1):
+ * - Header bersih tanpa bulatan overlay pada tombol <- dan ?, dilengkapi Vector Mahkota Royal 3-Puncak
+ * - Podium Top 1, 2, 3 & Daftar #4+ menampilkan Avatar Decoration milik masing-masing user (Versi STATIS / Non-Animasi)
+ * - Bar Header menggunakan Vector Icon Grup Pengguna & Vector Icon Grafik 3-Bar (tanpa simbol '#' atau emoji)
+ * - Indikator Level menggunakan Vector Icon Rank Chevron tanpa segitiga teks dan tanpa kapsul overlay
+ * - Sticky Bottom Bar presisi di tengah vertikal & Modal Cara Memperoleh EXP rapi
  */
 @Composable
 fun LeaderboardScreen(
     onBackClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val leaderboardUsers by FirebaseManager.leaderboard.collectAsState()
     val isLoading by FirebaseManager.isLeaderboardLoading.collectAsState()
     val currentUserProfile by FirebaseManager.userProfile.collectAsState()
@@ -87,6 +94,7 @@ fun LeaderboardScreen(
     var showXpInfoModal by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
+        FirebaseManager.deduplicateUserAccounts(context)
         FirebaseManager.startListeningLeaderboard()
     }
 
@@ -99,11 +107,11 @@ fun LeaderboardScreen(
         emptyList()
     }
 
-    val myRankEntry = remember(leaderboardUsers, currentUid) {
-        if (!currentUid.isNullOrBlank()) {
-            leaderboardUsers.firstOrNull { it.uid == currentUid }
-        } else {
-            null
+    val myRankEntry = remember(leaderboardUsers, currentUid, currentUserProfile) {
+        val profileName = currentUserProfile?.name?.trim().orEmpty()
+        leaderboardUsers.firstOrNull {
+            (!currentUid.isNullOrBlank() && it.uid == currentUid) ||
+                (profileName.isNotBlank() && it.name.equals(profileName, ignoreCase = true))
         }
     }
 
@@ -138,45 +146,42 @@ fun LeaderboardScreen(
                 .statusBarsPadding()
         ) {
             // ========================================================
-            // 1. HEADER ATAS (Persis 1000127571.png)
+            // 1. HEADER ATAS (Tanpa Bulatan Overlay + Vector Mahkota Royal 3-Puncak)
             // ========================================================
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
-                // Tombol Bulat Gelap Kiri (Panah <-)
+                // Tombol Kiri (Panah <- bersih tanpa lingkaran overlay)
                 IconButton(
                     onClick = onBackClick,
                     modifier = Modifier
                         .align(Alignment.CenterStart)
                         .size(38.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF14161E))
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Kembali",
                         tint = Color.White,
-                        modifier = Modifier.size(19.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
 
-                // Bagian Tengah: Ikon Mahkota Merah ♛ + Judul + Subteks + Ornamen Simetris
+                // Bagian Tengah: Vector Mahkota Royal 3-Puncak + Judul + Subteks + Ornamen Simetris
                 Column(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .padding(horizontal = 48.dp),
+                        .padding(horizontal = 44.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "♛",
-                        color = Color(0xFFE11D48),
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold
+                    RoyalThreePeakCrownIcon(
+                        size = 20.dp,
+                        primaryColor = Color(0xFFE11D48),
+                        accentColor = Color(0xFFF59E0B)
                     )
 
-                    Spacer(modifier = Modifier.height(1.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
 
                     Text(
                         text = "Papan Peringkat",
@@ -193,7 +198,7 @@ fun LeaderboardScreen(
                         fontFamily = SfProFontFamily
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(5.dp))
 
                     // Garis Hiasan Simetris Merah Tipis
                     Row(
@@ -230,20 +235,18 @@ fun LeaderboardScreen(
                     }
                 }
 
-                // Tombol Bulat Gelap Kanan (Tanda Tanya ?)
+                // Tombol Kanan (Ikon Bantuan ? bersih tanpa lingkaran overlay)
                 IconButton(
                     onClick = { showXpInfoModal = true },
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .size(38.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF14161E))
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.HelpOutline,
                         contentDescription = "Bantuan EXP",
                         tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(19.dp)
+                        modifier = Modifier.size(21.dp)
                     )
                 }
             }
@@ -311,7 +314,7 @@ fun LeaderboardScreen(
                     contentPadding = PaddingValues(bottom = 120.dp)
                 ) {
                     // ========================================================
-                    // 2. PODIUM TOP 1, 2, 3 (MAHKOTA + SAYAP DAUN LAUREL + PEDESTAL MELENGKUNG)
+                    // 2. PODIUM TOP 1, 2, 3 (AVATAR DECORATION STATIS MILIK USER + PEDESTAL)
                     // ========================================================
                     item {
                         TopThreeEditorialPodium(
@@ -323,7 +326,7 @@ fun LeaderboardScreen(
                     }
 
                     // ========================================================
-                    // 3. BAR HEADER # PENGGUNA & TOTAL EXP
+                    // 3. BAR HEADER PENGGUNA & TOTAL EXP (VECTOR ICON ASLI)
                     // ========================================================
                     item {
                         Box(
@@ -355,14 +358,11 @@ fun LeaderboardScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = "#",
-                                        color = Color(0xFFE11D48),
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = SfProFontFamily
+                                    UserGroupVectorIcon(
+                                        size = 16.dp,
+                                        color = Color(0xFFE11D48)
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Spacer(modifier = Modifier.width(7.dp))
                                     Text(
                                         text = "Pengguna",
                                         color = Color.White,
@@ -373,11 +373,11 @@ fun LeaderboardScreen(
                                 }
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = "📊",
-                                        fontSize = 12.sp
+                                    SparkBarChartVectorIcon(
+                                        size = 14.dp,
+                                        color = Color(0xFF94A3B8)
                                     )
-                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = "Total EXP",
                                         color = Color(0xFF94A3B8),
@@ -436,141 +436,333 @@ fun LeaderboardScreen(
 }
 
 /**
- * Komponen Vektor Bingkai Mahkota + Sayap Daun Laurel Wreath + Plakat Ribbon
- * 100% Mengikuti Gambar Referensi 1000127571.png
+ * Vector Icon Mahkota Royal 3-Puncak yang lancip, simetris, dan proporsional
  */
 @Composable
-private fun PodiumLaurelCrownFrame(
-    rank: Int,
-    avatarSize: Dp,
-    modifier: Modifier = Modifier,
-    avatarContent: @Composable () -> Unit
+private fun RoyalThreePeakCrownIcon(
+    size: Dp,
+    primaryColor: Color = Color(0xFFE11D48),
+    accentColor: Color = Color(0xFFF59E0B),
+    modifier: Modifier = Modifier
 ) {
-    val crownColor = when (rank) {
+    Canvas(modifier = modifier.size(width = size * 1.25f, height = size)) {
+        val w = this.size.width
+        val h = this.size.height
+
+        val crownPath = Path().apply {
+            moveTo(w * 0.14f, h * 0.78f)
+            lineTo(w * 0.05f, h * 0.28f)
+            lineTo(w * 0.31f, h * 0.52f)
+            lineTo(w * 0.50f, h * 0.12f)
+            lineTo(w * 0.69f, h * 0.52f)
+            lineTo(w * 0.95f, h * 0.28f)
+            lineTo(w * 0.86f, h * 0.78f)
+            close()
+        }
+
+        drawPath(
+            path = crownPath,
+            brush = Brush.verticalGradient(
+                colors = listOf(primaryColor, Color(0xFFBE123C))
+            )
+        )
+
+        // Base band mahkota
+        drawRoundRect(
+            color = primaryColor,
+            topLeft = Offset(w * 0.14f, h * 0.83f),
+            size = Size(w * 0.72f, h * 0.11f),
+            cornerRadius = CornerRadius(h * 0.05f, h * 0.05f)
+        )
+
+        // 3 titik permata di ujung puncak mahkota
+        val jewelRadius = h * 0.065f
+        drawCircle(
+            color = accentColor,
+            radius = jewelRadius,
+            center = Offset(w * 0.50f, h * 0.09f)
+        )
+        drawCircle(
+            color = primaryColor,
+            radius = jewelRadius * 0.85f,
+            center = Offset(w * 0.05f, h * 0.24f)
+        )
+        drawCircle(
+            color = primaryColor,
+            radius = jewelRadius * 0.85f,
+            center = Offset(w * 0.95f, h * 0.24f)
+        )
+    }
+}
+
+/**
+ * Vector Icon Grup Pengguna untuk kolom kiri Header Papan Peringkat
+ */
+@Composable
+private fun UserGroupVectorIcon(
+    size: Dp,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+
+        // User utama (depan kiri)
+        drawCircle(
+            color = color,
+            radius = w * 0.19f,
+            center = Offset(w * 0.38f, h * 0.30f)
+        )
+        val frontBody = Path().apply {
+            moveTo(w * 0.10f, h * 0.86f)
+            quadraticTo(w * 0.10f, h * 0.56f, w * 0.38f, h * 0.56f)
+            quadraticTo(w * 0.66f, h * 0.56f, w * 0.66f, h * 0.86f)
+            close()
+        }
+        drawPath(path = frontBody, color = color)
+
+        // User kedua (belakang kanan)
+        drawCircle(
+            color = color.copy(alpha = 0.65f),
+            radius = w * 0.15f,
+            center = Offset(w * 0.72f, h * 0.34f)
+        )
+        val backBody = Path().apply {
+            moveTo(w * 0.56f, h * 0.84f)
+            quadraticTo(w * 0.58f, h * 0.60f, w * 0.74f, h * 0.60f)
+            quadraticTo(w * 0.93f, h * 0.60f, w * 0.93f, h * 0.84f)
+            close()
+        }
+        drawPath(path = backBody, color = color.copy(alpha = 0.65f))
+    }
+}
+
+/**
+ * Vector Icon Grafik 3-Bar Monokrom Bersih untuk kolom kanan Total EXP
+ */
+@Composable
+private fun SparkBarChartVectorIcon(
+    size: Dp,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val barWidth = w * 0.21f
+        val radius = CornerRadius(barWidth * 0.45f, barWidth * 0.45f)
+
+        // Bar 1 (kiri - pendek)
+        drawRoundRect(
+            color = color.copy(alpha = 0.65f),
+            topLeft = Offset(w * 0.08f, h * 0.52f),
+            size = Size(barWidth, h * 0.40f),
+            cornerRadius = radius
+        )
+        // Bar 2 (tengah - sedang)
+        drawRoundRect(
+            color = color.copy(alpha = 0.85f),
+            topLeft = Offset(w * 0.395f, h * 0.30f),
+            size = Size(barWidth, h * 0.62f),
+            cornerRadius = radius
+        )
+        // Bar 3 (kanan - tinggi)
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(w * 0.71f, h * 0.10f),
+            size = Size(barWidth, h * 0.82f),
+            cornerRadius = radius
+        )
+    }
+}
+
+/**
+ * Vector Icon Rank Chevron (Pangkat Garis Bersusun Tajam Emas/Oranye) Tanpa Kapsul Overlay
+ */
+@Composable
+private fun RankChevronVectorIcon(
+    level: Int,
+    size: Dp = 13.dp,
+    modifier: Modifier = Modifier
+) {
+    val primaryColor = when {
+        level >= 50 -> Color(0xFFF59E0B)
+        level >= 20 -> Color(0xFFFF5722)
+        else -> Color(0xFFFB923C)
+    }
+    val secondaryColor = when {
+        level >= 50 -> Color(0xFFFDE68A)
+        level >= 20 -> Color(0xFFFDBA74)
+        else -> Color(0xFFFED7AA)
+    }
+
+    Canvas(modifier = modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val stroke = (w * 0.16f).coerceAtLeast(1.8f)
+
+        // Chevron Atas
+        val topChevron = Path().apply {
+            moveTo(w * 0.16f, h * 0.46f)
+            lineTo(w * 0.50f, h * 0.16f)
+            lineTo(w * 0.84f, h * 0.46f)
+        }
+        drawPath(
+            path = topChevron,
+            brush = Brush.horizontalGradient(listOf(primaryColor, secondaryColor, primaryColor)),
+            style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+
+        // Chevron Bawah
+        val bottomChevron = Path().apply {
+            moveTo(w * 0.16f, h * 0.82f)
+            lineTo(w * 0.50f, h * 0.52f)
+            lineTo(w * 0.84f, h * 0.82f)
+        }
+        drawPath(
+            path = bottomChevron,
+            color = primaryColor,
+            style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+    }
+}
+
+/**
+ * Komponen Avatar User + Avatar Decoration Milik User (Versi STATIS / Non-Animation)
+ * Digunakan di Podium Top 1, 2, 3, di Daftar #4 ke bawah, dan di Sticky Bottom Bar.
+ */
+@Composable
+private fun StaticUserAvatarWithBorder(
+    avatarUrl: String,
+    userName: String,
+    borderUrl: String,
+    avatarSize: Dp,
+    rankBadgeNumber: Int? = null,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val borderContainerSize = avatarSize * 1.22f
+    val staticBorderUrl = remember(borderUrl) {
+        if (borderUrl.isNotBlank()) {
+            DiscordCosmeticsRepository.getOptimizedUrl(
+                url = borderUrl.trim(),
+                size = 240,
+                animated = false
+            )
+        } else {
+            ""
+        }
+    }
+
+    val ringColor = when (rankBadgeNumber) {
         1 -> Color(0xFFF59E0B)
-        2 -> Color(0xFF94A3B8)
-        else -> Color(0xFFD97706)
-    }
-    val laurelColor = when (rank) {
-        1 -> Color(0xFFFBBF24)
-        2 -> Color(0xFFA5B4FC)
-        else -> Color(0xFFEA580C)
-    }
-    val plaqueText = "TOP $rank"
-    val plaqueBg = when (rank) {
-        1 -> listOf(Color(0xFFF59E0B), Color(0xFFB45309))
-        2 -> listOf(Color(0xFF94A3B8), Color(0xFF475569))
-        else -> listOf(Color(0xFFD97706), Color(0xFF7C2D12))
+        2 -> Color(0xFFCBD5E1)
+        3 -> Color(0xFFD97706)
+        else -> Color(0xFF262B38)
     }
 
     Box(
-        modifier = modifier.size(avatarSize + 36.dp),
+        modifier = modifier.size(borderContainerSize),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val cx = size.width / 2f
-            val cy = size.height / 2f
-            val r = (avatarSize.toPx() / 2f) + 2.dp.toPx()
-
-            // 1. Cincin Ganda Memeluk Avatar
-            drawCircle(
-                color = crownColor,
-                radius = r,
-                center = Offset(cx, cy),
-                style = Stroke(width = 2.dp.toPx())
-            )
-            drawCircle(
-                color = crownColor.copy(alpha = 0.35f),
-                radius = r + 2.5.dp.toPx(),
-                center = Offset(cx, cy),
-                style = Stroke(width = 1.dp.toPx())
-            )
-
-            // 2. Mahkota 3 Sudut di Puncak Atas
-            val crownTopY = cy - r - 12.dp.toPx()
-            val crownBaseY = cy - r - 1.dp.toPx()
-            val crownHalfW = 12.dp.toPx()
-
-            val crownPath = Path().apply {
-                moveTo(cx - crownHalfW, crownBaseY)
-                lineTo(cx - crownHalfW, crownTopY + 3.dp.toPx())
-                lineTo(cx - crownHalfW * 0.45f, crownBaseY - 4.dp.toPx())
-                lineTo(cx, crownTopY)
-                lineTo(cx + crownHalfW * 0.45f, crownBaseY - 4.dp.toPx())
-                lineTo(cx + crownHalfW, crownTopY + 3.dp.toPx())
-                lineTo(cx + crownHalfW, crownBaseY)
-                close()
-            }
-            drawPath(crownPath, color = crownColor)
-
-            // Permata Ruby Merah di Mahkota Top 1
-            if (rank == 1) {
-                drawCircle(
-                    color = Color(0xFFE11D48),
-                    radius = 2.dp.toPx(),
-                    center = Offset(cx, crownBaseY - 3.5.dp.toPx())
-                )
-            }
-
-            // 3. Sayap Daun Laurel Wreath Melengkung di Kiri dan Kanan Cincin
-            val leafRadiusX = 3.5.dp.toPx()
-            val leafRadiusY = 1.8.dp.toPx()
-            val leafAngles = listOf(-60f, -40f, -20f, 0f, 20f, 40f)
-
-            // Daun Sisi Kiri
-            for (ang in leafAngles) {
-                val rad = Math.toRadians((180f + ang).toDouble())
-                val lx = cx + (r + 4.dp.toPx()) * Math.cos(rad).toFloat()
-                val ly = cy + (r + 4.dp.toPx()) * Math.sin(rad).toFloat()
-                drawOval(
-                    color = laurelColor.copy(alpha = 0.85f),
-                    topLeft = Offset(lx - leafRadiusX, ly - leafRadiusY),
-                    size = androidx.compose.ui.geometry.Size(leafRadiusX * 2, leafRadiusY * 2)
-                )
-            }
-
-            // Daun Sisi Kanan
-            for (ang in leafAngles) {
-                val rad = Math.toRadians((0f - ang).toDouble())
-                val rx = cx + (r + 4.dp.toPx()) * Math.cos(rad).toFloat()
-                val ry = cy + (r + 4.dp.toPx()) * Math.sin(rad).toFloat()
-                drawOval(
-                    color = laurelColor.copy(alpha = 0.85f),
-                    topLeft = Offset(rx - leafRadiusX, ry - leafRadiusY),
-                    size = androidx.compose.ui.geometry.Size(leafRadiusX * 2, leafRadiusY * 2)
-                )
-            }
-        }
-
-        // Foto Profil Bulat di Tengah Cincin
+        // 1. Foto Profil Bulat di Tengah
         Box(
             modifier = Modifier
                 .size(avatarSize)
-                .clip(CircleShape),
+                .clip(CircleShape)
+                .background(Color(0xFF161820))
+                .then(
+                    if (staticBorderUrl.isBlank()) {
+                        Modifier.border(
+                            width = if (rankBadgeNumber != null) 2.dp else 1.dp,
+                            color = ringColor,
+                            shape = CircleShape
+                        )
+                    } else {
+                        Modifier
+                    }
+                ),
             contentAlignment = Alignment.Center
         ) {
-            avatarContent()
+            if (avatarUrl.isNotBlank()) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(avatarUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = userName,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                )
+            } else {
+                Text(
+                    text = userName.take(1).uppercase().ifBlank { "-" },
+                    color = Color.White,
+                    fontSize = (avatarSize.value * 0.36f).sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
+                )
+            }
         }
 
-        // 4. Plakat Pita Heksagonal Membulat di Bawah (TOP 1 / TOP 2 / TOP 3)
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .offset(y = (-2).dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(Brush.horizontalGradient(plaqueBg))
-                .border(0.75.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-                .padding(horizontal = 8.dp, vertical = 2.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = plaqueText,
-                color = Color.White,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.ExtraBold,
-                fontFamily = SfProFontFamily,
-                letterSpacing = 0.5.sp
+        // 2. Avatar Decoration Milik User (Versi STATIS / Frame Pertama ?passthrough=false)
+        if (staticBorderUrl.isNotBlank()) {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(staticBorderUrl)
+                    .crossfade(false)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .size(borderContainerSize)
+                    .align(Alignment.Center)
             )
+        }
+
+        // 3. Lencana Angka Podium Minimalis (1, 2, 3) di Bawah Cincin Avatar
+        if (rankBadgeNumber != null && rankBadgeNumber in 1..3) {
+            val badgeColors = when (rankBadgeNumber) {
+                1 -> listOf(Color(0xFFF59E0B), Color(0xFFB45309))
+                2 -> listOf(Color(0xFFCBD5E1), Color(0xFF475569))
+                else -> listOf(Color(0xFFD97706), Color(0xFF7C2D12))
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .offset(y = 3.dp)
+                    .height(18.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Brush.horizontalGradient(badgeColors))
+                    .border(1.dp, Color(0xFF090A0E), RoundedCornerShape(50))
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    RoyalThreePeakCrownIcon(
+                        size = 9.dp,
+                        primaryColor = Color.White,
+                        accentColor = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = "$rankBadgeNumber",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = SfProFontFamily,
+                        style = TextStyle(
+                            platformStyle = PlatformTextStyle(includeFontPadding = false)
+                        )
+                    )
+                }
+            }
         }
     }
 }
@@ -592,14 +784,14 @@ private fun CurvedHorizonPedestalArch(
     Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .height(28.dp)
+            .height(24.dp)
     ) {
         val w = size.width
         val h = size.height
 
         val archPath = Path().apply {
-            moveTo(w * 0.05f, h * 0.9f)
-            quadraticTo(w * 0.5f, 2.dp.toPx(), w * 0.95f, h * 0.9f)
+            moveTo(w * 0.04f, h * 0.9f)
+            quadraticTo(w * 0.5f, 2.dp.toPx(), w * 0.96f, h * 0.9f)
         }
 
         drawPath(
@@ -615,10 +807,10 @@ private fun CurvedHorizonPedestalArch(
         )
 
         val glowPath = Path().apply {
-            moveTo(w * 0.05f, h * 0.9f)
-            quadraticTo(w * 0.5f, 2.dp.toPx(), w * 0.95f, h * 0.9f)
-            lineTo(w * 0.95f, h)
-            lineTo(w * 0.05f, h)
+            moveTo(w * 0.04f, h * 0.9f)
+            quadraticTo(w * 0.5f, 2.dp.toPx(), w * 0.96f, h * 0.9f)
+            lineTo(w * 0.96f, h)
+            lineTo(w * 0.04f, h)
             close()
         }
         drawPath(
@@ -632,52 +824,28 @@ private fun CurvedHorizonPedestalArch(
 
 /**
  * Satu Spot Podium Lengkap (Top 1, 2, atau 3)
+ * Pedestal lega agar Custom Title ("MYTHIC SOVEREIGN" dll.) tampil utuh 100% tanpa terpotong!
  */
 @Composable
 private fun EditorialPodiumSpot(
     rank: Int,
     user: LeaderboardUser?,
     avatarSize: Dp,
-    accentColor: Color,
-    isCurrentUser: Boolean,
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.padding(horizontal = 2.dp),
+        modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        PodiumLaurelCrownFrame(
-            rank = rank,
-            avatarSize = avatarSize
-        ) {
-            if (user != null && user.avatar.isNotBlank()) {
-                AsyncImage(
-                    model = user.avatar,
-                    contentDescription = user.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF161820)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = user?.name?.take(1)?.uppercase() ?: "-",
-                        color = Color.White,
-                        fontSize = if (rank == 1) 24.sp else 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
-                    )
-                }
-            }
-        }
+        StaticUserAvatarWithBorder(
+            avatarUrl = user?.avatar.orEmpty(),
+            userName = user?.name ?: "-",
+            borderUrl = user?.equippedBorderUrl.orEmpty(),
+            avatarSize = avatarSize,
+            rankBadgeNumber = rank
+        )
 
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(5.dp))
 
         // Pedestal Melengkung Terbuka
         CurvedHorizonPedestalArch(rank = rank)
@@ -685,11 +853,11 @@ private fun EditorialPodiumSpot(
         Spacer(modifier = Modifier.height(4.dp))
 
         if (user != null) {
-            // 1. Username
+            // 1. Nama Pengguna
             Text(
                 text = user.name,
                 color = Color.White,
-                fontSize = if (rank == 1) 16.sp else 14.5.sp,
+                fontSize = if (rank == 1) 15.5.sp else 14.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = SfProFontFamily,
                 maxLines = 1,
@@ -697,40 +865,35 @@ private fun EditorialPodiumSpot(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
-            // 2. Kapsul Level Ramping (^ LV. X)
+            // 2. Indikator Level Bersih (Vector Rank Chevron + LV. X TANPA Kapsul Overlay & TANPA ▲)
             Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(Color(0xFF161922))
-                    .border(0.75.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(50))
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text = "▲",
-                    color = Color(0xFFFF5722),
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.Bold
+                RankChevronVectorIcon(
+                    level = user.level,
+                    size = 12.dp
                 )
                 Spacer(modifier = Modifier.width(3.dp))
                 Text(
                     text = "LV. ${user.level}",
-                    color = Color.White,
+                    color = Color(0xFFE2E8F0),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = SfProFontFamily
                 )
             }
 
-            // 3. Custom Title Badge (Jika Ada)
+            // 3. Custom Title Badge (Compact = true agar MYTHIC SOVEREIGN tampil utuh 100%)
             if (user.equippedTitle.isNotBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 GeometricTitleBadge(
                     titleName = user.equippedTitle,
                     tierLevel = user.equippedTitleTier,
-                    styleVariant = user.equippedTitleVariant
+                    styleVariant = user.equippedTitleVariant,
+                    compact = true
                 )
             }
 
@@ -740,7 +903,7 @@ private fun EditorialPodiumSpot(
             Text(
                 text = "${FirebaseManager.formatNumber(user.exp)} EXP",
                 color = if (rank == 1) Color(0xFFF59E0B) else Color.White,
-                fontSize = if (rank == 1) 15.sp else 13.sp,
+                fontSize = if (rank == 1) 14.5.sp else 12.5.sp,
                 fontWeight = if (rank == 1) FontWeight.ExtraBold else FontWeight.Bold,
                 fontFamily = SfProFontFamily,
                 maxLines = 1,
@@ -767,44 +930,40 @@ private fun TopThreeEditorialPodium(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.Bottom
     ) {
-        // TOP 2 (Kiri) - avatarSize = 70.dp
+        // TOP 2 (Kiri) - avatarSize = 68.dp
         EditorialPodiumSpot(
             rank = 2,
             user = top2,
-            avatarSize = 70.dp,
-            accentColor = Color(0xFF94A3B8),
-            isCurrentUser = top2?.uid != null && top2.uid == currentUid,
+            avatarSize = 68.dp,
             modifier = Modifier.weight(1f)
         )
 
-        // TOP 1 (Tengah - Lebih Tinggi & Besar) - avatarSize = 86.dp
+        // TOP 1 (Tengah - Lebih Tinggi & Besar) - avatarSize = 84.dp
         EditorialPodiumSpot(
             rank = 1,
             user = top1,
-            avatarSize = 86.dp,
-            accentColor = Color(0xFFF59E0B),
-            isCurrentUser = top1?.uid != null && top1.uid == currentUid,
-            modifier = Modifier.weight(1.18f)
+            avatarSize = 84.dp,
+            modifier = Modifier.weight(1.12f)
         )
 
-        // TOP 3 (Kanan) - avatarSize = 70.dp
+        // TOP 3 (Kanan) - avatarSize = 68.dp
         EditorialPodiumSpot(
             rank = 3,
             user = top3,
-            avatarSize = 70.dp,
-            accentColor = Color(0xFFD97706),
-            isCurrentUser = top3?.uid != null && top3.uid == currentUid,
+            avatarSize = 68.dp,
             modifier = Modifier.weight(1f)
         )
     }
 }
 
 /**
- * Baris Kartu Peringkat #4 ke Bawah (Bersih, Rapi & Elegan)
+ * Baris Kartu Peringkat #4 ke Bawah:
+ * - Menampilkan Avatar Decoration milik user (Versi STATIS)
+ * - Indikator Level menggunakan Vector Rank Chevron + LV. X + Pangkat/Title TANPA kapsul overlay
  */
 @Composable
 private fun ModernLeaderboardRowItem(
@@ -823,53 +982,37 @@ private fun ModernLeaderboardRowItem(
                 if (isCurrentUser) Color(0xFFE11D48).copy(alpha = 0.6f) else Color(0xFF1E222D),
                 RoundedCornerShape(16.dp)
             )
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Rank #
+        // Nomor Urut Peringkat
         Text(
-            text = "#${user.rank}",
-            color = Color(0xFF64748B),
+            text = "${user.rank}",
+            color = Color(0xFF94A3B8),
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = SfProFontFamily,
-            modifier = Modifier.width(36.dp)
+            textAlign = TextAlign.Center,
+            modifier = Modifier.width(28.dp)
         )
 
         Spacer(modifier = Modifier.width(6.dp))
 
-        // Foto Profil Bulat 44.dp
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF1E2230)),
-            contentAlignment = Alignment.Center
+        // Foto Profil Bulat + Avatar Decoration Milik User (Versi STATIS)
+        StaticUserAvatarWithBorder(
+            avatarUrl = user.avatar,
+            userName = user.name,
+            borderUrl = user.equippedBorderUrl,
+            avatarSize = 42.dp
+        )
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        // Tengah: Baris atas Nama + Tag; Baris bawah Vector Rank Chevron + LV. X + Pangkat/Title (Tanpa Kapsul Overlay!)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center
         ) {
-            if (user.avatar.isNotBlank()) {
-                AsyncImage(
-                    model = user.avatar,
-                    contentDescription = user.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                )
-            } else {
-                Text(
-                    text = user.name.take(1).uppercase(),
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        // Tengah: Baris atas nama + #tag; Baris bawah kapsul level + title
-        Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = user.name,
@@ -882,34 +1025,36 @@ private fun ModernLeaderboardRowItem(
                 )
                 Spacer(modifier = Modifier.width(5.dp))
                 Text(
-                    text = "#${user.userTag.removePrefix("@")}",
+                    text = "#${user.userTag.removePrefix("@").removePrefix("#")}",
                     color = Color(0xFF64748B),
-                    fontSize = 12.sp,
+                    fontSize = 11.5.sp,
                     fontFamily = SfProFontFamily
                 )
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(3.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Kapsul border merah tipis ^ LV. 1
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .border(0.75.dp, Color(0xFFE11D48).copy(alpha = 0.5f), RoundedCornerShape(50))
-                        .padding(horizontal = 6.dp, vertical = 1.dp)
-                ) {
-                    Text(
-                        text = "▲ LV. ${user.level}",
-                        color = Color(0xFFE2E8F0),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
-                    )
-                }
-
+                RankChevronVectorIcon(
+                    level = user.level,
+                    size = 12.dp
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "LV. ${user.level}",
+                    color = Color(0xFFE2E8F0),
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
+                )
                 Spacer(modifier = Modifier.width(6.dp))
-
+                Text(
+                    text = "•",
+                    color = Color(0xFF475569),
+                    fontSize = 11.sp,
+                    fontFamily = SfProFontFamily
+                )
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = user.equippedTitle.ifBlank { user.rankTitle },
                     color = Color(0xFF94A3B8),
@@ -923,8 +1068,11 @@ private fun ModernLeaderboardRowItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Kanan: Baris atas EXP, Baris bawah PrimoPointIcon + poin
-        Column(horizontalAlignment = Alignment.End) {
+        // Kanan: Baris atas EXP, Baris bawah PrimoPointIcon + Poin
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.Center
+        ) {
             Text(
                 text = "${FirebaseManager.formatNumber(user.exp)} EXP",
                 color = Color.White,
@@ -949,7 +1097,7 @@ private fun ModernLeaderboardRowItem(
 }
 
 /**
- * Sticky Bottom Bar "Posisi Peringkat Anda" (Persis 1000127571.png)
+ * Sticky Bottom Bar "Posisi Peringkat Anda" (URUTAN 1 Poin 5: Teks Tengah 100% Presisi Vertikal)
  */
 @Composable
 private fun CurrentUserRankBottomBar(
@@ -962,6 +1110,7 @@ private fun CurrentUserRankBottomBar(
     val displayName = currentUserProfile?.name ?: myRankEntry?.name ?: "Kamu"
     val userTag = currentUserProfile?.userTag ?: myRankEntry?.userTag ?: "1001"
     val avatarUrl = currentUserProfile?.avatar ?: myRankEntry?.avatar ?: ""
+    val borderUrl = currentUserProfile?.equippedBorderUrl ?: myRankEntry?.equippedBorderUrl ?: ""
     val exp = currentUserProfile?.exp ?: myRankEntry?.exp ?: 0L
     val level = currentUserProfile?.level ?: myRankEntry?.level ?: 1
     val rankTitle = currentUserProfile?.rankTitle ?: FirebaseManager.computeRankTitle(level)
@@ -977,7 +1126,8 @@ private fun CurrentUserRankBottomBar(
                 )
             )
             .border(1.dp, Color(0xFF9F1239), RoundedCornerShape(18.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -996,45 +1146,33 @@ private fun CurrentUserRankBottomBar(
                     color = Color.White,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
+                    fontFamily = SfProFontFamily,
+                    style = TextStyle(
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    )
                 )
             }
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            // Foto Profil Bulat 42.dp
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF1E2230)),
-                contentAlignment = Alignment.Center
-            ) {
-                if (avatarUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = avatarUrl,
-                        contentDescription = displayName,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape)
-                    )
-                } else {
-                    Text(
-                        text = displayName.take(1).uppercase(),
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
-                    )
-                }
-            }
+            // Foto Profil Bulat + Border Statis Milik User
+            StaticUserAvatarWithBorder(
+                avatarUrl = avatarUrl,
+                userName = displayName,
+                borderUrl = borderUrl,
+                avatarSize = 40.dp
+            )
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            // Info Tengah
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            // Info Tengah: 100% Pas di Tengah Vertikal (verticalArrangement = Arrangement.Center)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         text = displayName,
                         color = Color.White,
@@ -1042,52 +1180,84 @@ private fun CurrentUserRankBottomBar(
                         fontWeight = FontWeight.Bold,
                         fontFamily = SfProFontFamily,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        style = TextStyle(
+                            platformStyle = PlatformTextStyle(includeFontPadding = false)
+                        )
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(5.dp))
                     Text(
-                        text = "#${userTag.removePrefix("@")}",
+                        text = "#${userTag.removePrefix("@").removePrefix("#")}",
                         color = Color(0xFF64748B),
                         fontSize = 11.5.sp,
-                        fontFamily = SfProFontFamily
+                        fontFamily = SfProFontFamily,
+                        style = TextStyle(
+                            platformStyle = PlatformTextStyle(includeFontPadding = false)
+                        )
                     )
                 }
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = "Posisi Peringkat Anda • $rankTitle",
                     color = Color(0xFF94A3B8),
                     fontSize = 11.5.sp,
                     fontFamily = SfProFontFamily,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    style = TextStyle(
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    )
                 )
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Kanan: EXP & Level
-            Column(horizontalAlignment = Alignment.End) {
+            // Kanan: EXP & Level (Vector Rank Chevron + Lv. X)
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(
                     text = "${FirebaseManager.formatNumber(exp)} EXP",
                     color = Color(0xFFFF5722),
-                    fontSize = 15.sp,
+                    fontSize = 14.5.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    fontFamily = SfProFontFamily
+                    fontFamily = SfProFontFamily,
+                    style = TextStyle(
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    )
                 )
-                Text(
-                    text = "Lv. $level",
-                    color = Color.White,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
-                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RankChevronVectorIcon(
+                        level = level,
+                        size = 11.dp
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = "LV. $level",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily,
+                        style = TextStyle(
+                            platformStyle = PlatformTextStyle(includeFontPadding = false)
+                        )
+                    )
+                }
             }
         }
     }
 }
 
+private data class XpRuleItem(
+    val activity: String,
+    val expText: String,
+    val pointsText: String? = null
+)
+
 /**
- * Modal Dialog Penjelasan EXP & Poin
+ * Modal Dialog Penjelasan EXP & Poin (URUTAN 1 Poin 5: Rapi, Tidak Pernah Bertabrakan!)
  */
 @Composable
 private fun XpInfoModal(
@@ -1131,38 +1301,87 @@ private fun XpInfoModal(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 val rules = listOf(
-                    "Menonton Episode Anime" to "+20 EXP & +10 Poin",
-                    "Membaca Chapter Komik" to "+15 EXP & +8 Poin",
-                    "Check-In Harian" to "+50 EXP & +10-50 Poin",
-                    "Menyelesaikan Misi Komunitas" to "+100-300 EXP"
+                    XpRuleItem(
+                        activity = "Menonton Episode Anime",
+                        expText = "+20 EXP",
+                        pointsText = "+10 Poin"
+                    ),
+                    XpRuleItem(
+                        activity = "Membaca Chapter Komik",
+                        expText = "+15 EXP",
+                        pointsText = "+8 Poin"
+                    ),
+                    XpRuleItem(
+                        activity = "Check-In Harian",
+                        expText = "+50 EXP",
+                        pointsText = "+10–50 Poin"
+                    ),
+                    XpRuleItem(
+                        activity = "Menyelesaikan Misi Komunitas",
+                        expText = "+100–300 EXP",
+                        pointsText = null
+                    )
                 )
 
-                rules.forEach { (activity, reward) ->
+                rules.forEach { rule ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 6.dp),
+                            .padding(vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = activity,
+                            text = rule.activity,
                             color = Color(0xFFCBD5E1),
                             fontSize = 13.sp,
-                            fontFamily = SfProFontFamily
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = SfProFontFamily,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 12.dp)
                         )
-                        Text(
-                            text = reward,
-                            color = Color(0xFFF59E0B),
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
-                        )
+
+                        Column(
+                            horizontalAlignment = Alignment.End,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                SparkBarChartVectorIcon(
+                                    size = 11.dp,
+                                    color = Color(0xFFF59E0B)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = rule.expText,
+                                    color = Color(0xFFF59E0B),
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1
+                                )
+                            }
+                            if (rule.pointsText != null) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    PrimoPointIcon(size = 12.dp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = rule.pointsText,
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontFamily = SfProFontFamily,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
                     }
                     HorizontalDivider(thickness = 0.5.dp, color = Color(0xFF202538))
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Box(
                     modifier = Modifier
@@ -1170,7 +1389,7 @@ private fun XpInfoModal(
                         .clip(RoundedCornerShape(10.dp))
                         .background(Color(0xFFE11D48))
                         .clickable(onClick = onDismiss)
-                        .padding(vertical = 10.dp),
+                        .padding(vertical = 11.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(

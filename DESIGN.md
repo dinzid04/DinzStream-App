@@ -1471,3 +1471,27 @@ Mengacu pada tata letak referensi `WA_1794546770520.jpg` (`1002213252.jpg`) deng
 
 
 
+
+
+### I. Arsitektur Pembaruan 5 Urutan: Leaderboard, APNG Cache Safety, Multi-Layer Effects, Login Infinite Marquee, & Transparent System Bars
+1. **Rombak Papan Peringkat & Deduplikasi Database (`LeaderboardScreen.kt` & `FirebaseManager.kt`):**
+   - Header Atas: Menghapus seluruh bulatan overlay gelap pada tombol kembali `<-` dan bantuan `?`, mengganti karakter `"♛"` dengan `RoyalThreePeakCrownIcon` (vektor 3 puncak lancip dan simetris via Compose Canvas).
+   - Border Statis Pengguna: Menghapus seluruh bingkai buatan AI (`PodiumLaurelCrownFrame`). Baik di podium Top 1, 2, 3 maupun daftar peringkat baris #4 ke bawah, merender `Avatar Decoration` asli masing-masing user versi STATIS (`?passthrough=false` atau `animated=false`, size=240) dengan ukuran `avatarSize * 1.22f`.
+   - Lencana Podium: Lencana mahkota angka minimalis (1, 2, 3) di bawah cincin avatar dengan pedestal lega sehingga Custom Title panjang (`MYTHIC SOVEREIGN` via `GeometricTitleBadge` mode `compact`) tampil 100% utuh tanpa terpotong.
+   - Header Kolom Bersih: Mengganti karakter `#` dengan `UserGroupVectorIcon` ("Pengguna") dan mengganti emoji `📊` dengan `SparkBarChartVectorIcon` 3-bar monokrom ("Total EXP").
+   - Indikator Level: Mengganti karakter segitiga `▲` dan menghapus seluruh kapsul pembungkus level; menggunakan `RankChevronVectorIcon` + `LV. [Nomor]` + nama pangkat/title bersih langsung.
+   - Sticky Bottom Bar & XP Modal: Blok teks nama dan peringkat diatur presisi di tengah vertikal (`verticalArrangement = Arrangement.Center`), dan baris hadiah dialog XP dipisahkan ke kolom kanan dengan `PrimoPointIcon` tanpa pernah bertabrakan.
+   - Deduplikasi Akun: `deduplicateUserAccounts()` menyatukan dokumen akun ganda di Firestore (misalnya hasil ganti nama atau ID `g_email` vs UID) ke satu dokumen kanonik dengan nama hasil edit terbaru, EXP/poin tertinggi, dan union kosmetik, lalu menghapus dokumen duplikat dari database.
+2. **APNG Cache Resilience & Jeda 2 Detik Profile Effect (`ApngAnimationView.kt` & `LoginProfileScreen.kt`):**
+   - Cache Safety: Menangani skenario pasca hapus cache secara atomik (unduh ke `.tmp`, validasi ukuran >= 128 byte, rename/copy ke cache lokal), dan memverifikasi `file.exists() && file.length() >= 128L` sebelum decode native `APNGDrawable`.
+   - Jeda 2 Detik: Pada `LoginProfileScreen.kt`, `isEffectReadyToShow` menunggu 2000ms via `LaunchedEffect` sebelum menampilkan overlay `Profile Effect` dengan animasi `fadeIn(tween(700))`.
+3. **Multi-Layer Profile Effects & Full Canvas Preview (`ShopScreen.kt` & `DiscordCosmeticsRepository.kt`):**
+   - Seluruh layer dalam array `layers` / `layerUrls` dirender bertumpuk secara simultan menggunakan `ApngStackedEffectView` (tanpa pembatasan `.take(2)`), menjaga intro animasi dan karakter utama (seperti Venom, Deadpool, dll.) tampil utuh.
+   - Kanvas Preview Shop: Kontainer preview efek profil diperbesar menjadi proporsi kanvas penuh `aspectRatio(450f / 880f)` dengan avatar pengguna diletakkan di posisi atas menyerupai tampilan profil aslinya.
+4. **Halaman Login 3-Kolom Poster Infinite Seamless Loop (`LoginProfileScreen.kt`):**
+   - Jarak renggang horizontal antar-kolom `12.dp` dan vertikal antar-poster `12.dp`.
+   - Arah pergerakan: Kolom 1 (Kiri) bergerak ke ATAS, Kolom 2 (Tengah) bergerak ke BAWAH (mulai dari `Int.MAX_VALUE / 2`), Kolom 3 (Kanan) bergerak ke ATAS.
+   - Menggunakan `LazyColumn(userScrollEnabled = false)` dengan `items(count = Int.MAX_VALUE)` dan modulo index `index % posters.size`, mengalir tanpa jeda dan tanpa pernah ada ruang hitam kosong.
+   - Menghapus tombol duplikat `"Pilih Akun Google Lainnya"` dan menghapus teks versi build di bagian paling bawah.
+5. **Full Edge-to-Edge Transparent System Bars (`MainActivity.kt` & `themes.xml`):**
+   - Status bar atas dan navigation bar bawah diatur 100% transparan tembus pandang menggunakan `WindowCompat.setDecorFitsSystemWindows(window, false)`, `enableEdgeToEdge(statusBarStyle, navigationBarStyle)`, serta menonaktifkan contrast enforcement pada Android Q ke atas (`isStatusBarContrastEnforced = false`, `isNavigationBarContrastEnforced = false`).

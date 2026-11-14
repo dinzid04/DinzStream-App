@@ -321,4 +321,14 @@ object DiscordCosmeticsRepository {
         if (id.isBlank()) return null
         return getAllProfileEffects(context).firstOrNull { it.id == id || it.animationUrl == id }
     }
+
+    fun findEffect(context: Context, urlOrId: String): ProfileEffectDefinition? {
+        if (urlOrId.isBlank()) return null
+        return getAllProfileEffects(context).firstOrNull {
+            it.id == urlOrId ||
+            it.animationUrl == urlOrId ||
+            it.layerUrls.contains(urlOrId) ||
+            it.staticImageUrl == urlOrId
+        }
+    }
 }

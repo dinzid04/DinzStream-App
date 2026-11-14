@@ -564,7 +564,7 @@ fun ShopScreen(
             onDismissRequest = { previewEffectItem = null },
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xFF0B0D13))
@@ -612,76 +612,150 @@ fun ShopScreen(
                     }
                 }
 
-                // Area Tengah: APNG Animation Penuh 60 FPS + Avatar User + Loading Indicator
+                // Area Tengah: Kanvas Profil Penuh Proporsional (aspectRatio 450f / 880f)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .align(Alignment.Center),
+                        .weight(1f)
+                        .padding(horizontal = 24.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Animasi Profile Effect 60 FPS menggunakan ApngAnimationView / ApngStackedEffectView
-                    val layers = effect.layerUrls.ifEmpty { listOf(effect.animationUrl) }
-                    ApngStackedEffectView(
-                        layerUrls = layers,
-                        modifier = Modifier.size(320.dp),
-                        scaleType = ImageView.ScaleType.FIT_CENTER,
-                        onLoadingChanged = { isEffectLoading = it }
-                    )
-
-                    // Avatar Bulat Pengguna di Tengah
                     Box(
                         modifier = Modifier
-                            .size(92.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF1E2230)),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth(0.92f)
+                            .aspectRatio(450f / 880f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF13151F))
+                            .border(1.dp, Color(0xFF262A3B), RoundedCornerShape(20.dp))
                     ) {
-                        if (userAvatarUrl.isNotBlank()) {
-                            AsyncImage(
-                                model = userAvatarUrl,
-                                contentDescription = "Avatar Pengguna",
-                                contentScale = ContentScale.Crop,
+                        // 1. Banner Atas Kanvas Profil
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight(0.36f)
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            Color(0xFF2B0E16),
+                                            Color(0xFF1A1020),
+                                            Color(0xFF10121C)
+                                        )
+                                    )
+                                )
+                        ) {
+                            Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(Color.Transparent, Color(0xAA13151F), Color(0xFF13151F))
+                                        )
+                                    )
                             )
-                        } else {
+                        }
+
+                        // 2. Avatar Pengguna di Area Atas Sesuai Posisi Profil Anibi
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(start = 20.dp, top = 76.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.size(76.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(62.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF1E2230)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (userAvatarUrl.isNotBlank()) {
+                                        AsyncImage(
+                                            model = userAvatarUrl,
+                                            contentDescription = "Avatar",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "YU",
+                                            color = Color.White,
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = SfProFontFamily
+                                        )
+                                    }
+                                }
+
+                                if (equippedBorderUrl.isNotBlank()) {
+                                    AnimatedCosmeticImage(
+                                        url = DiscordCosmeticsRepository.getOptimizedUrl(equippedBorderUrl, size = 160, animated = true),
+                                        isAnimated = true,
+                                        modifier = Modifier.size(76.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
                             Text(
-                                text = "YU",
+                                text = "Pratinjau Pengguna",
                                 color = Color.White,
-                                fontSize = 26.sp,
+                                fontSize = 14.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = SfProFontFamily
                             )
-                        }
-                    }
-
-                    // Shimmer / Spinner Indikator saat animasi sedang dimuat
-                    AnimatedVisibility(
-                        visible = isEffectLoading,
-                        enter = fadeIn(),
-                        exit = fadeOut()
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xCC090A0F))
-                                .padding(16.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                color = Color(0xFFE11D48),
-                                strokeWidth = 2.5.dp,
-                                modifier = Modifier.size(28.dp)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Memuat animasi efek...",
-                                color = Color(0xFFCBD5E1),
-                                fontSize = 11.5.sp,
+                                text = "#1001 • Yuranime Member",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 11.sp,
                                 fontFamily = SfProFontFamily
                             )
+                        }
+
+                        // 3. Efek Animasi Profil Penuh (Seluruh Layer Bertumpuk 60 FPS, zIndex = 50f)
+                        val layers = effect.layerUrls.ifEmpty { listOf(effect.animationUrl) }
+                        ApngStackedEffectView(
+                            layerUrls = layers,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .zIndex(50f),
+                            scaleType = ImageView.ScaleType.FIT_CENTER,
+                            onLoadingChanged = { isEffectLoading = it }
+                        )
+
+                        // 4. Loading Spinner Indicator
+                        AnimatedVisibility(
+                            visible = isEffectLoading,
+                            enter = fadeIn(),
+                            exit = fadeOut(),
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .zIndex(60f)
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xCC090A0F))
+                                    .padding(14.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    color = Color(0xFFE11D48),
+                                    strokeWidth = 2.5.dp,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Memuat animasi...",
+                                    color = Color(0xFFCBD5E1),
+                                    fontSize = 11.sp,
+                                    fontFamily = SfProFontFamily
+                                )
+                            }
                         }
                     }
                 }
@@ -690,8 +764,7 @@ fun ShopScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = 24.dp, vertical = 24.dp),
+                        .padding(horizontal = 24.dp, vertical = 20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(

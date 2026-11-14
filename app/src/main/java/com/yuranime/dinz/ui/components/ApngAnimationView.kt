@@ -105,11 +105,11 @@ fun ApngAnimationView(
                 val safeHash = url.hashCode().toString().replace("-", "n")
                 val targetFile = File(cacheDir, "apng_$safeHash.png")
 
-                if (targetFile.exists() && targetFile.length() > 100L) {
+                if (targetFile.exists() && targetFile.length() >= 128L) {
                     return@withContext targetFile
                 }
 
-                val tempFile = File(cacheDir, "apng_${safeHash}_tmp.png")
+                val tempFile = File(cacheDir, "apng_${safeHash}_${System.currentTimeMillis()}_tmp.png")
                 val request = Request.Builder()
                     .url(url)
                     .header("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko)")
@@ -121,17 +121,28 @@ fun ApngAnimationView(
                     body.byteStream().use { input ->
                         FileOutputStream(tempFile).use { output ->
                             input.copyTo(output)
+                            output.flush()
                         }
                     }
                 }
 
-                if (tempFile.exists() && tempFile.length() > 100L) {
+                if (tempFile.exists() && tempFile.length() >= 128L) {
+                    if (targetFile.exists()) {
+                        try { targetFile.delete() } catch (_: Throwable) {}
+                    }
                     if (tempFile.renameTo(targetFile)) {
                         targetFile
                     } else {
-                        tempFile
+                        try {
+                            tempFile.copyTo(targetFile, overwrite = true)
+                            tempFile.delete()
+                            targetFile
+                        } catch (_: Throwable) {
+                            tempFile
+                        }
                     }
                 } else {
+                    try { tempFile.delete() } catch (_: Throwable) {}
                     null
                 }
             } catch (t: Throwable) {
@@ -140,7 +151,7 @@ fun ApngAnimationView(
             }
         }
 
-        if (file != null && file.exists() && file.length() > 100L) {
+        if (file != null && file.exists() && file.length() >= 128L) {
             val isApng = withContext(Dispatchers.IO) { isApngFile(file) }
             apngFile = file
             useApng = isApng
@@ -168,7 +179,7 @@ fun ApngAnimationView(
         contentAlignment = Alignment.Center
     ) {
         val file = apngFile
-        if (useApng && file != null && file.exists()) {
+        if (useApng && file != null && file.exists() && file.length() >= 128L) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
@@ -187,11 +198,16 @@ fun ApngAnimationView(
                     imageView.isEnabled = false
                     currentImageView = imageView
                     try {
-                        val drawable = APNGDrawable.fromFile(file.absolutePath)
-                        drawable.setLoopLimit(0) // 0 = Infinite loop
-                        imageView.setImageDrawable(drawable)
-                        drawable.start()
-                        currentDrawable = drawable
+                        if (file.exists() && file.length() >= 128L) {
+                            val drawable = APNGDrawable.fromFile(file.absolutePath)
+                            drawable.setLoopLimit(0) // 0 = Infinite loop
+                            imageView.setImageDrawable(drawable)
+                            drawable.start()
+                            currentDrawable = drawable
+                        } else {
+                            useApng = false
+                            imageView.setImageDrawable(null)
+                        }
                     } catch (t: Throwable) {
                         t.printStackTrace()
                         // Fallback ke Coil jika terjadi OOM atau error decode
@@ -225,7 +241,7 @@ fun ApngAnimationView(
 
 /**
  * ApngStackedEffectView:
- * Merender maksimal 2 layer efek profil secara aman tanpa membebani RAM (anti-OOM).
+ * Merender seluruh layer Profile Effect secara bertumpuk dan aman.
  */
 @Composable
 fun ApngStackedEffectView(
@@ -235,7 +251,7 @@ fun ApngStackedEffectView(
     onLoadingChanged: (Boolean) -> Unit = {}
 ) {
     val validLayers = remember(layerUrls) {
-        layerUrls.filter { it.isNotBlank() }.take(2)
+        layerUrls.filter { it.isNotBlank() }
     }
 
     if (validLayers.isEmpty()) {

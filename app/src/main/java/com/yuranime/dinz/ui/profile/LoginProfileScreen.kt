@@ -44,8 +44,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.isActive
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -127,6 +131,7 @@ import com.yuranime.dinz.ui.components.BottomNavBar
 import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
 import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
 import com.yuranime.dinz.ui.components.ApngAnimationView
+import com.yuranime.dinz.ui.components.ApngStackedEffectView
 import com.yuranime.dinz.ui.components.EmptyTitleSlotBadge
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.NavTab
@@ -144,6 +149,9 @@ import com.yuranime.dinz.ui.theme.JetBrainsMonoFontFamily
 import com.yuranime.dinz.ui.theme.OutfitDisplayFontFamily
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import com.yuranime.dinz.ui.theme.YuranimeLogoFontFamily
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 enum class ProfileSubScreen {
     MAIN,
@@ -462,6 +470,36 @@ private fun UserProfileView(
     val equippedBorderUrl = profile?.equippedBorderUrl.orEmpty()
     val equippedProfileEffectUrl = profile?.equippedProfileEffectUrl.orEmpty()
     val cosmeticAnimate = profile?.cosmeticAnimate ?: true
+
+    // URUTAN 2 & 3: Jeda 2 detik sebelum Profile Effect muncul + Preload seluruh multi-layer
+    var isEffectReadyToShow by remember { mutableStateOf(false) }
+    LaunchedEffect(equippedProfileEffectUrl) {
+        isEffectReadyToShow = false
+        if (equippedProfileEffectUrl.isNotBlank()) {
+            delay(2000L)
+            isEffectReadyToShow = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            DiscordCosmeticsRepository.getAllBorders(context)
+            DiscordCosmeticsRepository.getAllProfileEffects(context)
+        }
+    }
+
+    val effectDef = remember(equippedProfileEffectUrl) {
+        if (equippedProfileEffectUrl.isNotBlank()) {
+            DiscordCosmeticsRepository.findEffect(context, equippedProfileEffectUrl)
+        } else {
+            null
+        }
+    }
+    val effectLayers = remember(effectDef, equippedProfileEffectUrl) {
+        effectDef?.layerUrls?.ifEmpty { listOf(equippedProfileEffectUrl) }
+            ?: if (equippedProfileEffectUrl.isNotBlank()) listOf(equippedProfileEffectUrl) else emptyList()
+    }
+
     val resolvedBorderUrl = remember(equippedBorderUrl, cosmeticAnimate) {
         if (!cosmeticAnimate && equippedBorderUrl.contains("passthrough=true")) {
             equippedBorderUrl.replace("passthrough=true", "passthrough=false")
@@ -1029,20 +1067,21 @@ private fun UserProfileView(
     }
 
     // 5. LAYER OVERLAY FOREGROUND: FULL-SCREEN PROFILE EFFECT (DI ATAS SEMUA ELEMEN PROFIL & BANNER)
-    if (equippedProfileEffectUrl.isNotBlank() && cosmeticAnimate) {
-        Box(
+    AnimatedVisibility(
+        visible = isEffectReadyToShow && equippedProfileEffectUrl.isNotBlank() && cosmeticAnimate,
+        enter = fadeIn(animationSpec = tween(700)),
+        exit = fadeOut(animationSpec = tween(400)),
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(50f)
+    ) {
+        ApngStackedEffectView(
+            layerUrls = effectLayers,
+            scaleType = ImageView.ScaleType.FIT_START,
             modifier = Modifier
                 .fillMaxSize()
-                .zIndex(50f)
-        ) {
-            ApngAnimationView(
-                url = equippedProfileEffectUrl,
-                scaleType = ImageView.ScaleType.FIT_START,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-            )
-        }
+                .statusBarsPadding()
+        )
     }
 
     // 6. LAYER NAVIGASI TERATAS: 3 TOMBOL IKON BULAT POJOK KANAN ATAS (zIndex = 100f)
@@ -1891,27 +1930,6 @@ private fun LoginView(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF161820))
-                    .border(1.dp, Color(0x33E11D48), CircleShape)
-                    .clickable(enabled = !isLoggingIn) { onEmailLoginClick() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Pilih Akun Google Lainnya",
-                    color = Color(0xFFE2E8F0),
-                    fontSize = 14.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = SfProFontFamily
-                )
-            }
-
             Spacer(modifier = Modifier.height(14.dp))
 
             Text(
@@ -1925,7 +1943,7 @@ private fun LoginView(
                     .padding(vertical = 4.dp, horizontal = 16.dp)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             val agreementText = remember {
                 buildAnnotatedString {
@@ -1962,20 +1980,19 @@ private fun LoginView(
                 modifier = Modifier.fillMaxWidth(0.9f)
             )
 
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Text(
-                text = "Versi ${BuildConfig.VERSION_NAME}",
-                color = Color(0xFF6B7280),
-                fontSize = 12.sp,
-                fontFamily = SfProFontFamily
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
+/**
+ * URUTAN 4: 3 Kolom Poster Infinite Seamless Loop Tanpa Ruang Kosong
+ * - Jarak renggang horizontal & vertikal rapi seragam: 12.dp
+ * - Kolom 1 (Kiri): Bergerak mulus ke ATAS (↑)
+ * - Kolom 2 (Tengah): Bergerak mulus ke BAWAH (↓)
+ * - Kolom 3 (Kanan): Bergerak mulus ke ATAS (↑)
+ * - True infinite seamless loop: LazyColumn dengan Int.MAX_VALUE & modulo index
+ */
 @Composable
 private fun SeamlessTiltedPosterBackground() {
     val col1Posters = listOf(
@@ -2006,61 +2023,26 @@ private fun SeamlessTiltedPosterBackground() {
                 scaleY = 1.3f
             }
     ) {
-        val density = LocalDensity.current
-        val colWidth = (maxWidth - 16.dp) / 3
-        val posterHeight = colWidth * 1.5f
-        val itemHeightWithSpacing = posterHeight + 8.dp
-        val cycleHeightPx = with(density) { (itemHeightWithSpacing * 4).toPx() }
-
-        val transition = rememberInfiniteTransition(label = "seamlessPosterTransition")
-
-        val progressCol1 by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = -1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(42000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "progressCol1"
-        )
-
-        val progressCol2 by transition.animateFloat(
-            initialValue = -1f,
-            targetValue = 0f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(38000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "progressCol2"
-        )
-
-        val progressCol3 by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = -1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(45000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "progressCol3"
-        )
-
         Row(
             modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Kolom 1 (Kiri): Bergerak mulus ke ATAS (↑)
             SeamlessMarqueeColumn(
                 posters = col1Posters,
-                offsetY = progressCol1 * cycleHeightPx,
+                scrollUp = true,
                 modifier = Modifier.weight(1f)
             )
+            // Kolom 2 (Tengah): Bergerak mulus ke BAWAH (↓)
             SeamlessMarqueeColumn(
                 posters = col2Posters,
-                offsetY = progressCol2 * cycleHeightPx,
+                scrollUp = false,
                 modifier = Modifier.weight(1f)
             )
+            // Kolom 3 (Kanan): Bergerak mulus ke ATAS (↑)
             SeamlessMarqueeColumn(
                 posters = col3Posters,
-                offsetY = progressCol3 * cycleHeightPx,
+                scrollUp = true,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -2070,23 +2052,36 @@ private fun SeamlessTiltedPosterBackground() {
 @Composable
 private fun SeamlessMarqueeColumn(
     posters: List<Int>,
-    offsetY: Float,
+    scrollUp: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val repeatedPosters = remember(posters) { posters + posters + posters }
+    if (posters.isEmpty()) return
 
-    Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .offset { IntOffset(0, offsetY.toInt()) },
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = if (scrollUp) 0 else Int.MAX_VALUE / 2
+    )
+
+    LaunchedEffect(scrollUp) {
+        val speedPx = if (scrollUp) 0.65f else -0.65f
+        while (isActive) {
+            withInfiniteAnimationFrameMillis { /* vsync frame */ }
+            listState.scrollBy(speedPx)
+        }
+    }
+
+    LazyColumn(
+        state = listState,
+        userScrollEnabled = false,
+        modifier = modifier.fillMaxHeight(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        repeatedPosters.forEach { resId ->
+        items(count = Int.MAX_VALUE) { index ->
+            val resId = posters[index % posters.size]
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(10.dp))
                     .background(Color(0xFF1E293B))
             ) {
                 Image(
