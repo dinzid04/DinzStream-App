@@ -19,21 +19,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Forum
-import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -75,18 +72,14 @@ private data class RewardMissionItem(
     val isWeekly: Boolean = false
 )
 
-private data class RedeemPresetCode(
-    val code: String,
-    val label: String,
-    val rewardText: String
-)
-
 /**
- * TAHAP 6: Redesign Halaman Points & Rewards (100% Mengacu Referensi `1000127705.jpg`)
- * - Hero Balance: Saldo Poin Kamu (ExtraBold 34.sp) + Ilustrasi koin besar 72.dp (ic_primo.png)
- * - 7-Day Streak Check-In Card: 7 hari kapsul dengan ikon primo.png + Full-width Check in capsule
- * - Inline Kode Redeem Bar: Tepat di bawah kartu check-in
- * - Earn Rewards: Daftar misi vertikal bersih dengan ikon, PrimoPointIcon, dan tombol kapsul Go/Claim
+ * Halaman Points & Rewards (100% Mengacu Desain Referensi `1000127705_2.jpg`)
+ * - Latar Belakang Gradasi Atas Lembut: #3B0D16 -> #1A0C11 -> #0B0B0E
+ * - Top Bar Bersih: Tombol Kembali '<' minimalis, Judul Tengah "Rewards", Kanan kosong
+ * - Area Saldo Poin Terbuka (Direct On Gradient): Saldo Poin 40.sp ExtraBold + PrimoPointIcon besar 76.dp tanpa kotak
+ * - Kartu Check-in 7 Hari: 1 kontainer rapi #13151C, teks "Kamu sudah check-in X Hari", kapsul hari aktif beraksen #E11D48
+ * - Inline Kode Redeem Bar: 1 baris bersih 52.dp tanpa bocoran kode event
+ * - Earn Rewards Section: 1 kontainer rapi #13151C berisi seluruh misi harian & mingguan dengan divider bersih
  */
 @Composable
 fun PointsRewardsScreen(
@@ -96,9 +89,7 @@ fun PointsRewardsScreen(
     val context = LocalContext.current
     val currentProfile by FirebaseManager.userProfile.collectAsState()
 
-    val level = currentProfile?.level ?: 1
     val points = currentProfile?.points ?: 0L
-    val rankTitle = currentProfile?.rankTitle ?: FirebaseManager.computeRankTitle(level)
     val currentStreak = currentProfile?.checkInStreak ?: 0
     val lastCheckInDate = currentProfile?.lastCheckInDate.orEmpty()
     val todayDate = remember { FirebaseManager.getTodayDateString() }
@@ -110,20 +101,12 @@ fun PointsRewardsScreen(
     var redeemInput by remember { mutableStateOf("") }
     var isRedeeming by remember { mutableStateOf(false) }
 
-    val presetCodes = remember {
-        listOf(
-            RedeemPresetCode("YURAVENOM", "Venom Event", "+200 EXP & +100 Poin"),
-            RedeemPresetCode("MYTHIC2026", "Mythic 2026", "+500 EXP & +500 Poin"),
-            RedeemPresetCode("YURAUPDATE", "Server Update", "+150 EXP & +100 Poin")
-        )
-    }
-
     val missions = remember(watchHistory.size, isCheckedInToday, todayDate, weekKey) {
         listOf(
             RewardMissionItem(
                 id = "daily_checkin",
                 title = "Check-In Harian",
-                subtitle = "Buka aplikasi dan klaim hadiah harian Anda",
+                subtitle = "Buka aplikasi dan klaim hadiah harian",
                 expReward = 50L,
                 pointsReward = 20L,
                 currentProgress = if (isCheckedInToday) 1 else 0,
@@ -182,194 +165,110 @@ fun PointsRewardsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0B0B0B))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF3B0D16),
+                        Color(0xFF1A0C11),
+                        Color(0xFF0B0B0E)
+                    )
+                )
+            )
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
-        // TOP APP BAR: Tombol Kembali + Judul + Kapsul Poin Pengguna
+        // TOP APP BAR: Tombol Kembali '<' minimalis, Judul Tengah "Rewards"
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
                 onClick = onBackClick,
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF14161E))
+                modifier = Modifier.size(40.dp)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Kembali",
                     tint = Color.White,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "Rewards",
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = SfProFontFamily,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f)
+            )
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Points & Rewards",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
-                )
-                Text(
-                    text = "Check-In Harian, Misi & Kode Redeem",
-                    color = Color(0xFF94A3B8),
-                    fontSize = 11.5.sp,
-                    fontFamily = SfProFontFamily
-                )
-            }
-
-            // Kapsul Poin Kanan Atas
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(Color(0xFF14161F))
-                    .border(0.5.dp, Color(0xFF232738), RoundedCornerShape(50))
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                PrimoPointIcon(size = 15.dp)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "${FirebaseManager.formatNumber(points)} Poin",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
-                )
-            }
+            // Penyeimbang tombol kembali agar judul tetap tepat di tengah
+            Spacer(modifier = Modifier.size(40.dp))
         }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. HERO BALANCE (Referensi 1000127705.jpg)
+            // 1. HERO BALANCE (LANGSUNG DI ATAS GRADASI, TANPA KARTU PEMBUNGKUS)
             item {
-                Box(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(Color(0xFF171A27), Color(0xFF10121C), Color(0xFF0D0F17))
-                            )
-                        )
-                        .border(0.75.dp, Color(0xFF262C3D), RoundedCornerShape(18.dp))
-                        .padding(20.dp)
+                        .padding(horizontal = 4.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "Saldo Poin Kamu",
-                                color = Color(0xFF94A3B8),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                fontFamily = SfProFontFamily
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = FirebaseManager.formatNumber(points),
-                                color = Color.White,
-                                fontSize = 34.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontFamily = SfProFontFamily
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(50))
-                                    .background(Color(0xFF1F2436))
-                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = "Level $level • $rankTitle",
-                                    color = Color(0xFFFF5722),
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontFamily = SfProFontFamily
-                                )
-                            }
-                        }
-
-                        // Ilustrasi Koin Primo Besar 72.dp di Kanan
-                        Box(
-                            modifier = Modifier
-                                .size(78.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x1AE11D48)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            PrimoPointIcon(size = 72.dp)
-                        }
+                    Column {
+                        Text(
+                            text = "Saldo Poin",
+                            color = Color(0xFFCBD5E1),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = SfProFontFamily
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = FirebaseManager.formatNumber(points),
+                            color = Color.White,
+                            fontSize = 40.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontFamily = SfProFontFamily
+                        )
                     }
+
+                    // Ikon Primogem Besar 76.dp langsung di atas gradasi tanpa lingkaran overlay
+                    PrimoPointIcon(size = 76.dp)
                 }
             }
 
-            // 2. KARTU CHECK-IN 7 HARI (Referensi 1000127705.jpg)
+            // 2. KARTU CHECK-IN 7 HARI (1 KONTAINER RAPI #13151C)
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF11131B))
-                        .border(0.5.dp, Color(0xFF1E2230), RoundedCornerShape(16.dp))
-                        .padding(16.dp)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(Color(0xFF13151C))
+                        .border(0.5.dp, Color(0xFF1E222D), RoundedCornerShape(22.dp))
+                        .padding(18.dp)
                 ) {
                     // Header Card
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Check-in 7 Hari",
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
-                        )
+                    Text(
+                        text = "Kamu sudah check-in $currentStreak Hari",
+                        color = Color.White,
+                        fontSize = 15.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(50))
-                                .background(Color(0xFF1A1D2A))
-                                .padding(horizontal = 9.dp, vertical = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LocalFireDepartment,
-                                contentDescription = null,
-                                tint = Color(0xFFF59E0B),
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "$currentStreak Hari Berturut",
-                                color = Color(0xFFF59E0B),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = SfProFontFamily
-                            )
-                        }
-                    }
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // 7 Hari Kapsul
+                    // 7 Hari Row
                     val dailyRewards = listOf(10, 15, 20, 25, 30, 40, 50)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -382,26 +281,18 @@ fun PointsRewardsScreen(
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .clip(RoundedCornerShape(12.dp))
                                     .background(
-                                        when {
-                                            isClaimed -> Color(0xFF151822)
-                                            isCurrentTarget -> Color(0xFF1E1F30)
-                                            else -> Color(0xFF12141C)
-                                        }
+                                        if (isCurrentTarget) Color(0x28E11D48) else Color.Transparent
                                     )
                                     .border(
-                                        width = if (isCurrentTarget) 1.dp else 0.5.dp,
-                                        color = when {
-                                            isCurrentTarget -> Color(0xFFE11D48)
-                                            isClaimed -> Color(0xFF262D3F)
-                                            else -> Color(0xFF1B1E29)
-                                        },
-                                        shape = RoundedCornerShape(10.dp)
+                                        width = if (isCurrentTarget) 1.dp else 0.dp,
+                                        color = if (isCurrentTarget) Color(0xFFE11D48) else Color.Transparent,
+                                        shape = RoundedCornerShape(12.dp)
                                     )
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 10.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Text(
                                     text = "Hari ${idx + 1}",
@@ -423,13 +314,13 @@ fun PointsRewardsScreen(
                                 }
 
                                 Text(
-                                    text = "+$rewardAmount",
+                                    text = "$rewardAmount",
                                     color = when {
                                         isClaimed -> Color(0xFF64748B)
-                                        isCurrentTarget -> Color(0xFFFF5722)
+                                        isCurrentTarget -> Color(0xFFE11D48)
                                         else -> Color(0xFFCBD5E1)
                                     },
-                                    fontSize = 10.5.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = SfProFontFamily
                                 )
@@ -437,32 +328,28 @@ fun PointsRewardsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
-                    // Tombol Check In Full Width Capsule
+                    // Tombol Check In Kapsul Full Width
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(14.dp))
                             .background(
-                                if (isCheckedInToday) {
-                                    Brush.horizontalGradient(listOf(Color(0xFF181B26), Color(0xFF181B26)))
-                                } else {
-                                    Brush.horizontalGradient(listOf(Color(0xFFFF5722), Color(0xFFE11D48)))
-                                }
+                                if (isCheckedInToday) Color(0xFF1C1F2B) else Color(0xFFE11D48)
                             )
                             .clickable(enabled = !isCheckedInToday) {
                                 FirebaseManager.checkInToday(context) { _, msg ->
                                     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                 }
                             }
-                            .padding(vertical = 12.dp),
+                            .padding(vertical = 13.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (isCheckedInToday) "Sudah Check-In Hari Ini" else "Check in Sekarang (+50 EXP & +20 Poin)",
+                            text = if (isCheckedInToday) "Sudah Check-In Hari Ini" else "Check in",
                             color = if (isCheckedInToday) Color(0xFF64748B) else Color.White,
-                            fontSize = 13.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = SfProFontFamily
                         )
@@ -470,314 +357,223 @@ fun PointsRewardsScreen(
                 }
             }
 
-            // 3. INLINE KODE REDEEM BAR (Tepat di bawah check-in)
+            // 3. INLINE KODE REDEEM BAR (1 BARIS BERSIH 52.dp TANPA KODE BOCOR)
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFF13151C))
+                        .border(0.5.dp, Color(0xFF1E222D), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    BasicTextField(
+                        value = redeemInput,
+                        onValueChange = { redeemInput = it },
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            color = Color.White,
+                            fontSize = 13.5.sp,
+                            fontFamily = SfProFontFamily,
+                            fontWeight = FontWeight.Medium
+                        ),
+                        cursorBrush = SolidColor(Color(0xFFE11D48)),
+                        decorationBox = { innerTextField ->
+                            if (redeemInput.isEmpty()) {
+                                Text(
+                                    text = "Masukkan kode redeem...",
+                                    color = Color(0xFF64748B),
+                                    fontSize = 13.sp,
+                                    fontFamily = SfProFontFamily
+                                )
+                            }
+                            innerTextField()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (redeemInput.isNotBlank()) Color(0xFFE11D48) else Color(0xFF1E2230)
+                            )
+                            .clickable(enabled = redeemInput.isNotBlank() && !isRedeeming) {
+                                isRedeeming = true
+                                FirebaseManager.claimRedeemCode(context, redeemInput.trim()) { success, msg ->
+                                    isRedeeming = false
+                                    if (success) redeemInput = ""
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isRedeeming) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        } else {
+                            Text(
+                                text = "Klaim",
+                                color = if (redeemInput.isNotBlank()) Color.White else Color(0xFF64748B),
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SfProFontFamily
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 4. EARN REWARDS SECTION (1 KONTAINER RAPI #13151C)
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF11131B))
-                        .border(0.5.dp, Color(0xFF1E2230), RoundedCornerShape(16.dp))
-                        .padding(14.dp)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(Color(0xFF13151C))
+                        .border(0.5.dp, Color(0xFF1E222D), RoundedCornerShape(22.dp))
+                        .padding(18.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.CardGiftcard,
-                            contentDescription = null,
-                            tint = Color(0xFFE11D48),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(7.dp))
-                        Text(
-                            text = "Kode Redeem Hadiah",
-                            color = Color.White,
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
-                        )
-                    }
+                    Text(
+                        text = "Earn Rewards",
+                        color = Color.White,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    // Input Bar + Tombol Klaim
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF161924))
-                            .border(0.5.dp, Color(0xFF252B3D), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        BasicTextField(
-                            value = redeemInput,
-                            onValueChange = { redeemInput = it },
-                            singleLine = true,
-                            textStyle = TextStyle(
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontFamily = SfProFontFamily,
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            cursorBrush = SolidColor(Color(0xFFE11D48)),
-                            decorationBox = { innerTextField ->
-                                if (redeemInput.isEmpty()) {
+                    missions.forEachIndexed { index, mission ->
+                        val isClaimed = claimedMissions[mission.id] == mission.periodKey ||
+                            (mission.id == "daily_checkin" && isCheckedInToday)
+                        val isCompleted = mission.currentProgress >= mission.targetProgress
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF1A1D28)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = mission.icon,
+                                    contentDescription = null,
+                                    tint = if (isClaimed) Color(0xFF64748B) else Color(0xFFE11D48),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = "Masukkan kode redeem...",
-                                        color = Color(0xFF64748B),
-                                        fontSize = 12.5.sp,
+                                        text = mission.title,
+                                        color = Color.White,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontFamily = SfProFontFamily
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    PrimoPointIcon(size = 14.dp)
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "+${mission.pointsReward}",
+                                        color = Color(0xFFE11D48),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
                                         fontFamily = SfProFontFamily
                                     )
                                 }
-                                innerTextField()
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
 
-                        Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.height(2.dp))
 
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(9.dp))
-                                .background(
-                                    if (redeemInput.isNotBlank()) Color(0xFFE11D48) else Color(0xFF1F2433)
-                                )
-                                .clickable(enabled = redeemInput.isNotBlank() && !isRedeeming) {
-                                    isRedeeming = true
-                                    FirebaseManager.claimRedeemCode(context, redeemInput.trim()) { success, msg ->
-                                        isRedeeming = false
-                                        if (success) redeemInput = ""
-                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isRedeeming) {
-                                CircularProgressIndicator(
-                                    color = Color.White,
-                                    strokeWidth = 2.dp,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            } else {
                                 Text(
-                                    text = "Klaim",
-                                    color = if (redeemInput.isNotBlank()) Color.White else Color(0xFF64748B),
+                                    text = mission.subtitle,
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 11.5.sp,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(10.dp))
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(
+                                        when {
+                                            isClaimed -> Color(0xFF1A1D28)
+                                            isCompleted -> Color(0xFFE11D48)
+                                            else -> Color(0xFF1E2230)
+                                        }
+                                    )
+                                    .clickable(enabled = !isClaimed) {
+                                        if (mission.id == "daily_checkin") {
+                                            FirebaseManager.checkInToday(context) { _, msg ->
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                            }
+                                        } else if (isCompleted) {
+                                            FirebaseManager.claimMissionReward(
+                                                context = context,
+                                                missionId = mission.id,
+                                                missionTitle = mission.title,
+                                                expReward = mission.expReward,
+                                                pointsReward = mission.pointsReward,
+                                                periodKey = mission.periodKey
+                                            ) { _, msg ->
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                            }
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "Selesaikan misi (${mission.currentProgress}/${mission.targetProgress}) terlebih dahulu",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 7.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (isClaimed) "Claimed" else if (isCompleted) "Claim" else "Go",
+                                    color = if (isClaimed) Color(0xFF475569) else if (isCompleted) Color.White else Color(0xFFCBD5E1),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = SfProFontFamily
                                 )
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Chip Kode Event Cepat
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        presetCodes.forEach { preset ->
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFF161822))
-                                    .border(0.5.dp, Color(0xFF222838), RoundedCornerShape(8.dp))
-                                    .clickable { redeemInput = preset.code }
-                                    .padding(vertical = 6.dp, horizontal = 4.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = preset.code,
-                                        color = Color(0xFFCBD5E1),
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = SfProFontFamily,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = preset.label,
-                                        color = Color(0xFF64748B),
-                                        fontSize = 9.sp,
-                                        fontFamily = SfProFontFamily,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
+                        if (index < missions.size - 1) {
+                            HorizontalDivider(
+                                color = Color(0xFF1A1D27),
+                                thickness = 0.5.dp,
+                                modifier = Modifier.padding(vertical = 12.dp)
+                            )
                         }
                     }
                 }
             }
 
-            // 4. DAFTAR MISI: EARN REWARDS (Referensi 1000127705.jpg)
+            // Bottom Spacer agar tidak tertutup navbar
             item {
-                Column(modifier = Modifier.padding(top = 4.dp)) {
-                    Text(
-                        text = "Earn Rewards",
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "Selesaikan misi harian & mingguan untuk meraih EXP dan Poin",
-                        color = Color(0xFF94A3B8),
-                        fontSize = 11.5.sp,
-                        fontFamily = SfProFontFamily
-                    )
-                }
-            }
-
-            items(missions, key = { it.id }) { mission ->
-                val isClaimed = claimedMissions[mission.id] == mission.periodKey ||
-                    (mission.id == "daily_checkin" && isCheckedInToday)
-                val isCompleted = mission.currentProgress >= mission.targetProgress
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFF11131B))
-                        .border(0.5.dp, Color(0xFF1D212E), RoundedCornerShape(14.dp))
-                        .padding(13.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFF1A1D2B)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = mission.icon,
-                            contentDescription = null,
-                            tint = if (isClaimed) Color(0xFF64748B) else Color(0xFFFF5722),
-                            modifier = Modifier.size(19.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(11.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = mission.title,
-                                color = Color.White,
-                                fontSize = 13.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                fontFamily = SfProFontFamily
-                            )
-                            if (mission.isWeekly) {
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "MINGGUAN",
-                                    color = Color(0xFFF59E0B),
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = SfProFontFamily
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(2.dp))
-
-                        Text(
-                            text = mission.subtitle,
-                            color = Color(0xFF94A3B8),
-                            fontSize = 11.sp,
-                            fontFamily = SfProFontFamily
-                        )
-
-                        Spacer(modifier = Modifier.height(5.dp))
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            PrimoPointIcon(size = 13.dp)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "+${mission.pointsReward} Poin",
-                                color = Color(0xFFF43F5E),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = SfProFontFamily
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "+${mission.expReward} EXP",
-                                color = Color(0xFFFF5722),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = SfProFontFamily
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "(${mission.currentProgress}/${mission.targetProgress})",
-                                color = Color(0xFF64748B),
-                                fontSize = 10.5.sp,
-                                fontFamily = SfProFontFamily
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(9.dp))
-                            .background(
-                                when {
-                                    isClaimed -> Color(0xFF181B26)
-                                    isCompleted -> Color(0xFFE11D48)
-                                    else -> Color(0xFF141722)
-                                }
-                            )
-                            .clickable(enabled = !isClaimed) {
-                                if (mission.id == "daily_checkin") {
-                                    FirebaseManager.checkInToday(context) { _, msg ->
-                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                    }
-                                } else if (isCompleted) {
-                                    FirebaseManager.claimMissionReward(
-                                        context = context,
-                                        missionId = mission.id,
-                                        missionTitle = mission.title,
-                                        expReward = mission.expReward,
-                                        pointsReward = mission.pointsReward,
-                                        periodKey = mission.periodKey
-                                    ) { _, msg ->
-                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                    }
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        "Selesaikan misi (${mission.currentProgress}/${mission.targetProgress}) terlebih dahulu",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                            }
-                            .padding(horizontal = 14.dp, vertical = 7.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (isClaimed) "Klaim" else if (isCompleted) "Klaim" else "Go",
-                            color = if (isClaimed) Color(0xFF475569) else if (isCompleted) Color.White else Color(0xFFCBD5E1),
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
-                        )
-                    }
-                }
-            }
-
-            // Bottom Spacer
-            item {
-                Spacer(modifier = Modifier.height(115.dp))
+                Spacer(modifier = Modifier.height(120.dp))
             }
         }
     }

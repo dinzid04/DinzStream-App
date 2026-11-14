@@ -12,8 +12,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.github.penfeizhou.animation.apng.APNGDrawable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -33,10 +36,48 @@ private val sharedApngClient: OkHttpClient by lazy {
 }
 
 /**
+ * Memeriksa apakah file adalah APNG yang valid dengan memindai magic bytes dan chunk acTL.
+ */
+private fun isApngFile(file: File): Boolean {
+    if (!file.exists() || file.length() < 32L) return false
+    return try {
+        file.inputStream().use { stream ->
+            val header = ByteArray(8)
+            if (stream.read(header) != 8) return false
+            // Magic bytes PNG: 0x89 0x50 0x4E 0x47 0x0D 0x0A 0x1A 0x0A
+            if (header[0] != 0x89.toByte() || header[1] != 0x50.toByte() ||
+                header[2] != 0x4E.toByte() || header[3] != 0x47.toByte()
+            ) {
+                return false
+            }
+            // Pindai 8KB pertama untuk menemukan chunk 'acTL' (Animation Control Chunk)
+            val buffer = ByteArray(8192)
+            val bytesRead = stream.read(buffer)
+            if (bytesRead <= 0) return false
+            // 'a'=0x61, 'c'=0x63, 'T'=0x54, 'L'=0x4C
+            for (i in 0 until bytesRead - 3) {
+                if (buffer[i] == 0x61.toByte() &&
+                    buffer[i + 1] == 0x63.toByte() &&
+                    buffer[i + 2] == 0x54.toByte() &&
+                    buffer[i + 3] == 0x4C.toByte()
+                ) {
+                    return true
+                }
+            }
+            false
+        }
+    } catch (_: Throwable) {
+        false
+    }
+}
+
+/**
  * ApngAnimationView:
- * Komponen pemutar APNG 60 FPS hardware accelerated Discord menggunakan library Penfeizhou APNGDrawable.
- * Mendownload via OkHttpClient, menyimpan ke disk cache `context.cacheDir/apng_cache/`,
- * dan memutar secara mulus (setLoopLimit(0) + start()).
+ * Komponen pemutar APNG 60 FPS hardware-accelerated anti-crash.
+ * - Memeriksa signature APNG sebelum di-decode.
+ * - Menangani Throwable (Exception & OutOfMemoryError) dengan fallback otomatis ke Coil AsyncImage.
+ * - Touch pass-through (isClickable = false, isFocusable = false).
+ * - Membersihkan resource drawable dan memory saat unmount.
  */
 @Composable
 fun ApngAnimationView(
@@ -52,7 +93,9 @@ fun ApngAnimationView(
 
     val context = LocalContext.current
     var apngFile by remember(url) { mutableStateOf<File?>(null) }
+    var useApng by remember(url) { mutableStateOf(true) }
     var currentDrawable by remember { mutableStateOf<APNGDrawable?>(null) }
+    var currentImageView by remember { mutableStateOf<ImageView?>(null) }
 
     LaunchedEffect(url) {
         onLoadingChanged(true)
@@ -62,7 +105,7 @@ fun ApngAnimationView(
                 val safeHash = url.hashCode().toString().replace("-", "n")
                 val targetFile = File(cacheDir, "apng_$safeHash.png")
 
-                if (targetFile.exists() && targetFile.length() > 0L) {
+                if (targetFile.exists() && targetFile.length() > 100L) {
                     return@withContext targetFile
                 }
 
@@ -82,7 +125,7 @@ fun ApngAnimationView(
                     }
                 }
 
-                if (tempFile.exists() && tempFile.length() > 0L) {
+                if (tempFile.exists() && tempFile.length() > 100L) {
                     if (tempFile.renameTo(targetFile)) {
                         targetFile
                     } else {
@@ -91,13 +134,19 @@ fun ApngAnimationView(
                 } else {
                     null
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
+            } catch (t: Throwable) {
+                t.printStackTrace()
                 null
             }
         }
 
-        apngFile = file
+        if (file != null && file.exists() && file.length() > 100L) {
+            val isApng = withContext(Dispatchers.IO) { isApngFile(file) }
+            apngFile = file
+            useApng = isApng
+        } else {
+            useApng = false
+        }
         onLoadingChanged(false)
     }
 
@@ -105,10 +154,12 @@ fun ApngAnimationView(
         onDispose {
             try {
                 currentDrawable?.stop()
-            } catch (e: Exception) {
-                e.printStackTrace()
+                currentImageView?.setImageDrawable(null)
+            } catch (t: Throwable) {
+                t.printStackTrace()
             }
             currentDrawable = null
+            currentImageView = null
         }
     }
 
@@ -117,26 +168,56 @@ fun ApngAnimationView(
         contentAlignment = Alignment.Center
     ) {
         val file = apngFile
-        if (file != null && file.exists()) {
+        if (useApng && file != null && file.exists()) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
                     ImageView(ctx).apply {
                         this.scaleType = scaleType
+                        this.isClickable = false
+                        this.isFocusable = false
+                        this.isEnabled = false
+                        currentImageView = this
                     }
                 },
                 update = { imageView ->
                     imageView.scaleType = scaleType
+                    imageView.isClickable = false
+                    imageView.isFocusable = false
+                    imageView.isEnabled = false
+                    currentImageView = imageView
                     try {
                         val drawable = APNGDrawable.fromFile(file.absolutePath)
                         drawable.setLoopLimit(0) // 0 = Infinite loop
                         imageView.setImageDrawable(drawable)
                         drawable.start()
                         currentDrawable = drawable
-                    } catch (e: Exception) {
-                        e.printStackTrace()
+                    } catch (t: Throwable) {
+                        t.printStackTrace()
+                        // Fallback ke Coil jika terjadi OOM atau error decode
+                        useApng = false
+                        try {
+                            imageView.setImageDrawable(null)
+                        } catch (_: Throwable) {}
                     }
                 }
+            )
+        } else {
+            // Fallback aman ke Coil jika file bukan APNG atau decode gagal
+            val contentScale = when (scaleType) {
+                ImageView.ScaleType.CENTER_CROP -> ContentScale.Crop
+                ImageView.ScaleType.FIT_START -> ContentScale.FillWidth
+                ImageView.ScaleType.FIT_XY -> ContentScale.FillBounds
+                else -> ContentScale.Fit
+            }
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(url)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = contentScale,
+                modifier = Modifier.fillMaxSize()
             )
         }
     }
@@ -144,7 +225,7 @@ fun ApngAnimationView(
 
 /**
  * ApngStackedEffectView:
- * Merender layer APNG bertumpuk untuk efek profil multi-layer Discord.
+ * Merender maksimal 2 layer efek profil secara aman tanpa membebani RAM (anti-OOM).
  */
 @Composable
 fun ApngStackedEffectView(
@@ -153,7 +234,11 @@ fun ApngStackedEffectView(
     scaleType: ImageView.ScaleType = ImageView.ScaleType.FIT_CENTER,
     onLoadingChanged: (Boolean) -> Unit = {}
 ) {
-    if (layerUrls.isEmpty()) {
+    val validLayers = remember(layerUrls) {
+        layerUrls.filter { it.isNotBlank() }.take(2)
+    }
+
+    if (validLayers.isEmpty()) {
         Box(modifier = modifier)
         return
     }
@@ -162,12 +247,12 @@ fun ApngStackedEffectView(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        layerUrls.forEach { layerUrl ->
+        validLayers.forEachIndexed { index, layerUrl ->
             ApngAnimationView(
                 url = layerUrl,
                 modifier = Modifier.fillMaxSize(),
                 scaleType = scaleType,
-                onLoadingChanged = onLoadingChanged
+                onLoadingChanged = if (index == 0) onLoadingChanged else {}
             )
         }
     }

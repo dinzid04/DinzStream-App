@@ -1449,4 +1449,25 @@ Mengacu pada tata letak referensi `WA_1794546770520.jpg` (`1002213252.jpg`) deng
    - Tab Avatar Decoration dan Profile Effect di Edit Profil hanya menampilkan item yang SUDAH dimiliki pengguna (`unlockedBorders` / `unlockedEffects` / equipped).
    - Menampilkan empty state elegan *"Belum ada koleksi. Dapatkan di Shop Kosmetik"* jika belum ada kosmetik yang dimiliki.
 
+### H. Arsitektur Foreground Profile Effect, Anti-Crash APNG Engine, & Redesign Presisi Points & Rewards (`1000127705_2.jpg`)
+1. **Layering Foreground Profile Effect (`LoginProfileScreen.kt` & `EditProfileScreen.kt`):**
+   - Profile Effect dipindahkan ke layer terluar/terdepan (`zIndex = 50f`) sebagai anak terakhir di dalam root `Box`, di atas background (`#0B0B0B`) dan seluruh konten profil (`Column` pada `zIndex = 1f`). Animasi efek menyelimuti banner dan seluruh konten profil tanpa pernah terpotong kartu atau banner.
+   - Sifat tembus sentuhan (*Touch Pass-Through*): `ApngAnimationView` mengatur `isClickable = false`, `isFocusable = false`, `isEnabled = false` pada `ImageView` native, sehingga scroll dan klik pada elemen di bawahnya tetap 100% responsif.
+   - Layer Navigasi Teratas (`zIndex = 100f`): 3 tombol ikon pojok kanan atas diletakkan di `zIndex = 100f` di atas Profile Effect agar selalu dapat ditekan.
+2. **APNG Hardware Decoder Anti-Crash (`ApngAnimationView.kt`):**
+   - Validasi APNG: Fungsi `isApngFile()` memindai magic bytes PNG dan chunk `acTL` pada 8KB pertama file sebelum didecode oleh Penfeizhou APNG library.
+   - Pencegahan OutOfMemoryError (OOM): Dekoder menangkap `catch (t: Throwable)` (bukan hanya `Exception`, sehingga `OutOfMemoryError` tertangkap dengan aman).
+   - Fallback otomatis ke Coil `AsyncImage` jika decoding gagal atau memory tidak mencukupi, memastikan efek berat seperti `Deadpool` dsb. tidak pernah menyebabkan Force Close (Crash).
+   - Pembersihan memori pada `onDispose`: `drawable.stop()` dan pembersihan `ImageView.setImageDrawable(null)`.
+   - Pembatasan layer: `ApngStackedEffectView` dibatasi maksimal `take(2)` layer untuk mencegah kelebihan konsumsi RAM.
+   - Pada grid kartu kosmetik `EditProfileScreen`: menggunakan thumbnail gambar statis cepat dengan Coil `AsyncImage` dan live preview di root overlay `zIndex(50f)`.
+3. **Redesign Total Halaman Points & Rewards (`PointsRewardsScreen.kt` — Referensi `1000127705_2.jpg`):**
+   - **Latar Belakang Gradasi:** Gradasi vertikal lembut `listOf(Color(0xFF3B0D16), Color(0xFF1A0C11), Color(0xFF0B0B0E))`.
+   - **Top Bar:** Ikon kembali `<` minimalis tanpa bulatan background, judul tengah `"Rewards"` (18.sp Bold White), sisi kanan kosong (tanpa kapsul poin duplikat).
+   - **Area Saldo Poin Terbuka (Direct On Gradient):** Saldo poin ditampilkan langsung di atas gradasi tanpa kotak wrapper atau badge level: teks `"Saldo Poin"` (14.sp) + angka besar `FirebaseManager.formatNumber(points)` (40.sp ExtraBold White) di kiri, serta `PrimoPointIcon` besar (76.dp) mengambang bebas di kanan tanpa lingkaran overlay.
+   - **Kartu Check-in 7 Hari:** 1 kontainer rapi `RoundedCornerShape(22.dp)` background `#13151C`, header kiri `"Kamu sudah check-in X Hari"` (tanpa badge api di kanan), 7 hari kapsul dengan hari inaktif transparan tanpa border, hanya hari aktif yang disorot dengan aksen crimson `#E11D48` halus, angka poin bersih tanpa tanda `+`, dan tombol kapsul penuh `"Check in"` (`#E11D48`).
+   - **Inline Kode Redeem Bar:** 1 baris bersih 52.dp (`#13151C`, rounded 16.dp) dengan placeholder `"Masukkan kode redeem..."` dan tombol `"Klaim"`. Menghapus seluruh chip/kotak bocoran kode redeem event (`YURAVENOM`, `MYTHIC2026`, dsb.) demi keamanan dan kerapian UI.
+   - **Earn Rewards Section:** 1 kontainer tunggal `RoundedCornerShape(22.dp)` background `#13151C`, memuat judul `"Earn Rewards"` (17.sp Bold White) dan seluruh misi harian serta mingguan. Setiap misi memuat 2 baris teks (Judul + `PrimoPointIcon` + poin di baris 1, deskripsi di baris 2 tanpa baris ke-3 EXP merah) serta tombol kapsul `"Claim"` / `"Go"`, dipisahkan dengan `HorizontalDivider` tipis 0.5.dp `#1A1D27`.
+
+
 

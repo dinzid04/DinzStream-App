@@ -483,20 +483,10 @@ private fun UserProfileView(
             .fillMaxSize()
             .background(Color(0xFF0B0B0B))
     ) {
-        // Full-Screen Profile Effect 60 FPS Looping (Root Overlay - Penuh Layar Tanpa Terpotong Banner)
-        if (equippedProfileEffectUrl.isNotBlank() && cosmeticAnimate) {
-            ApngAnimationView(
-                url = equippedProfileEffectUrl,
-                scaleType = ImageView.ScaleType.FIT_START,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-            )
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .zIndex(1f)
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
                 .padding(bottom = 125.dp)
@@ -554,43 +544,6 @@ private fun UserProfileView(
                             )
                         )
                 )
-
-                // 3 Tombol Ikon Bulat Minimalis di Pojok Kanan Atas
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .statusBarsPadding()
-                        .padding(top = 12.dp, end = 18.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TopHeaderCircleIconButton(
-                        icon = Icons.Outlined.Visibility,
-                        contentDescription = "Preview Profil Publik",
-                        isActive = isPublicPreviewMode,
-                        onClick = {
-                            isPublicPreviewMode = !isPublicPreviewMode
-                            val msg = if (isPublicPreviewMode) {
-                                "Menampilkan pratinjau profil publik"
-                            } else {
-                                "Kembali ke mode profil pribadi"
-                            }
-                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                        }
-                    )
-
-                    TopHeaderCircleIconButton(
-                        icon = Icons.Outlined.Edit,
-                        contentDescription = "Edit Profil",
-                        onClick = onEditProfileClick
-                    )
-
-                    TopHeaderCircleIconButton(
-                        icon = Icons.Outlined.Settings,
-                        contentDescription = "Pengaturan",
-                        onClick = onOpenSettingsClick
-                    )
-                }
             }
 
 
@@ -1073,7 +1026,62 @@ private fun UserProfileView(
             }
         }
     }
+
+    // 5. LAYER OVERLAY FOREGROUND: FULL-SCREEN PROFILE EFFECT (DI ATAS SEMUA ELEMEN PROFIL & BANNER)
+    if (equippedProfileEffectUrl.isNotBlank() && cosmeticAnimate) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(50f)
+        ) {
+            ApngAnimationView(
+                url = equippedProfileEffectUrl,
+                scaleType = ImageView.ScaleType.FIT_START,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+            )
+        }
     }
+
+    // 6. LAYER NAVIGASI TERATAS: 3 TOMBOL IKON BULAT POJOK KANAN ATAS (zIndex = 100f)
+    Row(
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .statusBarsPadding()
+            .padding(top = 12.dp, end = 18.dp)
+            .zIndex(100f),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TopHeaderCircleIconButton(
+            icon = Icons.Outlined.Visibility,
+            contentDescription = "Preview Profil Publik",
+            isActive = isPublicPreviewMode,
+            onClick = {
+                isPublicPreviewMode = !isPublicPreviewMode
+                val msg = if (isPublicPreviewMode) {
+                    "Menampilkan pratinjau profil publik"
+                } else {
+                    "Kembali ke mode profil pribadi"
+                }
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            }
+        )
+
+        TopHeaderCircleIconButton(
+            icon = Icons.Outlined.Edit,
+            contentDescription = "Edit Profil",
+            onClick = onEditProfileClick
+        )
+
+        TopHeaderCircleIconButton(
+            icon = Icons.Outlined.Settings,
+            contentDescription = "Pengaturan",
+            onClick = onOpenSettingsClick
+        )
+    }
+}
 }
 
 @Composable

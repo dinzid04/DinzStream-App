@@ -1,6 +1,7 @@
 package com.yuranime.dinz.ui.profile.subscreens
 
 import android.net.Uri
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -62,13 +63,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.yuranime.dinz.data.firebase.BorderDefinition
 import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.firebase.ProfileEffectDefinition
 import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
 import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
+import com.yuranime.dinz.ui.components.ApngAnimationView
 import com.yuranime.dinz.ui.components.EmptyTitleSlotBadge
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.theme.SfProFontFamily
@@ -194,14 +198,19 @@ fun EditProfileScreen(
         cursorColor = Color(0xFFFF5722)
     )
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0B0B0B))
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .verticalScroll(rememberScrollState())
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(1f)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+        ) {
         // Top App Bar
         Row(
             modifier = Modifier
@@ -273,17 +282,6 @@ fun EditProfileScreen(
                                     colors = listOf(Color(0xFF281018), Color(0xFF14161E), Color(0xFF0B0B0B))
                                 )
                             )
-                    )
-                }
-
-                // Render Live Preview Profile Effect di Atas Banner
-                if (selectedProfileEffectUrl.isNotBlank()) {
-                    AnimatedCosmeticImage(
-                        url = selectedProfileEffectUrl,
-                        isAnimated = true,
-                        contentDescription = "Live Preview Profile Effect",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
                     )
                 }
 
@@ -753,7 +751,7 @@ fun EditProfileScreen(
 
                                     EditCosmeticCard(
                                         name = effect.name,
-                                        imageUrl = effect.animationUrl,
+                                        imageUrl = effect.staticImageUrl.ifBlank { effect.animationUrl },
                                         isBorder = false,
                                         userAvatarUrl = selectedAvatarUrl,
                                         isEquipped = isEquipped,
@@ -943,7 +941,25 @@ fun EditProfileScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
         }
+
+        // Live Preview Profile Effect di Luar/Depan Full Screen (zIndex = 50f)
+        if (selectedProfileEffectUrl.isNotBlank()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(50f)
+            ) {
+                ApngAnimationView(
+                    url = selectedProfileEffectUrl,
+                    scaleType = ImageView.ScaleType.FIT_START,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                )
+            }
+        }
     }
+}
 }
 
 /**
@@ -1002,7 +1018,7 @@ private fun EditCosmeticCard(
                     modifier = Modifier.size(72.dp)
                 )
             } else {
-                // Profile Effect di atas kartu mini
+                // Profile Effect di atas kartu mini (Thumbnail cepat & ringan)
                 Box(
                     modifier = Modifier
                         .size(64.dp)
@@ -1010,9 +1026,11 @@ private fun EditCosmeticCard(
                         .background(Color(0xFF161824)),
                     contentAlignment = Alignment.Center
                 ) {
-                    AnimatedCosmeticImage(
-                        url = imageUrl,
-                        isAnimated = true,
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(imageUrl)
+                            .crossfade(true)
+                            .build(),
                         contentDescription = name,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
