@@ -876,6 +876,533 @@
       flex-shrink: 0;
       margin-top: 1px;
     }
+  
+    /* Subheader Tab Navigation */
+    .admin-tab-nav-wrapper {
+      background: rgba(14, 16, 23, 0.95);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 0 28px;
+      position: sticky;
+      top: 61px;
+      z-index: 45;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .admin-tab-nav {
+      max-width: 1360px;
+      margin: 0 auto;
+      display: flex;
+      gap: 12px;
+    }
+
+    .admin-tab-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 13px 20px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-secondary);
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .admin-tab-item:hover {
+      color: var(--text-primary);
+    }
+
+    .admin-tab-item.active {
+      color: #fff;
+      border-bottom-color: var(--accent-red);
+    }
+
+    .tab-badge {
+      background: rgba(225, 29, 72, 0.18);
+      color: #FFA4B6;
+      border: 1px solid rgba(225, 29, 72, 0.35);
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    /* Redeem Section Container */
+    .redeem-container {
+      max-width: 1360px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .redeem-stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .stat-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .stat-card:hover {
+      border-color: var(--border-focus);
+      transform: translateY(-2px);
+    }
+
+    .stat-label {
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .stat-val {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: -0.5px;
+    }
+
+    .stat-sub {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .redeem-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 1.15fr;
+      gap: 28px;
+      align-items: start;
+    }
+
+    @media (max-width: 992px) {
+      .redeem-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .redeem-form-card, .redeem-list-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .redeem-card-header, .list-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .form-mode-badge {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .form-mode-badge.editing {
+      color: #F59E0B;
+    }
+
+    .btn-cancel-edit {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .btn-cancel-edit:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    .form-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    @media (max-width: 600px) {
+      .form-grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .btn-small-link {
+      background: none;
+      border: none;
+      color: var(--accent-blue);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .btn-small-link:hover {
+      text-decoration: underline;
+    }
+
+    .preset-pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+      align-items: center;
+    }
+
+    .preset-pill-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .preset-chip {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-size: 10.5px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: monospace;
+      transition: all 0.15s;
+    }
+
+    .preset-chip:hover {
+      background: rgba(225, 29, 72, 0.15);
+      border-color: rgba(225, 29, 72, 0.4);
+      color: #FFA4B6;
+    }
+
+    .preset-templates-box {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      margin-top: 6px;
+    }
+
+    .templates-header {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    .templates-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    @media (max-width: 600px) {
+      .templates-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .template-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 9px 12px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      transition: all 0.15s;
+    }
+
+    .template-btn:hover {
+      background: rgba(225, 29, 72, 0.1);
+      border-color: rgba(225, 29, 72, 0.3);
+    }
+
+    .template-btn strong {
+      font-size: 12px;
+      color: var(--text-primary);
+    }
+
+    .template-btn span {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .btn-seed {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.2));
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #FCD34D;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-seed:hover {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(217, 119, 6, 0.3));
+      transform: translateY(-1px);
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .filter-input {
+      flex: 1;
+      min-width: 180px;
+      background: var(--surface-input);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #fff;
+    }
+
+    .filter-input:focus {
+      outline: none;
+      border-color: var(--border-focus);
+    }
+
+    .filter-chips {
+      display: flex;
+      gap: 4px;
+    }
+
+    .filter-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .filter-chip.active {
+      background: var(--accent-red);
+      color: #fff;
+      border-color: var(--accent-red);
+    }
+
+    .codes-scroll-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 720px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .code-card-item {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: all 0.2s;
+    }
+
+    .code-card-item:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .code-card-item.inactive {
+      opacity: 0.6;
+      filter: grayscale(0.5);
+    }
+
+    .code-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .code-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .code-pill {
+      font-family: monospace;
+      font-size: 13.5px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      color: #fff;
+      background: rgba(225, 29, 72, 0.15);
+      border: 1px solid rgba(225, 29, 72, 0.35);
+      padding: 3px 9px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .code-pill:hover {
+      background: rgba(225, 29, 72, 0.25);
+    }
+
+    .badge-status {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 10px;
+    }
+
+    .badge-status.active {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34D399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-status.inactive {
+      background: rgba(239, 68, 68, 0.15);
+      color: #F87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .rewards-badges-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .reward-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    .reward-badge.exp {
+      background: rgba(56, 189, 248, 0.12);
+      color: #38BDF8;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+
+    .reward-badge.points {
+      background: rgba(245, 158, 11, 0.12);
+      color: #FBBF24;
+      border: 1px solid rgba(245, 158, 11, 0.25);
+    }
+
+    .reward-badge.cosmetic {
+      background: rgba(168, 85, 247, 0.12);
+      color: #C084FC;
+      border: 1px solid rgba(168, 85, 247, 0.25);
+    }
+
+    .code-msg-quote {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      background: rgba(0, 0, 0, 0.3);
+      padding: 6px 10px;
+      border-radius: 6px;
+      border-left: 2px solid var(--accent-red);
+      font-style: italic;
+    }
+
+    .code-actions-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      align-items: center;
+      margin-top: 2px;
+    }
+
+    .btn-action-small {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+
+    .btn-action-small:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+
+    .btn-action-small.danger:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #FCA5A5;
+    }
+
+    .empty-codes-box {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
   </style>
 </head>
 <body>
@@ -885,8 +1412,8 @@
     <div class="brand">
       <div class="brand-logo">Y</div>
       <div>
-        <div class="brand-title">Yuranime Promo Manager</div>
-        <div class="brand-subtitle">Real-Time Firebase Firestore Admin Console</div>
+        <div class="brand-title">Yuranime Admin Console</div>
+        <div class="brand-subtitle">Promo Popup &amp; Redeem Codes Manager</div>
       </div>
     </div>
     <div class="header-actions">
@@ -902,9 +1429,24 @@
       </div>
     </div>
   </header>
+  <!-- Subheader Navigation Tabs -->
+  <div class="admin-tab-nav-wrapper">
+    <div class="admin-tab-nav">
+      <button class="admin-tab-item active" id="tabNavPromo" onclick="switchMainTab('promo')">
+        <span>📢</span>
+        <span>Popup Promosi</span>
+      </button>
+      <button class="admin-tab-item" id="tabNavRedeem" onclick="switchMainTab('redeem')">
+        <span>🎁</span>
+        <span>Kelola Kode Redeem</span>
+        <span class="tab-badge" id="redeemCodesCountBadge">0</span>
+      </button>
+    </div>
+  </div>
+
 
   <!-- Main 2-Column Responsive Container -->
-  <main>
+  <main id="sectionPromo">
     <!-- Kolom Kiri: Kontrol Konfigurasi Promo -->
     <div class="form-column">
 
@@ -1105,6 +1647,193 @@
     </div>
   </main>
 
+  <!-- Redeem Codes Management Section -->
+  <div id="sectionRedeem" class="redeem-container" style="display: none;">
+    <!-- Stats Row -->
+    <div class="redeem-stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Total Kode Terdaftar</div>
+        <div class="stat-val" id="statTotalCodes">0</div>
+        <div class="stat-sub">Di Firestore collection <code>redeem_codes</code></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Kode Aktif</div>
+        <div class="stat-val" id="statActiveCodes" style="color: var(--accent-green);">0</div>
+        <div class="stat-sub">Dapat langsung diklaim di aplikasi</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Poin Disiapkan</div>
+        <div class="stat-val" id="statTotalPoints" style="color: #F59E0B;">0</div>
+        <div class="stat-sub">Akumulasi seluruh kode hadiah</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total EXP Disiapkan</div>
+        <div class="stat-val" id="statTotalExp" style="color: #38BDF8;">0</div>
+        <div class="stat-sub">Untuk menaikkan level akun user</div>
+      </div>
+    </div>
+
+    <!-- 2 Column Grid for Redeem -->
+    <div class="redeem-grid">
+      <!-- Kolom Kiri: Form Buat / Edit Kode -->
+      <div class="redeem-form-card">
+        <div class="redeem-card-header">
+          <div class="form-mode-badge" id="formModeBadge">✨ Buat Kode Redeem Baru</div>
+          <button type="button" class="btn-cancel-edit" id="btnCancelEdit" style="display: none;" onclick="cancelEditRedeemCode()">Batal Edit</button>
+        </div>
+
+        <form id="redeemCodeForm" onsubmit="handleRedeemFormSubmit(event)">
+          <!-- Kode Input -->
+          <div class="form-group">
+            <div class="form-label-row">
+              <label for="redeemCodeInput" class="form-label">Kode Redeem (Wajib):</label>
+              <button type="button" class="btn-small-link" onclick="generateRandomRedeemCode()">⚡ Buat Kode Acak</button>
+            </div>
+            <input type="text" id="redeemCodeInput" class="text-input" placeholder="Contoh: YURASPECIAL2026" required style="text-transform: uppercase; font-family: monospace; font-size: 14px; font-weight: 700; letter-spacing: 1px;">
+            <div class="field-hint">Otomatis diubah menjadi HURUF KAPITAL tanpa spasi (Document ID di Firestore).</div>
+          </div>
+
+          <!-- Hadiah EXP & Poin Row -->
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="redeemExpInput" class="form-label">Hadiah EXP:</label>
+              <input type="number" id="redeemExpInput" class="text-input" value="5000" min="0" step="500" required>
+              <div class="field-hint">Menambah EXP akun &amp; menaikkan Level.</div>
+            </div>
+            <div class="form-group">
+              <label for="redeemPointsInput" class="form-label">Hadiah Poin (Primo):</label>
+              <input type="number" id="redeemPointsInput" class="text-input" value="10000" min="0" step="500" required>
+              <div class="field-hint">Mata uang belanja kosmetik di Shop.</div>
+            </div>
+          </div>
+
+          <!-- Hadiah Title (Optional) -->
+          <div class="form-group">
+            <label for="redeemTitleInput" class="form-label">Hadiah Custom Title (Opsional):</label>
+            <input type="text" id="redeemTitleInput" class="text-input" placeholder="Contoh: MYTHIC SOVEREIGN, SEPUH YURANIME, VIP">
+            <div class="field-hint">Gelar eksklusif yang akan langsung di-unlock di profil user.</div>
+          </div>
+
+          <!-- Hadiah Border ID (Optional) with Presets -->
+          <div class="form-group">
+            <div class="form-label-row">
+              <label for="redeemBorderInput" class="form-label">Hadiah Avatar Decoration / Border (Opsional):</label>
+            </div>
+            <input type="text" id="redeemBorderInput" class="text-input" placeholder="ID Border, contoh: border_sovereign_gold">
+            <div class="preset-pill-row">
+              <span class="preset-pill-label">Preset:</span>
+              <button type="button" class="preset-chip" onclick="selectBorderPreset('border_sovereign_gold')">Sovereign Gold</button>
+              <button type="button" class="preset-chip" onclick="selectBorderPreset('border_silver_wings')">Silver Wings</button>
+              <button type="button" class="preset-chip" onclick="selectBorderPreset('border_venom_logo')">Venom</button>
+              <button type="button" class="preset-chip" onclick="selectBorderPreset('border_mythic_emperor')">Mythic Emperor</button>
+              <button type="button" class="preset-chip" onclick="selectBorderPreset('border_bronze_crest')">Bronze Crest</button>
+              <button type="button" class="preset-chip" onclick="selectBorderPreset('')">Kosongkan</button>
+            </div>
+          </div>
+
+          <!-- Hadiah Profile Effect ID (Optional) with Presets -->
+          <div class="form-group">
+            <div class="form-label-row">
+              <label for="redeemEffectInput" class="form-label">Hadiah Profile Effect (Opsional):</label>
+            </div>
+            <input type="text" id="redeemEffectInput" class="text-input" placeholder="ID Effect, contoh: effect_venom_symbiote">
+            <div class="preset-pill-row">
+              <span class="preset-pill-label">Preset:</span>
+              <button type="button" class="preset-chip" onclick="selectEffectPreset('effect_venom_symbiote')">Venom Symbiote</button>
+              <button type="button" class="preset-chip" onclick="selectEffectPreset('effect_mythic_aurora')">Mythic Aurora</button>
+              <button type="button" class="preset-chip" onclick="selectEffectPreset('effect_magic_hearts_gold')">Magic Hearts</button>
+              <button type="button" class="preset-chip" onclick="selectEffectPreset('effect_cosmic_twilight')">Cosmic Twilight</button>
+              <button type="button" class="preset-chip" onclick="selectEffectPreset('')">Kosongkan</button>
+            </div>
+          </div>
+
+          <!-- Pesan Notifikasi Sukses -->
+          <div class="form-group">
+            <label for="redeemMessageInput" class="form-label">Pesan Sukses Saat Diklaim:</label>
+            <input type="text" id="redeemMessageInput" class="text-input" placeholder="Contoh: Selamat! Kode VIP aktif: +10,000 EXP &amp; +5,000 Poin!" required>
+            <div class="field-hint">Muncul di toast / dialog aplikasi Android saat user menekan Klaim.</div>
+          </div>
+
+          <!-- Status Aktif (iOS Switch) -->
+          <div class="switch-row" style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 10px; border: 1px solid var(--border-subtle); margin-bottom: 20px;">
+            <div class="switch-info">
+              <div class="switch-label">Status Kode Redeem</div>
+              <div class="switch-subtext" id="redeemActiveSubtitle">Kode aktif dan dapat langsung diklaim pengguna</div>
+            </div>
+            <label class="ios-switch">
+              <input type="checkbox" id="redeemActiveSwitch" checked onchange="handleRedeemActiveToggle()">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- Tombol Simpan & Reset -->
+          <div class="action-btn-row">
+            <button type="submit" class="btn btn-primary" id="btnSaveRedeemCode">
+              <span>💾</span> <span id="btnSaveRedeemLabel">Simpan Kode ke Database</span>
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="resetRedeemForm()">
+              <span>🔄</span> Reset Form
+            </button>
+          </div>
+        </form>
+
+        <!-- Quick 1-Click Code Templates -->
+        <div class="preset-templates-box">
+          <div class="templates-header">⚡ Template Paket Cepat (1-Klik):</div>
+          <div class="templates-grid">
+            <button type="button" class="template-btn" onclick="applyCodeTemplate('weekend')">
+              <strong>🎉 Weekend Festival</strong>
+              <span>+5.000 EXP • +2.500 Poin</span>
+            </button>
+            <button type="button" class="template-btn" onclick="applyCodeTemplate('vip')">
+              <strong>👑 VIP Special Pass</strong>
+              <span>+10k EXP • +5k Poin • VIP Title &amp; Border</span>
+            </button>
+            <button type="button" class="template-btn" onclick="applyCodeTemplate('venom')">
+              <strong>🕷️ Venom Symbiote</strong>
+              <span>+12k EXP • +6k Poin • Venom Border &amp; Effect</span>
+            </button>
+            <button type="button" class="template-btn" onclick="applyCodeTemplate('mythic')">
+              <strong>✨ Mythic Sovereign</strong>
+              <span>+25k EXP • +15k Poin • Title &amp; Aurora Effect</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kolom Kanan: Live Database Explorer -->
+      <div class="redeem-list-card">
+        <div class="list-card-header">
+          <div>
+            <div class="list-title">Koleksi Kode Redeem di Database</div>
+            <div class="list-sub" id="listSubtitle">Memuat data dari Firestore...</div>
+          </div>
+          <button type="button" class="btn-seed" onclick="seedDefaultCodesToFirestore()" title="Tambah 6 kode resmi Yuranime ke Firestore">
+            <span>⚡</span> Seed 6 Kode Resmi
+          </button>
+        </div>
+
+        <!-- Search & Filter Controls -->
+        <div class="filter-bar">
+          <input type="text" id="filterCodeInput" class="filter-input" placeholder="🔍 Cari kode atau hadiah..." oninput="handleCodeFilterChange()">
+          <div class="filter-chips">
+            <button type="button" class="filter-chip active" id="filterAll" onclick="setFilterStatus('all')">Semua</button>
+            <button type="button" class="filter-chip" id="filterActive" onclick="setFilterStatus('active')">Aktif</button>
+            <button type="button" class="filter-chip" id="filterInactive" onclick="setFilterStatus('inactive')">Nonaktif</button>
+          </div>
+        </div>
+
+        <!-- Live Code Items Container -->
+        <div class="codes-scroll-container" id="codesListContainer">
+          <div class="loading-codes-state" style="padding: 30px; text-align: center; color: var(--text-muted);">
+            <span>Menghubungkan ke Firestore <code>redeem_codes</code>...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <!-- Modal Guide for Firestore Rules -->
   <div class="modal-overlay" id="rulesModal">
     <div class="modal-content">
@@ -1160,6 +1889,11 @@ service cloud.firestore {
 
     // 2. Izinkan data pengguna dan check-in
     match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // 3. Izinkan baca dan kelola kode redeem
+    match /redeem_codes/{codeId} {
       allow read, write: if true;
     }
 
@@ -1263,7 +1997,7 @@ service cloud.firestore {
   <!-- Firebase Modular SDK via ESM -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, doc, onSnapshot, setDoc, collection, getDocs, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
     // Konfigurasi Default Resmi Firebase Proyek Baru dinz-62119
@@ -1754,6 +2488,581 @@ service cloud.firestore {
 
     // Initial update
     updateMockupPreview();
+
+    // ==========================================
+    // TAB NAVIGATION: PROMO vs REDEEM
+    // ==========================================
+    window.switchMainTab = function(tab) {
+      const sectionPromo = document.getElementById("sectionPromo");
+      const sectionRedeem = document.getElementById("sectionRedeem");
+      const tabNavPromo = document.getElementById("tabNavPromo");
+      const tabNavRedeem = document.getElementById("tabNavRedeem");
+
+      if (tab === 'redeem') {
+        sectionPromo.style.display = "none";
+        sectionRedeem.style.display = "flex";
+        tabNavPromo.classList.remove("active");
+        tabNavRedeem.classList.add("active");
+        loadRedeemCodes();
+      } else {
+        sectionPromo.style.display = "grid";
+        sectionRedeem.style.display = "none";
+        tabNavPromo.classList.add("active");
+        tabNavRedeem.classList.remove("active");
+      }
+    };
+
+    // ==========================================
+    // REDEEM CODES MANAGEMENT LOGIC
+    // ==========================================
+    let allRedeemCodes = [];
+    let currentEditingCode = null;
+    let activeFilterStatus = 'all';
+    let filterSearchQuery = '';
+
+    // Realtime Listener for Redeem Codes
+    function listenToRedeemCodes() {
+      const activeDb = dbPrimary || dbFallback;
+      if (!activeDb) {
+        loadRedeemCodesFromRest();
+        return;
+      }
+
+      try {
+        const colRef = collection(activeDb, "redeem_codes");
+        onSnapshot(colRef, (snapshot) => {
+          const list = [];
+          snapshot.forEach((d) => {
+            const data = d.data();
+            list.push({
+              code: d.id,
+              active: data.active !== undefined ? Boolean(data.active) : true,
+              exp: Number(data.exp || 0),
+              points: Number(data.points || 0),
+              title: data.title || "",
+              borderId: data.borderId || "",
+              effectId: data.effectId || "",
+              message: data.message || `Kode "${d.id}" berhasil diklaim!`,
+              updatedAt: data.updatedAt || 0
+            });
+          });
+
+          // Sort by code name or updatedAt
+          list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+          allRedeemCodes = list;
+          renderRedeemCodesList();
+          updateRedeemStats();
+        }, (err) => {
+          console.warn("Redeem Firestore realtime error, trying REST:", err);
+          loadRedeemCodesFromRest();
+        });
+      } catch (err) {
+        console.warn("Error setting up redeem listener:", err);
+        loadRedeemCodesFromRest();
+      }
+    }
+
+    // Fallback load via REST API
+    async function loadRedeemCodesFromRest() {
+      try {
+        const restUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/redeem_codes?key=${firebaseConfig.apiKey}`;
+        const res = await fetch(restUrl);
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.documents) {
+            allRedeemCodes = json.documents.map(docItem => {
+              const parts = docItem.name.split('/');
+              const codeId = parts[parts.length - 1];
+              const f = docItem.fields || {};
+              return {
+                code: codeId,
+                active: f.active?.booleanValue !== undefined ? f.active.booleanValue : true,
+                exp: Number(f.exp?.integerValue || f.exp?.doubleValue || 0),
+                points: Number(f.points?.integerValue || f.points?.doubleValue || 0),
+                title: f.title?.stringValue || "",
+                borderId: f.borderId?.stringValue || "",
+                effectId: f.effectId?.stringValue || "",
+                message: f.message?.stringValue || `Kode "${codeId}" berhasil diklaim!`,
+                updatedAt: Number(f.updatedAt?.integerValue || 0)
+              };
+            });
+            renderRedeemCodesList();
+            updateRedeemStats();
+          } else {
+            allRedeemCodes = [];
+            renderRedeemCodesList();
+            updateRedeemStats();
+          }
+        }
+      } catch (e) {
+        console.warn("REST load redeem codes failed:", e);
+      }
+    }
+
+    function loadRedeemCodes() {
+      listenToRedeemCodes();
+    }
+
+    function updateRedeemStats() {
+      const total = allRedeemCodes.length;
+      const active = allRedeemCodes.filter(c => c.active).length;
+      const totalPoints = allRedeemCodes.reduce((sum, c) => sum + (c.points || 0), 0);
+      const totalExp = allRedeemCodes.reduce((sum, c) => sum + (c.exp || 0), 0);
+
+      document.getElementById("statTotalCodes").textContent = total.toLocaleString();
+      document.getElementById("statActiveCodes").textContent = active.toLocaleString();
+      document.getElementById("statTotalPoints").textContent = totalPoints.toLocaleString();
+      document.getElementById("statTotalExp").textContent = totalExp.toLocaleString();
+
+      const badge = document.getElementById("redeemCodesCountBadge");
+      if (badge) badge.textContent = total;
+
+      const sub = document.getElementById("listSubtitle");
+      if (sub) sub.textContent = `${total} kode tersimpan (${active} aktif)`;
+    }
+
+    function renderRedeemCodesList() {
+      const container = document.getElementById("codesListContainer");
+      if (!container) return;
+
+      let filtered = allRedeemCodes.filter(c => {
+        if (activeFilterStatus === 'active' && !c.active) return false;
+        if (activeFilterStatus === 'inactive' && c.active) return false;
+        if (filterSearchQuery) {
+          const q = filterSearchQuery.toLowerCase();
+          const matchCode = c.code.toLowerCase().includes(q);
+          const matchTitle = (c.title || "").toLowerCase().includes(q);
+          const matchMsg = (c.message || "").toLowerCase().includes(q);
+          if (!matchCode && !matchTitle && !matchMsg) return false;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-codes-box">
+            <div style="font-size: 36px;">🎁</div>
+            <div style="font-size: 14px; font-weight: 700; color: #fff;">Tidak ada kode redeem yang cocok</div>
+            <div style="font-size: 12px; max-width: 320px;">
+              ${allRedeemCodes.length === 0 
+                ? 'Database belum memiliki kode redeem kustom. Tekan tombol "Seed 6 Kode Resmi" di atas untuk menambahkan kode bawaan langsung ke Firestore!' 
+                : 'Tidak ada kode yang sesuai dengan filter pencarian.'}
+            </div>
+            ${allRedeemCodes.length === 0 ? `
+              <button class="btn-seed" onclick="seedDefaultCodesToFirestore()" style="margin-top: 6px;">
+                ⚡ Masukkan 6 Kode Resmi Sekarang
+              </button>
+            ` : ''}
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(c => `
+        <div class="code-card-item ${c.active ? '' : 'inactive'}" id="code-item-${c.code}">
+          <div class="code-header-row">
+            <div class="code-title-wrap">
+              <span class="code-pill" onclick="copyCodeToClipboard('${c.code}')" title="Klik untuk menyalin kode">
+                <span>📋</span> ${c.code}
+              </span>
+              <span class="badge-status ${c.active ? 'active' : 'inactive'}">
+                ${c.active ? '🟢 Aktif' : '🔴 Nonaktif'}
+              </span>
+            </div>
+            <div class="code-actions-row">
+              <button class="btn-action-small" onclick="toggleRedeemCodeActive('${c.code}', ${!c.active})" title="Ubah status">
+                ${c.active ? '⏸️ Nonaktifkan' : '▶️ Aktifkan'}
+              </button>
+              <button class="btn-action-small" onclick="editRedeemCode('${c.code}')" title="Edit kode">
+                ✏️ Edit
+              </button>
+              <button class="btn-action-small danger" onclick="deleteRedeemCode('${c.code}')" title="Hapus kode">
+                🗑️
+              </button>
+            </div>
+          </div>
+
+          <div class="rewards-badges-row">
+            <span class="reward-badge points">💎 +${(c.points || 0).toLocaleString()} Poin</span>
+            <span class="reward-badge exp">⭐ +${(c.exp || 0).toLocaleString()} EXP</span>
+            ${c.title ? `<span class="reward-badge cosmetic">👑 Gelar: ${c.title}</span>` : ''}
+            ${c.borderId ? `<span class="reward-badge cosmetic">🖼️ Border: ${c.borderId}</span>` : ''}
+            ${c.effectId ? `<span class="reward-badge cosmetic">✨ Efek: ${c.effectId}</span>` : ''}
+          </div>
+
+          <div class="code-msg-quote">"${c.message || 'Kode berhasil diklaim!'}"</div>
+        </div>
+      `).join('');
+    }
+
+    // Submit handler: Save or update redeem code
+    window.handleRedeemFormSubmit = async function(event) {
+      event.preventDefault();
+      const codeInput = document.getElementById("redeemCodeInput");
+      const expInput = document.getElementById("redeemExpInput");
+      const pointsInput = document.getElementById("redeemPointsInput");
+      const titleInput = document.getElementById("redeemTitleInput");
+      const borderInput = document.getElementById("redeemBorderInput");
+      const effectInput = document.getElementById("redeemEffectInput");
+      const messageInput = document.getElementById("redeemMessageInput");
+      const activeSwitch = document.getElementById("redeemActiveSwitch");
+
+      const cleanCode = (codeInput.value || "").trim().toUpperCase().replace(/\s+/g, '');
+      if (!cleanCode) {
+        showToast("Masukkan kode redeem yang valid!", true);
+        return;
+      }
+
+      const payload = {
+        active: Boolean(activeSwitch.checked),
+        exp: Number(expInput.value || 0),
+        points: Number(pointsInput.value || 0),
+        title: (titleInput.value || "").trim() || null,
+        borderId: (borderInput.value || "").trim() || null,
+        effectId: (effectInput.value || "").trim() || null,
+        message: (messageInput.value || "").trim() || `Selamat! Kode "${cleanCode}" berhasil diklaim!`,
+        updatedAt: Date.now()
+      };
+
+      const btn = document.getElementById("btnSaveRedeemCode");
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = "<span>⏳</span> Menyimpan ke Database...";
+      btn.disabled = true;
+
+      try {
+        const activeDb = dbPrimary || dbFallback;
+        if (activeDb) {
+          const docRef = doc(activeDb, "redeem_codes", cleanCode);
+          await setDoc(docRef, payload, { merge: true });
+        } else {
+          // REST Fallback
+          const restUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/redeem_codes/${cleanCode}?key=${firebaseConfig.apiKey}`;
+          const fieldsObj = {
+            active: { booleanValue: payload.active },
+            exp: { integerValue: String(payload.exp) },
+            points: { integerValue: String(payload.points) },
+            message: { stringValue: payload.message },
+            updatedAt: { integerValue: String(payload.updatedAt) }
+          };
+          if (payload.title) fieldsObj.title = { stringValue: payload.title };
+          if (payload.borderId) fieldsObj.borderId = { stringValue: payload.borderId };
+          if (payload.effectId) fieldsObj.effectId = { stringValue: payload.effectId };
+
+          await fetch(restUrl, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fields: fieldsObj })
+          });
+        }
+
+        showToast(`✓ Kode "${cleanCode}" berhasil disimpan ke Firestore!`);
+        resetRedeemForm();
+        loadRedeemCodesFromRest();
+      } catch (err) {
+        console.error("Save code error:", err);
+        showToast("Gagal menyimpan kode: " + (err.message || "Periksa Aturan Rules Firestore"), true);
+      } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+      }
+    };
+
+    window.editRedeemCode = function(code) {
+      const item = allRedeemCodes.find(c => c.code === code);
+      if (!item) return;
+
+      currentEditingCode = code;
+      document.getElementById("redeemCodeInput").value = item.code;
+      document.getElementById("redeemCodeInput").readOnly = true;
+      document.getElementById("redeemExpInput").value = item.exp || 0;
+      document.getElementById("redeemPointsInput").value = item.points || 0;
+      document.getElementById("redeemTitleInput").value = item.title || "";
+      document.getElementById("redeemBorderInput").value = item.borderId || "";
+      document.getElementById("redeemEffectInput").value = item.effectId || "";
+      document.getElementById("redeemMessageInput").value = item.message || "";
+      document.getElementById("redeemActiveSwitch").checked = item.active;
+      handleRedeemActiveToggle();
+
+      const badge = document.getElementById("formModeBadge");
+      badge.innerHTML = `✏️ Mode Edit: <strong>${code}</strong>`;
+      badge.classList.add("editing");
+      document.getElementById("btnCancelEdit").style.display = "inline-block";
+      document.getElementById("btnSaveRedeemLabel").textContent = `Perbarui Kode "${code}"`;
+
+      // Smooth scroll to form
+      document.querySelector(".redeem-form-card")?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    window.cancelEditRedeemCode = function() {
+      resetRedeemForm();
+    };
+
+    function resetRedeemForm() {
+      currentEditingCode = null;
+      document.getElementById("redeemCodeForm")?.reset();
+      document.getElementById("redeemCodeInput").readOnly = false;
+      document.getElementById("redeemActiveSwitch").checked = true;
+      handleRedeemActiveToggle();
+
+      const badge = document.getElementById("formModeBadge");
+      badge.innerHTML = `✨ Buat Kode Redeem Baru`;
+      badge.classList.remove("editing");
+      document.getElementById("btnCancelEdit").style.display = "none";
+      document.getElementById("btnSaveRedeemLabel").textContent = "Simpan Kode ke Database";
+    }
+    window.resetRedeemForm = resetRedeemForm;
+
+    window.toggleRedeemCodeActive = async function(code, newStatus) {
+      try {
+        const activeDb = dbPrimary || dbFallback;
+        if (activeDb) {
+          const docRef = doc(activeDb, "redeem_codes", code);
+          await setDoc(docRef, { active: newStatus, updatedAt: Date.now() }, { merge: true });
+        } else {
+          const restUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/redeem_codes/${code}?updateMask.fieldPaths=active&key=${firebaseConfig.apiKey}`;
+          await fetch(restUrl, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fields: { active: { booleanValue: newStatus } } })
+          });
+        }
+        showToast(`✓ Status kode "${code}" diubah menjadi: ${newStatus ? 'Aktif' : 'Nonaktif'}`);
+        loadRedeemCodesFromRest();
+      } catch (err) {
+        showToast("Gagal mengubah status: " + err.message, true);
+      }
+    };
+
+    window.deleteRedeemCode = async function(code) {
+      if (!confirm(`Apakah Anda yakin ingin menghapus kode "${code}" dari database Firestore?`)) return;
+
+      try {
+        const activeDb = dbPrimary || dbFallback;
+        if (activeDb) {
+          const docRef = doc(activeDb, "redeem_codes", code);
+          await deleteDoc(docRef);
+        } else {
+          const restUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/redeem_codes/${code}?key=${firebaseConfig.apiKey}`;
+          await fetch(restUrl, { method: "DELETE" });
+        }
+        showToast(`✓ Kode "${code}" berhasil dihapus!`);
+        allRedeemCodes = allRedeemCodes.filter(c => c.code !== code);
+        renderRedeemCodesList();
+        updateRedeemStats();
+      } catch (err) {
+        showToast("Gagal menghapus kode: " + err.message, true);
+      }
+    };
+
+    window.copyCodeToClipboard = function(code) {
+      navigator.clipboard.writeText(code).then(() => {
+        showToast(`✓ Kode "${code}" disalin ke clipboard!`);
+      }).catch(() => {
+        showToast(`Kode: ${code}`);
+      });
+    };
+
+    window.handleRedeemActiveToggle = function() {
+      const sw = document.getElementById("redeemActiveSwitch");
+      const sub = document.getElementById("redeemActiveSubtitle");
+      if (sw && sub) {
+        sub.textContent = sw.checked 
+          ? "Kode aktif dan dapat langsung diklaim pengguna" 
+          : "Kode dinonaktifkan sementara (tidak bisa diklaim)";
+      }
+    };
+
+    window.generateRandomRedeemCode = function() {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let rand = "";
+      for (let i = 0; i < 4; i++) {
+        rand += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      const code = `YURA-${rand}`;
+      document.getElementById("redeemCodeInput").value = code;
+      showToast(`Kode baru dibuat: ${code}`);
+    };
+
+    window.selectBorderPreset = function(id) {
+      document.getElementById("redeemBorderInput").value = id;
+    };
+
+    window.selectEffectPreset = function(id) {
+      document.getElementById("redeemEffectInput").value = id;
+    };
+
+    window.applyCodeTemplate = function(templateKey) {
+      const templates = {
+        weekend: {
+          code: "YURAWEEKEND",
+          exp: 5000,
+          points: 2500,
+          title: "",
+          border: "",
+          effect: "",
+          message: "Selamat! Paket Weekend Festival aktif: +5,000 EXP & +2,500 Poin!"
+        },
+        vip: {
+          code: "YURANIMEVIP",
+          exp: 10000,
+          points: 5000,
+          title: "VIP YURANIME",
+          border: "border_sovereign_gold",
+          effect: "effect_magic_hearts_gold",
+          message: "Selamat! Kode VIP Yuranime aktif: +10,000 EXP, +5,000 Poin, & Kosmetik Emas!"
+        },
+        venom: {
+          code: "VENOMSYMBIOTE",
+          exp: 12000,
+          points: 6000,
+          title: "",
+          border: "border_venom_logo",
+          effect: "effect_venom_symbiote",
+          message: "We Are Venom! +12,000 EXP, +6,000 Poin, Avatar Border & Profile Effect Venom didapatkan!"
+        },
+        mythic: {
+          code: "DINZMYTHIC",
+          exp: 25000,
+          points: 15000,
+          title: "MYTHIC SOVEREIGN",
+          border: "border_mythic_emperor",
+          effect: "effect_mythic_aurora",
+          message: "Luar biasa! Paket Mythic Sovereign aktif: +25,000 EXP, +15,000 Poin & Mahkota Mythic!"
+        }
+      };
+
+      const t = templates[templateKey];
+      if (!t) return;
+
+      document.getElementById("redeemCodeInput").value = t.code;
+      document.getElementById("redeemExpInput").value = t.exp;
+      document.getElementById("redeemPointsInput").value = t.points;
+      document.getElementById("redeemTitleInput").value = t.title;
+      document.getElementById("redeemBorderInput").value = t.border;
+      document.getElementById("redeemEffectInput").value = t.effect;
+      document.getElementById("redeemMessageInput").value = t.message;
+      showToast(`Template "${t.code}" diterapkan ke form!`);
+    };
+
+    window.seedDefaultCodesToFirestore = async function() {
+      if (!confirm("Masukkan 6 kode bawaan resmi Yuranime (DINZMYTHIC, YURANIMEVIP, VENOMSYMBIOTE, SOVEREIGN99, SEPUH2026, ANIMEKING) ke database Firestore?")) return;
+
+      const defaultCodes = [
+        {
+          code: "YURANIMEVIP",
+          exp: 10000,
+          points: 5000,
+          title: "VIP YURANIME",
+          borderId: "border_sovereign_gold",
+          effectId: "effect_magic_hearts_gold",
+          message: "Selamat! Kode VIP Yuranime aktif: +10,000 EXP, +5,000 Poin, & Kosmetik Emas!",
+          active: true
+        },
+        {
+          code: "DINZMYTHIC",
+          exp: 25000,
+          points: 15000,
+          title: "MYTHIC SOVEREIGN",
+          borderId: "border_mythic_emperor",
+          effectId: "effect_mythic_aurora",
+          message: "Luar biasa! Paket Mythic Sovereign aktif: +25,000 EXP, +15,000 Poin & Mahkota Mythic!",
+          active: true
+        },
+        {
+          code: "SEPUH2026",
+          exp: 5000,
+          points: 2500,
+          title: "SEPUH YURANIME",
+          borderId: "border_bronze_crest",
+          effectId: null,
+          message: "Kode Sepuh 2026 aktif: +5,000 EXP, +2,500 Poin & Title Sepuh!",
+          active: true
+        },
+        {
+          code: "SOVEREIGN99",
+          exp: 15000,
+          points: 8000,
+          title: "KHALIFAH ANIME",
+          borderId: "border_silver_wings",
+          effectId: null,
+          message: "Kode Sovereign aktif: +15,000 EXP, +8,000 Poin & Sayap Perak!",
+          active: true
+        },
+        {
+          code: "ANIMEKING",
+          exp: 8000,
+          points: 4000,
+          title: "BANGSAWAN KOMIK",
+          borderId: null,
+          effectId: "effect_cosmic_twilight",
+          message: "Kode Raja Anime aktif: +8,000 EXP, +4,000 Poin & Efek Cosmic Twilight!",
+          active: true
+        },
+        {
+          code: "VENOMSYMBIOTE",
+          exp: 12000,
+          points: 6000,
+          title: null,
+          borderId: "border_venom_logo",
+          effectId: "effect_venom_symbiote",
+          message: "We Are Venom! +12,000 EXP, +6,000 Poin, Avatar Border & Profile Effect Venom didapatkan!",
+          active: true
+        }
+      ];
+
+      try {
+        const activeDb = dbPrimary || dbFallback;
+        for (const item of defaultCodes) {
+          const { code, ...data } = item;
+          data.updatedAt = Date.now();
+          if (activeDb) {
+            await setDoc(doc(activeDb, "redeem_codes", code), data, { merge: true });
+          } else {
+            const restUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/redeem_codes/${code}?key=${firebaseConfig.apiKey}`;
+            const fieldsObj = {
+              active: { booleanValue: data.active },
+              exp: { integerValue: String(data.exp) },
+              points: { integerValue: String(data.points) },
+              message: { stringValue: data.message },
+              updatedAt: { integerValue: String(data.updatedAt) }
+            };
+            if (data.title) fieldsObj.title = { stringValue: data.title };
+            if (data.borderId) fieldsObj.borderId = { stringValue: data.borderId };
+            if (data.effectId) fieldsObj.effectId = { stringValue: data.effectId };
+
+            await fetch(restUrl, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ fields: fieldsObj })
+            });
+          }
+        }
+        showToast("✓ Berhasil memasukkan 6 kode resmi ke Firestore!");
+        loadRedeemCodesFromRest();
+      } catch (err) {
+        showToast("Gagal seed kode: " + err.message, true);
+      }
+    };
+
+    window.handleCodeFilterChange = function() {
+      filterSearchQuery = document.getElementById("filterCodeInput")?.value || "";
+      renderRedeemCodesList();
+    };
+
+    window.setFilterStatus = function(status) {
+      activeFilterStatus = status;
+      document.querySelectorAll(".filter-chip").forEach(el => el.classList.remove("active"));
+      if (status === 'all') document.getElementById("filterAll")?.classList.add("active");
+      if (status === 'active') document.getElementById("filterActive")?.classList.add("active");
+      if (status === 'inactive') document.getElementById("filterInactive")?.classList.add("active");
+      renderRedeemCodesList();
+    };
+
+    // Auto load redeem codes count badge on boot
+    setTimeout(() => {
+      listenToRedeemCodes();
+    }, 600);
+
   </script>
 </body>
 </html>

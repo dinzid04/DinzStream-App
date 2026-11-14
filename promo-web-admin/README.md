@@ -1,17 +1,19 @@
-# Yuranime Promo Web Admin Console
+# Yuranime Admin Console (Promo Popup & Kode Redeem Manager)
 
-Website Admin Panel untuk mengatur sistem **Popup Notifikasi Promosi Dinamis (`PromoPopupDialog`)** aplikasi mobile **Yuranime (`com.yuranime.dinz`)** secara real-time melalui **Firebase Firestore (`app_config/promo_popup`)**.
+Website Admin Panel untuk mengatur sistem **Popup Notifikasi Promosi Dinamis (`PromoPopupDialog`)** dan **Manajemen Kode Redeem Hadiah (`redeem_codes`)** aplikasi mobile **Yuranime (`com.yuranime.dinz`)** secara real-time melalui **Firebase Firestore (`dinz-62119`)**.
 
 🌐 **Live Vercel Production URL:** [https://yuranime-promo-admin.vercel.app](https://yuranime-promo-admin.vercel.app)
 
 Didesain dengan standar **Apple Dark Glassmorphism / Linear Style (Anti-Slop)**:
 - Background Obsidian Dark `#090A0F`, Card Glass `#12141C`, Hairline border `1px solid rgba(255, 255, 255, 0.08)`.
 - Menggunakan tipografi SF Pro Display / Inter berkelas, tanpa template gradien warna-warni murah khas AI.
-- Layout 2 Kolom Responsif: Form Kontrol Konfigurasi di sisi kiri dan Live Interactive Smartphone Mockup di sisi kanan.
+- Dua Tab Navigasi Utama:
+  1. 📢 **Popup Promosi:** Form kontrol interval, batasan tayang, live smartphone mockup skala 1:1.
+  2. 🎁 **Kelola Kode Redeem:** Form pembuat kode hadiah kustom, preset kosmetik (Border & Profile Effect), pesan sukses, dan live explorer database `redeem_codes`.
 
 ---
 
-## 🚀 Fitur Admin Panel
+## 🚀 Fitur Tab 1: Popup Promosi (`app_config/promo_popup`)
 
 1. **iOS-Style Toggle Switch:** Aktifkan atau nonaktifkan popup promosi di semua HP pengguna secara real-time.
 2. **Poster Image URL:** Masukkan link langsung poster promosi dengan live thumbnail verification dan tombol preset contoh.
@@ -25,6 +27,32 @@ Didesain dengan standar **Apple Dark Glassmorphism / Linear Style (Anti-Slop)**:
    - **Simpan & Terapkan ke Aplikasi:** Menyimpan pengaturan saat ini ke dokumen Firestore `app_config/promo_popup`.
    - **Push sebagai Promo Baru (Reset Cooldown):** Membuat `promoId` baru berbasis timestamp sehingga seluruh pengguna langsung mendapatkan popup saat membuka aplikasi kembali tanpa harus menunggu 8 jam.
 7. **Interactive Smartphone Mockup:** Menampilkan preview 1:1 persis bagaimana poster promosi, tombol close bulat `✕` di kanan atas luar gambar, dan latar redup (78% black) tampil di aplikasi Yuranime.
+
+---
+
+## 🎁 Fitur Tab 2: Kelola Kode Redeem (`redeem_codes`)
+
+1. **Form Buat / Edit Kode Redeem:**
+   - **Kode Redeem (Auto Uppercase):** Input kode unik (contoh: `VIP2026`, `DINZMYTHIC`) atau tombol `⚡ Buat Kode Acak` (`YURA-XXXX`).
+   - **Hadiah EXP & Poin:** Masukkan jumlah EXP untuk naikin level dan Poin (Primo) untuk belanja di Shop.
+   - **Hadiah Custom Title:** Berikan gelar eksklusif langsung ter-unlock di akun pengguna (contoh: `MYTHIC SOVEREIGN`, `SEPUH YURANIME`).
+   - **Hadiah Avatar Decoration / Border:** Pilihan cepat ID border (contoh: `border_sovereign_gold`, `border_silver_wings`, `border_venom_logo`, `border_mythic_emperor`, `border_bronze_crest`).
+   - **Hadiah Profile Effect:** Pilihan cepat ID effect animasi (contoh: `effect_venom_symbiote`, `effect_mythic_aurora`, `effect_magic_hearts_gold`, `effect_cosmic_twilight`).
+   - **Pesan Notifikasi:** Kustomisasi pesan pop-up saat user berhasil mengklaim kode di aplikasi.
+   - **Status Aktif/Nonaktif:** Matikan sementara kode tanpa menghapusnya dari database.
+2. **Template Paket Cepat (1-Klik):**
+   - 🎉 Weekend Festival (+5.000 EXP, +2.500 Poin)
+   - 👑 VIP Special Pass (+10.000 EXP, +5.000 Poin, VIP Title & Gold Border)
+   - 🕷️ Venom Symbiote (+12.000 EXP, +6.000 Poin, Venom Border & Effect)
+   - ✨ Mythic Sovereign (+25.000 EXP, +15.000 Poin, Title & Aurora Effect)
+3. **Live Database Explorer:**
+   - Menampilkan seluruh kode di koleksi Firestore `redeem_codes` secara real-time via `onSnapshot` & REST fallback.
+   - Kolom pencarian instan dan filter chip (Semua / Aktif / Nonaktif).
+   - Tombol 1-klik salin kode ke clipboard.
+   - Tombol 1-klik toggle Aktif / Nonaktif langsung ke Firestore.
+   - Tombol Edit (otomatis mengisi form dan scroll ke atas).
+   - Tombol Hapus dokumen dari Firestore dengan konfirmasi aman.
+   - **⚡ Seed 6 Kode Resmi:** Tombol untuk langsung mendaftarkan 6 kode bawaan resmi Yuranime (`YURANIMEVIP`, `DINZMYTHIC`, `SEPUH2026`, `SOVEREIGN99`, `ANIMEKING`, `VENOMSYMBIOTE`) ke database Firestore jika database masih kosong!
 
 ---
 
@@ -50,34 +78,17 @@ Cukup buka file `index.html` langsung di browser Chrome / Firefox / Safari Anda.
 
 ---
 
-## ☁️ Cara Deploy ke Vercel (1-Click Vercel Ready)
-
-Project ini sudah dilengkapi konfigurasi resmi `vercel.json`:
-
-### Opsi 1: Deploy via Vercel CLI
-```bash
-cd /storage/emulated/0/termux/Workspace_uiApp/promo-web-admin/
-npx vercel
-```
-Ikuti instruksi di layar dan web admin panel Anda akan langsung live dalam beberapa detik!
-
-### Opsi 2: Deploy via Vercel Web Dashboard (GitHub Import)
-1. Buka [https://vercel.com/new](https://vercel.com/new).
-2. Hubungkan repositori GitHub `dinzid04/DinzStream-App`.
-3. Pada bagian **Root Directory**, pilih folder `promo-web-admin`.
-4. Klik **Deploy**!
-
----
-
 ## 🔒 Konfigurasi Firebase Firestore
-- **Project ID:** `dinz-ai-gemini-copy`
-- **Database ID:** `ai-studio-eff2e4c3-4396-44bb-b0c9-0936b4c631a4` (atau `(default)`)
-- **Document Path:** `app_config/promo_popup`
-- **Fields:**
-  - `isActive: Boolean`
-  - `promoId: String`
-  - `imageUrl: String`
-  - `targetUrl: String`
-  - `intervalHours: Float`
-  - `maxImpressions: Int`
-  - `updatedAt: Long`
+- **Project ID:** `dinz-62119`
+- **Database ID:** `(default)`
+- **Collections:**
+  - `app_config/promo_popup`: Konfigurasi poster promosi.
+  - `redeem_codes/{code}`: Koleksi kode redeem dengan field:
+    - `active: Boolean`
+    - `exp: Long / Integer`
+    - `points: Long / Integer`
+    - `title: String?`
+    - `borderId: String?`
+    - `effectId: String?`
+    - `message: String`
+    - `updatedAt: Long`
