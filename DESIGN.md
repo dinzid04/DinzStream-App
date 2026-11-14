@@ -1495,3 +1495,22 @@ Mengacu pada tata letak referensi `WA_1794546770520.jpg` (`1002213252.jpg`) deng
    - Menghapus tombol duplikat `"Pilih Akun Google Lainnya"` dan menghapus teks versi build di bagian paling bawah.
 5. **Full Edge-to-Edge Transparent System Bars (`MainActivity.kt` & `themes.xml`):**
    - Status bar atas dan navigation bar bawah diatur 100% transparan tembus pandang menggunakan `WindowCompat.setDecorFitsSystemWindows(window, false)`, `enableEdgeToEdge(statusBarStyle, navigationBarStyle)`, serta menonaktifkan contrast enforcement pada Android Q ke atas (`isStatusBarContrastEnforced = false`, `isNavigationBarContrastEnforced = false`).
+
+### J. Penyelesaian Tuntas Multi-Layer Profile Effect (Venom/Lord of the Dead Loop) & Transparent System Bars (Edge-to-Edge)
+1. **Multi-Layer Profile Effect Timeline Engine (`ApngAnimationView.kt`, `DiscordCosmeticsRepository.kt`, `FirebaseManager.kt`):**
+   - Model data `ProfileEffectLayer` memetakan properti `src`, `loop`, `start`, `duration`, `loopDelay`, `positionY`, `zIndex`.
+   - Parsing seluruh layer APNG dari catalog dan raw Discord effects JSON tanpa menimpa layer intro dengan layer ambient loop.
+   - Cache file per layer yang unik: `effect_${safeEffectId}_layer_${layerIndex}_$safeHash.png`.
+   - Engine `MultiLayerProfileEffectView` dengan timeline controller (`while(isActive)`) yang menjadwalkan start tiap layer, memutar karakter intro (seperti raungan Venom atau Raja Tengkorak Lord of the Dead), menyembunyikan intro saat durasi berakhir (`View.INVISIBLE`), mempertahankan ambient loop, dan mengulang seluruh siklus secara periodik sehingga karakter utama selalu muncul hidup dan tidak pernah hilang/mati.
+2. **Redesign Presisi Dialog Preview Profile Effect (`ShopScreen.kt`):**
+   - Menghapus kotak card palsu `#13151F` ber-border tebal buatan AI.
+   - Menghapus teks subtitle `"Pratinjau Pengguna / #1001 • Yuranime Member"`.
+   - Menempatkan avatar pengguna bulat (76.dp) tepat di `Alignment.TopCenter` (`top = 36.dp`) dengan avatar decoration yang sedang terpasang.
+   - Header atas bersih: ikon tutup `✕` + judul efek + badge kategori/tier (`Exclusive`, `Lv. X`, `Shop`).
+   - Merender `MultiLayerProfileEffectView` di layer `zIndex(50f)` dengan kanvas bersih.
+   - Mengganti tombol aksi bawah dengan Apple-style compact capsule button (`wrapContentWidth()`, `height(46.dp)`, `RoundedCornerShape(23.dp)`).
+3. **100% Edge-to-Edge System Bars Transparan (`MainActivity.kt`, `ShopScreen.kt`, `PointsRewardsScreen.kt`, `LoginProfileScreen.kt`, `EditProfileScreen.kt`):**
+   - Urutan inisialisasi di `MainActivity.kt`: `enableEdgeToEdge(...)` dipanggil PERTAMA KALI dengan `SystemBarStyle.dark(Color.TRANSPARENT)`, disusul `WindowCompat.setDecorFitsSystemWindows(window, false)`, set status bar & navigation bar color ke `Color.TRANSPARENT`, menonaktifkan contrast enforcement (`isStatusBarContrastEnforced = false`, `isNavigationBarContrastEnforced = false`), serta `LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES`.
+   - Menghapus `.statusBarsPadding()` dan `.navigationBarsPadding()` dari kontainer root di `ShopScreen.kt` dan `PointsRewardsScreen.kt`, memindahkan `.statusBarsPadding()` hanya pada top header bar sehingga background halaman mengalir tembus pandang di balik status bar dan tombol navigasi HP (`||| O <`).
+   - Menghapus `.statusBarsPadding()` dari overlay `Profile Effect` di `LoginProfileScreen.kt` dan `EditProfileScreen.kt` agar animasi efek mengalir dari titik `(0,0)` layar paling atas.
+   - Mengubah gradasi bawah `SeamlessTiltedPosterBackground` pada layar Login agar semi-transparan sehingga poster-poster miring mengalir mulus di balik navigation bar.
