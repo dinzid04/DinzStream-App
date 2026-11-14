@@ -179,9 +179,9 @@ object FirebaseManager {
     private const val PREFS_NAME = "yuranime_google_session_prefs"
 
     // Border khusus podium Top 1, Top 2, dan Top 3
-    const val TOP_1_BORDER_URL = "https://url.dinzid.my.id/edTfBfx"
-    const val TOP_2_BORDER_URL = "https://url.dinzid.my.id/85MXtu1"
-    const val TOP_3_BORDER_URL = "https://url.dinzid.my.id/1KCdAyA"
+    const val TOP_1_BORDER_URL = "https://yuranime-tg-cdn.gadingkencana04.workers.dev/f/BQACAgUAAyEGAAMBCfs22gADBWr42b3FJPD7cmmoFeKiMPzulw5nAAJQKgAC6K7IV6gYJVEAAb5wBT0E/top_1_border_url.png"
+    const val TOP_2_BORDER_URL = "https://yuranime-tg-cdn.gadingkencana04.workers.dev/f/BQACAgUAAyEGAAMBCfs22gADBmr42cstH_akk1CXWyCItkIXZJ6mAAJRKgAC6K7IV6NESEpi9FYxPQQ/top_2_border_url.png"
+    const val TOP_3_BORDER_URL = "https://yuranime-tg-cdn.gadingkencana04.workers.dev/f/BQACAgUAAyEGAAMBCfs22gADB2r42dDemUCiG2gxsx0FrPdq8WzNAAJTKgAC6K7IV0VQ5hQdaw9mPQQ/top_3_border_url.png"
 
     // Katalog Title Resmi (Milestone Level & Tukar Poin)
     val ALL_TITLES: List<TitleDefinition> = listOf(

@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "2.8.1"
+  APP_VERSION: "2.8.2"
 
 jobs:
   build:
@@ -63,32 +63,20 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - All 985 Discord Borders & 396 Profile Effects, APNG 60FPS Decoder, Anibi 2-Column Grid, Fix HomeScreen JSON & Clean SF Pro Typography (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Telegram CDN (Animated GIF/WebP/Video Profile & Banner) & Fix Custom Title Alignment (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
-            ### Pembaruan & Fitur Baru (7 Instruksi Wajib):
-            1. **Perbaikan Error JSON Beranda (HomeScreen):**
-               - Semua instance Gson menggunakan `GsonBuilder().setLenient().serializeNulls().create()`.
-               - Interceptor OkHttpClient membersihkan Byte Order Mark (BOM), memangkas spasi/teks sampah sebelum `{` atau `[`, auto-retry 2x, dan fallback cache otomatis sehingga beranda 100% langsung muncul tanpa error.
-            2. **Tipografi Bersih SF Pro Display & Border Avatar Presisi:**
-               - Menghapus total font tipis dan font monospasi bergaris nol `0` (`77.230 / 77.500`); kini menggunakan font sans-serif SF Pro Display bersih dan tegas.
-               - Menghapus cincin EXP yang bertabrakan di foto profil; Avatar kini berukuran 82.dp dengan layer Border Avatar 100.dp (1.22x) tepat di tengah konsentris.
-               - Menambahkan padding bawah 120.dp pada ProfileScreen agar tombol 'Keluar Akun' tidak tertutup bottom navbar.
-            3. **Seluruh 985 Avatar Border & 396 Profile Effect Asli Discord:**
-               - Menghapus 5 item dummy; membaca seluruh 985 Avatar Decorations dan 396 Profile Effects dari `discord_assets` JSON.
-               - Pembagian tier otomatis: 15% Starter (500-1500 Poin), 65% Standard & High (3500-25000 Poin, Lv. 35+), 20% Mythic Limited (Eksklusif Redeem).
-            4. **Animasi APNG 60 FPS & Disk Cache Instan:**
-               - Mengintegrasikan library APNG decoder `com.github.penfeizhou.android.animation:apng:3.0.2` dengan komponen `AnimatedCosmeticImage` auto-start 60 FPS.
-               - Optimasi URL `?size=160&passthrough=true` untuk loading instan dalam milidetik serta disk cache 250MB.
-            5. **Katalog Lengkap di Halaman Edit Profil:**
-               - Menampilkan seluruh 985 Border, 396 Profile Effect, dan Custom Title dengan item dimiliki di urutan teratas.
-               - Memperbaiki bug double `@@` pada username.
-               - Live preview instan di foto profil/banner atas saat item apa pun diklik.
-            6. **Rombak Layout Shop, Rewards, & Leaderboard:**
-               - Shop & Kosmetik: Desain Grid 2 Kolom gaya Anibi, search bar, filter chip, preview animasi 100.dp.
-               - Points & Rewards: Menghapus kotak overlay tumpuk; header ramping 1 baris (`Lv. X • ✦ [Poin] Poin`), 7 kapsul streak check-in bersih emas/kristal, dan padding title 24.dp anti-terpotong.
-               - Papan Peringkat: Menghapus kotak merah/abu podium; foto profil pas di lubang atas bingkai Top 1, 2, 3 konsentris (layer belakang zIndex=0, bingkai zIndex=1).
+            ### Pembaruan Utama:
+            1. **CDN Telegram + Cloudflare Worker (`yuranime-tg-cdn`):**
+               - Menghapus total ketergantungan pada `dinzid` CDN & Catbox untuk upload avatar, cover banner, bingkai Top 1-3, dan aset maskot komik.
+               - Upload permanen langsung tersimpan ke channel Telegram via Cloudflare Worker dengan cache global 1 tahun (`Cache-Control: immutable`).
+            2. **Support Avatar & Banner Bergerak (GIF, WebP Animasi, Video-to-GIF):**
+               - Pemilih galeri di Edit Profil kini mendukung foto statis, GIF, WebP animasi, dan file video (`.mp4`/`.mov`/`.webm`).
+               - File video otomatis dikonversi langsung di perangkat menjadi Animated GIF loop sebelum pratinjau dan upload, sementara file GIF/WebP animasi dipertahankan tanpa merusak frame geraknya.
+            3. **Perbaikan Posisi Teks Custom Title Badge:**
+               - Menghilangkan `fontPadding` bawaan dan `lineHeight` berlebih pada `GeometricTitleBadge`, `SleekChamferedMicroTag`, dan `SleekHexChevronLevelTag` sehingga teks judul presisi di tengah bingkai poligon dan aman dari potongan sudut kanan.
+               - Merapikan dialog **Pilih Custom Title** agar semua lencana sejajar rata kiri tanpa distorsi skala.
           draft: false
           prerelease: false
           make_latest: true

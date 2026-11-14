@@ -144,8 +144,8 @@ fun GeometricTitleBadge(
         compact -> 8.2.sp
         else -> 10.5.sp
     }
-    val startTextPad: Dp = if (compact) 21.5.dp else 34.dp
-    val endSafePad: Dp = if (compact) 10.5.dp else 24.dp
+    val startTextPad: Dp = if (compact) 23.dp else 34.dp
+    val endSafePad: Dp = if (compact) 15.dp else 26.dp
 
     val phase = if (isAnimated) {
         val transition = rememberInfiniteTransition(label = "titleBadgeAnim")
@@ -438,11 +438,21 @@ fun GeometricTitleBadge(
                 compact -> 0.45.sp
                 else -> 0.9.sp
             },
+            style = centeredBadgeTextStyle(fontSize),
             maxLines = 1,
             softWrap = false
         )
     }
 }
+
+private fun centeredBadgeTextStyle(fontSize: TextUnit) = androidx.compose.ui.text.TextStyle(
+    lineHeight = fontSize,
+    platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false),
+    lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
+        alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+        trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both
+    )
+)
 
 /**
  * TAHAP 1 Item 2: Komponen "Micro-Title Tags" (`StatusMicroTitleTagRow`)
@@ -593,6 +603,7 @@ fun SleekChamferedMicroTag(
             fontWeight = FontWeight.SemiBold,
             fontFamily = if (useMonospace) JetBrainsMonoFontFamily else JakartaSansFontFamily,
             letterSpacing = 0.6.sp,
+            style = centeredBadgeTextStyle(10.sp),
             maxLines = 1,
             softWrap = false
         )
@@ -675,6 +686,7 @@ fun SleekHexChevronLevelTag(
             fontWeight = FontWeight.SemiBold,
             fontFamily = JetBrainsMonoFontFamily,
             letterSpacing = 0.4.sp,
+            style = centeredBadgeTextStyle(10.5.sp),
             maxLines = 1,
             softWrap = false
         )

@@ -1131,7 +1131,7 @@ private fun ComicCommunityChatSection(
             // Gambar Maskot Anime di Kanan Bawah bertumpu pas di bibir kanan atas kotak Cbox
             AsyncImage(
                 model = ImageRequest.Builder(context)
-                    .data("https://url.dinzid.my.id/pcZ3IHb")
+                    .data("https://yuranime-tg-cdn.gadingkencana04.workers.dev/f/BQACAgUAAyEGAAMBCfs22gADCGr42d6ic3EvHGiMhRTtiSPzfHiSAAJUKgAC6K7IVy6o0OOVHDh6PQQ/comic_mascot_1.png")
                     .crossfade(true)
                     .build(),
                 contentDescription = "Maskot Komunitas",
@@ -1794,7 +1794,7 @@ private fun ComicNewsletterBanner(
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data("https://url.dinzid.my.id/0XJg9If")
+                        .data("https://yuranime-tg-cdn.gadingkencana04.workers.dev/f/BQACAgUAAyEGAAMBCfs22gADCWr42eLZhKkvswlqf5qBujQYsav2AAJVKgAC6K7IV9YKrcFbM4H0PQQ/comic_mascot_2.webp")
                         .crossfade(true)
                         .build(),
                     contentDescription = "Karakter Anime",

@@ -51,6 +51,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,6 +70,8 @@ import coil.request.ImageRequest
 import com.yuranime.dinz.data.firebase.BorderDefinition
 import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.firebase.ProfileEffectDefinition
+import com.yuranime.dinz.data.firebase.R2CdnUploader
+import com.yuranime.dinz.data.firebase.VideoToGifConverter
 import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
 import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
@@ -78,6 +81,7 @@ import com.yuranime.dinz.ui.components.MultiLayerProfileEffectView
 import com.yuranime.dinz.ui.components.EmptyTitleSlotBadge
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.theme.SfProFontFamily
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 /**
@@ -108,6 +112,10 @@ fun EditProfileScreen(
 
     var lockedNoticeText by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
+    var isPreparingAvatar by remember { mutableStateOf(false) }
+    var isPreparingBanner by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val mediaMimeFilter = remember { arrayOf("image/*", "video/*") }
 
     val userLevel = currentProfile?.level ?: 1
     val userPoints = currentProfile?.points ?: 0L
@@ -120,18 +128,52 @@ fun EditProfileScreen(
     var searchQuery by remember { mutableStateOf("") }
 
     val avatarGalleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            selectedAvatarUrl = uri.toString()
+            scope.launch {
+                if (VideoToGifConverter.isVideoUri(context, uri)) {
+                    isPreparingAvatar = true
+                    val res = R2CdnUploader.prepareMediaForPreview(context, uri, isBanner = false)
+                    isPreparingAvatar = false
+                    res.onSuccess { gifUri ->
+                        selectedAvatarUrl = gifUri.toString()
+                    }.onFailure { err ->
+                        Toast.makeText(
+                            context,
+                            err.message ?: "Gagal mengonversi video ke GIF",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } else {
+                    selectedAvatarUrl = uri.toString()
+                }
+            }
         }
     }
 
     val bannerGalleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            selectedBannerUrl = uri.toString()
+            scope.launch {
+                if (VideoToGifConverter.isVideoUri(context, uri)) {
+                    isPreparingBanner = true
+                    val res = R2CdnUploader.prepareMediaForPreview(context, uri, isBanner = true)
+                    isPreparingBanner = false
+                    res.onSuccess { gifUri ->
+                        selectedBannerUrl = gifUri.toString()
+                    }.onFailure { err ->
+                        Toast.makeText(
+                            context,
+                            err.message ?: "Gagal mengonversi video ke GIF",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } else {
+                    selectedBannerUrl = uri.toString()
+                }
+            }
         }
     }
 
@@ -266,7 +308,9 @@ fun EditProfileScreen(
                     .fillMaxWidth()
                     .height(185.dp)
                     .background(Color(0xFF14161E))
-                    .clickable { bannerGalleryLauncher.launch("image/*") }
+                    .clickable(enabled = !isPreparingBanner) {
+                        bannerGalleryLauncher.launch(mediaMimeFilter)
+                    }
             ) {
                 if (selectedBannerUrl.isNotBlank()) {
                     AsyncImage(
@@ -301,28 +345,55 @@ fun EditProfileScreen(
                         )
                 )
 
-                // Tombol Ganti Cover Banner
+                if (isPreparingBanner) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color(0xCC0B0B0B))
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            color = Color(0xFFFF5722),
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Mengonversi video ke GIF...",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = SfProFontFamily
+                        )
+                    }
+                }
+
+                // Tombol Ganti Cover Banner (Foto, GIF, WebP, atau Video)
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(12.dp)
                         .clip(RoundedCornerShape(50))
                         .background(Color(0xB30B0B0B))
-                        .clickable { bannerGalleryLauncher.launch("image/*") }
+                        .clickable(enabled = !isPreparingBanner) {
+                            bannerGalleryLauncher.launch(mediaMimeFilter)
+                        }
                         .padding(horizontal = 12.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = Icons.Default.PhotoLibrary,
-                        contentDescription = "Upload Banner",
+                        contentDescription = "Ganti Banner Media",
                         tint = Color.White,
                         modifier = Modifier.size(13.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Upload Banner",
+                        text = "Foto / GIF / Video",
                         color = Color.White,
-                        fontSize = 11.5.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = SfProFontFamily
                     )
@@ -335,7 +406,9 @@ fun EditProfileScreen(
                     .align(Alignment.BottomStart)
                     .padding(start = 20.dp)
                     .size(100.dp)
-                    .clickable { avatarGalleryLauncher.launch("image/*") },
+                    .clickable(enabled = !isPreparingAvatar) {
+                        avatarGalleryLauncher.launch(mediaMimeFilter)
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 // Layer Foto Profil Bulat: 82.dp
@@ -363,6 +436,21 @@ fun EditProfileScreen(
                             fontWeight = FontWeight.Bold,
                             fontFamily = SfProFontFamily
                         )
+                    }
+
+                    if (isPreparingAvatar) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color(0x99000000)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = Color(0xFFFF5722),
+                                modifier = Modifier.size(22.dp),
+                                strokeWidth = 2.dp
+                            )
+                        }
                     }
                 }
 
@@ -832,11 +920,18 @@ fun EditProfileScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            GeometricTitleBadge(
-                                titleName = titleDef.titleName,
-                                tierLevel = titleDef.tierLevel,
-                                styleVariant = titleDef.styleVariant
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 10.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                GeometricTitleBadge(
+                                    titleName = titleDef.titleName,
+                                    tierLevel = titleDef.tierLevel,
+                                    styleVariant = titleDef.styleVariant
+                                )
+                            }
 
                             if (isOwned) {
                                 Box(
@@ -889,12 +984,9 @@ fun EditProfileScreen(
                             colors = listOf(Color(0xFFFF5722), Color(0xFFE11D48))
                         )
                     )
-                    .clickable(enabled = !isSaving) {
+                    .clickable(enabled = !isSaving && !isPreparingAvatar && !isPreparingBanner) {
                         isSaving = true
                         val cleanUsername = usernameInput.trim().lowercase(Locale.ROOT).replace(" ", "").removePrefix("@")
-                        authDb.setUsername(nameInput.trim())
-                        authDb.setAvatarUrl(selectedAvatarUrl.trim())
-                        authDb.setCoverUrl(selectedBannerUrl.trim())
 
                         FirebaseManager.updateProfile(
                             context = context,
@@ -906,10 +998,18 @@ fun EditProfileScreen(
                             equippedTitle = selectedTitle,
                             equippedBorderUrl = selectedBorderUrl,
                             equippedProfileEffectUrl = selectedProfileEffectUrl
-                        ) { _, msg ->
+                        ) { ok, msg ->
                             isSaving = false
-                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                            onBackClick()
+                            if (ok) {
+                                val savedProfile = FirebaseManager.userProfile.value
+                                authDb.setUsername(savedProfile?.name ?: nameInput.trim())
+                                authDb.setAvatarUrl(savedProfile?.avatar ?: selectedAvatarUrl.trim())
+                                authDb.setCoverUrl(savedProfile?.banner ?: selectedBannerUrl.trim())
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                onBackClick()
+                            } else {
+                                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                            }
                         }
                     },
                 contentAlignment = Alignment.Center

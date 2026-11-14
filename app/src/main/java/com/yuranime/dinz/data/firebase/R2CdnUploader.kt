@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -13,33 +14,75 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileInputStream
+import java.io.InputStream
 import java.util.concurrent.TimeUnit
-import kotlin.math.min
-import kotlin.random.Random
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
- * TAHAP 4: Utilitas Kompresi WebP & Upload Media ke Cloudflare R2 / Dinz CDN
- * Mengompresi gambar galeri menjadi WebP tajam (< 150KB) lalu mengunggahnya ke
- * jaringan CDN Dinz (cdn.dinzid.my.id / url.dinzid.my.id) agar tersimpan sebagai URL publik permanen.
+ * Pengelola unggahan Avatar & Banner ke CDN Telegram + Cloudflare Worker (`yuranime-tg-cdn`).
+ * Mendukung foto statis (dikompresi ke WebP) maupun media bergerak (GIF, WebP animasi, APNG,
+ * serta konversi otomatis Video ke Animated GIF).
  */
 object R2CdnUploader {
     private const val TAG = "R2CdnUploader"
-    private const val MAX_BYTES = 148 * 1024 // < 150 KB
 
-    private val httpClient: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(25, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(25, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
-            .build()
+    private const val TG_CDN_BASE = "https://yuranime-tg-cdn.gadingkencana04.workers.dev"
+    private const val TG_UPLOAD_URL = "$TG_CDN_BASE/upload"
+    private const val TG_UPLOAD_KEY = "yrn_tg_a86e4f8a6563a37e1afb996e93850e97"
+
+    private const val MAX_ANIMATED_UPLOAD_BYTES = 18 * 1024 * 1024
+
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(90, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .build()
+
+    private val gson = Gson()
+
+    private data class PreparedUpload(
+        val bytes: ByteArray,
+        val mimeType: String,
+        val ext: String
+    )
+
+    private data class WorkerUploadResponse(
+        val success: Boolean = false,
+        val url: String? = null,
+        val error: String? = null
+    )
+
+    /**
+     * Menyiapkan preview media sebelum upload. Jika pengguna memilih file video,
+     * mengonversinya menjadi file GIF lokal di cache agar preview di layar Edit Profil langsung bergerak.
+     */
+    suspend fun prepareMediaForPreview(
+        context: Context,
+        uri: Uri,
+        isBanner: Boolean
+    ): Result<Uri> = withContext(Dispatchers.IO) {
+        try {
+            if (!VideoToGifConverter.isVideoUri(context, uri)) {
+                return@withContext Result.success(uri)
+            }
+            val gifFile = VideoToGifConverter.convertVideoToGif(context, uri, isBanner = isBanner)
+                ?: return@withContext Result.failure(
+                    Exception("Video gagal dikonversi ke GIF. Gunakan video pendek (maks 5 detik).")
+                )
+            Result.success(Uri.fromFile(gifFile))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     /**
-     * Memproses URI gambar dari galeri (atau mengembalikan URL langsung jika sudah berupa https://),
-     * mengompresi ke WebP, dan mengunggahnya ke Cloudflare R2 / Dinz CDN.
+     * Memproses media dari URI lokal (foto statis, GIF/WebP animasi, atau video)
+     * lalu mengunggahnya ke CDN Telegram permanen.
      */
     suspend fun compressAndUploadImage(
         context: Context,
@@ -48,204 +91,213 @@ object R2CdnUploader {
         isBanner: Boolean
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
-            val trimmed = uriString.trim()
-            if (trimmed.isEmpty()) {
-                return@withContext Result.success("")
-            }
-            if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-                return@withContext Result.success(trimmed)
+            if (uriString.startsWith("http://") || uriString.startsWith("https://")) {
+                return@withContext Result.success(uriString)
             }
 
-            val uri = Uri.parse(trimmed)
-            val webpBytes = decodeAndCompressToWebP(
-                context = context,
-                uri = uri,
-                maxWidth = if (isBanner) 1200 else 512,
-                maxHeight = if (isBanner) 600 else 512
-            ) ?: return@withContext Result.failure(
-                IllegalStateException("Gagal membaca atau mengompresi gambar dari galeri")
+            val uri = Uri.parse(uriString)
+            val prepared = prepareBytesForUpload(context, uri, isBanner)
+                ?: return@withContext Result.failure(
+                    Exception("Gagal memproses file media. Pastikan file valid dan ukuran tidak terlalu besar.")
+                )
+
+            uploadToTelegramCdn(
+                bytes = prepared.bytes,
+                mimeType = prepared.mimeType,
+                ext = prepared.ext,
+                uid = uid,
+                type = if (isBanner) "banner" else "avatar"
             )
-
-            val folderPrefix = if (isBanner) "banners" else "avatars"
-            val safeUid = uid.take(12).replace(Regex("[^a-zA-Z0-9_-]"), "")
-            val fileName = "${folderPrefix}_${safeUid}_${System.currentTimeMillis()}.webp"
-
-            // 1. Primary Upload: Dinz Cloudflare R2 / CDN Node (https://cdn.dinzid.my.id/api/upload)
-            val primaryUrl = uploadToDinzCdn(webpBytes, fileName)
-            if (!primaryUrl.isNullOrBlank()) {
-                Log.d(TAG, "Berhasil upload ke Dinz CDN: $primaryUrl (${webpBytes.size / 1024} KB)")
-                return@withContext Result.success(primaryUrl)
-            }
-
-            // 2. Fallback Upload: Catbox / Qu.ax + Dinz Shortener Worker (https://url.dinzid.my.id/add)
-            val fallbackRawUrl = uploadToCatboxFallback(webpBytes, fileName)
-            if (!fallbackRawUrl.isNullOrBlank()) {
-                val shortened = shortenWithDinzWorker(fallbackRawUrl) ?: fallbackRawUrl
-                Log.d(TAG, "Berhasil upload via fallback CDN: $shortened")
-                return@withContext Result.success(shortened)
-            }
-
-            Result.failure(IllegalStateException("Server CDN sedang sibuk, silakan coba beberapa saat lagi"))
         } catch (e: Exception) {
-            Log.e(TAG, "Gagal mengunggah gambar profil/banner: ${e.message}", e)
+            Log.e(TAG, "Gagal memproses/upload media: ${e.message}", e)
             Result.failure(e)
         }
     }
 
-    private fun decodeAndCompressToWebP(
+    private fun prepareBytesForUpload(
         context: Context,
         uri: Uri,
-        maxWidth: Int,
-        maxHeight: Int
-    ): ByteArray? {
-        val boundsOptions = BitmapFactory.Options().apply {
-            inJustDecodeBounds = true
-        }
-        context.contentResolver.openInputStream(uri)?.use { stream ->
-            BitmapFactory.decodeStream(stream, null, boundsOptions)
-        }
-
-        val srcWidth = boundsOptions.outWidth
-        val srcHeight = boundsOptions.outHeight
-        if (srcWidth <= 0 || srcHeight <= 0) return null
-
-        var sampleSize = 1
-        while (srcWidth / (sampleSize * 2) >= maxWidth && srcHeight / (sampleSize * 2) >= maxHeight) {
-            sampleSize *= 2
+        isBanner: Boolean
+    ): PreparedUpload? {
+        // 1. Jika input berupa video -> konversi ke Animated GIF
+        if (VideoToGifConverter.isVideoUri(context, uri)) {
+            val gifFile = VideoToGifConverter.convertVideoToGif(context, uri, isBanner = isBanner)
+                ?: return null
+            val bytes = gifFile.readBytes()
+            runCatching { gifFile.delete() }
+            if (bytes.isEmpty() || bytes.size > MAX_ANIMATED_UPLOAD_BYTES) return null
+            return PreparedUpload(bytes = bytes, mimeType = "image/gif", ext = "gif")
         }
 
-        val decodeOptions = BitmapFactory.Options().apply {
-            inSampleSize = sampleSize
-            inPreferredConfig = Bitmap.Config.ARGB_8888
+        // 2. Baca header & raw bytes untuk deteksi GIF / WebP animasi / APNG tanpa merusak animasinya
+        val rawBytes = readBytesBounded(context, uri, MAX_ANIMATED_UPLOAD_BYTES + 1)
+        if (rawBytes != null && rawBytes.size <= MAX_ANIMATED_UPLOAD_BYTES &&
+            VideoToGifConverter.isAnimatedImageBytes(rawBytes)
+        ) {
+            val (mime, ext) = VideoToGifConverter.detectImageMimeAndExt(rawBytes)
+            Log.d(TAG, "Mempertahankan media animasi asli ($mime, ${rawBytes.size / 1024} KB)")
+            return PreparedUpload(bytes = rawBytes, mimeType = mime, ext = ext)
         }
 
-        val decodedBitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
-            BitmapFactory.decodeStream(stream, null, decodeOptions)
-        } ?: return null
-
-        val scale = min(
-            maxWidth.toFloat() / decodedBitmap.width.toFloat(),
-            maxHeight.toFloat() / decodedBitmap.height.toFloat()
-        ).coerceAtMost(1f)
-
-        val targetBitmap = if (scale < 1f) {
-            val targetW = (decodedBitmap.width * scale).toInt().coerceAtLeast(1)
-            val targetH = (decodedBitmap.height * scale).toInt().coerceAtLeast(1)
-            Bitmap.createScaledBitmap(decodedBitmap, targetW, targetH, true).also {
-                if (it !== decodedBitmap) decodedBitmap.recycle()
-            }
-        } else {
-            decodedBitmap
+        // Jika GIF/WebP animasi terlalu besar > 18 MB, jangan diratakan ke statis secara diam-diam
+        if (rawBytes != null && rawBytes.size > MAX_ANIMATED_UPLOAD_BYTES) {
+            return null
         }
 
-        val compressFormat = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Bitmap.CompressFormat.WEBP_LOSSY
-        } else {
-            @Suppress("DEPRECATION")
-            Bitmap.CompressFormat.WEBP
-        }
+        // 3. Gambar statis -> resize + kompres ke WebP ringan
+        val webpBytes = compressStaticToWebP(
+            context = context,
+            uri = uri,
+            maxWidth = if (isBanner) 1200 else 512,
+            targetMaxBytes = if (isBanner) 250 * 1024 else 160 * 1024
+        ) ?: return null
 
-        var quality = 85
-        var resultBytes: ByteArray
-        do {
-            val out = ByteArrayOutputStream()
-            targetBitmap.compress(compressFormat, quality, out)
-            resultBytes = out.toByteArray()
-            quality -= 12
-        } while (resultBytes.size > MAX_BYTES && quality >= 45)
-
-        targetBitmap.recycle()
-        return resultBytes
+        return PreparedUpload(bytes = webpBytes, mimeType = "image/webp", ext = "webp")
     }
 
-    private fun uploadToDinzCdn(webpBytes: ByteArray, fileName: String): String? {
+    private fun uploadToTelegramCdn(
+        bytes: ByteArray,
+        mimeType: String,
+        ext: String,
+        uid: String,
+        type: String
+    ): Result<String> {
         return try {
+            val fileName = "${type}_${uid.take(12)}_${System.currentTimeMillis()}.$ext"
             val requestBody = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
+                .addFormDataPart("uid", uid)
+                .addFormDataPart("type", type)
                 .addFormDataPart(
                     "file",
                     fileName,
-                    webpBytes.toRequestBody("image/webp".toMediaType())
+                    bytes.toRequestBody(mimeType.toMediaType())
                 )
                 .build()
 
             val request = Request.Builder()
-                .url("https://cdn.dinzid.my.id/api/upload")
-                .header("User-Agent", "YuranimeApp/1.5 (Android)")
+                .url(TG_UPLOAD_URL)
+                .header("User-Agent", "YuranimeApp/2.8 (Android)")
+                .header("X-Upload-Key", TG_UPLOAD_KEY)
                 .post(requestBody)
                 .build()
 
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return null
-                val bodyStr = response.body?.string() ?: return null
-                val json = JSONObject(bodyStr)
-                if (!json.optBoolean("success", false)) return null
-                val dataArr = json.optJSONArray("data") ?: return null
-                if (dataArr.length() == 0) return null
-                val firstItem = dataArr.optJSONObject(0) ?: return null
-                val resultObj = firstItem.optJSONObject("result")
-                val url = resultObj?.optString("url").takeUnless { it.isNullOrBlank() }
-                    ?: firstItem.optString("url").takeUnless { it.isNullOrBlank() }
-                url
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "uploadToDinzCdn gagal: ${e.message}")
-            null
-        }
-    }
+            client.newCall(request).execute().use { response ->
+                val rawBody = response.body?.string().orEmpty()
+                if (!response.isSuccessful) {
+                    val errDetail = runCatching {
+                        gson.fromJson(rawBody, WorkerUploadResponse::class.java)?.error
+                    }.getOrNull()
+                    return Result.failure(
+                        Exception(errDetail ?: "Upload CDN gagal (HTTP ${response.code})")
+                    )
+                }
 
-    private fun uploadToCatboxFallback(webpBytes: ByteArray, fileName: String): String? {
-        return try {
-            val requestBody = MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("reqtype", "fileupload")
-                .addFormDataPart("userhash", "")
-                .addFormDataPart(
-                    "fileToUpload",
-                    fileName,
-                    webpBytes.toRequestBody("image/webp".toMediaType())
-                )
-                .build()
+                val parsed = runCatching {
+                    gson.fromJson(rawBody, WorkerUploadResponse::class.java)
+                }.getOrNull()
 
-            val request = Request.Builder()
-                .url("https://catbox.moe/user/api.php")
-                .header("User-Agent", "Mozilla/5.0 (Android 13; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0")
-                .post(requestBody)
-                .build()
-
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return null
-                val text = response.body?.string()?.trim() ?: return null
-                if (text.startsWith("https://")) text else null
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "uploadToCatboxFallback gagal: ${e.message}")
-            null
-        }
-    }
-
-    private fun shortenWithDinzWorker(originalUrl: String): String? {
-        return try {
-            val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-            val code = (1..7).map { chars[Random.nextInt(chars.length)] }.joinToString("")
-            val payload = JSONObject().apply {
-                put("code", code)
-                put("url", originalUrl)
-            }
-            val request = Request.Builder()
-                .url("https://url.dinzid.my.id/add")
-                .header("Content-Type", "application/json")
-                .post(payload.toString().toRequestBody("application/json".toMediaType()))
-                .build()
-
-            httpClient.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    "https://url.dinzid.my.id/$code"
+                val uploadedUrl = parsed?.url
+                if (parsed?.success == true && !uploadedUrl.isNullOrBlank()) {
+                    Result.success(uploadedUrl)
                 } else {
-                    null
+                    Result.failure(
+                        Exception(parsed?.error ?: "Respons upload CDN tidak valid.")
+                    )
                 }
             }
         } catch (e: Exception) {
+            Log.e(TAG, "Error upload ke Telegram CDN: ${e.message}", e)
+            Result.failure(Exception("Koneksi ke server CDN gagal: ${e.message}"))
+        }
+    }
+
+    private fun openStream(context: Context, uri: Uri): InputStream? {
+        return if (uri.scheme == "file" && !uri.path.isNullOrBlank()) {
+            FileInputStream(File(uri.path!!))
+        } else {
+            context.contentResolver.openInputStream(uri)
+        }
+    }
+
+    private fun readBytesBounded(context: Context, uri: Uri, maxCap: Int): ByteArray? {
+        return try {
+            openStream(context, uri)?.use { input ->
+                val out = ByteArrayOutputStream()
+                val buf = ByteArray(16 * 1024)
+                var total = 0
+                while (true) {
+                    val read = input.read(buf)
+                    if (read == -1) break
+                    total += read
+                    if (total > maxCap) return null
+                    out.write(buf, 0, read)
+                }
+                out.toByteArray()
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun compressStaticToWebP(
+        context: Context,
+        uri: Uri,
+        maxWidth: Int,
+        targetMaxBytes: Int
+    ): ByteArray? {
+        return try {
+            val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            openStream(context, uri)?.use { BitmapFactory.decodeStream(it, null, boundsOpts) }
+
+            val srcW = boundsOpts.outWidth
+            val srcH = boundsOpts.outHeight
+            if (srcW <= 0 || srcH <= 0) return null
+
+            var sampleSize = 1
+            while (srcW / sampleSize > maxWidth * 2) {
+                sampleSize *= 2
+            }
+
+            val decodeOpts = BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+
+            var bitmap = openStream(context, uri)?.use {
+                BitmapFactory.decodeStream(it, null, decodeOpts)
+            } ?: return null
+
+            if (bitmap.width > maxWidth) {
+                val scale = maxWidth.toFloat() / bitmap.width.toFloat()
+                val targetH = max(1, (bitmap.height * scale).roundToInt())
+                val resized = Bitmap.createScaledBitmap(bitmap, maxWidth, targetH, true)
+                if (resized !== bitmap) bitmap.recycle()
+                bitmap = resized
+            }
+
+            val compressFormat = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Bitmap.CompressFormat.WEBP_LOSSY
+            } else {
+                @Suppress("DEPRECATION")
+                Bitmap.CompressFormat.WEBP
+            }
+
+            val stream = ByteArrayOutputStream()
+            var quality = 88
+            bitmap.compress(compressFormat, quality, stream)
+
+            while (stream.size() > targetMaxBytes && quality > 45) {
+                stream.reset()
+                quality -= 10
+                bitmap.compress(compressFormat, quality, stream)
+            }
+
+            val finalBytes = stream.toByteArray()
+            bitmap.recycle()
+            finalBytes
+        } catch (e: Exception) {
+            Log.e(TAG, "Error kompresi WebP statis: ${e.message}", e)
             null
         }
     }

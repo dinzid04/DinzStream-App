@@ -882,7 +882,11 @@ private fun EditorialPodiumSpot(
                     color = Color(0xFFE2E8F0),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
+                    fontFamily = SfProFontFamily,
+                    style = androidx.compose.ui.text.TextStyle(
+                        lineHeight = 11.sp,
+                        platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
+                    )
                 )
             }
 

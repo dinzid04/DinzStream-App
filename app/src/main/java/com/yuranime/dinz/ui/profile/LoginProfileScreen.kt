@@ -1489,13 +1489,19 @@ private fun QuickTitlePickerDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        GeometricTitleBadge(
-                            titleName = titleDef.titleName,
-                            tierLevel = titleDef.tierLevel,
-                            styleVariant = titleDef.styleVariant,
-                            compact = true,
-                            scaleFactor = 0.82f
-                        )
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 10.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            GeometricTitleBadge(
+                                titleName = titleDef.titleName,
+                                tierLevel = titleDef.tierLevel,
+                                styleVariant = titleDef.styleVariant,
+                                compact = true
+                            )
+                        }
 
                         if (isUnlocked) {
                             Text(
