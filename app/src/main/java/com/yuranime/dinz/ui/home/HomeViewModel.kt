@@ -190,16 +190,6 @@ class HomeViewModel(
                         popularAnimeList = popular
                     )
                 }
-                    }
-                } else {
-                    val errorMsg = homeResult.exceptionOrNull()?.localizedMessage ?: "Gagal memuat data"
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = errorMsg
-                        )
-                    }
-                }
             }
         }
     }

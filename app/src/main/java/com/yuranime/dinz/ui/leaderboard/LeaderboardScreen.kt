@@ -728,9 +728,9 @@ private fun EditorialPodiumSpot(
             if (user.equippedTitle.isNotBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 GeometricTitleBadge(
-                    title = user.equippedTitle,
-                    tier = user.equippedTitleTier,
-                    variant = user.equippedTitleVariant
+                    titleName = user.equippedTitle,
+                    tierLevel = user.equippedTitleTier,
+                    styleVariant = user.equippedTitleVariant
                 )
             }
 
