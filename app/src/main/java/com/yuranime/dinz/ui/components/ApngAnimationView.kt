@@ -252,7 +252,7 @@ fun ApngStackedEffectView(
                 url = layerUrl,
                 modifier = Modifier.fillMaxSize(),
                 scaleType = scaleType,
-                onLoadingChanged = if (index == 0) onLoadingChanged else {}
+                onLoadingChanged = if (index == 0) onLoadingChanged else { _ -> }
             )
         }
     }
