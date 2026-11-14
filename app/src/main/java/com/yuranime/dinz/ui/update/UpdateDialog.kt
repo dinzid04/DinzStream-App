@@ -64,9 +64,28 @@ fun UpdateNoticeDialog(
         properties = DialogProperties(
             dismissOnBackPress = true,
             dismissOnClickOutside = false,
-            usePlatformDefaultWidth = false
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
         )
     ) {
+        val dialogView = androidx.compose.ui.platform.LocalView.current
+        androidx.compose.runtime.SideEffect {
+            val dialogWindow = (dialogView.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+            if (dialogWindow != null) {
+                androidx.core.view.WindowCompat.setDecorFitsSystemWindows(dialogWindow, false)
+                dialogWindow.clearFlags(
+                    android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS or
+                        android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION
+                )
+                dialogWindow.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+                dialogWindow.statusBarColor = android.graphics.Color.TRANSPARENT
+                dialogWindow.navigationBarColor = android.graphics.Color.TRANSPARENT
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    dialogWindow.isStatusBarContrastEnforced = false
+                    dialogWindow.isNavigationBarContrastEnforced = false
+                }
+            }
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()

@@ -1,5 +1,6 @@
 package com.yuranime.dinz.ui.components
 
+import android.graphics.BitmapFactory
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -23,6 +24,7 @@ import com.github.penfeizhou.animation.apng.APNGDrawable
 import com.yuranime.dinz.data.firebase.ProfileEffectDefinition
 import com.yuranime.dinz.data.firebase.ProfileEffectLayer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -72,6 +74,22 @@ private fun isApngFile(file: File): Boolean {
                 }
             }
             false
+        }
+    } catch (_: Throwable) {
+        false
+    }
+}
+
+private fun isValidPngSignature(file: File): Boolean {
+    if (!file.exists() || file.length() < 32L) return false
+    return try {
+        file.inputStream().use { stream ->
+            val header = ByteArray(8)
+            if (stream.read(header) != 8) return false
+            header[0] == 0x89.toByte() &&
+                header[1] == 0x50.toByte() &&
+                header[2] == 0x4E.toByte() &&
+                header[3] == 0x47.toByte()
         }
     } catch (_: Throwable) {
         false
@@ -263,31 +281,36 @@ fun MultiLayerProfileEffectView(
     effectId: String = "effect",
     onLoadingChanged: (Boolean) -> Unit = {}
 ) {
-    if (layers.isEmpty()) {
+    val sortedLayers = remember(layers) { layers.sortedBy { it.zIndex } }
+    if (sortedLayers.isEmpty()) {
+        LaunchedEffect(Unit) { onLoadingChanged(false) }
         Box(modifier = modifier)
         return
     }
 
     val context = LocalContext.current
-    var isReady by remember(layers) { mutableStateOf(false) }
-    var cachedFiles by remember(layers) { mutableStateOf<List<File?>>(emptyList()) }
+    var isReady by remember(sortedLayers) { mutableStateOf(false) }
+    var cachedFiles by remember(sortedLayers) { mutableStateOf<List<File?>>(emptyList()) }
 
-    // Download & Cache setiap layer dengan nama unik
-    LaunchedEffect(layers) {
+    // Download & Cache setiap layer dengan nama unik & validasi PNG header
+    LaunchedEffect(sortedLayers) {
         onLoadingChanged(true)
         isReady = false
         val files = withContext(Dispatchers.IO) {
             val cacheDir = File(context.cacheDir, "apng_effects_cache").apply { if (!exists()) mkdirs() }
             val safeEffectId = effectId.replace(Regex("[^a-zA-Z0-9_]"), "_")
 
-            layers.mapIndexed { layerIndex, layer ->
+            sortedLayers.mapIndexed { layerIndex, layer ->
                 try {
                     if (layer.src.isBlank()) return@mapIndexed null
                     val safeHash = layer.src.hashCode().toString().replace("-", "n")
                     val targetFile = File(cacheDir, "effect_${safeEffectId}_layer_${layerIndex}_$safeHash.png")
 
-                    if (targetFile.exists() && targetFile.length() >= 128L) {
+                    if (targetFile.exists() && targetFile.length() >= 128L && isValidPngSignature(targetFile)) {
                         return@mapIndexed targetFile
+                    }
+                    if (targetFile.exists()) {
+                        try { targetFile.delete() } catch (_: Throwable) {}
                     }
 
                     val tempFile = File(cacheDir, "effect_${safeEffectId}_layer_${layerIndex}_${safeHash}_tmp.png")
@@ -304,7 +327,7 @@ fun MultiLayerProfileEffectView(
                         }
                     }
 
-                    if (tempFile.exists() && tempFile.length() >= 128L) {
+                    if (tempFile.exists() && tempFile.length() >= 128L && isValidPngSignature(tempFile)) {
                         try {
                             tempFile.copyTo(targetFile, overwrite = true)
                             tempFile.delete()
@@ -333,12 +356,14 @@ fun MultiLayerProfileEffectView(
         return
     }
 
-    // AndroidView dengan FrameLayout yang menampung ImageView per layer
-    val imageViews = remember(layers, cachedFiles) { mutableListOf<ImageView>() }
-    val drawables = remember(layers, cachedFiles) { mutableListOf<APNGDrawable?>() }
+    // AndroidView dengan FrameLayout yang menampung ImageView per layer sesuai urutan zIndex
+    val imageViews = remember(sortedLayers, cachedFiles) { mutableListOf<ImageView>() }
+    val drawables = remember(sortedLayers, cachedFiles) { mutableListOf<APNGDrawable?>() }
+    var isViewsAttached by remember(sortedLayers, cachedFiles) { mutableStateOf(false) }
 
-    DisposableEffect(layers, cachedFiles) {
+    DisposableEffect(sortedLayers, cachedFiles) {
         onDispose {
+            isViewsAttached = false
             drawables.forEach {
                 try { it?.stop() } catch (_: Throwable) {}
             }
@@ -350,41 +375,57 @@ fun MultiLayerProfileEffectView(
         }
     }
 
-    // Timeline Controller: memutar siklus multi-layer sesuai start, duration, dan looping
-    LaunchedEffect(isReady, layers, cachedFiles) {
-        if (!isReady) return@LaunchedEffect
+    // Timeline Controller: menunggu isReady dan isViewsAttached agar Cycle 0 selalu berjalan
+    LaunchedEffect(isReady, isViewsAttached, sortedLayers, cachedFiles) {
+        if (!isReady || !isViewsAttached || imageViews.isEmpty()) return@LaunchedEffect
 
+        var cycleCount = 0
         while (isActive) {
-            // Jalankan setiap layer sesuai start schedule-nya
-            layers.forEachIndexed { index, layer ->
-                launch {
-                    val iv = imageViews.getOrNull(index) ?: return@launch
-                    val d = drawables.getOrNull(index)
-
-                    if (layer.start > 0) {
-                        delay(layer.start)
-                    }
-
-                    if (d != null) {
-                        iv.visibility = View.VISIBLE
-                        try {
-                            d.setLoopLimit(if (layer.loop) 0 else 1)
-                            d.reset()
-                            d.start()
-                        } catch (_: Throwable) {}
-                    }
-
-                    if (!layer.loop) {
-                        delay(layer.duration)
-                        iv.visibility = View.INVISIBLE
-                    }
+            if (cycleCount > 0) {
+                sortedLayers.forEachIndexed { index, _ ->
+                    imageViews.getOrNull(index)?.visibility = View.INVISIBLE
+                    try {
+                        drawables.getOrNull(index)?.stop()
+                    } catch (_: Throwable) {}
                 }
             }
 
-            // Hitung panjang siklus terlama (minimal 4000L ms)
-            val maxDuration = layers.maxOfOrNull { it.start + it.duration }?.coerceAtLeast(3500L) ?: 4000L
-            // Waktu tunggu ambient sebelum karakter utama muncul kembali
-            delay(maxDuration + 2500L)
+            val maxDuration = sortedLayers.maxOfOrNull { it.start + it.duration }?.coerceAtLeast(3500L) ?: 4000L
+
+            coroutineScope {
+                sortedLayers.forEachIndexed { index, layer ->
+                    launch {
+                        val iv = imageViews.getOrNull(index) ?: return@launch
+                        val d = drawables.getOrNull(index)
+
+                        if (layer.start > 0L) {
+                            delay(layer.start)
+                        }
+                        if (!isActive) return@launch
+
+                        iv.visibility = View.VISIBLE
+                        if (d != null) {
+                            try {
+                                d.setLoopLimit(if (layer.loop) 0 else 1)
+                                if (cycleCount > 0) {
+                                    d.reset()
+                                }
+                                d.start()
+                            } catch (_: Throwable) {}
+                        }
+
+                        if (!layer.loop) {
+                            delay(layer.duration.coerceAtLeast(1000L))
+                            iv.visibility = View.INVISIBLE
+                            try { d?.stop() } catch (_: Throwable) {}
+                        }
+                    }
+                }
+
+                // Waktu tunggu ambient sebelum karakter utama muncul kembali
+                delay(maxDuration + 2500L)
+            }
+            cycleCount++
         }
     }
 
@@ -401,7 +442,7 @@ fun MultiLayerProfileEffectView(
                     imageViews.clear()
                     drawables.clear()
 
-                    layers.forEachIndexed { index, layer ->
+                    sortedLayers.forEachIndexed { index, layer ->
                         val file = cachedFiles.getOrNull(index)
                         val iv = ImageView(ctx).apply {
                             this.scaleType = scaleType
@@ -419,15 +460,26 @@ fun MultiLayerProfileEffectView(
                         var d: APNGDrawable? = null
                         if (file != null && file.exists() && file.length() >= 128L) {
                             try {
-                                d = APNGDrawable.fromFile(file.absolutePath)
-                                d.setLoopLimit(if (layer.loop) 0 else 1)
-                                iv.setImageDrawable(d)
-                            } catch (t: Throwable) {
-                                t.printStackTrace()
+                                val candidate = APNGDrawable.fromFile(file.absolutePath)
+                                if (candidate.intrinsicWidth > 0 && candidate.intrinsicHeight > 0) {
+                                    candidate.setLoopLimit(if (layer.loop) 0 else 1)
+                                    iv.setImageDrawable(candidate)
+                                    d = candidate
+                                }
+                            } catch (_: Throwable) {
+                                d = null
+                            }
+                            if (d == null) {
+                                try {
+                                    BitmapFactory.decodeFile(file.absolutePath)?.let { bmp ->
+                                        iv.setImageBitmap(bmp)
+                                    }
+                                } catch (_: Throwable) {}
                             }
                         }
                         drawables.add(d)
                     }
+                    isViewsAttached = true
                 }
             },
             update = { frameLayout ->

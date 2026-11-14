@@ -1569,12 +1569,11 @@ private fun CollectionAndHistorySubScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0B0B0B))
-            .statusBarsPadding()
-            .navigationBarsPadding()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1645,7 +1644,9 @@ private fun CollectionAndHistorySubScreen(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding(),
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {

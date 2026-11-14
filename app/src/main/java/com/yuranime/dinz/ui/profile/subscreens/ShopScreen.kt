@@ -2,12 +2,14 @@ package com.yuranime.dinz.ui.profile.subscreens
 
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,8 +69,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -153,11 +153,14 @@ fun ShopScreen(
         }
     }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFF090A0F))
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
         // ========================================================
         // 1. HEADER ATAS (Persis Desain 1000127784_2.png)
         // ========================================================
@@ -557,269 +560,265 @@ fun ShopScreen(
     }
 
     // ========================================================
-    // 5. PREVIEW PROFILE EFFECT (DENGAN APNG ANIMATION & LOADING SPINNER)
+    // 5. PREVIEW PROFILE EFFECT (IN-WINDOW FULL-BLEED + 60 FPS TIMELINE ENGINE)
     // ========================================================
     previewEffectItem?.let { effect ->
         val isOwned = unlockedEffects.contains(effect.id) || effect.animationUrl == equippedProfileEffectUrl
         val isEquipped = effect.animationUrl == equippedProfileEffectUrl
         val isLevelLocked = effect.tier == "B" && level < effect.requiredLevel
-        var isEffectLoading by remember { mutableStateOf(true) }
+        var isEffectLoading by remember(effect.id) { mutableStateOf(true) }
 
-        Dialog(
-            onDismissRequest = { previewEffectItem = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
+        BackHandler { previewEffectItem = null }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(200f)
+                .background(Color(0xFF0B0D13))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {}
         ) {
-            Column(
+            // 1. Avatar Pengguna Bulat 76.dp di posisi TopCenter (di bawah layer efek zIndex = 50f)
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF0B0D13))
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 68.dp)
+                    .size(76.dp),
+                contentAlignment = Alignment.Center
             ) {
-                // Header Atas: Tombol Tutup & Info Efek + Badge Kategori/Tier
-                Row(
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .size(62.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF1E2230)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = { previewEffectItem = null },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Tutup",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "Preview Effect",
-                                color = Color(0xFF94A3B8),
-                                fontSize = 11.sp,
-                                fontFamily = SfProFontFamily
-                            )
-                            Text(
-                                text = effect.name,
-                                color = Color.White,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = SfProFontFamily,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-
-                    // Badge Tier di Pojok Kanan Atas
-                    val tierBadgeText = when (effect.tier) {
-                        "C" -> "Exclusive"
-                        "B" -> "Lv. ${effect.requiredLevel}"
-                        else -> "Shop"
-                    }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF1E2232))
-                            .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
+                    if (userAvatarUrl.isNotBlank()) {
+                        AsyncImage(
+                            model = userAvatarUrl,
+                            contentDescription = "Avatar",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        )
+                    } else {
                         Text(
-                            text = tierBadgeText,
-                            color = Color(0xFFFF4D6D),
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            text = "YU",
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
                             fontFamily = SfProFontFamily
                         )
                     }
                 }
 
-                // Area Tengah: Kanvas Profil Bersih (aspectRatio 450f / 880f)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(horizontal = 24.dp, vertical = 6.dp),
-                    contentAlignment = Alignment.Center
+                if (equippedBorderUrl.isNotBlank()) {
+                    AnimatedCosmeticImage(
+                        url = DiscordCosmeticsRepository.getOptimizedUrl(equippedBorderUrl, size = 160, animated = true),
+                        isAnimated = true,
+                        modifier = Modifier.size(76.dp)
+                    )
+                }
+            }
+
+            // 2. Efek Animasi Profil Penuh Edge-to-Edge (MultiLayer Engine 60 FPS, zIndex = 50f)
+            MultiLayerProfileEffectView(
+                effect = effect,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(50f),
+                scaleType = ImageView.ScaleType.FIT_START,
+                onLoadingChanged = { isEffectLoading = it }
+            )
+
+            // 3. Header Atas: Tombol Tutup & Info Efek + Badge Kategori/Tier (di atas efek, zIndex = 60f)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .zIndex(60f)
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.92f)
-                            .aspectRatio(450f / 880f)
-                            .clip(RoundedCornerShape(20.dp))
+                    IconButton(
+                        onClick = { previewEffectItem = null },
+                        modifier = Modifier.size(36.dp)
                     ) {
-                        // 1. Avatar Pengguna Bulat 76.dp di Posisi Alignment.TopCenter
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = 36.dp)
-                                .size(76.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(62.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFF1E2230)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (userAvatarUrl.isNotBlank()) {
-                                    AsyncImage(
-                                        model = userAvatarUrl,
-                                        contentDescription = "Avatar",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize().clip(CircleShape)
-                                    )
-                                } else {
-                                    Text(
-                                        text = "YU",
-                                        color = Color.White,
-                                        fontSize = 20.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = SfProFontFamily
-                                    )
-                                }
-                            }
-
-                            if (equippedBorderUrl.isNotBlank()) {
-                                AnimatedCosmeticImage(
-                                    url = DiscordCosmeticsRepository.getOptimizedUrl(equippedBorderUrl, size = 160, animated = true),
-                                    isAnimated = true,
-                                    modifier = Modifier.size(76.dp)
-                                )
-                            }
-                        }
-
-                        // 2. Efek Animasi Profil Penuh (MultiLayer Engine 60 FPS dengan Timeline Controller, zIndex = 50f)
-                        MultiLayerProfileEffectView(
-                            effect = effect,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .zIndex(50f),
-                            scaleType = ImageView.ScaleType.FIT_CENTER,
-                            onLoadingChanged = { isEffectLoading = it }
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Tutup",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
                         )
-
-                        // 3. Loading Spinner Indicator
-                        if (isEffectLoading) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center,
-                                modifier = Modifier
-                                    .align(Alignment.Center)
-                                    .zIndex(60f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xCC090A0F))
-                                    .padding(14.dp)
-                            ) {
-                                CircularProgressIndicator(
-                                    color = Color(0xFFE11D48),
-                                    strokeWidth = 2.5.dp,
-                                    modifier = Modifier.size(26.dp)
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "Memuat animasi...",
-                                    color = Color(0xFFCBD5E1),
-                                    fontSize = 11.sp,
-                                    fontFamily = SfProFontFamily
-                                )
-                            }
-                        }
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "Preview Effect",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 11.sp,
+                            fontFamily = SfProFontFamily
+                        )
+                        Text(
+                            text = effect.name,
+                            color = Color.White,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SfProFontFamily,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
 
-                // Area Bawah: Kapsul Tombol Aksi & Harga Poin (Crimson Red)
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Badge Tier di Pojok Kanan Atas
+                val tierBadgeText = when (effect.tier) {
+                    "C" -> "Exclusive"
+                    "B" -> "Lv. ${effect.requiredLevel}"
+                    else -> "Shop"
+                }
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
-                    contentAlignment = Alignment.Center
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xCC1E2232))
+                        .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .wrapContentWidth()
-                            .height(46.dp)
-                            .clip(RoundedCornerShape(23.dp))
-                            .background(
-                                when {
-                                    isEquipped -> Color(0xFF1E202B)
-                                    isOwned -> Color(0xFFE11D48)
-                                    isLevelLocked -> Color(0xFF1E2232)
-                                    effect.tier == "C" -> Color(0xFF1E202B)
-                                    else -> Color(0xFFE11D48)
-                                }
-                            )
-                            .border(
-                                1.dp,
-                                if (isEquipped) Color(0xFFE11D48).copy(alpha = 0.5f) else Color.Transparent,
-                                RoundedCornerShape(23.dp)
-                            )
-                            .clickable {
-                                if (isProcessingAction) return@clickable
-                                isProcessingAction = true
-                                coroutineScope.launch {
-                                    try {
-                                        when {
-                                            isEquipped -> {
-                                                Toast.makeText(context, "Efek ini sudah terpasang!", Toast.LENGTH_SHORT).show()
-                                            }
-                                            isLevelLocked -> {
-                                                Toast.makeText(context, "Capai Level ${effect.requiredLevel} terlebih dahulu!", Toast.LENGTH_SHORT).show()
-                                            }
-                                            effect.tier == "C" && !isOwned -> {
-                                                Toast.makeText(context, "Efek ini eksklusif dari Kode Redeem!", Toast.LENGTH_SHORT).show()
-                                                onNavigateToRewards()
+                    Text(
+                        text = tierBadgeText,
+                        color = Color(0xFFFF4D6D),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = SfProFontFamily
+                    )
+                }
+            }
+
+            // 4. Loading Spinner Indicator
+            if (isEffectLoading) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .zIndex(60f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xCC090A0F))
+                        .padding(14.dp)
+                ) {
+                    CircularProgressIndicator(
+                        color = Color(0xFFE11D48),
+                        strokeWidth = 2.5.dp,
+                        modifier = Modifier.size(26.dp)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Memuat animasi...",
+                        color = Color(0xFFCBD5E1),
+                        fontSize = 11.sp,
+                        fontFamily = SfProFontFamily
+                    )
+                }
+            }
+
+            // 5. Area Bawah: Kapsul Tombol Aksi & Harga Poin (Crimson Red, zIndex = 60f)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .zIndex(60f)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .wrapContentWidth()
+                        .height(46.dp)
+                        .clip(RoundedCornerShape(23.dp))
+                        .background(
+                            when {
+                                isEquipped -> Color(0xFF1E202B)
+                                isOwned -> Color(0xFFE11D48)
+                                isLevelLocked -> Color(0xFF1E2232)
+                                effect.tier == "C" -> Color(0xFF1E202B)
+                                else -> Color(0xFFE11D48)
+                            }
+                        )
+                        .border(
+                            1.dp,
+                            if (isEquipped) Color(0xFFE11D48).copy(alpha = 0.5f) else Color.Transparent,
+                            RoundedCornerShape(23.dp)
+                        )
+                        .clickable {
+                            if (isProcessingAction) return@clickable
+                            isProcessingAction = true
+                            coroutineScope.launch {
+                                try {
+                                    when {
+                                        isEquipped -> {
+                                            Toast.makeText(context, "Efek ini sudah terpasang!", Toast.LENGTH_SHORT).show()
+                                        }
+                                        isLevelLocked -> {
+                                            Toast.makeText(context, "Capai Level ${effect.requiredLevel} terlebih dahulu!", Toast.LENGTH_SHORT).show()
+                                        }
+                                        effect.tier == "C" && !isOwned -> {
+                                            Toast.makeText(context, "Efek ini eksklusif dari Kode Redeem!", Toast.LENGTH_SHORT).show()
+                                            onNavigateToRewards()
+                                            previewEffectItem = null
+                                        }
+                                        else -> {
+                                            FirebaseManager.unlockOrEquipProfileEffect(context, effect) { _, msg ->
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                                 previewEffectItem = null
                                             }
-                                            else -> {
-                                                FirebaseManager.unlockOrEquipProfileEffect(context, effect) { _, msg ->
-                                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                                    previewEffectItem = null
-                                                }
-                                            }
                                         }
-                                    } finally {
-                                        isProcessingAction = false
                                     }
+                                } finally {
+                                    isProcessingAction = false
                                 }
                             }
-                            .padding(horizontal = 24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (isProcessingAction) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                        } else {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                when {
-                                    isEquipped -> {
-                                        Text(text = "Sedang Terpasang", color = Color.White, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
-                                    }
-                                    isOwned -> {
-                                        Text(text = "Pasang Efek Ini", color = Color.White, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
-                                    }
-                                    isLevelLocked -> {
-                                        Text(text = "🔒 Minimal Level ${effect.requiredLevel}", color = Color(0xFF94A3B8), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
-                                    }
-                                    effect.tier == "C" -> {
-                                        Text(text = "🔒 Eksklusif Kode Redeem", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
-                                    }
-                                    else -> {
-                                        PrimoPointIcon(size = 18.dp)
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "Tukar • ${FirebaseManager.formatNumber(effect.pointCost)} Poin",
-                                            color = Color.White,
-                                            fontSize = 14.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = SfProFontFamily
-                                        )
-                                    }
+                        }
+                        .padding(horizontal = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isProcessingAction) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            when {
+                                isEquipped -> {
+                                    Text(text = "Sedang Terpasang", color = Color.White, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
+                                }
+                                isOwned -> {
+                                    Text(text = "Pasang Efek Ini", color = Color.White, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
+                                }
+                                isLevelLocked -> {
+                                    Text(text = "🔒 Minimal Level ${effect.requiredLevel}", color = Color(0xFF94A3B8), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
+                                }
+                                effect.tier == "C" -> {
+                                    Text(text = "🔒 Eksklusif Kode Redeem", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
+                                }
+                                else -> {
+                                    PrimoPointIcon(size = 18.dp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Tukar • ${FirebaseManager.formatNumber(effect.pointCost)} Poin",
+                                        color = Color.White,
+                                        fontSize = 14.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = SfProFontFamily
+                                    )
                                 }
                             }
                         }
@@ -830,22 +829,28 @@ fun ShopScreen(
     }
 
     // ========================================================
-    // 6. PREVIEW AVATAR DECORATION
+    // 6. PREVIEW AVATAR DECORATION (IN-WINDOW OVERLAY)
     // ========================================================
     previewBorderItem?.let { border ->
         val isOwned = unlockedBorders.contains(border.id) || border.imageUrl == equippedBorderUrl
         val isEquipped = border.imageUrl == equippedBorderUrl
         val isLevelLocked = border.tier == "B" && level < border.requiredLevel
-        var isBorderLoading by remember { mutableStateOf(true) }
+        var isBorderLoading by remember(border.id) { mutableStateOf(true) }
 
-        Dialog(
-            onDismissRequest = { previewBorderItem = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
+        BackHandler { previewBorderItem = null }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(200f)
+                .background(Color(0xFF0B0D13))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {}
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF0B0D13))
+                modifier = Modifier.fillMaxSize()
             ) {
                 // Header Atas: Tombol Tutup & Nama Border
                 Row(
@@ -1040,6 +1045,7 @@ fun ShopScreen(
                 }
             }
         }
+    }
     }
 }
 

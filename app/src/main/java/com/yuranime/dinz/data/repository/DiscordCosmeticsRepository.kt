@@ -233,19 +233,24 @@ object DiscordCosmeticsRepository {
                                 ?: raw.bakedCardUrl?.takeIf { it.isNotBlank() }
                                 ?: raw.animatedIcon.orEmpty()
 
-                            val catalogLoopLayer = catalogItem?.layers?.firstOrNull { it.loop == true }?.src
-                                ?: catalogItem?.effects?.firstOrNull { it.loop == true }?.src
-                                ?: catalogItem?.layers?.lastOrNull()?.src
-                                ?: catalogItem?.effects?.lastOrNull()?.src
-                            val animUrl = catalogLoopLayer?.takeIf { it.isNotBlank() }
+                            val rawLayers = raw.effects ?: raw.layers
+                            val catalogLayers = catalogItem?.layers ?: catalogItem?.effects
+                            val bestLayers = when {
+                                !rawLayers.isNullOrEmpty() && (catalogLayers.isNullOrEmpty() || rawLayers.size >= catalogLayers.size) -> rawLayers
+                                !catalogLayers.isNullOrEmpty() -> catalogLayers
+                                else -> rawLayers
+                            }
+
+                            val loopLayer = bestLayers?.firstOrNull { it.loop == true }?.src
+                                ?: bestLayers?.lastOrNull()?.src
+                            val animUrl = loopLayer?.takeIf { it.isNotBlank() }
                                 ?: raw.animatedIcon?.takeIf { it.isNotBlank() }
                                 ?: raw.icon.orEmpty()
 
                             // Parse seluruh layer ProfileEffectLayer (loop, start, duration, loopDelay, positionY, zIndex)
                             val parsedLayers = mutableListOf<ProfileEffectLayer>()
-                            val catalogLayers = catalogItem?.layers ?: catalogItem?.effects
-                            if (!catalogLayers.isNullOrEmpty()) {
-                                catalogLayers.forEachIndexed { idx, lay ->
+                            if (!bestLayers.isNullOrEmpty()) {
+                                bestLayers.forEachIndexed { idx, lay ->
                                     val s = lay.src?.takeIf { it.isNotBlank() }
                                     if (s != null) {
                                         parsedLayers.add(
@@ -259,28 +264,6 @@ object DiscordCosmeticsRepository {
                                                 zIndex = lay.zIndex ?: (100 + idx)
                                             )
                                         )
-                                    }
-                                }
-                            }
-
-                            if (parsedLayers.isEmpty()) {
-                                val rawLayers = raw.effects ?: raw.layers
-                                if (!rawLayers.isNullOrEmpty()) {
-                                    rawLayers.forEachIndexed { idx, lay ->
-                                        val s = lay.src?.takeIf { it.isNotBlank() }
-                                        if (s != null) {
-                                            parsedLayers.add(
-                                                ProfileEffectLayer(
-                                                    src = s,
-                                                    loop = lay.loop ?: true,
-                                                    start = lay.start ?: 0L,
-                                                    duration = lay.duration ?: 3000L,
-                                                    loopDelay = lay.loopDelay ?: 0L,
-                                                    positionY = lay.position?.y ?: 0,
-                                                    zIndex = lay.zIndex ?: (100 + idx)
-                                                )
-                                            )
-                                        }
                                     }
                                 }
                             }
