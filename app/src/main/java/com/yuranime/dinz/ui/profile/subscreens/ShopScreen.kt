@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -66,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.yuranime.dinz.R
@@ -75,6 +78,7 @@ import com.yuranime.dinz.data.firebase.ProfileEffectDefinition
 import com.yuranime.dinz.data.firebase.TitleDefinition
 import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
+import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
 import com.yuranime.dinz.ui.components.ApngAnimationView
 import com.yuranime.dinz.ui.components.ApngStackedEffectView
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
@@ -727,18 +731,13 @@ fun ShopScreen(
                         )
 
                         // 4. Loading Spinner Indicator
-                        AnimatedVisibility(
-                            visible = isEffectLoading,
-                            enter = fadeIn(),
-                            exit = fadeOut(),
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .zIndex(60f)
-                        ) {
+                        if (isEffectLoading) {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center,
                                 modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .zIndex(60f)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(Color(0xCC090A0F))
                                     .padding(14.dp)

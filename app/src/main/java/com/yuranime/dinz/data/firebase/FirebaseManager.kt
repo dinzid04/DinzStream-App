@@ -1225,7 +1225,7 @@ object FirebaseManager {
                 }
 
                 if (anyDeleted && context != null) {
-                    syncUserFromFirestore(context)
+                    startListeningCurrentUser(context)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Deduplikasi akun dilewati sementara: ${e.message}")
