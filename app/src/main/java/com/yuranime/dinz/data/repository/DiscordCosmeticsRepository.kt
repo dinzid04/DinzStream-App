@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.annotations.SerializedName
 import com.yuranime.dinz.data.firebase.BorderDefinition
 import com.yuranime.dinz.data.firebase.ProfileEffectDefinition
+import com.yuranime.dinz.data.firebase.ProfileEffectLayer
 import java.io.InputStreamReader
 
 object DiscordCosmeticsRepository {
@@ -31,12 +32,23 @@ object DiscordCosmeticsRepository {
         @SerializedName("animated_icon") val animatedIcon: String?,
         @SerializedName("label") val label: String?,
         @SerializedName("accessibility_label") val accessibilityLabel: String?,
-        @SerializedName("bakedCardUrl") val bakedCardUrl: String?
+        @SerializedName("bakedCardUrl") val bakedCardUrl: String?,
+        @SerializedName("effects") val effects: List<CatalogLayerDto>?,
+        @SerializedName("layers") val layers: List<CatalogLayerDto>?
+    )
+
+    private data class CatalogPositionDto(
+        @SerializedName("x") val x: Int?,
+        @SerializedName("y") val y: Int?
     )
 
     private data class CatalogLayerDto(
         @SerializedName("src") val src: String?,
         @SerializedName("loop") val loop: Boolean?,
+        @SerializedName("duration") val duration: Long?,
+        @SerializedName("start") val start: Long?,
+        @SerializedName("loopDelay") val loopDelay: Long?,
+        @SerializedName("position") val position: CatalogPositionDto?,
         @SerializedName("zIndex") val zIndex: Int?
     )
 
@@ -48,7 +60,8 @@ object DiscordCosmeticsRepository {
         @SerializedName("staticFrameSrc") val staticFrameSrc: String?,
         @SerializedName("thumbnailPreviewSrc") val thumbnailPreviewSrc: String?,
         @SerializedName("reducedMotionSrc") val reducedMotionSrc: String?,
-        @SerializedName("layers") val layers: List<CatalogLayerDto>?
+        @SerializedName("layers") val layers: List<CatalogLayerDto>?,
+        @SerializedName("effects") val effects: List<CatalogLayerDto>?
     )
 
     private data class CatalogCollectionDto(
@@ -221,14 +234,75 @@ object DiscordCosmeticsRepository {
                                 ?: raw.animatedIcon.orEmpty()
 
                             val catalogLoopLayer = catalogItem?.layers?.firstOrNull { it.loop == true }?.src
+                                ?: catalogItem?.effects?.firstOrNull { it.loop == true }?.src
                                 ?: catalogItem?.layers?.lastOrNull()?.src
+                                ?: catalogItem?.effects?.lastOrNull()?.src
                             val animUrl = catalogLoopLayer?.takeIf { it.isNotBlank() }
                                 ?: raw.animatedIcon?.takeIf { it.isNotBlank() }
                                 ?: raw.icon.orEmpty()
 
-                            val layerUrls = catalogItem?.layers?.mapNotNull { it.src?.takeIf { s -> s.isNotBlank() } }
-                                ?.ifEmpty { listOf(animUrl).filter { it.isNotBlank() } }
-                                ?: listOf(animUrl).filter { it.isNotBlank() }
+                            // Parse seluruh layer ProfileEffectLayer (loop, start, duration, loopDelay, positionY, zIndex)
+                            val parsedLayers = mutableListOf<ProfileEffectLayer>()
+                            val catalogLayers = catalogItem?.layers ?: catalogItem?.effects
+                            if (!catalogLayers.isNullOrEmpty()) {
+                                catalogLayers.forEachIndexed { idx, lay ->
+                                    val s = lay.src?.takeIf { it.isNotBlank() }
+                                    if (s != null) {
+                                        parsedLayers.add(
+                                            ProfileEffectLayer(
+                                                src = s,
+                                                loop = lay.loop ?: true,
+                                                start = lay.start ?: 0L,
+                                                duration = lay.duration ?: 3000L,
+                                                loopDelay = lay.loopDelay ?: 0L,
+                                                positionY = lay.position?.y ?: 0,
+                                                zIndex = lay.zIndex ?: (100 + idx)
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (parsedLayers.isEmpty()) {
+                                val rawLayers = raw.effects ?: raw.layers
+                                if (!rawLayers.isNullOrEmpty()) {
+                                    rawLayers.forEachIndexed { idx, lay ->
+                                        val s = lay.src?.takeIf { it.isNotBlank() }
+                                        if (s != null) {
+                                            parsedLayers.add(
+                                                ProfileEffectLayer(
+                                                    src = s,
+                                                    loop = lay.loop ?: true,
+                                                    start = lay.start ?: 0L,
+                                                    duration = lay.duration ?: 3000L,
+                                                    loopDelay = lay.loopDelay ?: 0L,
+                                                    positionY = lay.position?.y ?: 0,
+                                                    zIndex = lay.zIndex ?: (100 + idx)
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Fallback jika tidak ada layer list: gunakan animUrl sebagai 1 layer utama
+                            if (parsedLayers.isEmpty() && animUrl.isNotBlank()) {
+                                parsedLayers.add(
+                                    ProfileEffectLayer(
+                                        src = animUrl,
+                                        loop = true,
+                                        start = 0L,
+                                        duration = 3800L,
+                                        loopDelay = 0L,
+                                        positionY = 0,
+                                        zIndex = 100
+                                    )
+                                )
+                            }
+
+                            val layerUrls = parsedLayers.map { it.src }.ifEmpty {
+                                listOf(animUrl).filter { it.isNotBlank() }
+                            }
 
                             val desc = raw.accessibilityLabel?.takeIf { it.isNotBlank() }
                                 ?: catalogItem?.accessibilityLabel?.takeIf { it.isNotBlank() }
@@ -253,7 +327,8 @@ object DiscordCosmeticsRepository {
                                         requiredLevel = 1,
                                         category = category,
                                         staticImageUrl = staticUrl,
-                                        layerUrls = layerUrls
+                                        layerUrls = layerUrls,
+                                        layers = parsedLayers
                                     )
                                 }
                                 index < highEnd -> {
@@ -268,7 +343,8 @@ object DiscordCosmeticsRepository {
                                         requiredLevel = 35,
                                         category = category,
                                         staticImageUrl = staticUrl,
-                                        layerUrls = layerUrls
+                                        layerUrls = layerUrls,
+                                        layers = parsedLayers
                                     )
                                 }
                                 else -> {
@@ -282,7 +358,8 @@ object DiscordCosmeticsRepository {
                                         requiredLevel = 0,
                                         category = category,
                                         staticImageUrl = staticUrl,
-                                        layerUrls = layerUrls
+                                        layerUrls = layerUrls,
+                                        layers = parsedLayers
                                     )
                                 }
                             }

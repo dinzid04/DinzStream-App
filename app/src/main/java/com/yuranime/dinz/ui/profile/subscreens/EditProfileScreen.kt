@@ -74,6 +74,7 @@ import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
 import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
 import com.yuranime.dinz.ui.components.ApngAnimationView
 import com.yuranime.dinz.ui.components.ApngStackedEffectView
+import com.yuranime.dinz.ui.components.MultiLayerProfileEffectView
 import com.yuranime.dinz.ui.components.EmptyTitleSlotBadge
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.theme.SfProFontFamily
@@ -957,13 +958,19 @@ fun EditProfileScreen(
                     .fillMaxSize()
                     .zIndex(50f)
             ) {
-                ApngStackedEffectView(
-                    layerUrls = previewLayers,
-                    scaleType = ImageView.ScaleType.FIT_START,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                )
+                if (previewEffectDef != null) {
+                    MultiLayerProfileEffectView(
+                        effect = previewEffectDef,
+                        scaleType = ImageView.ScaleType.FIT_START,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    ApngStackedEffectView(
+                        layerUrls = previewLayers,
+                        scaleType = ImageView.ScaleType.FIT_START,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }

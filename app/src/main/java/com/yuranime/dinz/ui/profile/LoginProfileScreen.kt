@@ -132,6 +132,7 @@ import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
 import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
 import com.yuranime.dinz.ui.components.ApngAnimationView
 import com.yuranime.dinz.ui.components.ApngStackedEffectView
+import com.yuranime.dinz.ui.components.MultiLayerProfileEffectView
 import com.yuranime.dinz.ui.components.EmptyTitleSlotBadge
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.NavTab
@@ -1075,13 +1076,19 @@ private fun UserProfileView(
             .fillMaxSize()
             .zIndex(50f)
     ) {
-        ApngStackedEffectView(
-            layerUrls = effectLayers,
-            scaleType = ImageView.ScaleType.FIT_START,
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-        )
+        if (effectDef != null) {
+            MultiLayerProfileEffectView(
+                effect = effectDef,
+                scaleType = ImageView.ScaleType.FIT_START,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            ApngStackedEffectView(
+                layerUrls = effectLayers,
+                scaleType = ImageView.ScaleType.FIT_START,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 
     // 6. LAYER NAVIGASI TERATAS: 3 TOMBOL IKON BULAT POJOK KANAN ATAS (zIndex = 100f)
@@ -1795,10 +1802,10 @@ private fun LoginView(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0x99000000),
-                            Color(0xD90B0B0B),
-                            Color(0xFA0B0B0B),
-                            Color(0xFF0B0B0B)
+                            Color(0x55000000),
+                            Color(0xAA0B0B0B),
+                            Color(0xDD0B0B0B),
+                            Color(0xBB0B0B0B)
                         )
                     )
                 )

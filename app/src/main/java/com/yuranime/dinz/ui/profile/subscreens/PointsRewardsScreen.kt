@@ -174,13 +174,12 @@ fun PointsRewardsScreen(
                     )
                 )
             )
-            .statusBarsPadding()
-            .navigationBarsPadding()
     ) {
         // TOP APP BAR: Tombol Kembali '<' minimalis, Judul Tengah "Rewards"
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .statusBarsPadding()
                 .padding(horizontal = 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

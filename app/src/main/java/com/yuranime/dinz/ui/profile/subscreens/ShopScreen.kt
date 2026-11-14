@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -81,6 +82,7 @@ import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
 import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
 import com.yuranime.dinz.ui.components.ApngAnimationView
 import com.yuranime.dinz.ui.components.ApngStackedEffectView
+import com.yuranime.dinz.ui.components.MultiLayerProfileEffectView
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.PrimoPointIcon
 import com.yuranime.dinz.ui.theme.SfProFontFamily
@@ -155,8 +157,6 @@ fun ShopScreen(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFF090A0F))
-            .statusBarsPadding()
-            .navigationBarsPadding()
     ) {
         // ========================================================
         // 1. HEADER ATAS (Persis Desain 1000127784_2.png)
@@ -164,6 +164,7 @@ fun ShopScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
             // Sisi Kiri: Ikon Panah Bersih (Tanpa Bulatan Background) + Judul & Subteks
@@ -572,13 +573,12 @@ fun ShopScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xFF0B0D13))
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
             ) {
-                // Header Atas: Tombol Tutup & Info Efek
+                // Header Atas: Tombol Tutup & Info Efek + Badge Kategori/Tier
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .statusBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -614,9 +614,31 @@ fun ShopScreen(
                             )
                         }
                     }
+
+                    // Badge Tier di Pojok Kanan Atas
+                    val tierBadgeText = when (effect.tier) {
+                        "C" -> "Exclusive"
+                        "B" -> "Lv. ${effect.requiredLevel}"
+                        else -> "Shop"
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF1E2232))
+                            .border(1.dp, Color(0xFFE11D48).copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            text = tierBadgeText,
+                            color = Color(0xFFFF4D6D),
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = SfProFontFamily
+                        )
+                    }
                 }
 
-                // Area Tengah: Kanvas Profil Penuh Proporsional (aspectRatio 450f / 880f)
+                // Area Tengah: Kanvas Profil Bersih (aspectRatio 450f / 880f)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -629,100 +651,52 @@ fun ShopScreen(
                             .fillMaxWidth(0.92f)
                             .aspectRatio(450f / 880f)
                             .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0xFF13151F))
-                            .border(1.dp, Color(0xFF262A3B), RoundedCornerShape(20.dp))
                     ) {
-                        // 1. Banner Atas Kanvas Profil
+                        // 1. Avatar Pengguna Bulat 76.dp di Posisi Alignment.TopCenter
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight(0.36f)
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(
-                                            Color(0xFF2B0E16),
-                                            Color(0xFF1A1020),
-                                            Color(0xFF10121C)
-                                        )
-                                    )
-                                )
+                                .align(Alignment.TopCenter)
+                                .padding(top = 36.dp)
+                                .size(76.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(Color.Transparent, Color(0xAA13151F), Color(0xFF13151F))
-                                        )
-                                    )
-                            )
-                        }
-
-                        // 2. Avatar Pengguna di Area Atas Sesuai Posisi Profil Anibi
-                        Column(
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .padding(start = 20.dp, top = 76.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier.size(76.dp),
+                                    .size(62.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF1E2230)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(62.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF1E2230)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (userAvatarUrl.isNotBlank()) {
-                                        AsyncImage(
-                                            model = userAvatarUrl,
-                                            contentDescription = "Avatar",
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize().clip(CircleShape)
-                                        )
-                                    } else {
-                                        Text(
-                                            text = "YU",
-                                            color = Color.White,
-                                            fontSize = 20.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = SfProFontFamily
-                                        )
-                                    }
-                                }
-
-                                if (equippedBorderUrl.isNotBlank()) {
-                                    AnimatedCosmeticImage(
-                                        url = DiscordCosmeticsRepository.getOptimizedUrl(equippedBorderUrl, size = 160, animated = true),
-                                        isAnimated = true,
-                                        modifier = Modifier.size(76.dp)
+                                if (userAvatarUrl.isNotBlank()) {
+                                    AsyncImage(
+                                        model = userAvatarUrl,
+                                        contentDescription = "Avatar",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                    )
+                                } else {
+                                    Text(
+                                        text = "YU",
+                                        color = Color.White,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = SfProFontFamily
                                     )
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = "Pratinjau Pengguna",
-                                color = Color.White,
-                                fontSize = 14.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = SfProFontFamily
-                            )
-                            Text(
-                                text = "#1001 • Yuranime Member",
-                                color = Color(0xFF94A3B8),
-                                fontSize = 11.sp,
-                                fontFamily = SfProFontFamily
-                            )
+                            if (equippedBorderUrl.isNotBlank()) {
+                                AnimatedCosmeticImage(
+                                    url = DiscordCosmeticsRepository.getOptimizedUrl(equippedBorderUrl, size = 160, animated = true),
+                                    isAnimated = true,
+                                    modifier = Modifier.size(76.dp)
+                                )
+                            }
                         }
 
-                        // 3. Efek Animasi Profil Penuh (Seluruh Layer Bertumpuk 60 FPS, zIndex = 50f)
-                        val layers = effect.layerUrls.ifEmpty { listOf(effect.animationUrl) }
-                        ApngStackedEffectView(
-                            layerUrls = layers,
+                        // 2. Efek Animasi Profil Penuh (MultiLayer Engine 60 FPS dengan Timeline Controller, zIndex = 50f)
+                        MultiLayerProfileEffectView(
+                            effect = effect,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .zIndex(50f),
@@ -730,7 +704,7 @@ fun ShopScreen(
                             onLoadingChanged = { isEffectLoading = it }
                         )
 
-                        // 4. Loading Spinner Indicator
+                        // 3. Loading Spinner Indicator
                         if (isEffectLoading) {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -759,18 +733,19 @@ fun ShopScreen(
                     }
                 }
 
-                // Area Bawah: Tombol Aksi & Harga Poin (Crimson Red)
-                Column(
+                // Area Bawah: Kapsul Tombol Aksi & Harga Poin (Crimson Red)
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .navigationBarsPadding()
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                            .clip(RoundedCornerShape(26.dp))
+                            .wrapContentWidth()
+                            .height(46.dp)
+                            .clip(RoundedCornerShape(23.dp))
                             .background(
                                 when {
                                     isEquipped -> Color(0xFF1E202B)
@@ -783,7 +758,7 @@ fun ShopScreen(
                             .border(
                                 1.dp,
                                 if (isEquipped) Color(0xFFE11D48).copy(alpha = 0.5f) else Color.Transparent,
-                                RoundedCornerShape(26.dp)
+                                RoundedCornerShape(23.dp)
                             )
                             .clickable {
                                 if (isProcessingAction) return@clickable
@@ -813,33 +788,34 @@ fun ShopScreen(
                                         isProcessingAction = false
                                     }
                                 }
-                            },
+                            }
+                            .padding(horizontal = 24.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         if (isProcessingAction) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
                         } else {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 when {
                                     isEquipped -> {
-                                        Text(text = "Sedang Terpasang", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
+                                        Text(text = "Sedang Terpasang", color = Color.White, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
                                     }
                                     isOwned -> {
-                                        Text(text = "Pasang Efek Ini", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
+                                        Text(text = "Pasang Efek Ini", color = Color.White, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
                                     }
                                     isLevelLocked -> {
-                                        Text(text = "🔒 Terkunci (Minimal Level ${effect.requiredLevel})", color = Color(0xFF94A3B8), fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
+                                        Text(text = "🔒 Minimal Level ${effect.requiredLevel}", color = Color(0xFF94A3B8), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
                                     }
                                     effect.tier == "C" -> {
-                                        Text(text = "🔒 Eksklusif Kode Redeem", color = Color.White, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
+                                        Text(text = "🔒 Eksklusif Kode Redeem", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
                                     }
                                     else -> {
-                                        PrimoPointIcon(size = 20.dp)
+                                        PrimoPointIcon(size = 18.dp)
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "Tukar & Pasang • ${FirebaseManager.formatNumber(effect.pointCost)} Poin",
+                                            text = "Tukar • ${FirebaseManager.formatNumber(effect.pointCost)} Poin",
                                             color = Color.White,
-                                            fontSize = 15.sp,
+                                            fontSize = 14.5.sp,
                                             fontWeight = FontWeight.Bold,
                                             fontFamily = SfProFontFamily
                                         )
@@ -870,13 +846,12 @@ fun ShopScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xFF0B0D13))
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
             ) {
                 // Header Atas: Tombol Tutup & Nama Border
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .statusBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -970,19 +945,20 @@ fun ShopScreen(
                     }
                 }
 
-                // Area Bawah: Tombol Aksi & Harga Poin (Crimson Red)
-                Column(
+                // Area Bawah: Kapsul Tombol Aksi & Harga Poin (Crimson Red)
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
-                        .padding(horizontal = 24.dp, vertical = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .navigationBarsPadding()
+                        .padding(horizontal = 24.dp, vertical = 20.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                            .clip(RoundedCornerShape(26.dp))
+                            .wrapContentWidth()
+                            .height(46.dp)
+                            .clip(RoundedCornerShape(23.dp))
                             .background(
                                 when {
                                     isEquipped -> Color(0xFF1E202B)
@@ -995,7 +971,7 @@ fun ShopScreen(
                             .border(
                                 1.dp,
                                 if (isEquipped) Color(0xFFE11D48).copy(alpha = 0.5f) else Color.Transparent,
-                                RoundedCornerShape(26.dp)
+                                RoundedCornerShape(23.dp)
                             )
                             .clickable {
                                 if (isProcessingAction) return@clickable
@@ -1025,33 +1001,34 @@ fun ShopScreen(
                                         isProcessingAction = false
                                     }
                                 }
-                            },
+                            }
+                            .padding(horizontal = 24.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         if (isProcessingAction) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
                         } else {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 when {
                                     isEquipped -> {
-                                        Text(text = "Sedang Terpasang", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
+                                        Text(text = "Sedang Terpasang", color = Color.White, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
                                     }
                                     isOwned -> {
-                                        Text(text = "Pasang Border Ini", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
+                                        Text(text = "Pasang Border Ini", color = Color.White, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
                                     }
                                     isLevelLocked -> {
-                                        Text(text = "🔒 Terkunci (Minimal Level ${border.requiredLevel})", color = Color(0xFF94A3B8), fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
+                                        Text(text = "🔒 Minimal Level ${border.requiredLevel}", color = Color(0xFF94A3B8), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
                                     }
                                     border.tier == "C" -> {
-                                        Text(text = "🔒 Eksklusif Kode Redeem", color = Color.White, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
+                                        Text(text = "🔒 Eksklusif Kode Redeem", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
                                     }
                                     else -> {
-                                        PrimoPointIcon(size = 20.dp)
+                                        PrimoPointIcon(size = 18.dp)
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "Tukar & Pasang • ${FirebaseManager.formatNumber(border.pointCost)} Poin",
+                                            text = "Tukar • ${FirebaseManager.formatNumber(border.pointCost)} Poin",
                                             color = Color.White,
-                                            fontSize = 15.sp,
+                                            fontSize = 14.5.sp,
                                             fontWeight = FontWeight.Bold,
                                             fontFamily = SfProFontFamily
                                         )

@@ -71,6 +71,16 @@ data class BorderDefinition(
     val category: String = "General"
 )
 
+data class ProfileEffectLayer(
+    val src: String,
+    val loop: Boolean = true,
+    val start: Long = 0L,
+    val duration: Long = 3000L,
+    val loopDelay: Long = 0L,
+    val positionY: Int = 0,
+    val zIndex: Int = 0
+)
+
 data class ProfileEffectDefinition(
     val id: String,
     val name: String,
@@ -81,7 +91,8 @@ data class ProfileEffectDefinition(
     val requiredLevel: Int = 1,
     val category: String = "General",
     val staticImageUrl: String = "",
-    val layerUrls: List<String> = emptyList()
+    val layerUrls: List<String> = emptyList(),
+    val layers: List<ProfileEffectLayer> = emptyList()
 )
 
 data class UserProfile(
