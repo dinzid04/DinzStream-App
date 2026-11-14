@@ -1383,3 +1383,51 @@ Mengacu pada tata letak referensi `WA_1794546770520.jpg` (`1002213252.jpg`) deng
    - **Kategori A (Tier Dasar):** Terbuka di bawah Lv. 35 dengan harga `300` – `800 Poin`.
    - **Kategori B (Tier Eksklusif Shop):** Wajib mencapai minimal **Level 35 (`userLevel >= 35`)** DAN harga poin tinggi (`3.500` – `25.000 Poin`). Jika belum Lv. 35, terkunci dengan label `🔒 Syarat Lv. 35 & [Harga] Poin`.
    - **Kategori C (Tier Langka / Mythic / Limited — `✦ LIMITED • REDEEM ONLY`):** Hanya dapat dibuka melalui tab **`Kode Redeem`** (terhubung ke koleksi `redeem_codes` di Firestore + kode resmi seperti `YURANIMEVIP`, `DINZMYTHIC`, `SEPUH2026`, `SOVEREIGN99`, `ANIMEKING`, `VENOMSYMBIOTE`).
+
+---
+
+## 5. SPESIFIKASI DESAIN TERBARU: Full Cosmetics Catalog, PrimoPointIcon, Independent ShopScreen, Reference-Accurate Leaderboard (1000127571.png), Profile (1000127642.png), & Rewards (1000127705.jpg)
+
+### A. Ikon Poin Resmi Aplikasi (`PrimoPointIcon` / `ic_primo.png`)
+1. **Asset:** Gambar resmi `primo.png` (Primogem) beresolusi tajam disematkan di `app/src/main/res/drawable/ic_primo.png`.
+2. **Komponen Reusable:** `PrimoPointIcon(size: Dp = 18.dp, modifier: Modifier = Modifier)` menggantikan seluruh ikon bintang/wajik poin di seluruh aplikasi (`ProfileScreen`, `ShopScreen`, `RewardsScreen`, `Preview Sheet`, dan `LeaderboardScreen`).
+
+### B. Pemisahan Halaman Shop (`ShopScreen.kt` — Referensi `1000127784.png`, `1000127821.jpg`, `1000127817.jpg`, `1000127813.jpg`)
+1. **Penghapusan Batas 60 Item:** Menghapus `.take(60)` secara total. Seluruh 985+ Avatar Decoration dan 396+ Profile Effect Discord asli dimuat dan dapat di-scroll secara mulus menggunakan `LazyVerticalGrid`.
+2. **Header Shop:**
+   - Kiri Atas: Ikon panah kiri `<-` bersih tanpa bulatan background, judul `Shop` (`22.sp` Bold Putih), dan sub-teks `"Customize your profile"` (`12.sp` `#94A3B8`).
+   - Kanan Atas: Kapsul poin pengguna dengan `PrimoPointIcon` dan siluet ikon logo aplikasi ber-opasitas rendah (`alpha = 0.14f`) dengan pendaran crimson halus tanpa kotak shadow kaku.
+3. **3 Tab Kategori:** `Profile Effect` (396 efek), `Avatar Decoration` (985 border), dan `Milestone & Title` (tanpa background card kaku).
+4. **Strategi Render Grid Cepat & Preview Animasi:**
+   - Di grid list: Render gambar statis ringan (`?size=160&passthrough=false`) dan mockup HP minimalis untuk Profile Effect agar scroll mulus 60 FPS tanpa beban memory leak.
+   - Saat diklik: Buka Full Screen / Bottom Sheet Preview beranimasi penuh 60 FPS dengan `AnimatedCosmeticImage`, avatar pengguna, badge tier, dan tombol harga `PrimoPointIcon`.
+
+### C. Redesign Total Papan Peringkat (`LeaderboardScreen.kt` — Referensi `1000127571.png`)
+1. **Header Aurora & Mahkota:** Latar atas sapuan gelombang gradasi merah marun lembut (*dark crimson aurora wave*), tombol bulat `#14161E` untuk `<-` dan `?`, ikon mahkota merah kecil `♛` `#E11D48`, judul `Papan Peringkat`, sub-teks real-time, dan ornamen simetris merah.
+2. **Podium Top 1–3 (`PodiumLaurelCrownFrame`):**
+   - Mahkota 3 sudut di puncak lingkaran, cincin berlapis memeluk avatar tanpa celah, sayap daun padi (Laurel Wreath) melengkung di sisi kiri dan kanan, serta plakat heksagonal membulat di bawah bertuliskan `TOP 1` (Emas `#F59E0B`), `TOP 2` (Perak `#94A3B8`), dan `TOP 3` (Perunggu `#D97706`).
+   - Ukuran avatar: Top 1 (86.dp), Top 2 & Top 3 (70.dp).
+   - Pedestal Melengkung Terbuka (*Curved Horizon Pedestal Arch*) di bawah avatar dengan busur cahaya emas/perak/perunggu memudar ke bawah tanpa garis tutup kaku.
+   - Info rata tengah: Username bold putih, kapsul level ramping `#161922` ber-border halus dengan ikon `^`, Custom Title Badge anti-terpotong, dan Total EXP ekstra tegas.
+3. **Bar Header `# Pengguna` & `Total EXP`:** Bar kapsul `#0E1016` (height 42.dp) dengan pendaran merah neon tipis di sisi kiri bawah.
+4. **Kartu Peringkat #4+ & Sticky Bottom Bar:**
+   - Kartu gelap `#11131A` dengan teks `#4`, avatar bulat 44.dp, username + tag, level capsule + rank title, EXP + `PrimoPointIcon` poin.
+   - Sticky bar bawah melayang ber-border merah menyala `1.dp` `#9F1239`, kotak merah `#E11D48` dengan `#1` + avatar 42.dp, username, status, EXP, dan level.
+
+### D. Redesign Total Profile Screen (`ProfileScreen.kt` — Referensi `1000127642.png`)
+1. **Header & Profile Effect Looping:** Kontainer setinggi `380.dp` dengan `clipToBounds = false` memutar animasi APNG/WebP secara infinite loop tanpa terpotong kaku. Avatar 84.dp tanpa cincin EXP, Avatar Decoration 102.dp.
+2. **Identitas & Baris Status Bersih:** Nama besar + tag, email dengan ikon amplop outline, tanggal gabung dengan ikon kalender outline, bio, baris status `MEMBER | LV. X | RANK TITLE` tanpa kotak overlay (hanya dipisah garis vertikal tipis `1.dp` `#262934`).
+3. **Title & EXP Bar:** Custom Title Badge dengan `clipPath` anti-bocor, EXP bar bersih sans-serif tanpa garis di angka 0.
+4. **2 Kolom Divider:** `Papan Peringkat` dan `Points & Rewards` (dengan `PrimoPointIcon`) dibatasi garis pembagi halus (`HorizontalDivider` & `VerticalDivider` 0.5.dp `#1E222B`).
+5. **Menu Bersih:** `Shop Kosmetik`, `Unduh`, `Koleksi & Riwayat`, `Info Aplikasi`, `Keluar Akun` dengan bottom padding 115.dp agar tidak tertutup `LiquidGlassNavbar`.
+
+### E. Redesign Halaman Rewards (`PointsRewardsScreen.kt` — Referensi `1000127705.jpg`)
+1. **Hero Balance:** `"Saldo Poin Kamu"` + angka besar (`34.sp` ExtraBold Putih) dan ilustrasi koin `primo.png` besar (`72.dp`).
+2. **Kartu Check-In 7 Hari:** 7 kapsul hari dengan ikon `primo.png` dan tombol penuh `Check in`.
+3. **Inline Kode Redeem Bar:** Bar input kapsul `"Masukkan kode redeem..."` + tombol `Klaim` langsung di halaman misi.
+4. **Daftar Misi (Earn Rewards):** Vertikal rapi dengan ikon, judul + `PrimoPointIcon` + nilai hadiah, tombol `Go` / `Claim`.
+
+### F. Pemulihan Section Beranda Anime (`HomeScreen.kt`)
+1. Menjamin seluruh section bawah (`Jadwal Hari Ini`, `Jat For Yu`, `Paling Dinanti`, `Paling Populer`) selalu terisi dan dirender 100% tanpa pernah terhenti di `Komik Terbaru`.
+2. Semua instance `Gson` diset lenient dan response sanitizer OkHttp membersihkan payload response.
+

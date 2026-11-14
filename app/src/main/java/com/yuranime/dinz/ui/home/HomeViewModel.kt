@@ -124,9 +124,10 @@ class HomeViewModel(
                 _uiState.update { current ->
                     val newEp = data?.newEpisodes ?: emptyList()
                     val hot = data?.hotAnime ?: emptyList()
-                    val today = data?.todayAnime ?: emptyList()
-                    val waiting = data?.waitingAnime ?: emptyList()
-                    val popular = data?.popularAnime ?: emptyList()
+                    val today = data?.todayAnime?.ifEmpty { null } ?: current.todayScheduleList.ifEmpty { hot }
+                    val waiting = data?.waitingAnime?.ifEmpty { null } ?: current.waitingAnimeList.ifEmpty { newEp }
+                    val popular = data?.popularAnime?.ifEmpty { null } ?: current.popularAnimeList.ifEmpty { hot }
+                    val jatForYu = randomItems.ifEmpty { data?.randomAnime ?: hot }
                     val combinedAnime = newEp + hot + today + waiting + popular
                     val upgradedContinueWatching = current.continueWatchingList.map { cw ->
                         val matchedCover = combinedAnime
@@ -139,15 +140,15 @@ class HomeViewModel(
                     current.copy(
                         isLoading = false,
                         errorMessage = null,
-                        sliderItem = data?.slider?.firstOrNull(),
+                        sliderItem = data?.slider?.firstOrNull() ?: current.sliderItem,
                         cuplixList = cuplixItems,
                         continueWatchingList = upgradedContinueWatching,
-                        newEpisodesList = newEp,
-                        hotAnimeList = hot,
-                        newTitlesList = newTitles,
+                        newEpisodesList = if (newEp.isNotEmpty()) newEp else current.newEpisodesList,
+                        hotAnimeList = if (hot.isNotEmpty()) hot else current.hotAnimeList,
+                        newTitlesList = if (newTitles.isNotEmpty()) newTitles else current.newTitlesList,
                         comicsList = if (comicsItems.isNotEmpty()) comicsItems else current.comicsList,
                         todayScheduleList = today,
-                        jatForYuList = randomItems,
+                        jatForYuList = jatForYu,
                         waitingAnimeList = waiting,
                         popularAnimeList = popular,
                         manreList = emptyList()
@@ -160,34 +161,35 @@ class HomeViewModel(
                 val newTitles = newTitlesResult.getOrNull() ?: emptyList()
                 val randomItems = randomResult.getOrNull() ?: emptyList()
 
-                if (fallbackData != null || newTitles.isNotEmpty() || randomItems.isNotEmpty() || comicsItems.isNotEmpty()) {
-                    _uiState.update { current ->
-                        val newEp = fallbackData?.newEpisodes ?: newTitles
-                        val hot = fallbackData?.hotAnime ?: randomItems
-                        val today = fallbackData?.todayAnime ?: emptyList()
-                        val waiting = fallbackData?.waitingAnime ?: emptyList()
-                        val popular = fallbackData?.popularAnime ?: emptyList()
-                        current.copy(
-                            isLoading = false,
-                            errorMessage = null,
-                            sliderItem = fallbackData?.slider?.firstOrNull() ?: current.sliderItem ?: newEp.firstOrNull()?.let { 
-                                com.yuranime.dinz.data.model.SliderItem(
-                                    id = it.id,
-                                    title = it.title,
-                                    image = it.getEffectivePoster(),
-                                    synopsis = it.synopsis
-                                )
-                            },
-                            cuplixList = cuplixItems,
-                            newEpisodesList = newEp,
-                            hotAnimeList = hot,
-                            newTitlesList = newTitles,
-                            comicsList = if (comicsItems.isNotEmpty()) comicsItems else current.comicsList,
-                            todayScheduleList = today,
-                            jatForYuList = randomItems,
-                            waitingAnimeList = waiting,
-                            popularAnimeList = popular
-                        )
+                _uiState.update { current ->
+                    val newEp = fallbackData?.newEpisodes ?: newTitles.ifEmpty { current.newEpisodesList }
+                    val hot = fallbackData?.hotAnime ?: randomItems.ifEmpty { current.hotAnimeList }
+                    val today = fallbackData?.todayAnime ?: current.todayScheduleList.ifEmpty { hot }
+                    val waiting = fallbackData?.waitingAnime ?: current.waitingAnimeList.ifEmpty { newEp }
+                    val popular = fallbackData?.popularAnime ?: current.popularAnimeList.ifEmpty { hot }
+                    val jatForYu = randomItems.ifEmpty { fallbackData?.randomAnime ?: hot }
+                    current.copy(
+                        isLoading = false,
+                        errorMessage = null,
+                        sliderItem = fallbackData?.slider?.firstOrNull() ?: current.sliderItem ?: newEp.firstOrNull()?.let { 
+                            com.yuranime.dinz.data.model.SliderItem(
+                                id = it.id,
+                                title = it.title,
+                                image = it.getEffectivePoster(),
+                                synopsis = it.synopsis
+                            )
+                        },
+                        cuplixList = if (cuplixItems.isNotEmpty()) cuplixItems else current.cuplixList,
+                        newEpisodesList = newEp,
+                        hotAnimeList = hot,
+                        newTitlesList = if (newTitles.isNotEmpty()) newTitles else current.newTitlesList,
+                        comicsList = if (comicsItems.isNotEmpty()) comicsItems else current.comicsList,
+                        todayScheduleList = today,
+                        jatForYuList = jatForYu,
+                        waitingAnimeList = waiting,
+                        popularAnimeList = popular
+                    )
+                }
                     }
                 } else {
                     val errorMsg = homeResult.exceptionOrNull()?.localizedMessage ?: "Gagal memuat data"

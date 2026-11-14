@@ -388,7 +388,8 @@ fun HomeScreen(
                         }
 
                         // 7. Section "Jadwal Hari Ini" (2:3 Vertical Cards + Purple Airing Time)
-                        if (uiState.todayScheduleList.isNotEmpty()) {
+                        val displayToday = if (uiState.todayScheduleList.isNotEmpty()) uiState.todayScheduleList else uiState.hotAnimeList
+                        if (displayToday.isNotEmpty()) {
                             item(key = "section_today_schedule") {
                                 Spacer(modifier = Modifier.height(18.dp))
                                 SectionHeader(
@@ -400,7 +401,7 @@ fun HomeScreen(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     items(
-                                        items = uiState.todayScheduleList,
+                                        items = displayToday,
                                         key = { "today_" + (it.id ?: it.hashCode().toString()) }
                                     ) { anime ->
                                         val singleGenre = anime.getDisplayGenre().split(",").firstOrNull()?.trim() ?: "Action"
@@ -416,7 +417,8 @@ fun HomeScreen(
                         }
 
                         // 8. Section "Jat For Yu" (16:9 Landscape Wide Cards)
-                        if (uiState.jatForYuList.isNotEmpty()) {
+                        val displayJat = if (uiState.jatForYuList.isNotEmpty()) uiState.jatForYuList else uiState.hotAnimeList
+                        if (displayJat.isNotEmpty()) {
                             item(key = "section_jat_for_yu") {
                                 Spacer(modifier = Modifier.height(18.dp))
                                 SectionHeader(
@@ -429,7 +431,7 @@ fun HomeScreen(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     items(
-                                        items = uiState.jatForYuList,
+                                        items = displayJat,
                                         key = { "jat_for_yu_" + (it.id ?: it.hashCode().toString()) }
                                     ) { anime ->
                                         AnimeWideCard(
@@ -442,7 +444,8 @@ fun HomeScreen(
                         }
 
                         // 9. Section "Paling Dinanti" (2:3 Vertical Cards + Blue Release Date)
-                        if (uiState.waitingAnimeList.isNotEmpty()) {
+                        val displayWaiting = if (uiState.waitingAnimeList.isNotEmpty()) uiState.waitingAnimeList else uiState.newEpisodesList
+                        if (displayWaiting.isNotEmpty()) {
                             item(key = "section_waiting_anime") {
                                 Spacer(modifier = Modifier.height(18.dp))
                                 SectionHeader(
@@ -455,7 +458,7 @@ fun HomeScreen(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     items(
-                                        items = uiState.waitingAnimeList,
+                                        items = displayWaiting,
                                         key = { "waiting_" + (it.id ?: it.hashCode().toString()) }
                                     ) { anime ->
                                         val singleGenre = anime.getDisplayGenre().split(",").firstOrNull()?.trim() ?: "Action"
@@ -471,7 +474,8 @@ fun HomeScreen(
                         }
 
                         // 10. Section "Paling Populer" (Leaderboard Ranking Cards sesuai referensi)
-                        if (uiState.popularAnimeList.isNotEmpty()) {
+                        val displayPopular = if (uiState.popularAnimeList.isNotEmpty()) uiState.popularAnimeList else uiState.hotAnimeList
+                        if (displayPopular.isNotEmpty()) {
                             item(key = "section_popular_header") {
                                 Spacer(modifier = Modifier.height(20.dp))
                                 SectionHeader(
@@ -481,7 +485,7 @@ fun HomeScreen(
                                 Spacer(modifier = Modifier.height(6.dp))
                             }
 
-                            val topRankItems = uiState.popularAnimeList.take(10)
+                            val topRankItems = displayPopular.take(10)
                             itemsIndexed(
                                 items = topRankItems,
                                 key = { index, anime -> "pop_rank_${index + 1}_${anime.id ?: anime.hashCode()}" }
@@ -498,6 +502,11 @@ fun HomeScreen(
                                     )
                                 }
                             }
+                        }
+
+                        // Bottom Spacer agar konten paling bawah tidak tertutup Floating Bottom Navbar
+                        item(key = "section_home_bottom_spacer") {
+                            Spacer(modifier = Modifier.height(130.dp))
                         }
                     }
                 }

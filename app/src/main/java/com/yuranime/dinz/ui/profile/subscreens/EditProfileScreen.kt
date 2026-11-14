@@ -657,8 +657,8 @@ fun EditProfileScreen(
                     }
                 }
 
-                // Grid 2 Kolom untuk Border Avatar (Tampilkan 60 item pertama bertahap)
-                val displayList = remember(sortedBorders) { sortedBorders.take(60) }
+                // Grid 2 Kolom untuk Border Avatar (Tampilkan seluruh item)
+                val displayList = sortedBorders
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     val chunked = displayList.chunked(2)
                     chunked.forEach { pair ->
@@ -745,7 +745,7 @@ fun EditProfileScreen(
                     }
                 }
 
-                val displayList = remember(sortedEffects) { sortedEffects.take(60) }
+                val displayList = sortedEffects
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     val chunked = displayList.chunked(2)
                     chunked.forEach { pair ->
@@ -1142,7 +1142,7 @@ private fun EditCosmeticCard(
                     isOwned -> "Pasang"
                     tier == "C" -> "🔒 Redeem"
                     tier == "B" -> "🔒 Lv. $requiredLevel"
-                    else -> "🔒 ✦ $pointCost"
+                    else -> "🔒 $pointCost Poin"
                 },
                 color = when {
                     isEquipped -> Color.White

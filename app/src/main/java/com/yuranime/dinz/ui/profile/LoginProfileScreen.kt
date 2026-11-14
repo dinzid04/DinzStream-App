@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -56,11 +57,16 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Bookmarks
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.Diamond
 import androidx.compose.material.icons.outlined.DownloadForOffline
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.KeyboardDoubleArrowUp
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.CircularProgressIndicator
@@ -68,6 +74,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -120,6 +127,7 @@ import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
 import com.yuranime.dinz.ui.components.EmptyTitleSlotBadge
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.NavTab
+import com.yuranime.dinz.ui.components.PrimoPointIcon
 import com.yuranime.dinz.ui.components.StatusMicroTitleTagRow
 import com.yuranime.dinz.ui.components.liquidGlassBackdrop
 import com.yuranime.dinz.ui.leaderboard.LeaderboardScreen
@@ -127,6 +135,7 @@ import com.yuranime.dinz.ui.profile.subscreens.DownloadsScreen
 import com.yuranime.dinz.ui.profile.subscreens.EditProfileScreen
 import com.yuranime.dinz.ui.profile.subscreens.PointsRewardsScreen
 import com.yuranime.dinz.ui.profile.subscreens.SettingsScreen
+import com.yuranime.dinz.ui.profile.subscreens.ShopScreen
 import com.yuranime.dinz.ui.theme.JakartaSansFontFamily
 import com.yuranime.dinz.ui.theme.JetBrainsMonoFontFamily
 import com.yuranime.dinz.ui.theme.OutfitDisplayFontFamily
@@ -138,6 +147,7 @@ enum class ProfileSubScreen {
     EDIT_PROFILE,
     LEADERBOARD,
     POINTS_REWARDS,
+    SHOP,
     DOWNLOADS,
     COLLECTION_HISTORY,
     SETTINGS
@@ -295,6 +305,12 @@ fun LoginProfileScreen(
                     onBackClick = { currentSubScreen = ProfileSubScreen.MAIN }
                 )
             }
+            ProfileSubScreen.SHOP -> {
+                ShopScreen(
+                    onBack = { currentSubScreen = ProfileSubScreen.MAIN },
+                    onNavigateToRewards = { currentSubScreen = ProfileSubScreen.POINTS_REWARDS }
+                )
+            }
             ProfileSubScreen.DOWNLOADS -> {
                 DownloadsScreen(
                     onBackClick = { currentSubScreen = ProfileSubScreen.MAIN },
@@ -366,6 +382,7 @@ fun LoginProfileScreen(
                             onEditProfileClick = { currentSubScreen = ProfileSubScreen.EDIT_PROFILE },
                             onOpenLeaderboardClick = { currentSubScreen = ProfileSubScreen.LEADERBOARD },
                             onOpenPointsRewardsClick = { currentSubScreen = ProfileSubScreen.POINTS_REWARDS },
+                            onOpenShopClick = { currentSubScreen = ProfileSubScreen.SHOP },
                             onOpenTitleSlotClick = { showTitlePickerDialog = true },
                             onOpenDownloadsClick = { currentSubScreen = ProfileSubScreen.DOWNLOADS },
                             onOpenCollectionHistoryClick = { currentSubScreen = ProfileSubScreen.COLLECTION_HISTORY },
@@ -410,6 +427,7 @@ private fun UserProfileView(
     onEditProfileClick: () -> Unit,
     onOpenLeaderboardClick: () -> Unit,
     onOpenPointsRewardsClick: () -> Unit,
+    onOpenShopClick: () -> Unit,
     onOpenTitleSlotClick: () -> Unit,
     onOpenDownloadsClick: () -> Unit,
     onOpenCollectionHistoryClick: () -> Unit,
@@ -464,18 +482,19 @@ private fun UserProfileView(
             .background(Color(0xFF0B0B0B))
             .verticalScroll(rememberScrollState())
             .navigationBarsPadding()
-            .padding(bottom = 120.dp)
+            .padding(bottom = 125.dp)
     ) {
-        // 1. HEADER BANNER (195.dp edge-to-edge) + AVATAR KIRI (86.dp overlap separuh) + 3 TOMBOL IKON KANAN ATAS
+        // 1. HEADER BANNER + PROFILE EFFECT LOOPING 380.dp (TANPA CLIPPING) + AVATAR 84.dp & BORDER 102.dp
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(238.dp)
+                .height(380.dp)
         ) {
+            // Layer Background Banner: 270.dp
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(195.dp)
+                    .height(270.dp)
                     .align(Alignment.TopCenter)
             ) {
                 if (bannerUrl.isNotBlank()) {
@@ -503,34 +522,23 @@ private fun UserProfileView(
                     )
                 }
 
-                // Render Profile Effect Di Atas Banner (Jika Ada)
-                if (equippedProfileEffectUrl.isNotBlank()) {
-                    AnimatedCosmeticImage(
-                        url = equippedProfileEffectUrl,
-                        isAnimated = cosmeticAnimate,
-                        contentDescription = "Profile Effect",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
-                // Gradasi Bawah (Smooth Dark Vignette memudar mulus ke #0B0B0B)
+                // Gradasi Bawah memudar lembut ke #0B0B0B
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
                                 colorStops = arrayOf(
-                                    0.0f to Color(0x330B0B0B),
-                                    0.52f to Color(0x660B0B0B),
-                                    0.85f to Color(0xD90B0B0B),
+                                    0.0f to Color(0x220B0B0B),
+                                    0.55f to Color(0x660B0B0B),
+                                    0.88f to Color(0xD90B0B0B),
                                     1.0f to Color(0xFF0B0B0B)
                                 )
                             )
                         )
                 )
 
-                // 3 Tombol Ikon Bulat Minimalis di Pojok Kanan Atas (size = 36.dp, latar #730B0B0B tanpa border tebal)
+                // 3 Tombol Ikon Bulat Minimalis di Pojok Kanan Atas
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -568,18 +576,29 @@ private fun UserProfileView(
                 }
             }
 
-            // 2. Avatar Kiri Presisi 100% Pas: Foto Profil 82.dp + Discord Border 100.dp (TANPA Cincin EXP Bertabrakan!)
+            // Profile Effect Looping APNG/WebP 60 FPS (Fills 380.dp Box TANPA Clipping)
+            if (equippedProfileEffectUrl.isNotBlank()) {
+                AnimatedCosmeticImage(
+                    url = equippedProfileEffectUrl,
+                    isAnimated = cosmeticAnimate,
+                    contentDescription = "Profile Effect",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            // Layer Avatar: Bulat 84.dp + Border 102.dp (TANPA Cincin EXP!)
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = 20.dp)
-                    .size(100.dp),
+                    .padding(start = 20.dp, bottom = 8.dp)
+                    .size(102.dp),
                 contentAlignment = Alignment.Center
             ) {
-                // Layer Foto Profil Bulat: 82.dp
+                // Layer Foto Profil Bulat: 84.dp
                 Box(
                     modifier = Modifier
-                        .size(82.dp)
+                        .size(84.dp)
                         .clip(CircleShape)
                         .background(Color(0xFF161820))
                         .clickable { if (!isPublicPreviewMode) onEditProfileClick() },
@@ -598,20 +617,20 @@ private fun UserProfileView(
                         Text(
                             text = displayName.take(1).uppercase(),
                             color = Color.White,
-                            fontSize = 28.sp,
+                            fontSize = 30.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = SfProFontFamily
                         )
                     }
                 }
 
-                // Layer Border Avatar Asli (discord_assets): 100.dp tepat konsentris di Alignment.Center
+                // Layer Border Avatar Asli (discord_assets): 102.dp tepat konsentris di Alignment.Center
                 if (resolvedBorderUrl.isNotBlank()) {
                     AnimatedCosmeticImage(
                         url = DiscordCosmeticsRepository.getOptimizedUrl(resolvedBorderUrl, size = 240, animated = cosmeticAnimate),
                         isAnimated = cosmeticAnimate,
                         contentDescription = "Avatar Border",
-                        modifier = Modifier.size(100.dp)
+                        modifier = Modifier.size(102.dp)
                     )
                 }
             }
@@ -655,86 +674,172 @@ private fun UserProfileView(
             }
         }
 
-        // 2B. IDENTITAS PENGGUNA TEPAT DI BAWAH AVATAR (Rata Kiri, Tanpa Kotak Overlay)
+        // 2. IDENTITAS PENGGUNA BERSIH (Rata Kiri, Ikon Outline Mail & Calendar, Tanpa Kotak Overlay)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
                 .padding(top = 10.dp)
         ) {
-            // Baris 1: Username (Outfit Bold 22.sp) + #ID unik 4 digit (JetBrains Mono 15.sp)
+            // Baris 1: Username (SF Pro Bold 24.sp) + #ID unik (SF Pro 15.sp)
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = displayName,
                     color = Color.White,
-                    fontSize = 22.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = OutfitDisplayFontFamily,
+                    fontFamily = SfProFontFamily,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.alignByBaseline()
                 )
-                Spacer(modifier = Modifier.width(7.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "#$userTag",
                     color = Color(0xFF64748B),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
-                    fontFamily = JetBrainsMonoFontFamily,
+                    fontFamily = SfProFontFamily,
                     modifier = Modifier.alignByBaseline()
                 )
             }
 
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(5.dp))
 
-            // Baris 2: Email asli akun pengguna (Jakarta Sans 13.sp)
-            Text(
-                text = email,
-                color = Color(0xFFCBD5E1),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Normal,
-                fontFamily = JakartaSansFontFamily,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            // Baris 2: Email dengan Ikon Outline Envelope
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.Email,
+                    contentDescription = null,
+                    tint = Color(0xFF94A3B8),
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = email,
+                    color = Color(0xFFCBD5E1),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Normal,
+                    fontFamily = SfProFontFamily,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
 
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // Baris 3: Tanggal Bergabung Asli (Jakarta Sans 12.sp)
-            Text(
-                text = "Bergabung sejak $joinDate",
-                color = Color(0xFF64748B),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Normal,
-                fontFamily = JakartaSansFontFamily
-            )
+            // Baris 3: Tanggal Bergabung dengan Ikon Outline Calendar
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.CalendarToday,
+                    contentDescription = null,
+                    tint = Color(0xFF64748B),
+                    modifier = Modifier.size(13.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Bergabung sejak $joinDate",
+                    color = Color(0xFF64748B),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal,
+                    fontFamily = SfProFontFamily
+                )
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Baris 4: Bio pengguna dari database (Jakarta Sans 13.5.sp)
+            // Baris 4: Bio Pengguna
             Text(
                 text = bio,
                 color = Color(0xFFE2E8F0),
                 fontSize = 13.5.sp,
                 fontWeight = FontWeight.Normal,
-                fontFamily = JakartaSansFontFamily,
+                fontFamily = SfProFontFamily,
                 lineHeight = 19.sp
             )
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 3A. BARIS MICRO-TITLE TAGS (Role Chamfered Tag, Level Chevron Hex Tag, Level Class Tag)
-            StatusMicroTitleTagRow(
-                role = role,
-                level = level,
-                rankClassTitle = rankTitle
-            )
+            // Baris 5: Status Row (MEMBER | LV. X | RANK TITLE) - Bersih Tanpa Polygon/Card Box Overlay
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.WorkspacePremium,
+                        contentDescription = null,
+                        tint = Color(0xFFFF5722),
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = role.uppercase(),
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+                VerticalDivider(
+                    modifier = Modifier.height(12.dp),
+                    thickness = 1.dp,
+                    color = Color(0xFF262934)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.KeyboardDoubleArrowUp,
+                        contentDescription = null,
+                        tint = Color(0xFF38BDF8),
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = "LV. $level",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+                VerticalDivider(
+                    modifier = Modifier.height(12.dp),
+                    thickness = 1.dp,
+                    color = Color(0xFF262934)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.Diamond,
+                        contentDescription = null,
+                        tint = Color(0xFFE11D48),
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = rankTitle.uppercase(),
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 3B. SLOT CUSTOM TITLE BADGE (Tepat di Bawah Baris Pill)
+            // Baris 6: Slot Custom Title Badge
             if (equippedTitle.isNotBlank()) {
                 GeometricTitleBadge(
                     titleName = equippedTitle,
@@ -750,7 +855,7 @@ private fun UserProfileView(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 3C. FULL-WIDTH EXP BAR
+            // Baris 7: Full-Width EXP Bar Sans-Serif Bold (NO slashed zero!)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -761,14 +866,14 @@ private fun UserProfileView(
                     color = Color.White,
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = OutfitDisplayFontFamily
+                    fontFamily = SfProFontFamily
                 )
                 Text(
                     text = "${FirebaseManager.formatNumber(exp)} / ${FirebaseManager.formatNumber(nextTargetExp)}",
                     color = Color.White,
                     fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = JetBrainsMonoFontFamily
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily
                 )
             }
 
@@ -795,17 +900,106 @@ private fun UserProfileView(
             }
         }
 
-        Spacer(modifier = Modifier.height(22.dp))
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // 3. 2-KOLOM DIVIDER PAPAN PERINGKAT & POINTS & REWARDS (Dibatasi Divider 0.5.dp #1E222B, Tanpa Card Box)
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            thickness = 0.5.dp,
+            color = Color(0xFF1E222B)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .height(IntrinsicSize.Min),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Kolom Kiri: Papan Peringkat
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onOpenLeaderboardClick() }
+                    .padding(vertical = 14.dp, horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.EmojiEvents,
+                    contentDescription = "Papan Peringkat",
+                    tint = Color(0xFFFF5722),
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "Papan Peringkat",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily,
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (userRankNumber != null) "Rank #$userRankNumber • TOP 100" else "TOP 100 Global",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 11.5.sp,
+                        fontFamily = SfProFontFamily,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            VerticalDivider(
+                modifier = Modifier.fillMaxHeight(),
+                thickness = 0.5.dp,
+                color = Color(0xFF1E222B)
+            )
+
+            // Kolom Kanan: Points & Rewards (dengan PrimoPointIcon)
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onOpenPointsRewardsClick() }
+                    .padding(vertical = 14.dp, horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                PrimoPointIcon(size = 22.dp)
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "Points & Rewards",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily,
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "${FirebaseManager.formatNumber(points)} Poin",
+                        color = Color(0xFFE11D48),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = SfProFontFamily,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
 
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 20.dp),
             thickness = 0.5.dp,
-            color = Color(0xFF1A1D26)
+            color = Color(0xFF1E222B)
         )
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // 4. AREA MENU DI BAWAH EXP BAR (Bersih, Mengalir di atas #0B0B0B, Tanpa Kebanyakan Kotak Overlay)
+        // 4. CLEAN BOTTOM MENU LIST (Termasuk "Shop Kosmetik" Baru)
         if (isPublicPreviewMode) {
             PublicProfileShowcaseSection(
                 authDb = authDb,
@@ -813,38 +1007,18 @@ private fun UserProfileView(
                 points = points
             )
         } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                SleekHighlightFeatureCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Papan Peringkat",
-                    subtitle = if (userRankNumber != null) "Rank #$userRankNumber • TOP 100" else "TOP 100 Global",
-                    accentColor = Color(0xFFFF5722),
-                    icon = Icons.Outlined.EmojiEvents,
-                    onClick = onOpenLeaderboardClick
-                )
-
-                SleekHighlightFeatureCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Points & Rewards",
-                    subtitle = "✦ ${FirebaseManager.formatNumber(points)} Poin",
-                    accentColor = Color(0xFFE11D48),
-                    icon = Icons.Outlined.WorkspacePremium,
-                    onClick = onOpenPointsRewardsClick
-                )
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
             ) {
+                CleanEditorialNavRow(
+                    icon = Icons.Outlined.Storefront,
+                    title = "Shop Kosmetik",
+                    subtitle = "Koleksi 985 border, 396 efek & custom title",
+                    onClick = onOpenShopClick
+                )
+
                 HorizontalDivider(thickness = 0.5.dp, color = Color(0xFF1A1D26))
 
                 CleanEditorialNavRow(
@@ -885,6 +1059,9 @@ private fun UserProfileView(
                 )
 
                 HorizontalDivider(thickness = 0.5.dp, color = Color(0xFF1A1D26))
+
+                // Spacer ekstra agar tombol "Keluar Akun" tidak tertutup LiquidGlassNavbar
+                Spacer(modifier = Modifier.height(130.dp))
             }
         }
     }

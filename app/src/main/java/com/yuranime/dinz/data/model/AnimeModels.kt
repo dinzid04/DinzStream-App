@@ -42,7 +42,8 @@ data class AnimeHomeData(
     @SerializedName("fyp") val fypAnime: List<AnimeItem>? = null,
     @SerializedName("waiting") val waitingAnime: List<AnimeItem>? = null,
     @SerializedName("popular") val popularAnime: List<AnimeItem>? = null,
-    @SerializedName("movie") val movies: List<AnimeItem>? = null
+    @SerializedName("movie") val movies: List<AnimeItem>? = null,
+    @SerializedName("random") val randomAnime: List<AnimeItem>? = null
 )
 
 data class SliderItem(

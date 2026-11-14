@@ -74,7 +74,7 @@ object ApiClient {
                 cleanText = cleanText.substring(firstBrace)
             } else if (firstBrace < 0 && (cleanText.startsWith("<") || cleanText.isBlank())) {
                 // Server mengembalikan HTML error page / Cloudflare challenge
-                cleanText = "{\"status\":\"error\",\"message\":\"Server sedang sibuk, memuat data fallback...\",\"data\":{}}"
+                cleanText = "{\"status\": 500, \"error\": true, \"message\":\"Server sedang sibuk, memuat data fallback...\",\"data\":{}}"
             }
 
             val newBody = cleanText.toResponseBody(contentType)

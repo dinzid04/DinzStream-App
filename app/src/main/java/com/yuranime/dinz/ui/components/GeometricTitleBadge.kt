@@ -248,64 +248,84 @@ fun GeometricTitleBadge(
 
                 drawPath(path = wingPath, brush = wingFillBrush)
 
-                // Render 8 Variasi Animasi di Latar & Border Sayap
-                when (resolvedAnimType) {
-                    TitleAnimationType.HOLOGRAPHIC_FOIL -> {
-                        val sweepX = wingStartX + (wingEndX - wingStartX + 40.dp.toPx()) * phase - 20.dp.toPx()
-                        drawLine(
-                            brush = Brush.verticalGradient(
-                                listOf(
-                                    Color.Transparent,
-                                    Color(0x66A5F3FC),
-                                    Color(0x66F472B6),
-                                    Color.Transparent
-                                )
-                            ),
-                            start = Offset(sweepX, wingTopY),
-                            end = Offset(sweepX - 10.dp.toPx(), wingBottomY),
-                            strokeWidth = 10.dp.toPx()
-                        )
-                    }
-                    TitleAnimationType.LIQUID_GOLD_WAVE -> {
-                        val waveX = wingStartX + (wingEndX - wingStartX) * phase
-                        drawLine(
-                            brush = Brush.verticalGradient(
-                                listOf(
-                                    Color.Transparent,
-                                    palette.highlightLine.copy(alpha = 0.55f),
-                                    Color.Transparent
-                                )
-                            ),
-                            start = Offset(waveX, wingTopY),
-                            end = Offset(waveX - 7.dp.toPx(), wingBottomY),
-                            strokeWidth = 7.dp.toPx()
-                        )
-                    }
-                    TitleAnimationType.CRIMSON_EMBER_DRIFT -> {
-                        for (i in 0..3) {
-                            val pLocal = (phase + i * 0.25f) % 1f
-                            val ex = wingStartX + (wingEndX - wingStartX - 18.dp.toPx()) * ((i * 0.27f + 0.12f) % 1f)
-                            val ey = wingBottomY - wingHeight * pLocal
-                            drawCircle(
-                                color = palette.highlightLine.copy(alpha = (1f - pLocal) * 0.65f),
-                                radius = 1.3.dp.toPx(),
-                                center = Offset(ex, ey)
+                // Render 8 Variasi Animasi di Latar Sayap (Terkunci Sempurna di Dalam clipPath)
+                clipPath(wingPath) {
+                    when (resolvedAnimType) {
+                        TitleAnimationType.HOLOGRAPHIC_FOIL -> {
+                            val sweepX = wingStartX + (wingEndX - wingStartX + 40.dp.toPx()) * phase - 20.dp.toPx()
+                            drawLine(
+                                brush = Brush.verticalGradient(
+                                    listOf(
+                                        Color.Transparent,
+                                        Color(0x66A5F3FC),
+                                        Color(0x66F472B6),
+                                        Color.Transparent
+                                    )
+                                ),
+                                start = Offset(sweepX, wingTopY),
+                                end = Offset(sweepX - 10.dp.toPx(), wingBottomY),
+                                strokeWidth = 10.dp.toPx()
                             )
                         }
-                    }
-                    TitleAnimationType.STARLIGHT_TWINKLE -> {
-                        for (i in 0..3) {
-                            val alpha = (0.2f + 0.7f * sin((phase * 2 * Math.PI + i * 1.5).toFloat()).let { (it + 1f) / 2f })
-                            val sx = wingStartX + (wingEndX - wingStartX - 16.dp.toPx()) * (0.18f + i * 0.22f)
-                            val sy = if (i % 2 == 0) wingTopY + wingHeight * 0.28f else wingBottomY - wingHeight * 0.28f
-                            drawCircle(
-                                color = palette.highlightLine.copy(alpha = alpha * 0.75f),
-                                radius = 1.2.dp.toPx(),
-                                center = Offset(sx, sy)
+                        TitleAnimationType.LIQUID_GOLD_WAVE -> {
+                            val waveX = wingStartX + (wingEndX - wingStartX) * phase
+                            drawLine(
+                                brush = Brush.verticalGradient(
+                                    listOf(
+                                        Color.Transparent,
+                                        palette.highlightLine.copy(alpha = 0.55f),
+                                        Color.Transparent
+                                    )
+                                ),
+                                start = Offset(waveX, wingTopY),
+                                end = Offset(waveX - 7.dp.toPx(), wingBottomY),
+                                strokeWidth = 7.dp.toPx()
                             )
                         }
+                        TitleAnimationType.CRIMSON_EMBER_DRIFT -> {
+                            for (i in 0..3) {
+                                val pLocal = (phase + i * 0.25f) % 1f
+                                val ex = wingStartX + (wingEndX - wingStartX - 18.dp.toPx()) * ((i * 0.27f + 0.12f) % 1f)
+                                val ey = wingBottomY - wingHeight * pLocal
+                                drawCircle(
+                                    color = palette.highlightLine.copy(alpha = (1f - pLocal) * 0.65f),
+                                    radius = 1.3.dp.toPx(),
+                                    center = Offset(ex, ey)
+                                )
+                            }
+                        }
+                        TitleAnimationType.STARLIGHT_TWINKLE -> {
+                            for (i in 0..3) {
+                                val alpha = (0.2f + 0.7f * sin((phase * 2 * Math.PI + i * 1.5).toFloat()).let { (it + 1f) / 2f })
+                                val sx = wingStartX + (wingEndX - wingStartX - 16.dp.toPx()) * (0.18f + i * 0.22f)
+                                val sy = if (i % 2 == 0) wingTopY + wingHeight * 0.28f else wingBottomY - wingHeight * 0.28f
+                                drawCircle(
+                                    color = palette.highlightLine.copy(alpha = alpha * 0.75f),
+                                    radius = 1.2.dp.toPx(),
+                                    center = Offset(sx, sy)
+                                )
+                            }
+                        }
+                        else -> Unit
                     }
-                    else -> Unit
+
+                    if (resolvedAnimType == TitleAnimationType.LIGHTNING_ARC_SWEEP && phase < 0.35f) {
+                        val lx = wingStartX + (wingEndX - wingStartX) * (phase / 0.35f)
+                        drawLine(
+                            color = palette.highlightLine.copy(alpha = 0.85f),
+                            start = Offset(lx, wingTopY),
+                            end = Offset(lx - 4.dp.toPx(), cy),
+                            strokeWidth = 1.3.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                        drawLine(
+                            color = palette.highlightLine.copy(alpha = 0.85f),
+                            start = Offset(lx - 4.dp.toPx(), cy),
+                            end = Offset(lx + 2.dp.toPx(), wingBottomY),
+                            strokeWidth = 1.3.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                    }
                 }
 
                 val borderAlpha = if (resolvedAnimType == TitleAnimationType.CYBER_PULSE_GLOW) {
@@ -347,24 +367,6 @@ fun GeometricTitleBadge(
                     strokeWidth = 1.dp.toPx(),
                     cap = StrokeCap.Round
                 )
-
-                if (resolvedAnimType == TitleAnimationType.LIGHTNING_ARC_SWEEP && phase < 0.35f) {
-                    val lx = wingStartX + (wingEndX - wingStartX) * (phase / 0.35f)
-                    drawLine(
-                        color = palette.highlightLine.copy(alpha = 0.85f),
-                        start = Offset(lx, wingTopY),
-                        end = Offset(lx - 4.dp.toPx(), cy),
-                        strokeWidth = 1.3.dp.toPx(),
-                        cap = StrokeCap.Round
-                    )
-                    drawLine(
-                        color = palette.highlightLine.copy(alpha = 0.85f),
-                        start = Offset(lx - 4.dp.toPx(), cy),
-                        end = Offset(lx + 2.dp.toPx(), wingBottomY),
-                        strokeWidth = 1.3.dp.toPx(),
-                        cap = StrokeCap.Round
-                    )
-                }
 
                 // 2. Emblem Heksagon Kiri Berlapis
                 fun buildHexagonPath(cx: Float, centerY: Float, radius: Float): Path {
