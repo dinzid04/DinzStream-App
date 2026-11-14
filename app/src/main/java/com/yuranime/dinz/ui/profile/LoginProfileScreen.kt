@@ -1,6 +1,7 @@
 package com.yuranime.dinz.ui.profile
 
 import android.app.Activity
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -124,6 +125,7 @@ import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.ui.components.BottomNavBar
 import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
 import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
+import com.yuranime.dinz.ui.components.ApngAnimationView
 import com.yuranime.dinz.ui.components.EmptyTitleSlotBadge
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.NavTab
@@ -476,14 +478,29 @@ private fun UserProfileView(
         label = "profileExpSpring"
     )
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFF0B0B0B))
-            .verticalScroll(rememberScrollState())
-            .navigationBarsPadding()
-            .padding(bottom = 125.dp)
     ) {
+        // Full-Screen Profile Effect 60 FPS Looping (Root Overlay - Penuh Layar Tanpa Terpotong Banner)
+        if (equippedProfileEffectUrl.isNotBlank() && cosmeticAnimate) {
+            ApngAnimationView(
+                url = equippedProfileEffectUrl,
+                scaleType = ImageView.ScaleType.FIT_TOP,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(bottom = 125.dp)
+        ) {
         // 1. HEADER BANNER + PROFILE EFFECT LOOPING 380.dp (TANPA CLIPPING) + AVATAR 84.dp & BORDER 102.dp
         Box(
             modifier = Modifier
@@ -576,16 +593,7 @@ private fun UserProfileView(
                 }
             }
 
-            // Profile Effect Looping APNG/WebP 60 FPS (Fills 380.dp Box TANPA Clipping)
-            if (equippedProfileEffectUrl.isNotBlank()) {
-                AnimatedCosmeticImage(
-                    url = equippedProfileEffectUrl,
-                    isAnimated = cosmeticAnimate,
-                    contentDescription = "Profile Effect",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+
 
             // Layer Avatar: Bulat 84.dp + Border 102.dp (TANPA Cincin EXP!)
             Box(
@@ -1064,6 +1072,7 @@ private fun UserProfileView(
                 Spacer(modifier = Modifier.height(130.dp))
             }
         }
+    }
     }
 }
 

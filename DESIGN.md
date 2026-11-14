@@ -1431,3 +1431,22 @@ Mengacu pada tata letak referensi `WA_1794546770520.jpg` (`1002213252.jpg`) deng
 1. Menjamin seluruh section bawah (`Jadwal Hari Ini`, `Jat For Yu`, `Paling Dinanti`, `Paling Populer`) selalu terisi dan dirender 100% tanpa pernah terhenti di `Komik Terbaru`.
 2. Semua instance `Gson` diset lenient dan response sanitizer OkHttp membersihkan payload response.
 
+### G. Overhaul Visual Shop Kosmetik (`ShopScreen`), APNG Engine Hardware-Accelerated, & Full-Screen Profile Effect
+1. **Visual Overhaul ShopScreen (Referensi `1000127784_2.png`):**
+   - Hapus semua elemen slop: hilangkan chip filter baris atas, hilangkan badge starter biru / tier label pada kartu, ganti tombol hijau toska menjadi Crimson Red `#E11D48` (atau `#1E202B` ber-border merah tipis untuk status `Terpasang`).
+   - Single surface clean card: permukaan kartu utuh `Color(0xFF12131A)`, rounded 20.dp, padding 14.dp tanpa double box/inner black overlay.
+   - Mockup HP Vertikal 9:16 (82.dp x 145.dp) untuk Profile Effect dengan notch bar minimalis dan gambar efek statis mengisi mockup + mini avatar di tengah.
+   - Avatar Decoration card: foto bulat 76.dp dengan border 94.dp konsentris tepat di tengah.
+   - Search Bar: `BasicTextField` dalam row 46.dp dengan placeholder `"Cari efek profil atau dekorasi..."` rata tengah vertikal tanpa pernah terpotong.
+   - Header kanan atas: `PrimoPointIcon` 24.dp dengan teks poin 15.sp Bold, sapuan cahaya crimson glow radial + siluet logo monochrome 130.dp (miring -15f).
+2. **APNG Engine Hardware-Accelerated (`ApngAnimationView.kt`):**
+   - Menggunakan `com.github.penfeizhou.android.animation:apng:3.0.2` (`APNGDrawable`) dengan disk cache instan `context.cacheDir/apng_cache/` via OkHttpClient.
+   - Infinite 60 FPS looping (`setLoopLimit(0)` + `start()`), mendukung single layer dan stacked layer (`ApngStackedEffectView`).
+   - Loading indicator halus `"Memuat animasi efek..."` pada preview modal sheet.
+3. **Full-Screen Profile Effect di ProfileScreen (`LoginProfileScreen.kt`):**
+   - Dikeluarkan dari dalam banner box, dipasang langsung pada root `Box(modifier = Modifier.fillMaxSize())` sebagai full-screen looping overlay (`scaleType = FIT_TOP`) sehingga menyelimuti profil penuh tanpa terpotong banner.
+4. **Owned-Only Filter di EditProfileScreen (`EditProfileScreen.kt`):**
+   - Tab Avatar Decoration dan Profile Effect di Edit Profil hanya menampilkan item yang SUDAH dimiliki pengguna (`unlockedBorders` / `unlockedEffects` / equipped).
+   - Menampilkan empty state elegan *"Belum ada koleksi. Dapatkan di Shop Kosmetik"* jika belum ada kosmetik yang dimiliki.
+
+

@@ -30,7 +30,34 @@ object DiscordCosmeticsRepository {
         @SerializedName("icon") val icon: String?,
         @SerializedName("animated_icon") val animatedIcon: String?,
         @SerializedName("label") val label: String?,
-        @SerializedName("accessibility_label") val accessibilityLabel: String?
+        @SerializedName("accessibility_label") val accessibilityLabel: String?,
+        @SerializedName("bakedCardUrl") val bakedCardUrl: String?
+    )
+
+    private data class CatalogLayerDto(
+        @SerializedName("src") val src: String?,
+        @SerializedName("loop") val loop: Boolean?,
+        @SerializedName("zIndex") val zIndex: Int?
+    )
+
+    private data class CatalogEffectDto(
+        @SerializedName("id") val id: String?,
+        @SerializedName("title") val title: String?,
+        @SerializedName("description") val description: String?,
+        @SerializedName("accessibilityLabel") val accessibilityLabel: String?,
+        @SerializedName("staticFrameSrc") val staticFrameSrc: String?,
+        @SerializedName("thumbnailPreviewSrc") val thumbnailPreviewSrc: String?,
+        @SerializedName("reducedMotionSrc") val reducedMotionSrc: String?,
+        @SerializedName("layers") val layers: List<CatalogLayerDto>?
+    )
+
+    private data class CatalogCollectionDto(
+        @SerializedName("category") val category: String?,
+        @SerializedName("effects") val effects: List<CatalogEffectDto>?
+    )
+
+    private data class CatalogRootDto(
+        @SerializedName("collections") val collections: List<CatalogCollectionDto>?
     )
 
     @Volatile
@@ -79,7 +106,6 @@ object DiscordCosmeticsRepository {
 
                             when {
                                 index < starterEnd -> {
-                                    // Starter Tier: 500 - 1.500 Poin, Level 1
                                     val cost = 500L + ((index % 11) * 100L)
                                     BorderDefinition(
                                         id = resolvedId,
@@ -94,7 +120,6 @@ object DiscordCosmeticsRepository {
                                     )
                                 }
                                 index < highEnd -> {
-                                    // Standard & High Tier: 3.500 - 25.000 Poin, Wajib Level 35
                                     val cost = 3500L + ((index % 44) * 500L)
                                     BorderDefinition(
                                         id = resolvedId,
@@ -109,7 +134,6 @@ object DiscordCosmeticsRepository {
                                     )
                                 }
                                 else -> {
-                                    // Mythic / Limited Tier: Redeem Code Only
                                     BorderDefinition(
                                         id = resolvedId,
                                         name = resolvedName,
@@ -135,8 +159,32 @@ object DiscordCosmeticsRepository {
         }
     }
 
+    private fun loadCatalogEffects(context: Context): Map<String, CatalogEffectDto> {
+        val map = mutableMapOf<String, CatalogEffectDto>()
+        try {
+            context.assets.open("discord_assets/discord_profile_effects_catalog.json").use { stream ->
+                InputStreamReader(stream, Charsets.UTF_8).use { reader ->
+                    val root = gson.fromJson(reader, CatalogRootDto::class.java)
+                    root?.collections?.forEach { col ->
+                        col.effects?.forEach { eff ->
+                            eff.id?.takeIf { it.isNotBlank() }?.let { id ->
+                                map[id] = eff
+                            }
+                            eff.title?.takeIf { it.isNotBlank() }?.let { title ->
+                                map[title.trim().lowercase()] = eff
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return map
+    }
+
     /**
-     * Membaca dan mem-parse seluruh 396 Profile Effects Discord asli dari asset JSON
+     * Membaca dan mem-parse seluruh Profile Effects Discord asli dari asset JSON (396 lengkap + catalog)
      */
     fun getAllProfileEffects(context: Context): List<ProfileEffectDefinition> {
         cachedEffects?.let { return it }
@@ -145,6 +193,8 @@ object DiscordCosmeticsRepository {
             cachedEffects?.let { return it }
 
             return try {
+                val catalogMap = loadCatalogEffects(context)
+
                 context.assets.open("discord_assets/discord_profile_effects_complete_396.json").use { stream ->
                     InputStreamReader(stream, Charsets.UTF_8).use { reader ->
                         val itemType = object : com.google.gson.reflect.TypeToken<List<RawDiscordEffectDto>>() {}.type
@@ -159,9 +209,30 @@ object DiscordCosmeticsRepository {
                                 ?: raw.uuid
                                 ?: "effect_$index"
                             val resolvedName = raw.name?.takeIf { it.isNotBlank() } ?: "Profile Effect #$index"
-                            val animUrl = raw.animatedIcon?.takeIf { it.isNotBlank() }
+
+                            val catalogItem = (raw.id?.let { catalogMap[it] })
+                                ?: (raw.name?.let { catalogMap[it.trim().lowercase()] })
+
+                            val staticUrl = catalogItem?.thumbnailPreviewSrc?.takeIf { it.isNotBlank() }
+                                ?: catalogItem?.reducedMotionSrc?.takeIf { it.isNotBlank() }
+                                ?: catalogItem?.staticFrameSrc?.takeIf { it.isNotBlank() }
+                                ?: raw.icon?.takeIf { it.isNotBlank() }
+                                ?: raw.bakedCardUrl?.takeIf { it.isNotBlank() }
+                                ?: raw.animatedIcon.orEmpty()
+
+                            val catalogLoopLayer = catalogItem?.layers?.firstOrNull { it.loop == true }?.src
+                                ?: catalogItem?.layers?.lastOrNull()?.src
+                            val animUrl = catalogLoopLayer?.takeIf { it.isNotBlank() }
+                                ?: raw.animatedIcon?.takeIf { it.isNotBlank() }
                                 ?: raw.icon.orEmpty()
+
+                            val layerUrls = catalogItem?.layers?.mapNotNull { it.src?.takeIf { s -> s.isNotBlank() } }
+                                ?.ifEmpty { listOf(animUrl).filter { it.isNotBlank() } }
+                                ?: listOf(animUrl).filter { it.isNotBlank() }
+
                             val desc = raw.accessibilityLabel?.takeIf { it.isNotBlank() }
+                                ?: catalogItem?.accessibilityLabel?.takeIf { it.isNotBlank() }
+                                ?: catalogItem?.description?.takeIf { it.isNotBlank() }
                                 ?: raw.label?.takeIf { it.isNotBlank() }
                                 ?: raw.category?.takeIf { it.isNotBlank() }
                                 ?: "Efek Animasi Profil Discord Premium"
@@ -180,7 +251,9 @@ object DiscordCosmeticsRepository {
                                         description = desc,
                                         tier = "A",
                                         requiredLevel = 1,
-                                        category = category
+                                        category = category,
+                                        staticImageUrl = staticUrl,
+                                        layerUrls = layerUrls
                                     )
                                 }
                                 index < highEnd -> {
@@ -193,7 +266,9 @@ object DiscordCosmeticsRepository {
                                         description = desc,
                                         tier = "B",
                                         requiredLevel = 35,
-                                        category = category
+                                        category = category,
+                                        staticImageUrl = staticUrl,
+                                        layerUrls = layerUrls
                                     )
                                 }
                                 else -> {
@@ -205,7 +280,9 @@ object DiscordCosmeticsRepository {
                                         description = desc,
                                         tier = "C",
                                         requiredLevel = 0,
-                                        category = category
+                                        category = category,
+                                        staticImageUrl = staticUrl,
+                                        layerUrls = layerUrls
                                     )
                                 }
                             }
@@ -223,8 +300,7 @@ object DiscordCosmeticsRepository {
 
     /**
      * Optimasi ukuran resolusi dan status animasi URL CDN Discord
-     * Default size=160 untuk grid shop/edit profile agar instan dimuat dalam hitungan milidetik
-     * size=240 untuk halaman profil utama
+     * Hanya berlaku untuk avatar-decoration-presets (DO NOT append query params to profile_effects / collectibles-shop)
      */
     fun getOptimizedUrl(url: String, size: Int = 160, animated: Boolean = true): String {
         if (url.isBlank()) return ""

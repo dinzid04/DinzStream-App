@@ -79,7 +79,9 @@ data class ProfileEffectDefinition(
     val description: String,
     val tier: String = "A", // "A", "B", "C"
     val requiredLevel: Int = 1,
-    val category: String = "General"
+    val category: String = "General",
+    val staticImageUrl: String = "",
+    val layerUrls: List<String> = emptyList()
 )
 
 data class UserProfile(

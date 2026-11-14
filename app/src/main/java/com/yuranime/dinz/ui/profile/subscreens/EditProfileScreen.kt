@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -108,10 +109,9 @@ fun EditProfileScreen(
     val unlockedBorders = currentProfile?.unlockedBorders ?: emptyList()
     val unlockedEffects = currentProfile?.unlockedEffects ?: emptyList()
 
-    // Tab Kosmetik: 0 = Border Avatar (985), 1 = Profile Effect (396), 2 = Custom Title
+    // Tab Kosmetik: 0 = Border Avatar, 1 = Profile Effect, 2 = Custom Title
     var cosmeticTab by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
-    var filterTier by remember { mutableStateOf("Semua") } // Semua, Koleksiku, Starter, Lv. 35+, Limited Redeem
 
     val avatarGalleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -147,53 +147,40 @@ fun EditProfileScreen(
         }
     }
 
-    // Seluruh 985 Border Avatar Asli Discord
+    // Seluruh Border Avatar Asli Discord (Filter hanya yang dimiliki user di Edit Profil)
     val allBorders = remember(context) { DiscordCosmeticsRepository.getAllBorders(context) }
-    // Seluruh 396 Profile Effects Asli Discord
+    // Seluruh Profile Effects Asli Discord (Filter hanya yang dimiliki user di Edit Profil)
     val allProfileEffects = remember(context) { DiscordCosmeticsRepository.getAllProfileEffects(context) }
 
-    // Urutkan item dimiliki di urutan paling depan
-    val sortedBorders = remember(allBorders, unlockedBorders, selectedBorderUrl, searchQuery, filterTier) {
+    // HANYA tampilkan border avatar yang SUDAH dimiliki pengguna
+    val ownedBorders = remember(allBorders, unlockedBorders, selectedBorderUrl, searchQuery) {
         allBorders
             .filter { border ->
+                val isOwned = unlockedBorders.contains(border.id) || border.imageUrl == selectedBorderUrl
                 val matchSearch = searchQuery.isBlank() ||
                     border.name.contains(searchQuery, ignoreCase = true) ||
                     border.category.contains(searchQuery, ignoreCase = true)
-                val isOwned = unlockedBorders.contains(border.id) || border.imageUrl == selectedBorderUrl
-                val matchFilter = when (filterTier) {
-                    "Koleksiku" -> isOwned
-                    "Starter" -> border.tier == "A"
-                    "Lv. 35+" -> border.tier == "B"
-                    "Limited Redeem" -> border.tier == "C"
-                    else -> true
-                }
-                matchSearch && matchFilter
+                isOwned && matchSearch
             }
             .sortedWith(
                 compareByDescending<BorderDefinition> { it.imageUrl == selectedBorderUrl }
-                    .thenByDescending { unlockedBorders.contains(it.id) }
+                    .thenBy { it.name }
             )
     }
 
-    val sortedEffects = remember(allProfileEffects, unlockedEffects, selectedProfileEffectUrl, searchQuery, filterTier) {
+    // HANYA tampilkan efek profil yang SUDAH dimiliki pengguna
+    val ownedEffects = remember(allProfileEffects, unlockedEffects, selectedProfileEffectUrl, searchQuery) {
         allProfileEffects
             .filter { effect ->
+                val isOwned = unlockedEffects.contains(effect.id) || effect.animationUrl == selectedProfileEffectUrl
                 val matchSearch = searchQuery.isBlank() ||
                     effect.name.contains(searchQuery, ignoreCase = true) ||
                     effect.category.contains(searchQuery, ignoreCase = true)
-                val isOwned = unlockedEffects.contains(effect.id) || effect.animationUrl == selectedProfileEffectUrl
-                val matchFilter = when (filterTier) {
-                    "Koleksiku" -> isOwned
-                    "Starter" -> effect.tier == "A"
-                    "Lv. 35+" -> effect.tier == "B"
-                    "Limited Redeem" -> effect.tier == "C"
-                    else -> true
-                }
-                matchSearch && matchFilter
+                isOwned && matchSearch
             }
             .sortedWith(
                 compareByDescending<ProfileEffectDefinition> { it.animationUrl == selectedProfileEffectUrl }
-                    .thenByDescending { unlockedEffects.contains(it.id) }
+                    .thenBy { it.name }
             )
     }
 
@@ -591,36 +578,6 @@ fun EditProfileScreen(
                     colors = textFieldColors,
                     modifier = Modifier.fillMaxWidth()
                 )
-
-                // Chips Filter Kasta
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    val filterChips = listOf("Semua", "Koleksiku", "Starter", "Lv. 35+", "Limited Redeem")
-                    items(filterChips) { chip ->
-                        val selected = filterTier == chip
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(50))
-                                .background(if (selected) Color(0xFFFF5722) else Color(0xFF141722))
-                                .border(
-                                    width = 0.5.dp,
-                                    color = if (selected) Color(0xFFFF5722) else Color(0xFF222738),
-                                    shape = RoundedCornerShape(50)
-                                )
-                                .clickable { filterTier = chip }
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text(
-                                text = chip,
-                                color = if (selected) Color.White else Color(0xFF94A3B8),
-                                fontSize = 11.5.sp,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                fontFamily = SfProFontFamily
-                            )
-                        }
-                    }
-                }
             }
 
             // KONTEN TAB 0: SEMUA 985 BORDER AVATAR
@@ -657,58 +614,66 @@ fun EditProfileScreen(
                     }
                 }
 
-                // Grid 2 Kolom untuk Border Avatar (Tampilkan seluruh item)
-                val displayList = sortedBorders
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val chunked = displayList.chunked(2)
-                    chunked.forEach { pair ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            pair.forEach { border ->
-                                val isEquipped = border.imageUrl == selectedBorderUrl
-                                val isOwned = unlockedBorders.contains(border.id)
+                if (ownedBorders.isEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 36.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Storefront,
+                            contentDescription = null,
+                            tint = Color(0xFF64748B),
+                            modifier = Modifier.size(40.dp)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Belum ada koleksi.",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SfProFontFamily
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Dapatkan border avatar di Shop Kosmetik",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 12.sp,
+                            fontFamily = SfProFontFamily
+                        )
+                    }
+                } else {
+                    val displayList = ownedBorders
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val chunked = displayList.chunked(2)
+                        chunked.forEach { pair ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                pair.forEach { border ->
+                                    val isEquipped = border.imageUrl == selectedBorderUrl
 
-                                EditCosmeticCard(
-                                    name = border.name,
-                                    imageUrl = border.imageUrl,
-                                    isBorder = true,
-                                    userAvatarUrl = selectedAvatarUrl,
-                                    isEquipped = isEquipped,
-                                    isOwned = isOwned,
-                                    tier = border.tier,
-                                    requiredLevel = border.requiredLevel,
-                                    pointCost = border.pointCost,
-                                    modifier = Modifier.weight(1f),
-                                    onClick = {
-                                        selectedBorderUrl = border.imageUrl
-                                        if (!isOwned) {
-                                            lockedNoticeText = when (border.tier) {
-                                                "C" -> "🔒 \"${border.name}\" adalah Item Eksklusif Kode Redeem!"
-                                                "B" -> "🔒 \"${border.name}\" butuh Level 35 & ${border.pointCost} Poin di Shop!"
-                                                else -> "🔒 \"${border.name}\" butuh ${border.pointCost} Poin di Shop!"
-                                            }
-                                        } else {
+                                    EditCosmeticCard(
+                                        name = border.name,
+                                        imageUrl = border.imageUrl,
+                                        isBorder = true,
+                                        userAvatarUrl = selectedAvatarUrl,
+                                        isEquipped = isEquipped,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = {
+                                            selectedBorderUrl = border.imageUrl
                                             lockedNoticeText = null
                                         }
-                                    }
-                                )
-                            }
-                            if (pair.size == 1) {
-                                Spacer(modifier = Modifier.weight(1f))
+                                    )
+                                }
+                                if (pair.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
-                }
-                if (sortedBorders.size > 60) {
-                    Text(
-                        text = "Menampilkan 60 dari ${sortedBorders.size} Border. Gunakan kolom pencarian di atas untuk menemukan spesifik nama.",
-                        color = Color(0xFF64748B),
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                    )
                 }
             }
 
@@ -745,57 +710,66 @@ fun EditProfileScreen(
                     }
                 }
 
-                val displayList = sortedEffects
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val chunked = displayList.chunked(2)
-                    chunked.forEach { pair ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            pair.forEach { effect ->
-                                val isEquipped = effect.animationUrl == selectedProfileEffectUrl
-                                val isOwned = unlockedEffects.contains(effect.id)
+                if (ownedEffects.isEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 36.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Storefront,
+                            contentDescription = null,
+                            tint = Color(0xFF64748B),
+                            modifier = Modifier.size(40.dp)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Belum ada koleksi.",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SfProFontFamily
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Dapatkan efek profil di Shop Kosmetik",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 12.sp,
+                            fontFamily = SfProFontFamily
+                        )
+                    }
+                } else {
+                    val displayList = ownedEffects
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val chunked = displayList.chunked(2)
+                        chunked.forEach { pair ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                pair.forEach { effect ->
+                                    val isEquipped = effect.animationUrl == selectedProfileEffectUrl
 
-                                EditCosmeticCard(
-                                    name = effect.name,
-                                    imageUrl = effect.animationUrl,
-                                    isBorder = false,
-                                    userAvatarUrl = selectedAvatarUrl,
-                                    isEquipped = isEquipped,
-                                    isOwned = isOwned,
-                                    tier = effect.tier,
-                                    requiredLevel = effect.requiredLevel,
-                                    pointCost = effect.pointCost,
-                                    modifier = Modifier.weight(1f),
-                                    onClick = {
-                                        selectedProfileEffectUrl = effect.animationUrl
-                                        if (!isOwned) {
-                                            lockedNoticeText = when (effect.tier) {
-                                                "C" -> "🔒 \"${effect.name}\" adalah Efek Eksklusif Kode Redeem!"
-                                                "B" -> "🔒 \"${effect.name}\" butuh Level 35 & ${effect.pointCost} Poin di Shop!"
-                                                else -> "🔒 \"${effect.name}\" butuh ${effect.pointCost} Poin di Shop!"
-                                            }
-                                        } else {
+                                    EditCosmeticCard(
+                                        name = effect.name,
+                                        imageUrl = effect.animationUrl,
+                                        isBorder = false,
+                                        userAvatarUrl = selectedAvatarUrl,
+                                        isEquipped = isEquipped,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = {
+                                            selectedProfileEffectUrl = effect.animationUrl
                                             lockedNoticeText = null
                                         }
-                                    }
-                                )
-                            }
-                            if (pair.size == 1) {
-                                Spacer(modifier = Modifier.weight(1f))
+                                    )
+                                }
+                                if (pair.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
-                }
-                if (sortedEffects.size > 60) {
-                    Text(
-                        text = "Menampilkan 60 dari ${sortedEffects.size} Effect. Gunakan kolom pencarian di atas untuk menemukan spesifik nama.",
-                        color = Color(0xFF64748B),
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                    )
                 }
             }
 
@@ -982,80 +956,22 @@ private fun EditCosmeticCard(
     isBorder: Boolean,
     userAvatarUrl: String,
     isEquipped: Boolean,
-    isOwned: Boolean,
-    tier: String,
-    requiredLevel: Int,
-    pointCost: Long,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                when {
-                    isEquipped -> Color(0x33E11D48)
-                    isOwned -> Color(0xFF141722)
-                    else -> Color(0xFF0F1118)
-                }
-            )
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xFF10121A))
             .border(
                 width = if (isEquipped) 1.dp else 0.5.dp,
-                color = when {
-                    isEquipped -> Color(0xFFE11D48)
-                    isOwned -> Color(0xFF283046)
-                    else -> Color(0xFF1D212E)
-                },
-                shape = RoundedCornerShape(12.dp)
+                color = if (isEquipped) Color(0xFFE11D48) else Color(0xFF1E2230),
+                shape = RoundedCornerShape(14.dp)
             )
             .clickable { onClick() }
             .padding(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Baris Atas: Badge Status / Kasta
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val tierLabel = when (tier) {
-                "C" -> "Limited"
-                "B" -> "Lv. $requiredLevel"
-                else -> "Starter"
-            }
-            val tierColor = when (tier) {
-                "C" -> Color(0xFFE11D48)
-                "B" -> Color(0xFFF59E0B)
-                else -> Color(0xFF38BDF8)
-            }
-            Text(
-                text = tierLabel,
-                color = tierColor,
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = SfProFontFamily
-            )
-
-            if (isOwned) {
-                Text(
-                    text = "Milikmu",
-                    color = Color(0xFF10B981),
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = SfProFontFamily
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = "Terkunci",
-                    tint = Color(0xFF64748B),
-                    modifier = Modifier.size(11.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
         // Center Preview
         Box(
             modifier = Modifier.size(72.dp),
@@ -1127,28 +1043,14 @@ private fun EditCosmeticCard(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
                 .background(
-                    when {
-                        isEquipped -> Color(0xFFE11D48)
-                        isOwned -> Color(0xFF1E293B)
-                        else -> Color(0xFF161822)
-                    }
+                    if (isEquipped) Color(0xFFE11D48) else Color(0xFF1E293B)
                 )
                 .padding(vertical = 5.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = when {
-                    isEquipped -> "Terpasang"
-                    isOwned -> "Pasang"
-                    tier == "C" -> "🔒 Redeem"
-                    tier == "B" -> "🔒 Lv. $requiredLevel"
-                    else -> "🔒 $pointCost Poin"
-                },
-                color = when {
-                    isEquipped -> Color.White
-                    isOwned -> Color(0xFFE2E8F0)
-                    else -> Color(0xFF64748B)
-                },
+                text = if (isEquipped) "Terpasang" else "Pasang",
+                color = Color.White,
                 fontSize = 10.5.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = SfProFontFamily
