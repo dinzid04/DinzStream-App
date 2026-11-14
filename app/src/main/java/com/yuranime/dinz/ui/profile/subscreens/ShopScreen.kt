@@ -454,8 +454,8 @@ fun ShopScreen(
                     }
 
                     items(allTitles, key = { it.id }) { titleDef ->
-                        val isOwned = unlockedTitles.contains(titleDef.title)
-                        val isEquipped = equippedTitle == titleDef.title
+                        val isOwned = unlockedTitles.any { it.equals(titleDef.titleName, ignoreCase = true) }
+                        val isEquipped = equippedTitle.equals(titleDef.titleName, ignoreCase = true)
                         val isLevelLocked = level < titleDef.requiredLevel
 
                         Row(
@@ -471,9 +471,9 @@ fun ShopScreen(
                             Box(modifier = Modifier.weight(1f)) {
                                 Column {
                                     GeometricTitleBadge(
-                                        title = titleDef.title,
-                                        tier = titleDef.tier,
-                                        variant = titleDef.variant
+                                        titleName = titleDef.titleName,
+                                        tierLevel = titleDef.tierLevel,
+                                        styleVariant = titleDef.styleVariant
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
@@ -502,25 +502,14 @@ fun ShopScreen(
                                     .clickable {
                                         if (isEquipped) return@clickable
                                         if (isOwned) {
-                                            coroutineScope.launch {
-                                                FirebaseManager.updateProfile(
-                                                    context = context,
-                                                    equippedTitle = titleDef.title,
-                                                    equippedTitleTier = titleDef.tier,
-                                                    equippedTitleVariant = titleDef.variant
-                                                )
-                                                Toast.makeText(context, "Title '${titleDef.title}' berhasil dipasang!", Toast.LENGTH_SHORT).show()
+                                            FirebaseManager.equipTitle(context, titleDef) { _, msg ->
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                             }
                                         } else if (isLevelLocked) {
                                             Toast.makeText(context, "Capai Level ${titleDef.requiredLevel} untuk membuka Title ini!", Toast.LENGTH_SHORT).show()
                                         } else {
-                                            coroutineScope.launch {
-                                                val success = FirebaseManager.unlockTitle(context, titleDef.title, titleDef.pointCost)
-                                                if (success) {
-                                                    Toast.makeText(context, "Title terbuka & poin terpotong!", Toast.LENGTH_SHORT).show()
-                                                } else {
-                                                    Toast.makeText(context, "Poin tidak mencukupi!", Toast.LENGTH_SHORT).show()
-                                                }
+                                            FirebaseManager.unlockAndEquipShopTitle(context, titleDef) { _, msg ->
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     }
@@ -713,30 +702,18 @@ fun ShopScreen(
                                             isEquipped -> {
                                                 Toast.makeText(context, "Efek ini sudah terpasang!", Toast.LENGTH_SHORT).show()
                                             }
-                                            isOwned -> {
-                                                FirebaseManager.updateProfile(
-                                                    context = context,
-                                                    equippedProfileEffectUrl = effect.animationUrl
-                                                )
-                                                Toast.makeText(context, "Efek profil berhasil dipasang!", Toast.LENGTH_SHORT).show()
-                                                previewEffectItem = null
-                                            }
                                             isLevelLocked -> {
                                                 Toast.makeText(context, "Capai Level ${effect.requiredLevel} terlebih dahulu!", Toast.LENGTH_SHORT).show()
                                             }
-                                            effect.tier == "C" -> {
+                                            effect.tier == "C" && !isOwned -> {
                                                 Toast.makeText(context, "Efek ini eksklusif dari Kode Redeem!", Toast.LENGTH_SHORT).show()
                                                 onNavigateToRewards()
                                                 previewEffectItem = null
                                             }
                                             else -> {
-                                                val success = FirebaseManager.unlockProfileEffect(context, effect.id, effect.pointCost)
-                                                if (success) {
-                                                    FirebaseManager.updateProfile(context = context, equippedProfileEffectUrl = effect.animationUrl)
-                                                    Toast.makeText(context, "Efek berhasil dibeli & dipasang!", Toast.LENGTH_SHORT).show()
+                                                FirebaseManager.unlockOrEquipProfileEffect(context, effect) { _, msg ->
+                                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                                     previewEffectItem = null
-                                                } else {
-                                                    Toast.makeText(context, "Poin Anda tidak mencukupi!", Toast.LENGTH_SHORT).show()
                                                 }
                                             }
                                         }
@@ -923,30 +900,18 @@ fun ShopScreen(
                                         isEquipped -> {
                                             Toast.makeText(context, "Border ini sudah terpasang!", Toast.LENGTH_SHORT).show()
                                         }
-                                        isOwned -> {
-                                            FirebaseManager.updateProfile(
-                                                context = context,
-                                                equippedBorderUrl = border.imageUrl
-                                            )
-                                            Toast.makeText(context, "Border avatar berhasil dipasang!", Toast.LENGTH_SHORT).show()
-                                            previewBorderItem = null
-                                        }
                                         isLevelLocked -> {
                                             Toast.makeText(context, "Capai Level ${border.requiredLevel} terlebih dahulu!", Toast.LENGTH_SHORT).show()
                                         }
-                                        border.tier == "C" -> {
+                                        border.tier == "C" && !isOwned -> {
                                             Toast.makeText(context, "Border ini khusus dari Kode Redeem!", Toast.LENGTH_SHORT).show()
                                             onNavigateToRewards()
                                             previewBorderItem = null
                                         }
                                         else -> {
-                                            val success = FirebaseManager.unlockBorder(context, border.id, border.pointCost)
-                                            if (success) {
-                                                FirebaseManager.updateProfile(context = context, equippedBorderUrl = border.imageUrl)
-                                                Toast.makeText(context, "Border berhasil dibeli & dipasang!", Toast.LENGTH_SHORT).show()
+                                            FirebaseManager.unlockOrEquipBorder(context, border) { _, msg ->
+                                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                                 previewBorderItem = null
-                                            } else {
-                                                Toast.makeText(context, "Poin Anda tidak mencukupi!", Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     }
