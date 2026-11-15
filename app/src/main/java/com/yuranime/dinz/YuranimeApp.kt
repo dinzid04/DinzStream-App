@@ -32,6 +32,7 @@ class YuranimeApp : Application(), ImageLoaderFactory {
         try {
             coil.Coil.setImageLoader(this)
         } catch (ignored: Exception) {}
+        com.yuranime.dinz.data.repository.StickerRepository.initializeAndPreload(this)
     }
 
     override fun newImageLoader(): ImageLoader {
@@ -53,8 +54,9 @@ class YuranimeApp : Application(), ImageLoaderFactory {
                     host.contains("komikid")
 
                 val isDiscordDomain = host.contains("discordapp.com") || host.contains("discord.com")
+                val isStickerDomain = host.contains("pstatic.net") || host.contains("sticker.ly")
 
-                if (isDiscordDomain) {
+                if (isDiscordDomain || isStickerDomain) {
                     requestBuilder
                         .removeHeader("Referer")
                         .removeHeader("x-proxy-secret")

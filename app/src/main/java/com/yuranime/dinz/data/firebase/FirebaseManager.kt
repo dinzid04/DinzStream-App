@@ -23,6 +23,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import com.yuranime.dinz.data.local.AppPreferences
+import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.local.SavedGoogleUserSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -606,6 +607,14 @@ object FirebaseManager {
         }
     }
 
+    private fun syncLocalAuthDatabase(context: Context?, profile: UserProfile) {
+        if (context == null) return
+        val db = LocalAuthDatabase(context)
+        db.setLoggedIn(true, profile.name)
+        db.setAvatarUrl(profile.avatar)
+        db.setCoverUrl(profile.banner)
+    }
+
     fun onGoogleAccountSelected(
         uid: String,
         name: String,
@@ -614,35 +623,48 @@ object FirebaseManager {
         idToken: String? = null,
         context: Context? = null
     ) {
-        val canonicalUid = resolveCanonicalUserId(email, uid)
-        val session = SavedGoogleUserSession(
-            id = canonicalUid,
-            name = name,
-            email = email.trim().lowercase(Locale.ROOT),
-            photoUrl = avatar
-        )
-        _googleSession.value = session
-        if (context != null) {
-            AppPreferences.saveGoogleSession(context, canonicalUid, name, email.trim().lowercase(Locale.ROOT), avatar)
+        scope.launch {
+            onGoogleAccountSelectedAwait(
+                uid = uid,
+                name = name,
+                email = email,
+                avatar = avatar,
+                idToken = idToken,
+                context = context
+            )
         }
+    }
 
+    /** Memeriksa dokumen Firestore dulu sebelum menyentuh AppPreferences agar profil editan tidak tertimpa. */
+    suspend fun onGoogleAccountSelectedAwait(
+        uid: String,
+        name: String,
+        email: String,
+        avatar: String?,
+        idToken: String? = null,
+        context: Context? = null
+    ): UserProfile {
+        val cleanEmail = email.trim().lowercase(Locale.ROOT)
         if (!idToken.isNullOrBlank()) {
             try {
                 val credential = GoogleAuthProvider.getCredential(idToken, null)
-                auth.signInWithCredential(credential)
-                    .addOnSuccessListener {
-                        _currentUser.value = auth.currentUser
-                        deduplicateUserAccounts(context)
-                    }
-            } catch (ignored: Exception) {}
+                val authResult = auth.signInWithCredential(credential).await()
+                _currentUser.value = authResult.user ?: auth.currentUser
+            } catch (_: Exception) {}
         }
 
-        scope.launch {
-            ensureUserDocumentExists(context, session)
-            deduplicateUserAccounts(context)
-            startListeningCurrentUser(context)
-            startListeningLeaderboard()
-        }
+        val canonicalUid = resolveCanonicalUserId(cleanEmail, uid)
+        val profile = hydrateOrCreateGoogleUser(
+            context = context,
+            canonicalUid = canonicalUid,
+            googleName = name,
+            cleanEmail = cleanEmail,
+            googlePhotoUrl = avatar
+        )
+        deduplicateUserAccounts(context)
+        startListeningCurrentUser(context)
+        startListeningLeaderboard()
+        return profile
     }
 
     suspend fun onGoogleAccountSelected(
@@ -654,29 +676,26 @@ object FirebaseManager {
         return try {
             val cleanEmail = email.trim().lowercase(Locale.ROOT)
             val deterministicUid = resolveCanonicalUserId(cleanEmail, "g_${cleanEmail.hashCode()}")
-            val finalName = displayName?.takeIf { it.isNotBlank() }
+            val fallbackName = displayName?.takeIf { it.isNotBlank() }
                 ?: cleanEmail.substringBefore("@").replaceFirstChar { it.uppercase() }
 
-            val savedSession = SavedGoogleUserSession(
-                id = deterministicUid,
-                name = finalName,
-                email = cleanEmail,
-                photoUrl = photoUrl
+            val profile = hydrateOrCreateGoogleUser(
+                context = context,
+                canonicalUid = deterministicUid,
+                googleName = fallbackName,
+                cleanEmail = cleanEmail,
+                googlePhotoUrl = photoUrl
             )
-            _googleSession.value = savedSession
-            AppPreferences.saveGoogleSession(context, deterministicUid, finalName, cleanEmail, photoUrl)
-
-            ensureUserDocumentExists(context, savedSession)
             deduplicateUserAccounts(context)
             startListeningCurrentUser(context)
             startListeningLeaderboard()
 
             Result.success(
                 GoogleSessionInfo(
-                    uid = deterministicUid,
-                    name = finalName,
-                    email = cleanEmail,
-                    avatar = photoUrl.orEmpty()
+                    uid = profile.uid,
+                    name = profile.name,
+                    email = profile.email,
+                    avatar = profile.avatar
                 )
             )
         } catch (e: Exception) {
@@ -720,9 +739,9 @@ object FirebaseManager {
                     ?: jwtPayload?.optString("picture")
                     ?: ""
 
-                var finalName = displayName
+                var googleName = displayName
                 var finalEmail = email.trim().lowercase(Locale.ROOT)
-                var finalPhoto = photoUrl
+                var googlePhoto = photoUrl
 
                 try {
                     val firebaseCredential = GoogleAuthProvider.getCredential(idToken, null)
@@ -730,35 +749,31 @@ object FirebaseManager {
                     val fbUser = authResult.user
                     if (fbUser != null) {
                         _currentUser.value = fbUser
-                        finalName = fbUser.displayName ?: displayName
+                        googleName = fbUser.displayName ?: displayName
                         finalEmail = (fbUser.email ?: email).trim().lowercase(Locale.ROOT)
-                        finalPhoto = fbUser.photoUrl?.toString() ?: photoUrl
+                        googlePhoto = fbUser.photoUrl?.toString() ?: photoUrl
                     }
                 } catch (firebaseErr: Exception) {
                     Log.w(TAG, "Menggunakan sesi Google terverifikasi: ${firebaseErr.message}")
                 }
 
                 val finalUid = resolveCanonicalUserId(finalEmail, subUid)
-
-                val savedSession = SavedGoogleUserSession(
-                    id = finalUid,
-                    name = finalName,
-                    email = finalEmail,
-                    photoUrl = finalPhoto
+                val profile = hydrateOrCreateGoogleUser(
+                    context = context,
+                    canonicalUid = finalUid,
+                    googleName = googleName,
+                    cleanEmail = finalEmail,
+                    googlePhotoUrl = googlePhoto
                 )
-                _googleSession.value = savedSession
-                AppPreferences.saveGoogleSession(context, finalUid, finalName, finalEmail, finalPhoto)
-
-                ensureUserDocumentExists(context, savedSession)
                 deduplicateUserAccounts(context)
                 startListeningCurrentUser(context)
                 startListeningLeaderboard()
                 Result.success(
                     GoogleSessionInfo(
-                        uid = finalUid,
-                        name = finalName,
-                        email = finalEmail,
-                        avatar = finalPhoto
+                        uid = profile.uid,
+                        name = profile.name,
+                        email = profile.email,
+                        avatar = profile.avatar
                     )
                 )
             } else {
@@ -770,66 +785,174 @@ object FirebaseManager {
         }
     }
 
-    private suspend fun ensureUserDocumentExists(context: Context?, session: SavedGoogleUserSession) {
-        val uid = session.id
+    private suspend fun hydrateOrCreateGoogleUser(
+        context: Context?,
+        canonicalUid: String,
+        googleName: String,
+        cleanEmail: String,
+        googlePhotoUrl: String?
+    ): UserProfile {
         val prefs = context?.let { getPrefs(it) }
-        val localExp = prefs?.getLong("exp_$uid", 0L) ?: 0L
-        val localPoints = prefs?.getLong("points_$uid", 100L) ?: 100L
+        val docRef = firestore.collection("users").document(canonicalUid)
+
+        var existingSnapshot: DocumentSnapshot? = null
+        var fetchFailed = false
+        try {
+            val directSnap = docRef.get().await()
+            if (directSnap.exists()) {
+                existingSnapshot = directSnap
+            } else if (cleanEmail.isNotBlank()) {
+                val byEmail = firestore.collection("users")
+                    .whereEqualTo("email", cleanEmail)
+                    .limit(1)
+                    .get()
+                    .await()
+                existingSnapshot = byEmail.documents.firstOrNull { it.exists() }
+            }
+        } catch (e: Exception) {
+            fetchFailed = true
+            Log.w(TAG, "Cek profil Firestore gagal saat login: ${e.message}")
+        }
+
+        val fallbackSession = SavedGoogleUserSession(
+            id = canonicalUid,
+            name = googleName,
+            email = cleanEmail,
+            photoUrl = googlePhotoUrl
+        )
+
+        if (existingSnapshot != null && existingSnapshot.exists()) {
+            // Dokumen user sudah ada di Firestore: pertahankan seluruh profil hasil edit user.
+            val parsed = parseUserProfileFromSnapshot(
+                snapshot = existingSnapshot,
+                fallbackUid = canonicalUid,
+                fallbackSession = fallbackSession
+            ).copy(uid = canonicalUid)
+
+            val sessionPhoto = parsed.avatar.ifBlank { googlePhotoUrl.orEmpty() }
+            val session = SavedGoogleUserSession(
+                id = canonicalUid,
+                name = parsed.name,
+                email = parsed.email.ifBlank { cleanEmail },
+                photoUrl = sessionPhoto.ifBlank { null }
+            )
+            _googleSession.value = session
+            _userProfile.value = parsed
+
+            if (context != null) {
+                AppPreferences.saveGoogleSession(
+                    context = context,
+                    id = canonicalUid,
+                    name = parsed.name,
+                    email = session.email,
+                    photoUrl = sessionPhoto
+                )
+                saveProfileToPrefs(context, parsed)
+                syncLocalAuthDatabase(context, parsed)
+            }
+
+            try {
+                val existingExp = maxOf(
+                    existingSnapshot.getLong("exp") ?: 0L,
+                    existingSnapshot.getLong("xp") ?: 0L
+                )
+                val patchMap = mutableMapOf<String, Any>(
+                    "uid" to canonicalUid,
+                    "exp" to existingExp,
+                    "xp" to existingExp,
+                    "userTag" to parsed.userTag,
+                    "joinDate" to parsed.joinDate,
+                    "lastActive" to FieldValue.serverTimestamp()
+                )
+                if (existingSnapshot.getString("email").isNullOrBlank() && cleanEmail.isNotBlank()) {
+                    patchMap["email"] = cleanEmail
+                }
+                docRef.set(patchMap, SetOptions.merge()).await()
+            } catch (_: Exception) {}
+
+            return parsed
+        }
+
+        // Jika Firestore gagal diakses sementara saat login, utamakan cache lokal sebelum memakai data Google.
+        val cachedName = prefs?.getString("profile_name_$canonicalUid", null)?.takeIf { it.isNotBlank() }
+        val cachedAvatar = prefs?.getString("profile_avatar_$canonicalUid", null)?.takeIf { it.isNotBlank() }
+
+        val localExp = prefs?.getLong("exp_$canonicalUid", 0L) ?: 0L
+        val localPoints = prefs?.getLong("points_$canonicalUid", 100L) ?: 100L
         val level = computeLevelFromExp(localExp)
         val nextTarget = computeNextLevelTargetExp(level)
         val progress = computeExpProgress(localExp, nextTarget)
-        val defaultUsername = session.name.lowercase(Locale.ROOT)
+        val resolvedName = cachedName ?: googleName
+        val defaultUsername = resolvedName.lowercase(Locale.ROOT)
             .replace(Regex("[^a-z0-9_]"), "")
             .ifBlank { "member" }
-        val userTag = computeUserTag(uid, prefs?.getString("profile_tag_$uid", null))
+        val userTag = computeUserTag(canonicalUid, prefs?.getString("profile_tag_$canonicalUid", null))
         val defaultJoinDate = formatJoinDate(
             try { auth.currentUser?.metadata?.creationTimestamp } catch (_: Exception) { null }
                 ?: System.currentTimeMillis()
         )
+        val resolvedAvatar = cachedAvatar ?: googlePhotoUrl.orEmpty()
 
         val initialProfile = UserProfile(
-            uid = uid,
-            name = prefs?.getString("profile_name_$uid", session.name) ?: session.name,
-            username = prefs?.getString("profile_username_$uid", defaultUsername) ?: defaultUsername,
+            uid = canonicalUid,
+            name = resolvedName,
+            username = prefs?.getString("profile_username_$canonicalUid", defaultUsername) ?: defaultUsername,
             userTag = userTag,
-            email = session.email,
-            avatar = prefs?.getString("profile_avatar_$uid", session.photoUrl ?: "") ?: (session.photoUrl ?: ""),
-            banner = prefs?.getString("profile_banner_$uid", "") ?: "",
-            bio = prefs?.getString("profile_bio_$uid", "Penikmat anime & komik di Yuranime.")
+            email = cleanEmail,
+            avatar = resolvedAvatar,
+            banner = prefs?.getString("profile_banner_$canonicalUid", "") ?: "",
+            bio = prefs?.getString("profile_bio_$canonicalUid", "Penikmat anime & komik di Yuranime.")
                 ?: "Penikmat anime & komik di Yuranime.",
-            role = prefs?.getString("profile_role_$uid", "Member") ?: "Member",
-            joinDate = prefs?.getString("profile_joindate_$uid", defaultJoinDate) ?: defaultJoinDate,
+            role = prefs?.getString("profile_role_$canonicalUid", "Member") ?: "Member",
+            joinDate = prefs?.getString("profile_joindate_$canonicalUid", defaultJoinDate) ?: defaultJoinDate,
             exp = localExp,
             points = localPoints,
             level = level,
             rankTitle = computeRankTitle(level),
-            equippedTitle = prefs?.getString("profile_title_$uid", "") ?: "",
-            equippedBorderUrl = prefs?.getString("profile_border_$uid", "") ?: "",
-            equippedProfileEffectUrl = prefs?.getString("profile_effect_$uid", "") ?: "",
-            cosmeticAnimate = prefs?.getBoolean("cosmetic_animate_$uid", true) ?: true,
+            equippedTitle = prefs?.getString("profile_title_$canonicalUid", "") ?: "",
+            equippedBorderUrl = prefs?.getString("profile_border_$canonicalUid", "") ?: "",
+            equippedProfileEffectUrl = prefs?.getString("profile_effect_$canonicalUid", "") ?: "",
+            cosmeticAnimate = prefs?.getBoolean("cosmetic_animate_$canonicalUid", true) ?: true,
             unlockedTitles = listOf("WARGA YURANIME"),
-            unlockedBorders = prefs?.getStringSet("profile_unlocked_borders_$uid", emptySet())?.toList() ?: emptyList(),
-            unlockedEffects = prefs?.getStringSet("profile_unlocked_effects_$uid", emptySet())?.toList() ?: emptyList(),
-            claimedRedeemCodes = prefs?.getStringSet("profile_claimed_codes_$uid", emptySet())?.toList() ?: emptyList(),
-            lastCheckInDate = prefs?.getString("last_checkin_$uid", "") ?: "",
-            checkInStreak = prefs?.getInt("streak_$uid", 0) ?: 0,
+            unlockedBorders = prefs?.getStringSet("profile_unlocked_borders_$canonicalUid", emptySet())?.toList()
+                ?: emptyList(),
+            unlockedEffects = prefs?.getStringSet("profile_unlocked_effects_$canonicalUid", emptySet())?.toList()
+                ?: emptyList(),
+            claimedRedeemCodes = prefs?.getStringSet("profile_claimed_codes_$canonicalUid", emptySet())?.toList()
+                ?: emptyList(),
+            lastCheckInDate = prefs?.getString("last_checkin_$canonicalUid", "") ?: "",
+            checkInStreak = prefs?.getInt("streak_$canonicalUid", 0) ?: 0,
             nextLevelTargetExp = nextTarget,
             expProgress = progress
         )
-        if (_userProfile.value == null) {
-            _userProfile.value = initialProfile
-        }
+
+        val session = SavedGoogleUserSession(
+            id = canonicalUid,
+            name = initialProfile.name,
+            email = cleanEmail,
+            photoUrl = initialProfile.avatar.ifBlank { null }
+        )
+        _googleSession.value = session
+        _userProfile.value = initialProfile
+
         if (context != null) {
+            AppPreferences.saveGoogleSession(
+                context = context,
+                id = canonicalUid,
+                name = initialProfile.name,
+                email = cleanEmail,
+                photoUrl = initialProfile.avatar
+            )
             saveProfileToPrefs(context, initialProfile)
+            syncLocalAuthDatabase(context, initialProfile)
         }
 
-        try {
-            val docRef = firestore.collection("users").document(uid)
-            val snapshot = docRef.get().await()
-            if (!snapshot.exists()) {
+        if (!fetchFailed) {
+            try {
                 val newProfileMap = hashMapOf(
-                    "uid" to uid,
+                    "uid" to canonicalUid,
                     "name" to initialProfile.name,
+                    "displayName" to initialProfile.name,
                     "username" to initialProfile.username,
                     "userTag" to initialProfile.userTag,
                     "email" to initialProfile.email,
@@ -847,7 +970,9 @@ object FirebaseManager {
                     "rankTitle" to initialProfile.rankTitle,
                     "equippedTitle" to initialProfile.equippedTitle,
                     "equippedBorderUrl" to initialProfile.equippedBorderUrl,
+                    "equippedAvatarDecoration" to initialProfile.equippedBorderUrl,
                     "equippedProfileEffectUrl" to initialProfile.equippedProfileEffectUrl,
+                    "equippedProfileEffect" to initialProfile.equippedProfileEffectUrl,
                     "cosmeticAnimate" to initialProfile.cosmeticAnimate,
                     "unlockedTitles" to initialProfile.unlockedTitles,
                     "unlockedBorders" to initialProfile.unlockedBorders,
@@ -859,36 +984,19 @@ object FirebaseManager {
                     "lastActive" to FieldValue.serverTimestamp()
                 )
                 docRef.set(newProfileMap, SetOptions.merge()).await()
-            } else {
-                val existingExp = maxOf(snapshot.getLong("exp") ?: 0L, snapshot.getLong("xp") ?: 0L)
-                val resolvedJoinDate = extractJoinDateFromSnapshot(
-                    snapshot,
-                    try { auth.currentUser?.metadata?.creationTimestamp } catch (_: Exception) { null }
-                )
-                val resolvedTag = computeUserTag(uid, snapshot.getString("userTag"))
-                val patchMap = mutableMapOf<String, Any>(
-                    "uid" to uid,
-                    "exp" to existingExp,
-                    "xp" to existingExp,
-                    "userTag" to resolvedTag,
-                    "joinDate" to resolvedJoinDate,
-                    "lastActive" to FieldValue.serverTimestamp()
-                )
-                if (snapshot.getString("email").isNullOrBlank() && session.email.isNotBlank()) {
-                    patchMap["email"] = session.email
-                }
-                docRef.set(patchMap, SetOptions.merge()).await()
+            } catch (e: Exception) {
+                Log.w(TAG, "Gagal menulis profil baru ke Firestore: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Firestore sync tertunda: ${e.message}")
         }
+        return initialProfile
     }
 
     @Suppress("UNCHECKED_CAST")
     private fun parseUserProfileFromSnapshot(
         snapshot: DocumentSnapshot,
         fallbackUid: String,
-        fallbackSession: SavedGoogleUserSession? = null
+        fallbackSession: SavedGoogleUserSession? = null,
+        allowCurrentAuthTimestampFallback: Boolean = true
     ): UserProfile {
         val uid = snapshot.getString("uid")?.takeIf { it.isNotBlank() } ?: snapshot.id.ifBlank { fallbackUid }
         val exp = maxOf(snapshot.getLong("exp") ?: 0L, snapshot.getLong("xp") ?: 0L)
@@ -907,19 +1015,26 @@ object FirebaseManager {
         val email = snapshot.getString("email")?.takeIf { it.isNotBlank() }
             ?: fallbackSession?.email
             ?: ""
-        val avatar = (snapshot.getString("avatar")?.takeIf { it.isNotBlank() }
-            ?: snapshot.getString("photoUrl")?.takeIf { it.isNotBlank() }
-            ?: fallbackSession?.photoUrl
-            ?: "").trim()
-        val banner = (snapshot.getString("banner")?.takeIf { it.isNotBlank() }
-            ?: snapshot.getString("bannerUrl")?.takeIf { it.isNotBlank() }
+        val rawAvatarField = snapshot.getString("avatar")?.trim().orEmpty()
+        val rawPhotoUrlField = snapshot.getString("photoUrl")?.trim().orEmpty()
+        val avatar = when {
+            rawPhotoUrlField.isNotBlank() && !rawPhotoUrlField.contains("googleusercontent.com") -> rawPhotoUrlField
+            rawAvatarField.isNotBlank() && !rawAvatarField.contains("googleusercontent.com") -> rawAvatarField
+            rawPhotoUrlField.isNotBlank() -> rawPhotoUrlField
+            rawAvatarField.isNotBlank() -> rawAvatarField
+            else -> fallbackSession?.photoUrl.orEmpty()
+        }.trim()
+        val banner = (snapshot.getString("bannerUrl")?.takeIf { it.isNotBlank() }
+            ?: snapshot.getString("banner")?.takeIf { it.isNotBlank() }
             ?: "").trim()
         val bio = snapshot.getString("bio")?.takeIf { it.isNotBlank() }
             ?: "Penikmat anime & komik di Yuranime."
         val role = snapshot.getString("role")?.takeIf { it.isNotBlank() } ?: "Member"
         val joinDate = extractJoinDateFromSnapshot(
             snapshot,
-            try { auth.currentUser?.metadata?.creationTimestamp } catch (_: Exception) { null }
+            if (allowCurrentAuthTimestampFallback) {
+                try { auth.currentUser?.metadata?.creationTimestamp } catch (_: Exception) { null }
+            } else null
         )
 
         val equippedTitle = snapshot.getString("equippedTitle")?.trim().orEmpty()
@@ -930,8 +1045,12 @@ object FirebaseManager {
         val equippedTitleVariant = (snapshot.getLong("equippedTitleVariant")?.toInt())
             ?: titleDef?.styleVariant
             ?: 0
-        val equippedBorderUrl = snapshot.getString("equippedBorderUrl")?.trim().orEmpty()
-        val equippedProfileEffectUrl = snapshot.getString("equippedProfileEffectUrl")?.trim().orEmpty()
+        val equippedBorderUrl = (snapshot.getString("equippedBorderUrl")?.takeIf { it.isNotBlank() }
+            ?: snapshot.getString("equippedAvatarDecoration")?.takeIf { it.isNotBlank() }
+            ?: "").trim()
+        val equippedProfileEffectUrl = (snapshot.getString("equippedProfileEffectUrl")?.takeIf { it.isNotBlank() }
+            ?: snapshot.getString("equippedProfileEffect")?.takeIf { it.isNotBlank() }
+            ?: "").trim()
         val cosmeticAnimate = snapshot.getBoolean("cosmeticAnimate") ?: true
 
         val rawUnlockedTitles = (snapshot.get("unlockedTitles") as? List<*>)
@@ -1018,6 +1137,14 @@ object FirebaseManager {
                     _userProfile.value = profile
                     if (context != null) {
                         saveProfileToPrefs(context, profile)
+                        AppPreferences.saveGoogleSession(
+                            context = context,
+                            id = profile.uid,
+                            name = profile.name,
+                            email = profile.email,
+                            photoUrl = profile.avatar.ifBlank { _googleSession.value?.photoUrl }
+                        )
+                        syncLocalAuthDatabase(context, profile)
                     }
                     refreshLeaderboardWithCurrentUser(profile)
                 }
@@ -1551,6 +1678,7 @@ object FirebaseManager {
                 "uid" to uid,
                 "email" to effectiveEmail,
                 "name" to updated.name,
+                "displayName" to updated.name,
                 "username" to updated.username,
                 "userTag" to updated.userTag,
                 "bio" to updated.bio,
@@ -1562,7 +1690,9 @@ object FirebaseManager {
                 "equippedTitleTier" to updated.equippedTitleTier,
                 "equippedTitleVariant" to updated.equippedTitleVariant,
                 "equippedBorderUrl" to updated.equippedBorderUrl,
-                "equippedProfileEffectUrl" to updated.equippedProfileEffectUrl
+                "equippedAvatarDecoration" to updated.equippedBorderUrl,
+                "equippedProfileEffectUrl" to updated.equippedProfileEffectUrl,
+                "equippedProfileEffect" to updated.equippedProfileEffectUrl
             )
 
             try {
@@ -2364,6 +2494,11 @@ object FirebaseManager {
         if (context != null) {
             AppPreferences.clearGoogleSession(context)
             getPrefs(context).edit().remove("uid").apply()
+            LocalAuthDatabase(context).apply {
+                setLoggedIn(false, "Member Yuranime")
+                setAvatarUrl("")
+                setCoverUrl("")
+            }
             scope.launch {
                 try {
                     val credentialManager = CredentialManager.create(context)
@@ -2391,5 +2526,39 @@ object FirebaseManager {
         cal.add(Calendar.DAY_OF_YEAR, -1)
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         return sdf.format(cal.time)
+    }
+
+    /** Mengambil profil publik user lain berdasarkan UID dari Firestore (untuk preview profil chat). */
+    suspend fun fetchUserProfileByUid(uid: String): UserProfile? {
+        if (uid.isBlank()) return null
+        return try {
+            val snap = firestore.collection("users").document(uid).get().await()
+            if (snap.exists()) {
+                parseUserProfileFromSnapshot(
+                    snapshot = snap,
+                    fallbackUid = uid,
+                    fallbackSession = null,
+                    allowCurrentAuthTimestampFallback = (uid == getActiveUid())
+                )
+            } else {
+                val query = firestore.collection("users")
+                    .whereEqualTo("uid", uid)
+                    .limit(1)
+                    .get()
+                    .await()
+                val first = query.documents.firstOrNull()
+                if (first != null && first.exists()) {
+                    parseUserProfileFromSnapshot(
+                        snapshot = first,
+                        fallbackUid = uid,
+                        fallbackSession = null,
+                        allowCurrentAuthTimestampFallback = (uid == getActiveUid())
+                    )
+                } else null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Gagal mengambil profil peer $uid: ${e.message}")
+            null
+        }
     }
 }

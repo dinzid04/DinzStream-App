@@ -35,6 +35,7 @@ object R2CdnUploader {
     private const val TG_UPLOAD_KEY = "yrn_tg_a86e4f8a6563a37e1afb996e93850e97"
 
     private const val MAX_ANIMATED_UPLOAD_BYTES = 18 * 1024 * 1024
+    private const val MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
@@ -110,6 +111,76 @@ object R2CdnUploader {
             )
         } catch (e: Exception) {
             Log.e(TAG, "Gagal memproses/upload media: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /** Memproses foto/GIF chat (maksimal 10 MB) lalu mengunggah ke Telegram CDN. */
+    suspend fun compressAndUploadChatImage(
+        context: Context,
+        uriString: String,
+        uid: String
+    ): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            if (uriString.startsWith("http://") || uriString.startsWith("https://")) {
+                return@withContext Result.success(uriString)
+            }
+            val uri = Uri.parse(uriString)
+            if (VideoToGifConverter.isVideoUri(context, uri)) {
+                return@withContext Result.failure(
+                    Exception("Pilih file gambar atau GIF animasi (maks 10 MB).")
+                )
+            }
+            val rawBytes = readBytesBounded(context, uri, MAX_CHAT_IMAGE_BYTES + 1)
+            val prepared = if (rawBytes != null && rawBytes.size <= MAX_CHAT_IMAGE_BYTES &&
+                VideoToGifConverter.isAnimatedImageBytes(rawBytes)
+            ) {
+                val (mime, ext) = VideoToGifConverter.detectImageMimeAndExt(rawBytes)
+                PreparedUpload(bytes = rawBytes, mimeType = mime, ext = ext)
+            } else if (rawBytes == null) {
+                val head = readBytesBounded(context, uri, 32 * 1024)
+                val mimeHint = context.contentResolver.getType(uri).orEmpty().lowercase()
+                if (mimeHint.contains("gif") || (head != null && VideoToGifConverter.isAnimatedImageBytes(head))) {
+                    return@withContext Result.failure(
+                        Exception("GIF/WebP animasi melebihi batas maksimal 10 MB.")
+                    )
+                }
+                val webpBytes = compressStaticToWebP(
+                    context = context,
+                    uri = uri,
+                    maxWidth = 1280,
+                    targetMaxBytes = 420 * 1024
+                ) ?: return@withContext Result.failure(
+                    Exception("Ukuran media melebihi batas maksimal 10 MB.")
+                )
+                PreparedUpload(bytes = webpBytes, mimeType = "image/webp", ext = "webp")
+            } else {
+                val webpBytes = compressStaticToWebP(
+                    context = context,
+                    uri = uri,
+                    maxWidth = 1280,
+                    targetMaxBytes = 420 * 1024
+                ) ?: return@withContext Result.failure(
+                    Exception("Gagal memproses gambar chat.")
+                )
+                PreparedUpload(bytes = webpBytes, mimeType = "image/webp", ext = "webp")
+            }
+
+            if (prepared.bytes.size > MAX_CHAT_IMAGE_BYTES) {
+                return@withContext Result.failure(
+                    Exception("Ukuran media melebihi batas maksimal 10 MB.")
+                )
+            }
+
+            uploadToTelegramCdn(
+                bytes = prepared.bytes,
+                mimeType = prepared.mimeType,
+                ext = prepared.ext,
+                uid = uid,
+                type = "chat"
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Gagal upload gambar chat: ${e.message}", e)
             Result.failure(e)
         }
     }

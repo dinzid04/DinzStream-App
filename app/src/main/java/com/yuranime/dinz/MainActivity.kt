@@ -29,6 +29,7 @@ import com.yuranime.dinz.data.update.AppUpdateInfo
 import com.yuranime.dinz.data.update.UpdateChecker
 import com.yuranime.dinz.ui.comic.ComicDetailScreen
 import com.yuranime.dinz.ui.comic.ComicHomeScreen
+import com.yuranime.dinz.ui.chat.GlobalChatScreen
 import com.yuranime.dinz.ui.comic.ComicReaderScreen
 import com.yuranime.dinz.ui.comic.ComicSearchScreen
 import com.yuranime.dinz.ui.comic.ComicViewAllScreen
@@ -102,7 +103,24 @@ class MainActivity : ComponentActivity() {
                     var currentTab by remember { mutableStateOf(NavTab.HOME) }
                     var isComicMode by rememberSaveable { mutableStateOf(false) }
                     var selectedComicTab by rememberSaveable { mutableStateOf(ComicNavTab.HOME) }
+                    var chatReturnTab by remember { mutableStateOf(NavTab.HOME) }
+                    var chatReturnComicMode by rememberSaveable { mutableStateOf(false) }
+                    var chatReturnComicTab by rememberSaveable { mutableStateOf(ComicNavTab.HOME) }
                     var activeComicGenreFilter by remember { mutableStateOf<String?>(null) }
+
+                    fun openGlobalChat() {
+                        chatReturnTab = currentTab
+                        chatReturnComicMode = isComicMode
+                        chatReturnComicTab = selectedComicTab
+                        isComicMode = false
+                        currentTab = NavTab.CHAT
+                    }
+
+                    fun closeGlobalChat() {
+                        isComicMode = chatReturnComicMode
+                        selectedComicTab = chatReturnComicTab
+                        currentTab = if (chatReturnTab == NavTab.CHAT) NavTab.HOME else chatReturnTab
+                    }
                     var pendingUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
 
                     // Real-time Promo Popup State
@@ -118,17 +136,9 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // TAHAP 1: Pengecekan versi SemVer otomatis saat aplikasi dibuka
-                    LaunchedEffect(Unit) {
-                        try {
-                            val info = UpdateChecker.checkUpdate(BuildConfig.VERSION_NAME)
-                            if (info != null && info.isUpdateAvailable) {
-                                pendingUpdateInfo = info
-                            }
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
-                    }
+                    // Pengecekan update otomatis saat startup dinonaktifkan sementara untuk rilis bertahap ini
+                    // agar pengguna terinstall tidak terus mendapat popup pembaruan di awal buka aplikasi.
+                    // Pengecekan manual lewat Profil -> Periksa Pembaruan tetap tersedia.
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         when {
@@ -262,7 +272,7 @@ class MainActivity : ComponentActivity() {
                                                         currentTab = NavTab.HOME
                                                     }
                                                     ComicNavTab.CHAT -> {
-                                                        Toast.makeText(this@MainActivity, "Fitur ${tab.title} segera hadir", Toast.LENGTH_SHORT).show()
+                                                        openGlobalChat()
                                                     }
                                                     ComicNavTab.CARI -> {
                                                         activeComicGenreFilter = null
@@ -314,7 +324,7 @@ class MainActivity : ComponentActivity() {
                                                         currentTab = NavTab.HOME
                                                     }
                                                     ComicNavTab.CHAT -> {
-                                                        Toast.makeText(this@MainActivity, "Fitur ${tab.title} segera hadir", Toast.LENGTH_SHORT).show()
+                                                        openGlobalChat()
                                                     }
                                                     else -> {
                                                         selectedComicTab = tab
@@ -331,7 +341,7 @@ class MainActivity : ComponentActivity() {
                                             selectedTab = currentTab,
                                             onTabSelected = { tab ->
                                                 if (tab == NavTab.CHAT) {
-                                                    Toast.makeText(this@MainActivity, "Fitur ${tab.title} segera hadir", Toast.LENGTH_SHORT).show()
+                                                    openGlobalChat()
                                                 } else if (tab == NavTab.COMIC) {
                                                     selectedComicTab = ComicNavTab.HOME
                                                 } else {
@@ -377,7 +387,7 @@ class MainActivity : ComponentActivity() {
                                             selectedTab = currentTab,
                                             onTabSelected = { tab ->
                                                 if (tab == NavTab.CHAT) {
-                                                    Toast.makeText(this@MainActivity, "Fitur ${tab.title} segera hadir", Toast.LENGTH_SHORT).show()
+                                                    openGlobalChat()
                                                 } else if (tab == NavTab.COMIC) {
                                                     isComicMode = true
                                                     selectedComicTab = ComicNavTab.HOME
@@ -418,7 +428,7 @@ class MainActivity : ComponentActivity() {
                                             selectedTab = currentTab,
                                             onTabSelected = { tab ->
                                                 if (tab == NavTab.CHAT) {
-                                                    Toast.makeText(this@MainActivity, "Fitur ${tab.title} segera hadir", Toast.LENGTH_SHORT).show()
+                                                    openGlobalChat()
                                                 } else if (tab == NavTab.COMIC) {
                                                     isComicMode = true
                                                     selectedComicTab = ComicNavTab.HOME
@@ -442,7 +452,7 @@ class MainActivity : ComponentActivity() {
                                             selectedTab = currentTab,
                                             onTabSelected = { tab ->
                                                 if (tab == NavTab.CHAT) {
-                                                    Toast.makeText(this@MainActivity, "Fitur ${tab.title} segera hadir", Toast.LENGTH_SHORT).show()
+                                                    openGlobalChat()
                                                 } else if (tab == NavTab.COMIC) {
                                                     isComicMode = true
                                                     selectedComicTab = ComicNavTab.HOME
@@ -471,7 +481,7 @@ class MainActivity : ComponentActivity() {
                                                         currentTab = NavTab.HOME
                                                     }
                                                     ComicNavTab.CHAT -> {
-                                                        Toast.makeText(this@MainActivity, "Fitur ${tab.title} segera hadir", Toast.LENGTH_SHORT).show()
+                                                        openGlobalChat()
                                                     }
                                                     ComicNavTab.CARI -> {
                                                         activeComicGenreFilter = null
@@ -511,7 +521,7 @@ class MainActivity : ComponentActivity() {
                                             selectedTab = currentTab,
                                             onTabSelected = { tab ->
                                                 if (tab == NavTab.CHAT) {
-                                                    Toast.makeText(this@MainActivity, "Fitur ${tab.title} segera hadir", Toast.LENGTH_SHORT).show()
+                                                    openGlobalChat()
                                                 } else if (tab == NavTab.COMIC) {
                                                     isComicMode = true
                                                     selectedComicTab = ComicNavTab.HOME
@@ -541,6 +551,15 @@ class MainActivity : ComponentActivity() {
                                                         Toast.makeText(this@MainActivity, "Gagal memeriksa pembaruan", Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
+                                            }
+                                        )
+                                    }
+                                    NavTab.CHAT -> {
+                                        GlobalChatScreen(
+                                            onBackClick = { closeGlobalChat() },
+                                            onOpenLoginProfile = {
+                                                isComicMode = false
+                                                currentTab = NavTab.PROFILE
                                             }
                                         )
                                     }

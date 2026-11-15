@@ -87,6 +87,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -152,6 +153,7 @@ import com.yuranime.dinz.ui.theme.SfProFontFamily
 import com.yuranime.dinz.ui.theme.YuranimeLogoFontFamily
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class ProfileSubScreen {
@@ -183,6 +185,7 @@ fun LoginProfileScreen(
     onComicChapterClick: ((chapterId: String) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val authDb = remember { LocalAuthDatabase(context) }
 
     var currentSubScreen by remember { mutableStateOf(ProfileSubScreen.MAIN) }
@@ -244,23 +247,22 @@ fun LoginProfileScreen(
                         .ifBlank { "Pengguna Google" }
                 val photoUrl = account.photoUrl?.toString()
 
-                AppPreferences.saveGoogleSession(context, googleId, displayName, email, photoUrl)
-                authDb.setLoggedIn(true, displayName)
-                if (!photoUrl.isNullOrBlank()) {
-                    authDb.setAvatarUrl(photoUrl)
+                // Tunggu pengecekan Firestore selesai agar foto/nama hasil edit tidak tertimpa Google.
+                scope.launch {
+                    val resolvedProfile = FirebaseManager.onGoogleAccountSelectedAwait(
+                        uid = googleId,
+                        name = displayName,
+                        email = email,
+                        avatar = photoUrl,
+                        idToken = account.idToken,
+                        context = context
+                    )
+                    authDb.setLoggedIn(true, resolvedProfile.name)
+                    authDb.setAvatarUrl(resolvedProfile.avatar)
+                    authDb.setCoverUrl(resolvedProfile.banner)
+                    isLoggingIn = false
+                    Toast.makeText(context, "Selamat datang, ${resolvedProfile.name}!", Toast.LENGTH_SHORT).show()
                 }
-
-                FirebaseManager.onGoogleAccountSelected(
-                    uid = googleId,
-                    name = displayName,
-                    email = email,
-                    avatar = photoUrl,
-                    idToken = account.idToken,
-                    context = context
-                )
-
-                isLoggingIn = false
-                Toast.makeText(context, "Selamat datang, $displayName!", Toast.LENGTH_SHORT).show()
             } else {
                 isLoggingIn = false
             }

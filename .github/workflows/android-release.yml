@@ -63,23 +63,20 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Telegram CDN (Animated GIF/WebP/Video Profile & Banner) & Fix Custom Title Alignment (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Chat Global Real-Time, Stiker 2 Mode & Perbaikan Profil Login Google (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
             ### Pembaruan Utama:
-            1. **CDN Telegram + Cloudflare Worker (`yuranime-tg-cdn`):**
-               - Menghapus total ketergantungan pada `dinzid` CDN & Catbox untuk upload avatar, cover banner, bingkai Top 1-3, dan aset maskot komik.
-               - Upload permanen langsung tersimpan ke channel Telegram via Cloudflare Worker dengan cache global 1 tahun (`Cache-Control: immutable`).
-            2. **Support Avatar & Banner Bergerak (GIF, WebP Animasi, Video-to-GIF):**
-               - Pemilih galeri di Edit Profil kini mendukung foto statis, GIF, WebP animasi, dan file video (`.mp4`/`.mov`/`.webm`).
-               - File video otomatis dikonversi langsung di perangkat menjadi Animated GIF loop sebelum pratinjau dan upload, sementara file GIF/WebP animasi dipertahankan tanpa merusak frame geraknya.
-            3. **Perbaikan Posisi Teks Custom Title Badge:**
-               - Menghilangkan `fontPadding` bawaan dan `lineHeight` berlebih pada `GeometricTitleBadge`, `SleekChamferedMicroTag`, dan `SleekHexChevronLevelTag` sehingga teks judul presisi di tengah bingkai poligon dan aman dari potongan sudut kanan.
-               - Merapikan dialog **Pilih Custom Title** agar semua lencana sejajar rata kiri tanpa distorsi skala.
+            1. **Perbaikan Profil Login Google:**
+               - Mencegah nama, foto profil R2/Telegram CDN, banner, bio, dan kosmetik pengguna tertimpa data bawaan Google saat logout dan login kembali.
+            2. **Fitur Chat Global (`GlobalChatScreen`) & Preload Stiker Sticker.ly:**
+               - Top header real-time dengan kehadiran `chat_presence` (maksimal 4 avatar online + `+N`), gelembung berekor modern dengan Avatar Decoration statis, Swipe-to-Reply WhatsApp, dan Context Menu Popover iOS.
+               - Panel stiker 2 mode (Inline Emoji-Sticker 8-kolom sebaris dengan teks & Stiker Besar 4-kolom), pencarian cepat Sticker.ly, bar thumbnail sinkron 2 arah, serta manajemen paket default real-time dari Web Admin.
+               - Upload foto/GIF chat langsung ke Telegram Worker CDN (maks 10 MB) dan Bottom Sheet Preview Profil teman dengan kosmetik animasi penuh.
           draft: false
           prerelease: false
-          make_latest: true
+          make_latest: false
           files: |
             build-output/Yuranime-v${{ env.APP_VERSION }}-b${{ github.run_number }}.apk
         env:
