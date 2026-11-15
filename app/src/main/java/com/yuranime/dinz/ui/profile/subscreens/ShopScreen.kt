@@ -77,6 +77,7 @@ import com.yuranime.dinz.data.firebase.BorderDefinition
 import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.firebase.ProfileEffectDefinition
 import com.yuranime.dinz.data.firebase.TitleDefinition
+import com.yuranime.dinz.data.firebase.TitleUnlockType
 import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
 import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
@@ -467,9 +468,12 @@ fun ShopScreen(
                     }
 
                     items(allTitles, key = { it.id }) { titleDef ->
-                        val isOwned = unlockedTitles.any { it.equals(titleDef.titleName, ignoreCase = true) }
+                        val isRedeemOnly = titleDef.unlockType == TitleUnlockType.REDEEM_ONLY
+                        val isMilestoneFree = titleDef.unlockType == TitleUnlockType.MILESTONE
+                        val isOwned = unlockedTitles.any { it.equals(titleDef.titleName, ignoreCase = true) } ||
+                            (isMilestoneFree && level >= titleDef.requiredLevel)
                         val isEquipped = equippedTitle.equals(titleDef.titleName, ignoreCase = true)
-                        val isLevelLocked = level < titleDef.requiredLevel
+                        val isLevelLocked = !isRedeemOnly && level < titleDef.requiredLevel
 
                         Row(
                             modifier = Modifier
@@ -485,7 +489,9 @@ fun ShopScreen(
                                     GeometricTitleBadge(
                                         titleName = titleDef.titleName,
                                         tierLevel = titleDef.tierLevel,
-                                        styleVariant = titleDef.styleVariant
+                                        styleVariant = titleDef.styleVariant,
+                                        vfxTier = titleDef.vfxTier,
+                                        titleId = titleDef.id
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
@@ -507,13 +513,18 @@ fun ShopScreen(
                                         when {
                                             isEquipped -> Color(0xFF1E202B)
                                             isOwned -> Color(0xFFE11D48)
+                                            isRedeemOnly -> Color(0xFF1E1B2E)
                                             isLevelLocked -> Color(0xFF181B26)
                                             else -> Color(0xFFE11D48)
                                         }
                                     )
                                     .border(
                                         1.dp,
-                                        if (isEquipped) Color(0xFFE11D48).copy(alpha = 0.5f) else Color.Transparent,
+                                        when {
+                                            isEquipped -> Color(0xFFE11D48).copy(alpha = 0.5f)
+                                            isRedeemOnly && !isOwned -> Color(0xFFA855F7).copy(alpha = 0.45f)
+                                            else -> Color.Transparent
+                                        },
                                         RoundedCornerShape(10.dp)
                                     )
                                     .clickable {
@@ -522,6 +533,12 @@ fun ShopScreen(
                                             FirebaseManager.equipTitle(context, titleDef) { _, msg ->
                                                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                             }
+                                        } else if (isRedeemOnly) {
+                                            Toast.makeText(
+                                                context,
+                                                "Title eksklusif ini hanya bisa didapatkan melalui Kode Redeem!",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
                                         } else if (isLevelLocked) {
                                             Toast.makeText(context, "Capai Level ${titleDef.requiredLevel} untuk membuka Title ini!", Toast.LENGTH_SHORT).show()
                                         } else {
@@ -539,6 +556,9 @@ fun ShopScreen(
                                     }
                                     isOwned -> {
                                         Text(text = "Pasang", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
+                                    }
+                                    isRedeemOnly -> {
+                                        Text(text = "Redeem", color = Color(0xFFC084FC), fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)
                                     }
                                     isLevelLocked -> {
                                         Text(text = "🔒 Lv. ${titleDef.requiredLevel}", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = SfProFontFamily)

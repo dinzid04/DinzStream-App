@@ -25,6 +25,8 @@ import com.google.firebase.firestore.SetOptions
 import com.yuranime.dinz.data.local.AppPreferences
 import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.local.SavedGoogleUserSession
+import com.yuranime.dinz.ui.components.TitleVfxTier
+import com.yuranime.dinz.ui.components.VERIFIED_BADGE_DEFAULT_HEX
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -46,7 +48,8 @@ import kotlin.math.abs
 
 enum class TitleUnlockType {
     MILESTONE,
-    POINTS_SHOP
+    POINTS_SHOP,
+    REDEEM_ONLY
 }
 
 data class TitleDefinition(
@@ -57,7 +60,8 @@ data class TitleDefinition(
     val unlockType: TitleUnlockType,
     val requiredLevel: Int = 1,
     val pointCost: Long = 0L,
-    val description: String = ""
+    val description: String = "",
+    val vfxTier: TitleVfxTier = TitleVfxTier.SUBTLE_SHIMMER
 )
 
 data class BorderDefinition(
@@ -125,7 +129,9 @@ data class UserProfile(
     val lastCheckInDate: String = "",
     val checkInStreak: Int = 0,
     val nextLevelTargetExp: Long = 500L,
-    val expProgress: Float = 0f
+    val expProgress: Float = 0f,
+    val isVerified: Boolean = false,
+    val verifiedColor: String = VERIFIED_BADGE_DEFAULT_HEX
 ) {
     val expToNextLevel: Long
         get() = (nextLevelTargetExp - exp).coerceAtLeast(0L)
@@ -147,7 +153,9 @@ data class LeaderboardUser(
     val equippedTitleTier: Int = 1,
     val equippedTitleVariant: Int = 0,
     val equippedBorderUrl: String = "",
-    val equippedProfileEffectUrl: String = ""
+    val equippedProfileEffectUrl: String = "",
+    val isVerified: Boolean = false,
+    val verifiedColor: String = VERIFIED_BADGE_DEFAULT_HEX
 )
 
 data class GoogleSessionInfo(
@@ -184,8 +192,9 @@ object FirebaseManager {
     const val TOP_2_BORDER_URL = "https://yuranime-tg-cdn.gadingkencana04.workers.dev/f/BQACAgUAAyEGAAMBCfs22gADBmr42cstH_akk1CXWyCItkIXZJ6mAAJRKgAC6K7IV6NESEpi9FYxPQQ/top_2_border_url.png"
     const val TOP_3_BORDER_URL = "https://yuranime-tg-cdn.gadingkencana04.workers.dev/f/BQACAgUAAyEGAAMBCfs22gADB2r42dDemUCiG2gxsx0FrPdq8WzNAAJTKgAC6K7IV0VQ5hQdaw9mPQQ/top_3_border_url.png"
 
-    // Katalog Title Resmi (Milestone Level & Tukar Poin)
+    // Katalog Title Resmi (Milestone Level, Shop Bertingkat, & Redeem Eksklusif)
     val ALL_TITLES: List<TitleDefinition> = listOf(
+        // === A. MILESTONE LEVEL (Gratis Starter -> Meriah di Level Tinggi) ===
         TitleDefinition(
             id = "title_lv1_starter",
             titleName = "WARGA YURANIME",
@@ -193,7 +202,8 @@ object FirebaseManager {
             styleVariant = 0,
             unlockType = TitleUnlockType.MILESTONE,
             requiredLevel = 1,
-            description = "Terbuka otomatis saat bergabung sebagai keluarga Yuranime"
+            description = "Pelat pemula sederhana untuk anggota baru Yuranime",
+            vfxTier = TitleVfxTier.NONE
         ),
         TitleDefinition(
             id = "title_lv5_pioneer",
@@ -202,25 +212,28 @@ object FirebaseManager {
             styleVariant = 1,
             unlockType = TitleUnlockType.MILESTONE,
             requiredLevel = 5,
-            description = "Capai Level 5 melalui misi menonton dan check-in harian"
+            description = "Capai Level 5 lewat misi menonton & check-in harian",
+            vfxTier = TitleVfxTier.SUBTLE_SHIMMER
         ),
         TitleDefinition(
             id = "title_lv10_explorer",
             titleName = "PENJELAJAH KOMIK",
             tierLevel = 10,
-            styleVariant = 2,
+            styleVariant = 3,
             unlockType = TitleUnlockType.MILESTONE,
             requiredLevel = 10,
-            description = "Capai Level 10 dengan aktif menjelajahi anime & komik"
+            description = "Capai Level 10 dengan aktif menjelajahi anime & komik",
+            vfxTier = TitleVfxTier.SUBTLE_SHIMMER
         ),
         TitleDefinition(
             id = "title_lv15_vanguard",
             titleName = "VANGUARD OTAKU",
             tierLevel = 15,
-            styleVariant = 3,
+            styleVariant = 4,
             unlockType = TitleUnlockType.MILESTONE,
             requiredLevel = 15,
-            description = "Capai Level 15 sebagai garda depan komunitas Yuranime"
+            description = "Capai Level 15 — Bingkai HUD Mecha dengan sapuan radar",
+            vfxTier = TitleVfxTier.PULSE_SCAN
         ),
         TitleDefinition(
             id = "title_lv25_dimension",
@@ -229,7 +242,18 @@ object FirebaseManager {
             styleVariant = 1,
             unlockType = TitleUnlockType.MILESTONE,
             requiredLevel = 25,
-            description = "Capai Level 25 dengan dedikasi tinggi di Yuranime"
+            description = "Capai Level 25 — Sirkuit antariksa dengan aura nebula",
+            vfxTier = TitleVfxTier.VOID_NEBULA
+        ),
+        TitleDefinition(
+            id = "title_lv35_knight",
+            titleName = "KSATRIA ISEKAI",
+            tierLevel = 35,
+            styleVariant = 2,
+            unlockType = TitleUnlockType.MILESTONE,
+            requiredLevel = 35,
+            description = "Capai Level 35 — Bilah faset poligon dengan bara api hangat",
+            vfxTier = TitleVfxTier.EMBER_SPARK
         ),
         TitleDefinition(
             id = "title_lv50_sepuh",
@@ -238,43 +262,530 @@ object FirebaseManager {
             styleVariant = 3,
             unlockType = TitleUnlockType.MILESTONE,
             requiredLevel = 50,
-            description = "Gelar kehormatan tertinggi untuk legenda Level 50+"
+            description = "Capai Level 50 — Gelar naga legendaris berkobar api aktif",
+            vfxTier = TitleVfxTier.BLAZING_INFERNO
         ),
+        TitleDefinition(
+            id = "title_lv65_grandmaster",
+            titleName = "GRANDMASTER LORE",
+            tierLevel = 65,
+            styleVariant = 4,
+            unlockType = TitleUnlockType.MILESTONE,
+            requiredLevel = 65,
+            description = "Capai Level 65 — Pelat mecha berlapis foil prismatik",
+            vfxTier = TitleVfxTier.HOLO_PRISM
+        ),
+        TitleDefinition(
+            id = "title_lv80_emperor",
+            titleName = "EMPEROR OF OTAKU",
+            tierLevel = 80,
+            styleVariant = 2,
+            unlockType = TitleUnlockType.MILESTONE,
+            requiredLevel = 80,
+            description = "Capai Level 80 — Trofi kaisar dengan sambaran petir bercabang",
+            vfxTier = TitleVfxTier.LIGHTNING_STORM
+        ),
+        TitleDefinition(
+            id = "title_lv100_akashic",
+            titleName = "AKASHIC SOVEREIGN",
+            tierLevel = 100,
+            styleVariant = 1,
+            unlockType = TitleUnlockType.MILESTONE,
+            requiredLevel = 100,
+            description = "Capai Level 100 — Takhta Phoenix tertinggi dengan korona surya",
+            vfxTier = TitleVfxTier.SOLAR_FLARE
+        ),
+
+        // === B. POINTS SHOP — ENTRY / CASUAL (Terjangkau, Gaya Bersih & Sederhana) ===
+        TitleDefinition(
+            id = "shop_vault_hunter",
+            titleName = "PEMBURU KOLEKSI",
+            tierLevel = 4,
+            styleVariant = 0,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 1,
+            pointCost = 450L,
+            description = "Badge tas petualang klasik untuk kolektor awal",
+            vfxTier = TitleVfxTier.NONE
+        ),
+        TitleDefinition(
+            id = "shop_ramen_chef",
+            titleName = "PENJAGA RAMEN",
+            tierLevel = 5,
+            styleVariant = 3,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 1,
+            pointCost = 650L,
+            description = "Pot hangat bergaya diagonal simpel untuk penikmat slice-of-life",
+            vfxTier = TitleVfxTier.SUBTLE_SHIMMER
+        ),
+        TitleDefinition(
+            id = "shop_cozy_pumpkin",
+            titleName = "PUMPKIN PHANTOM",
+            tierLevel = 6,
+            styleVariant = 0,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 1,
+            pointCost = 800L,
+            description = "Lentera labu klasik dengan efek kilau tipis",
+            vfxTier = TitleVfxTier.SUBTLE_SHIMMER
+        ),
+        TitleDefinition(
+            id = "shop_peace_keeper",
+            titleName = "PEACEKEEPER",
+            tierLevel = 7,
+            styleVariant = 1,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 1,
+            pointCost = 950L,
+            description = "Simbol merpati damai bagi anggota ramah Global Chat",
+            vfxTier = TitleVfxTier.SUBTLE_SHIMMER
+        ),
+        TitleDefinition(
+            id = "shop_alchemist_heart",
+            titleName = "ALCHEMIST HEART",
+            tierLevel = 9,
+            styleVariant = 0,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 3,
+            pointCost = 1100L,
+            description = "Labu alkimia romantis dengan sapuan cahaya lembut",
+            vfxTier = TitleVfxTier.SUBTLE_SHIMMER
+        ),
+        TitleDefinition(
+            id = "shop_iron_brawler",
+            titleName = "IRON BRAWLER",
+            tierLevel = 10,
+            styleVariant = 2,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 5,
+            pointCost = 1350L,
+            description = "Tinju besi faset obsidian untuk fans genre shonen tarung",
+            vfxTier = TitleVfxTier.PULSE_SCAN
+        ),
+        TitleDefinition(
+            id = "shop_forge_master",
+            titleName = "FORGE MASTER",
+            tierLevel = 11,
+            styleVariant = 4,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 5,
+            pointCost = 1500L,
+            description = "Paron tempa mekanis bergaya bingkai HUD metalik",
+            vfxTier = TitleVfxTier.PULSE_SCAN
+        ),
+        TitleDefinition(
+            id = "shop_love_potion",
+            titleName = "CRIMSON ELIXIR",
+            tierLevel = 12,
+            styleVariant = 3,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 5,
+            pointCost = 1600L,
+            description = "Ramuan vitalitas bergaya potongan diagonal tajam",
+            vfxTier = TitleVfxTier.SUBTLE_SHIMMER
+        ),
+
+        // === C. POINTS SHOP — RARE / EPIC (Efek Cyber, Frost, Holo & Ember) ===
         TitleDefinition(
             id = "shop_crimson_knight",
             titleName = "KSATRIA CRIMSON",
-            tierLevel = 8,
-            styleVariant = 0,
+            tierLevel = 14,
+            styleVariant = 3,
             unlockType = TitleUnlockType.POINTS_SHOP,
-            pointCost = 100L,
-            description = "Badge geometris eksklusif bertema prajurit Crimson"
+            requiredLevel = 8,
+            pointCost = 2000L,
+            description = "Dua pedang bersilang dengan percikan bara merah menyala",
+            vfxTier = TitleVfxTier.EMBER_SPARK
         ),
         TitleDefinition(
             id = "shop_marathon_king",
             titleName = "RAJA MARATON",
-            tierLevel = 14,
-            styleVariant = 2,
+            tierLevel = 16,
+            styleVariant = 1,
             unlockType = TitleUnlockType.POINTS_SHOP,
-            pointCost = 200L,
-            description = "Simbol penakluk ratusan episode anime tanpa henti"
+            requiredLevel = 10,
+            pointCost = 2400L,
+            description = "Jam pasir penakluk anime dengan trace sirkuit & radar pulse",
+            vfxTier = TitleVfxTier.PULSE_SCAN
+        ),
+        TitleDefinition(
+            id = "shop_goblin_slayer",
+            titleName = "GOBLIN SLAYER",
+            tierLevel = 17,
+            styleVariant = 4,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 10,
+            pointCost = 2600L,
+            description = "Pelat mecha pemburu dungeon berbalut kilau bara merah",
+            vfxTier = TitleVfxTier.EMBER_SPARK
         ),
         TitleDefinition(
             id = "shop_amethyst_lord",
             titleName = "BANGSAWAN KOMIK",
             tierLevel = 20,
+            styleVariant = 2,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 12,
+            pointCost = 3000L,
+            description = "Bilah faset istana kristal dengan spektrum holografik",
+            vfxTier = TitleVfxTier.HOLO_PRISM
+        ),
+        TitleDefinition(
+            id = "shop_druid_sanctuary",
+            titleName = "DRUID SANCTUARY",
+            tierLevel = 21,
             styleVariant = 1,
             unlockType = TitleUnlockType.POINTS_SHOP,
-            pointCost = 350L,
-            description = "Gelar Royal Amethyst untuk pembaca setia manhwa & manga"
+            requiredLevel = 12,
+            pointCost = 3200L,
+            description = "Tongkat alam zamrud dengan denyut sirkuit hijau neon",
+            vfxTier = TitleVfxTier.PULSE_SCAN
+        ),
+        TitleDefinition(
+            id = "shop_treasure_warden",
+            titleName = "VAULT WARDEN",
+            tierLevel = 22,
+            styleVariant = 0,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 15,
+            pointCost = 3500L,
+            description = "Penjaga peti pusaka emas dengan efek kilau prismatik",
+            vfxTier = TitleVfxTier.HOLO_PRISM
+        ),
+        TitleDefinition(
+            id = "shop_rider_nomad",
+            titleName = "NOMAD RIDER",
+            tierLevel = 23,
+            styleVariant = 3,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 15,
+            pointCost = 3600L,
+            description = "Pelana pengembara dunia paralel dengan strip diagonal",
+            vfxTier = TitleVfxTier.PULSE_SCAN
+        ),
+        TitleDefinition(
+            id = "shop_glacial_monarch",
+            titleName = "GLACIAL MONARCH",
+            tierLevel = 25,
+            styleVariant = 2,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 15,
+            pointCost = 4200L,
+            description = "Faset kristal es biru membeku dengan refraksi prisma",
+            vfxTier = TitleVfxTier.FROST_PRISM
+        ),
+        TitleDefinition(
+            id = "shop_cyber_netrunner",
+            titleName = "CYBER NETRUNNER",
+            tierLevel = 27,
+            styleVariant = 1,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 18,
+            pointCost = 4800L,
+            description = "Roda gigi cyber dengan node sirkuit & scanline aktif",
+            vfxTier = TitleVfxTier.PULSE_SCAN
+        ),
+        TitleDefinition(
+            id = "shop_dizzy_trickster",
+            titleName = "PHANTOM JESTER",
+            tierLevel = 28,
+            styleVariant = 3,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 18,
+            pointCost = 5000L,
+            description = "Gelar ilusionis kosmik dengan gelombang nebula ungu",
+            vfxTier = TitleVfxTier.VOID_NEBULA
+        ),
+        TitleDefinition(
+            id = "shop_berserker_cleaver",
+            titleName = "BERSERKER CLEAVER",
+            tierLevel = 30,
+            styleVariant = 2,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 20,
+            pointCost = 5400L,
+            description = "Kapak raksasa dengan letupan partikel bara darah",
+            vfxTier = TitleVfxTier.EMBER_SPARK
+        ),
+        TitleDefinition(
+            id = "shop_bombardier",
+            titleName = "ARCANE BOMBARDIER",
+            tierLevel = 31,
+            styleVariant = 4,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 20,
+            pointCost = 5600L,
+            description = "Meriam mecha berenergi ledak & kilau percikan api",
+            vfxTier = TitleVfxTier.EMBER_SPARK
+        ),
+        TitleDefinition(
+            id = "shop_beast_tamer",
+            titleName = "BEAST TAMER",
+            tierLevel = 32,
+            styleVariant = 1,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 20,
+            pointCost = 5800L,
+            description = "Lambang beruang buas di pelat sirkuit bertenaga",
+            vfxTier = TitleVfxTier.EMBER_SPARK
+        ),
+        TitleDefinition(
+            id = "shop_shadow_shinobi",
+            titleName = "SHADOW SHINOBI",
+            tierLevel = 34,
+            styleVariant = 3,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 22,
+            pointCost = 6200L,
+            description = "Shuriken bayangan dengan kabut void ungu & biru tua",
+            vfxTier = TitleVfxTier.VOID_NEBULA
+        ),
+        TitleDefinition(
+            id = "shop_ronin_katana",
+            titleName = "RONIN KATANA",
+            tierLevel = 35,
+            styleVariant = 4,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 22,
+            pointCost = 6800L,
+            description = "Bilah katana mecha tajam dengan percikan api baja",
+            vfxTier = TitleVfxTier.EMBER_SPARK
+        ),
+        TitleDefinition(
+            id = "shop_fuse_demolition",
+            titleName = "PYRO TECHNICIAN",
+            tierLevel = 36,
+            styleVariant = 2,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 25,
+            pointCost = 7200L,
+            description = "Bom sumbu klasik dibalut kristal faset membara",
+            vfxTier = TitleVfxTier.EMBER_SPARK
+        ),
+        TitleDefinition(
+            id = "shop_skull_warlord",
+            titleName = "SKULL WARLORD",
+            tierLevel = 37,
+            styleVariant = 4,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 25,
+            pointCost = 7500L,
+            description = "Tengkorak berhelm perang dengan aura void mematikan",
+            vfxTier = TitleVfxTier.VOID_NEBULA
+        ),
+        TitleDefinition(
+            id = "shop_curse_collar",
+            titleName = "CURSE BEARER",
+            tierLevel = 38,
+            styleVariant = 3,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 25,
+            pointCost = 7800L,
+            description = "Kalung kutukan kuno dalam bingkai slash bermuatan nebula",
+            vfxTier = TitleVfxTier.VOID_NEBULA
+        ),
+
+        // === D. POINTS SHOP — LUXURY / MYTHIC (Kobaran Api, Petir Bercabang, & Korona Surya!) ===
+        TitleDefinition(
+            id = "shop_inferno_emperor",
+            titleName = "INFERNO EMPEROR",
+            tierLevel = 45,
+            styleVariant = 2,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 30,
+            pointCost = 9500L,
+            description = "Aura api neraka berkobar nyata di atas pelat faset gelap",
+            vfxTier = TitleVfxTier.BLAZING_INFERNO
+        ),
+        TitleDefinition(
+            id = "shop_raijin_thunder",
+            titleName = "RAIJIN THUNDER",
+            tierLevel = 48,
+            styleVariant = 4,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 30,
+            pointCost = 10500L,
+            description = "Kilat bercabang menyambar aktif melintasi bingkai HUD mecha",
+            vfxTier = TitleVfxTier.LIGHTNING_STORM
+        ),
+        TitleDefinition(
+            id = "shop_crimson_shogun",
+            titleName = "CRIMSON SHOGUN",
+            tierLevel = 52,
+            styleVariant = 3,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 35,
+            pointCost = 12000L,
+            description = "Kabuto samurai agung diselimuti lidah api crimson membara",
+            vfxTier = TitleVfxTier.BLAZING_INFERNO
+        ),
+        TitleDefinition(
+            id = "shop_astral_sorcerer",
+            titleName = "ASTRAL SORCERER",
+            tierLevel = 55,
+            styleVariant = 1,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 35,
+            pointCost = 13500L,
+            description = "Pusaran roh arwah pada sirkuit futuristik berkilau prismatik",
+            vfxTier = TitleVfxTier.HOLO_PRISM
+        ),
+        TitleDefinition(
+            id = "shop_abyssal_reaper",
+            titleName = "ABYSSAL REAPER",
+            tierLevel = 58,
+            styleVariant = 2,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 40,
+            pointCost = 15000L,
+            description = "Sabit maut berbalut pusaran energi void gelap nan megah",
+            vfxTier = TitleVfxTier.VOID_NEBULA
+        ),
+        TitleDefinition(
+            id = "shop_storm_breaker",
+            titleName = "STORM BREAKER",
+            tierLevel = 62,
+            styleVariant = 4,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 40,
+            pointCost = 16500L,
+            description = "Pedang halilintar bersambaran petir biru elektrik tanpa henti",
+            vfxTier = TitleVfxTier.LIGHTNING_STORM
+        ),
+        TitleDefinition(
+            id = "shop_obsidian_eye",
+            titleName = "OBSIDIAN EYE",
+            tierLevel = 64,
+            styleVariant = 2,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 40,
+            pointCost = 17500L,
+            description = "Mata iblis abadi dalam bilah obsidian bercahaya plasma ungu",
+            vfxTier = TitleVfxTier.VOID_NEBULA
+        ),
+        TitleDefinition(
+            id = "shop_meteor_destroyer",
+            titleName = "METEOR DESTROYER",
+            tierLevel = 70,
+            styleVariant = 3,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 45,
+            pointCost = 19500L,
+            description = "Meteor jatuh berkecepatan penuh dibakar api berkobar dahsyat",
+            vfxTier = TitleVfxTier.BLAZING_INFERNO
+        ),
+        TitleDefinition(
+            id = "shop_celestial_archon",
+            titleName = "CELESTIAL ARCHON",
+            tierLevel = 75,
+            styleVariant = 1,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 50,
+            pointCost = 22000L,
+            description = "Halo bertaji agung bermandikan korona surya emas berkilau",
+            vfxTier = TitleVfxTier.SOLAR_FLARE
+        ),
+        TitleDefinition(
+            id = "shop_solar_valkyrie",
+            titleName = "SOLAR VALKYRIE",
+            tierLevel = 80,
+            styleVariant = 4,
+            unlockType = TitleUnlockType.POINTS_SHOP,
+            requiredLevel = 55,
+            pointCost = 24000L,
+            description = "Griffin suci pada bingkai mecha bertenaga badai cahaya matahari",
+            vfxTier = TitleVfxTier.SOLAR_FLARE
         ),
         TitleDefinition(
             id = "shop_mythic_sovereign",
             titleName = "MYTHIC SOVEREIGN",
-            tierLevel = 35,
-            styleVariant = 3,
+            tierLevel = 90,
+            styleVariant = 2,
             unlockType = TitleUnlockType.POINTS_SHOP,
-            pointCost = 600L,
-            description = "Badge kasta tertinggi Gold-Crimson berefek kilau mewah"
+            requiredLevel = 60,
+            pointCost = 28000L,
+            description = "Permata api kasta tertinggi dengan kobaran inferno & aura emas",
+            vfxTier = TitleVfxTier.BLAZING_INFERNO
+        ),
+
+        // === E. EXCLUSIVE REDEEM ONLY (Hanya Via Kode Redeem Resmi / Event Web Admin!) ===
+        TitleDefinition(
+            id = "redeem_vip_yuranime",
+            titleName = "VIP YURANIME",
+            tierLevel = 70,
+            styleVariant = 1,
+            unlockType = TitleUnlockType.REDEEM_ONLY,
+            requiredLevel = 1,
+            pointCost = 0L,
+            description = "Eksklusif Redeem Code — Pelat Sirkuit VIP berkilau holografik",
+            vfxTier = TitleVfxTier.HOLO_PRISM
+        ),
+        TitleDefinition(
+            id = "redeem_khalifah_anime",
+            titleName = "KHALIFAH ANIME",
+            tierLevel = 82,
+            styleVariant = 2,
+            unlockType = TitleUnlockType.REDEEM_ONLY,
+            requiredLevel = 1,
+            pointCost = 0L,
+            description = "Eksklusif Redeem Code — Faset emas suci berkorona bintang surya",
+            vfxTier = TitleVfxTier.SOLAR_FLARE
+        ),
+        TitleDefinition(
+            id = "redeem_tempest_overlord",
+            titleName = "TEMPEST OVERLORD",
+            tierLevel = 85,
+            styleVariant = 4,
+            unlockType = TitleUnlockType.REDEEM_ONLY,
+            requiredLevel = 1,
+            pointCost = 0L,
+            description = "Eksklusif Redeem Code — Badai petir terfokus bersambaran hebat",
+            vfxTier = TitleVfxTier.LIGHTNING_STORM
+        ),
+        TitleDefinition(
+            id = "redeem_eternal_phoenix",
+            titleName = "ETERNAL PHOENIX",
+            tierLevel = 88,
+            styleVariant = 3,
+            unlockType = TitleUnlockType.REDEEM_ONLY,
+            requiredLevel = 1,
+            pointCost = 0L,
+            description = "Eksklusif Redeem Code — Gulungan kuno terbakar kobaran api abadi",
+            vfxTier = TitleVfxTier.BLAZING_INFERNO
+        ),
+        TitleDefinition(
+            id = "redeem_lunar_predator",
+            titleName = "LUNAR PREDATOR",
+            tierLevel = 90,
+            styleVariant = 2,
+            unlockType = TitleUnlockType.REDEEM_ONLY,
+            requiredLevel = 1,
+            pointCost = 0L,
+            description = "Eksklusif Redeem Code — Cakar bulan sabit diselimuti nebula malam",
+            vfxTier = TitleVfxTier.VOID_NEBULA
+        ),
+        TitleDefinition(
+            id = "redeem_dragon_emperor",
+            titleName = "DRAGON EMPEROR",
+            tierLevel = 95,
+            styleVariant = 4,
+            unlockType = TitleUnlockType.REDEEM_ONLY,
+            requiredLevel = 1,
+            pointCost = 0L,
+            description = "Eksklusif Redeem Code — Perisai naga mecha dengan lidah api naga",
+            vfxTier = TitleVfxTier.BLAZING_INFERNO
+        ),
+        TitleDefinition(
+            id = "redeem_starfall_god",
+            titleName = "STARFALL GOD",
+            tierLevel = 99,
+            styleVariant = 1,
+            unlockType = TitleUnlockType.REDEEM_ONLY,
+            requiredLevel = 1,
+            pointCost = 0L,
+            description = "Eksklusif Redeem Code — Bintang jatuh ilahi bermandikan cahaya surya",
+            vfxTier = TitleVfxTier.SOLAR_FLARE
         )
     )
 
@@ -386,6 +897,11 @@ object FirebaseManager {
 
     fun computeRankTitle(level: Int): String {
         return when {
+            level >= 100 -> "Celestial Sovereign"
+            level >= 85 -> "Grandmaster Akashic"
+            level >= 75 -> "Monarch Dimensi"
+            level >= 60 -> "Overlord Yuranime"
+            level >= 45 -> "Archmage Isekai"
             level >= 30 -> "Sepuh Yuranime"
             level >= 20 -> "Vanguard Otaku"
             level >= 10 -> "Penjelajah Komik"
@@ -413,12 +929,19 @@ object FirebaseManager {
         if (titleName.isBlank()) return null
         val matched = ALL_TITLES.find { it.titleName.equals(titleName.trim(), ignoreCase = true) }
         if (matched != null) return matched
+        val inferredVfx = when {
+            fallbackLevel >= 50 -> TitleVfxTier.BLAZING_INFERNO
+            fallbackLevel >= 35 -> TitleVfxTier.HOLO_PRISM
+            fallbackLevel >= 20 -> TitleVfxTier.PULSE_SCAN
+            else -> TitleVfxTier.SUBTLE_SHIMMER
+        }
         return TitleDefinition(
             id = "custom_${titleName.lowercase(Locale.ROOT)}",
             titleName = titleName.uppercase(Locale.ROOT),
             tierLevel = fallbackLevel,
-            styleVariant = fallbackLevel % 4,
-            unlockType = TitleUnlockType.MILESTONE
+            styleVariant = fallbackLevel % 5,
+            unlockType = TitleUnlockType.REDEEM_ONLY,
+            vfxTier = inferredVfx
         )
     }
 
@@ -530,6 +1053,9 @@ object FirebaseManager {
             ?.toList() ?: emptyList()
         val lastCheckIn = prefs.getString("last_checkin_${session.id}", "") ?: ""
         val streak = prefs.getInt("streak_${session.id}", 0)
+        val cachedVerified = prefs.getBoolean("profile_verified_${session.id}", false)
+        val cachedVerifiedColor = prefs.getString("profile_verified_color_${session.id}", VERIFIED_BADGE_DEFAULT_HEX)
+            ?: VERIFIED_BADGE_DEFAULT_HEX
 
         _userProfile.value = UserProfile(
             uid = session.id,
@@ -559,7 +1085,9 @@ object FirebaseManager {
             lastCheckInDate = lastCheckIn,
             checkInStreak = streak,
             nextLevelTargetExp = nextTarget,
-            expProgress = progress
+            expProgress = progress,
+            isVerified = cachedVerified,
+            verifiedColor = cachedVerifiedColor
         )
     }
 
@@ -589,6 +1117,8 @@ object FirebaseManager {
             .putLong("points_${profile.uid}", profile.points)
             .putString("last_checkin_${profile.uid}", profile.lastCheckInDate)
             .putInt("streak_${profile.uid}", profile.checkInStreak)
+            .putBoolean("profile_verified_${profile.uid}", profile.isVerified)
+            .putString("profile_verified_color_${profile.uid}", profile.verifiedColor)
             .apply()
     }
 
@@ -1085,6 +1615,12 @@ object FirebaseManager {
             }?.toMap()
             ?: emptyMap()
 
+        val verifiedBool = snapshot.getBoolean("isVerified") ?: false
+        val verifiedHex = snapshot.getString("verifiedColor")
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: VERIFIED_BADGE_DEFAULT_HEX
+
         return UserProfile(
             uid = uid,
             name = name,
@@ -1114,7 +1650,9 @@ object FirebaseManager {
             lastCheckInDate = snapshot.getString("lastCheckInDate") ?: "",
             checkInStreak = (snapshot.getLong("checkInStreak") ?: 0L).toInt(),
             nextLevelTargetExp = nextTarget,
-            expProgress = expProgress
+            expProgress = expProgress,
+            isVerified = verifiedBool,
+            verifiedColor = verifiedHex
         )
     }
 
@@ -1317,6 +1855,11 @@ object FirebaseManager {
                         (it.get("claimedMissions") as? List<*>)?.mapNotNull { x -> x?.toString() } ?: emptyList()
                     }.distinct()
 
+                    val mergedVerified = docs.any { it.getBoolean("isVerified") == true }
+                    val mergedVerifiedColor = (preferredNameDoc.getString("verifiedColor")?.takeIf { it.isNotBlank() }
+                        ?: docs.firstNotNullOfOrNull { it.getString("verifiedColor")?.trim()?.takeIf { c -> c.isNotBlank() } }
+                        ?: VERIFIED_BADGE_DEFAULT_HEX)
+
                     val mergedPayload = mutableMapOf<String, Any>(
                         "uid" to targetDocId,
                         "name" to mergedName,
@@ -1331,6 +1874,8 @@ object FirebaseManager {
                         "points" to mergedPoints,
                         "level" to mergedLevel,
                         "role" to mergedRole,
+                        "isVerified" to mergedVerified,
+                        "verifiedColor" to mergedVerifiedColor,
                         "equippedTitle" to mergedTitle,
                         "equippedTitleTier" to mergedTitleTier,
                         "equippedTitleVariant" to mergedTitleVariant,
@@ -1432,6 +1977,9 @@ object FirebaseManager {
                             ?: 0
                         val equippedBorderUrl = doc.getString("equippedBorderUrl")?.trim().orEmpty()
                         val equippedProfileEffectUrl = doc.getString("equippedProfileEffectUrl")?.trim().orEmpty()
+                        val isVerified = doc.getBoolean("isVerified") ?: false
+                        val verifiedColor = doc.getString("verifiedColor")?.trim()?.takeIf { it.isNotBlank() }
+                            ?: VERIFIED_BADGE_DEFAULT_HEX
 
                         val rawEmail = doc.getString("email")?.trim()?.lowercase(Locale.ROOT).orEmpty()
                         val lowerName = name.trim().lowercase(Locale.ROOT)
@@ -1477,7 +2025,9 @@ object FirebaseManager {
                                 equippedTitleTier = equippedTitleTier,
                                 equippedTitleVariant = equippedTitleVariant,
                                 equippedBorderUrl = equippedBorderUrl,
-                                equippedProfileEffectUrl = equippedProfileEffectUrl
+                                equippedProfileEffectUrl = equippedProfileEffectUrl,
+                                isVerified = isVerified,
+                                verifiedColor = verifiedColor
                             )
                         )
                     }
@@ -1503,6 +2053,10 @@ object FirebaseManager {
                             val bestTitle = primary.equippedTitle.ifBlank {
                                 group.firstNotNullOfOrNull { it.user.equippedTitle.takeIf { t -> t.isNotBlank() } }.orEmpty()
                             }
+                            val bestVerified = group.any { it.user.isVerified }
+                            val bestVerifiedColor = primary.verifiedColor.takeIf { it.isNotBlank() }
+                                ?: group.firstNotNullOfOrNull { it.user.verifiedColor.takeIf { c -> c.isNotBlank() } }
+                                ?: VERIFIED_BADGE_DEFAULT_HEX
                             primary.copy(
                                 exp = maxExp,
                                 points = maxPoints,
@@ -1510,7 +2064,9 @@ object FirebaseManager {
                                 rankTitle = computeRankTitle(bestLevel),
                                 equippedBorderUrl = bestBorder,
                                 equippedProfileEffectUrl = bestEffect,
-                                equippedTitle = bestTitle
+                                equippedTitle = bestTitle,
+                                isVerified = bestVerified,
+                                verifiedColor = bestVerifiedColor
                             )
                         }
                         .sortedWith(
@@ -1545,7 +2101,9 @@ object FirebaseManager {
             equippedTitleTier = profile.equippedTitleTier,
             equippedTitleVariant = profile.equippedTitleVariant,
             equippedBorderUrl = profile.equippedBorderUrl,
-            equippedProfileEffectUrl = profile.equippedProfileEffectUrl
+            equippedProfileEffectUrl = profile.equippedProfileEffectUrl,
+            isVerified = profile.isVerified,
+            verifiedColor = profile.verifiedColor
         )
         if (existingIdx >= 0) {
             currentList[existingIdx] = updatedEntry
@@ -1774,6 +2332,25 @@ object FirebaseManager {
 
         if (current.unlockedTitles.any { it.equals(titleDefinition.titleName, ignoreCase = true) }) {
             equipTitle(context, titleDefinition, onComplete)
+            return
+        }
+
+        if (titleDefinition.unlockType == TitleUnlockType.REDEEM_ONLY) {
+            onComplete(false, "Title eksklusif ini hanya bisa dibuka lewat Kode Redeem atau Event!")
+            return
+        }
+
+        if (titleDefinition.unlockType == TitleUnlockType.MILESTONE) {
+            if (current.level < titleDefinition.requiredLevel) {
+                onComplete(false, "Capai Level ${titleDefinition.requiredLevel} untuk membuka Title ini!")
+            } else {
+                equipTitle(context, titleDefinition, onComplete)
+            }
+            return
+        }
+
+        if (current.level < titleDefinition.requiredLevel) {
+            onComplete(false, "Butuh minimal Level ${titleDefinition.requiredLevel} untuk membeli Title ini!")
             return
         }
 

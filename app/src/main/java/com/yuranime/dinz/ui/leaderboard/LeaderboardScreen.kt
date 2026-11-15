@@ -71,6 +71,7 @@ import com.yuranime.dinz.data.firebase.LeaderboardUser
 import com.yuranime.dinz.data.firebase.UserProfile
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.PrimoPointIcon
+import com.yuranime.dinz.ui.components.VerifiedBadgeIcon
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 
 /**
@@ -853,17 +854,31 @@ private fun EditorialPodiumSpot(
         Spacer(modifier = Modifier.height(4.dp))
 
         if (user != null) {
-            // 1. Nama Pengguna
-            Text(
-                text = user.name,
-                color = Color.White,
-                fontSize = if (rank == 1) 15.5.sp else 14.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = SfProFontFamily,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
+            // 1. Nama Pengguna + Centang Verifikasi
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = user.name,
+                    color = Color.White,
+                    fontSize = if (rank == 1) 15.5.sp else 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (user.isVerified) {
+                    Spacer(modifier = Modifier.width(3.5.dp))
+                    VerifiedBadgeIcon(
+                        isVerified = true,
+                        colorHex = user.verifiedColor,
+                        size = if (rank == 1) 14.dp else 13.dp
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(2.dp))
 
@@ -1025,8 +1040,17 @@ private fun ModernLeaderboardRowItem(
                     fontWeight = FontWeight.Bold,
                     fontFamily = SfProFontFamily,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
+                if (user.isVerified) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    VerifiedBadgeIcon(
+                        isVerified = true,
+                        colorHex = user.verifiedColor,
+                        size = 13.5.dp
+                    )
+                }
                 Spacer(modifier = Modifier.width(5.dp))
                 Text(
                     text = "#${user.userTag.removePrefix("@").removePrefix("#")}",
@@ -1118,6 +1142,10 @@ private fun CurrentUserRankBottomBar(
     val exp = currentUserProfile?.exp ?: myRankEntry?.exp ?: 0L
     val level = currentUserProfile?.level ?: myRankEntry?.level ?: 1
     val rankTitle = currentUserProfile?.rankTitle ?: FirebaseManager.computeRankTitle(level)
+    val isVerified = currentUserProfile?.isVerified ?: myRankEntry?.isVerified ?: false
+    val verifiedColor = currentUserProfile?.verifiedColor?.ifBlank { null }
+        ?: myRankEntry?.verifiedColor
+        ?: "#1D9BF0"
 
     Box(
         modifier = modifier
@@ -1185,10 +1213,19 @@ private fun CurrentUserRankBottomBar(
                         fontFamily = SfProFontFamily,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                         style = TextStyle(
                             platformStyle = PlatformTextStyle(includeFontPadding = false)
                         )
                     )
+                    if (isVerified) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        VerifiedBadgeIcon(
+                            isVerified = true,
+                            colorHex = verifiedColor,
+                            size = 13.5.dp
+                        )
+                    }
                     Spacer(modifier = Modifier.width(5.dp))
                     Text(
                         text = "#${userTag.removePrefix("@").removePrefix("#")}",

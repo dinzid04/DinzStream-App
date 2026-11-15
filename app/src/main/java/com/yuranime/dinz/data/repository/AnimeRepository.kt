@@ -77,21 +77,92 @@ class AnimeRepository(
         }
     }
 
+    private fun isFamilySafeCuplix(item: CuplixItem): Boolean {
+        val animeTitle = item.anime.orEmpty().lowercase(java.util.Locale.ROOT)
+        val caption = item.caption.orEmpty().lowercase(java.util.Locale.ROOT)
+        val combined = "$animeTitle $caption"
+
+        val blockedAnimeKeywords = listOf(
+            "kanojo mo kanojo", "isekai maou", "domestic na kanojo", "tejina-senpai",
+            "tejina senpai", "tawawa", "high school dxd", "highschool dxd", "redo of healer",
+            "kaifuku jutsushi", "interspecies", "ishuzoku", "overflow", "kiss x sis",
+            "kissxsis", "shinmai maou", "valkyrie drive", "masou gakuen", "to love-ru",
+            "toloveru", "prison school", "seikon no qwaser", "peter grill", "shuumatsu no harem",
+            "world's end harem", "megami-ryou", "yuragi-sou", "isekai meikyuu",
+            "harem in the labyrinth", "futoku no guild", "nande koko ni sensei",
+            "yosuga no sora", "monster musume", "okusan", "oku-sama ga seitokaichou",
+            "hxeros", "cyclops shoujo", "mankitsu", "gushing over magical girls",
+            "mahou shoujo ni akogarete", "chichi", "boku no pico", "highschool of the dead",
+            "high school of the dead", "strike the blood", "trinity seven"
+        )
+        if (blockedAnimeKeywords.any { animeTitle.contains(it) }) return false
+
+        val blockedCaptionKeywords = listOf(
+            "18+", "nsfw", "ecchi", "hentai", "oppai", "toket", "nenen", "sange",
+            "bokep", "mesum", "telanjang", "cabul", "coli", "colmek", "desah",
+            "celana dalam", "sempak", "jav", "tobrut", "boobs", "tits", "pussy",
+            "panty", "panties", "paizuri", "lewds", "lewd", "bikini seksi"
+        )
+        val words = combined.split(Regex("[\\s,.;:!?/()\\[\\]\"']+"))
+        for (kw in blockedCaptionKeywords) {
+            if (kw.contains(" ") || kw.contains("+")) {
+                if (combined.contains(kw)) return false
+            } else if (words.any { it == kw || (kw.length >= 5 && it.contains(kw)) }) {
+                return false
+            }
+        }
+        return true
+    }
+
+    private fun diversifyCuplixItems(items: List<CuplixItem>): List<CuplixItem> {
+        val safe = items.filter { !it.id.isNullOrBlank() && isFamilySafeCuplix(it) }
+            .distinctBy { it.id }
+        val perAnimeCounts = HashMap<String, Int>()
+        val primary = ArrayList<CuplixItem>(safe.size)
+        val overflow = ArrayList<CuplixItem>()
+        for (item in safe) {
+            val key = item.anime?.trim()?.lowercase(java.util.Locale.ROOT).orEmpty().ifBlank { item.id.orEmpty() }
+            val c = perAnimeCounts[key] ?: 0
+            if (c < 2) {
+                perAnimeCounts[key] = c + 1
+                primary.add(item)
+            } else {
+                overflow.add(item)
+            }
+        }
+        return primary.shuffled() + overflow.shuffled()
+    }
+
+    private suspend fun fetchCuplixPage(
+        limit: Int = 30,
+        sort: String = "new",
+        cursorNewId: String? = null,
+        cursorNewTime: String? = null
+    ): Pair<List<CuplixItem>, com.yuranime.dinz.data.model.CuplixCursor?> {
+        val response = api.getCuplixFeed(
+            limit = limit,
+            sort = sort,
+            cursorNewId = cursorNewId,
+            cursorNewTime = cursorNewTime
+        )
+        return (response.data?.fypList ?: emptyList()) to response.data?.cursor
+    }
+
     suspend fun getCuplixFeed(
         limit: Int = 30,
-        sort: String = "views",
+        sort: String = "new",
         cursorNewId: String? = null,
         cursorNewTime: String? = null
     ): Result<List<CuplixItem>> = withContext(Dispatchers.IO) {
         try {
-            val response = api.getCuplixFeed(
+            val resolvedSort = if (sort == "views") "new" else sort
+            val (items, _) = fetchCuplixPage(
                 limit = limit,
-                sort = sort,
+                sort = resolvedSort,
                 cursorNewId = cursorNewId,
                 cursorNewTime = cursorNewTime
             )
-            val items = response.data?.fypList ?: emptyList()
-            Result.success(items)
+            Result.success(items.filter { isFamilySafeCuplix(it) }.ifEmpty { items })
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -102,57 +173,50 @@ class AnimeRepository(
     }
 
     /**
-     * Mengambil feed Cuplix acak berkualitas tinggi dengan variasi batch independen untuk
-     * setiap halaman (Home, Jadwal, Search, Cuplix Feed) serta pengacakan dinamis (shuffled).
+     * Mengambil feed Cuplix terbaru (`sort=new`) lintas beberapa halaman cursor agar bervariasi,
+     * segar, dan bebas dominasi klip 18+/ecchi lama untuk setiap halaman.
      */
     suspend fun getRandomizedCuplixFeed(
         limit: Int = 30,
         source: CuplixPageSource = CuplixPageSource.FEED
     ): Result<List<CuplixItem>> = withContext(Dispatchers.IO) {
-        coroutineScope {
-            try {
-                val items = when (source) {
-                    CuplixPageSource.HOME -> {
-                        val popular = async { getCuplixFeed(limit = 35, sort = "views").getOrDefault(emptyList()) }
-                        val latest = async { getCuplixFeed(limit = 35, sort = "new").getOrDefault(emptyList()) }
-                        val merged = (popular.await() + latest.await())
-                            .filter { !it.id.isNullOrBlank() }
-                            .distinctBy { it.id }
-                            .shuffled()
-                        merged.take(limit)
-                    }
-                    CuplixPageSource.JADWAL -> {
-                        val latest = async { getCuplixFeed(limit = 40, sort = "new").getOrDefault(emptyList()) }
-                        val popular = async { getCuplixFeed(limit = 20, sort = "views").getOrDefault(emptyList()) }
-                        val merged = (latest.await().shuffled() + popular.await())
-                            .filter { !it.id.isNullOrBlank() }
-                            .distinctBy { it.id }
-                            .shuffled()
-                        merged.take(limit)
-                    }
-                    CuplixPageSource.SEARCH -> {
-                        val popular = async { getCuplixFeed(limit = 45, sort = "views").getOrDefault(emptyList()) }
-                        val latest = async { getCuplixFeed(limit = 25, sort = "new").getOrDefault(emptyList()) }
-                        val list = popular.await().shuffled() + latest.await().shuffled()
-                        list.filter { !it.id.isNullOrBlank() }
-                            .distinctBy { it.id }
-                            .shuffled()
-                            .take(limit)
-                    }
-                    CuplixPageSource.FEED -> {
-                        val popular = async { getCuplixFeed(limit = 40, sort = "views").getOrDefault(emptyList()) }
-                        val latest = async { getCuplixFeed(limit = 40, sort = "new").getOrDefault(emptyList()) }
-                        val merged = (popular.await() + latest.await())
-                            .filter { !it.id.isNullOrBlank() }
-                            .distinctBy { it.id }
-                            .shuffled()
-                        merged
-                    }
-                }
-                Result.success(items)
-            } catch (e: Exception) {
-                getCuplixFeed(limit = limit, sort = "views")
+        try {
+            val targetPages = when (source) {
+                CuplixPageSource.HOME -> 3
+                CuplixPageSource.JADWAL -> 3
+                CuplixPageSource.SEARCH -> 4
+                CuplixPageSource.FEED -> 4
             }
+            val collected = ArrayList<CuplixItem>()
+            var nextId: String? = null
+            var nextTime: String? = null
+
+            for (page in 0 until targetPages) {
+                val (pageItems, cursor) = fetchCuplixPage(
+                    limit = 25,
+                    sort = "new",
+                    cursorNewId = nextId,
+                    cursorNewTime = nextTime
+                )
+                collected.addAll(pageItems)
+                val cid = cursor?.cursorNewId?.takeIf { it.isNotBlank() }
+                val ctime = cursor?.cursorNewTime?.takeIf { it.isNotBlank() }
+                if (cid == null || ctime == null || pageItems.isEmpty()) break
+                nextId = cid
+                nextTime = ctime
+            }
+
+            // Pilih segmen berbeda per sumber halaman supaya Home/Jadwal/Search tidak terasa identik
+            val filtered = diversifyCuplixItems(collected)
+            val result = when (source) {
+                CuplixPageSource.HOME -> filtered.take(limit)
+                CuplixPageSource.JADWAL -> filtered.drop((filtered.size / 6).coerceAtMost(8)).plus(filtered.take(8)).distinctBy { it.id }.take(limit)
+                CuplixPageSource.SEARCH -> filtered.shuffled().take(limit)
+                CuplixPageSource.FEED -> filtered
+            }
+            Result.success(result.ifEmpty { collected.distinctBy { it.id }.take(limit) })
+        } catch (e: Exception) {
+            getCuplixFeed(limit = limit, sort = "new")
         }
     }
 

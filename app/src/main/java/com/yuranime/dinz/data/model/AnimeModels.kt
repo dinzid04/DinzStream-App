@@ -106,8 +106,14 @@ data class CuplixResponse(
     @SerializedName("data") val data: CuplixData? = null
 )
 
+data class CuplixCursor(
+    @SerializedName("cursor_new_id") val cursorNewId: String? = null,
+    @SerializedName("cursor_new_time") val cursorNewTime: String? = null
+)
+
 data class CuplixData(
-    @SerializedName("fyp") val fypList: List<CuplixItem>? = null
+    @SerializedName("fyp") val fypList: List<CuplixItem>? = null,
+    @SerializedName("cursor") val cursor: CuplixCursor? = null
 )
 
 data class CuplixItem(

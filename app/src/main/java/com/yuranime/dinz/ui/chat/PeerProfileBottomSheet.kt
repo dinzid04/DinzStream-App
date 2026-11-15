@@ -1,6 +1,7 @@
 package com.yuranime.dinz.ui.chat
 
 import android.widget.ImageView
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -39,8 +40,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -56,6 +59,8 @@ import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
 import com.yuranime.dinz.ui.components.ApngStackedEffectView
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.MultiLayerProfileEffectView
+import com.yuranime.dinz.ui.components.RpgSvgIconCatalog
+import com.yuranime.dinz.ui.components.VerifiedBadgeIcon
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -109,6 +114,8 @@ fun PeerProfileBottomSheet(
     val equippedTitleVariant = latestProfile?.equippedTitleVariant ?: peerMessage.equippedTitleVariant
     val borderUrl = latestProfile?.equippedBorderUrl ?: peerMessage.equippedBorderUrl
     val effectUrl = latestProfile?.equippedProfileEffectUrl ?: peerMessage.equippedProfileEffectUrl
+    val isVerified = latestProfile?.isVerified ?: peerMessage.isVerified
+    val verifiedColor = latestProfile?.verifiedColor?.ifBlank { null } ?: peerMessage.verifiedColor
 
     val animatedBorderUrl = remember(borderUrl) {
         if (borderUrl.isNotBlank()) {
@@ -257,16 +264,29 @@ fun PeerProfileBottomSheet(
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp)
                 ) {
-                    // 1. Username (SF Pro Bold 22.sp)
-                    Text(
-                        text = displayName,
-                        color = Color.White,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    // 1. Username + Centang Verifikasi (SF Pro Bold 22.sp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = displayName,
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SfProFontFamily,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (isVerified) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            VerifiedBadgeIcon(
+                                isVerified = true,
+                                colorHex = verifiedColor,
+                                size = 18.dp
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(3.dp))
 
@@ -286,19 +306,19 @@ fun PeerProfileBottomSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        val isPriv = role.equals("Admin", ignoreCase = true) ||
-                            role.equals("Owner", ignoreCase = true)
+                        val roleSpec = remember(role) { RpgSvgIconCatalog.resolveRoleSpec(role) }
+                        val roleAccent = Color(roleSpec.accentHex)
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Outlined.WorkspacePremium,
+                            Image(
+                                painter = painterResource(id = roleSpec.iconRes),
                                 contentDescription = null,
-                                tint = if (isPriv) Color(0xFFF43F5E) else Color(0xFFFF5722),
+                                colorFilter = ColorFilter.tint(roleAccent),
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = role.uppercase(Locale.ROOT),
-                                color = Color.White,
+                                color = if (roleSpec.isExclusiveStaff) roleAccent else Color.White,
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.4.sp,
@@ -315,10 +335,11 @@ fun PeerProfileBottomSheet(
                         )
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Outlined.KeyboardDoubleArrowUp,
+                            val lvIconRes = remember(level) { RpgSvgIconCatalog.resolveLevelIcon(level) }
+                            Image(
+                                painter = painterResource(id = lvIconRes),
                                 contentDescription = null,
-                                tint = Color(0xFF38BDF8),
+                                colorFilter = ColorFilter.tint(Color(0xFF38BDF8)),
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(modifier = Modifier.width(3.dp))

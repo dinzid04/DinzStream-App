@@ -1632,6 +1632,220 @@
       white-space: nowrap;
     }
 
+    /* Verified Badge Management Styles */
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible,
+    a:focus-visible {
+      outline: 2px solid #38BDF8;
+      outline-offset: 2px;
+    }
+
+    .verified-lookup-row {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .verified-lookup-row .text-input {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .verified-user-selected-card {
+      background: rgba(29, 155, 240, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.28);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .verified-user-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid rgba(255, 255, 255, 0.16);
+      background: #1B1E2B;
+      flex-shrink: 0;
+    }
+
+    .verified-user-avatar-fallback {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #E11D48, #FF5722);
+      color: #fff;
+      font-weight: 800;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .verified-color-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .verified-color-picker {
+      width: 48px;
+      height: 44px;
+      padding: 3px;
+      border-radius: 10px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .color-swatch-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .color-swatch-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 12px;
+      min-height: 38px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.04);
+      color: #E2E8F0;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .color-swatch-btn:hover {
+      background: rgba(255, 255, 255, 0.09);
+      transform: translateY(-1px);
+    }
+
+    .color-swatch-btn.active {
+      border-color: #38BDF8;
+      background: rgba(56, 189, 248, 0.14);
+      color: #FFFFFF;
+    }
+
+    .color-swatch-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      flex-shrink: 0;
+    }
+
+    .verified-preview-box {
+      background: #0B0D14;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 14px;
+      padding: 14px;
+      margin-top: 6px;
+      margin-bottom: 18px;
+    }
+
+    .verified-preview-stage {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .verified-preview-bubble {
+      background: #141722;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 100%;
+    }
+
+    .verified-user-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .verified-user-item:hover {
+      border-color: rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.055);
+    }
+
+    .verified-user-item.selected {
+      border-color: #38BDF8;
+      background: rgba(56, 189, 248, 0.10);
+    }
+
+    .verified-user-meta {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .verified-user-texts {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .verified-user-name-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .verified-user-sub {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .verified-gear-inline {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -1674,6 +1888,11 @@
         <span>🧩</span>
         <span>Kelola Stiker Chat</span>
         <span class="tab-badge" id="globalStickersCountBadge">0</span>
+      </button>
+      <button type="button" class="admin-tab-item" id="tabNavVerified" onclick="switchMainTab('verified')">
+        <span>⚙️</span>
+        <span>Centang Biru (Verified)</span>
+        <span class="tab-badge" id="verifiedUsersCountBadge">0</span>
       </button>
     </div>
   </div>
@@ -1944,8 +2163,34 @@
           <!-- Hadiah Title (Optional) -->
           <div class="form-group">
             <label for="redeemTitleInput" class="form-label">Hadiah Custom Title (Opsional):</label>
-            <input type="text" id="redeemTitleInput" class="text-input" placeholder="Contoh: MYTHIC SOVEREIGN, SEPUH YURANIME, VIP">
-            <div class="field-hint">Gelar eksklusif yang akan langsung di-unlock di profil user.</div>
+            <input type="text" id="redeemTitleInput" list="customTitlesDatalist" class="text-input" placeholder="Contoh: VIP YURANIME, TEMPEST OVERLORD, KHALIFAH ANIME">
+            <datalist id="customTitlesDatalist">
+              <option value="VIP YURANIME"></option>
+              <option value="KHALIFAH ANIME"></option>
+              <option value="TEMPEST OVERLORD"></option>
+              <option value="ETERNAL PHOENIX"></option>
+              <option value="LUNAR PREDATOR"></option>
+              <option value="DRAGON EMPEROR"></option>
+              <option value="STARFALL GOD"></option>
+              <option value="SEPUH YURANIME"></option>
+              <option value="AKASHIC SOVEREIGN"></option>
+              <option value="INFERNO EMPEROR"></option>
+              <option value="RAIJIN STORMBORN"></option>
+              <option value="ABYSS REAPER"></option>
+              <option value="CHRONO CYBERNET"></option>
+            </datalist>
+            <div class="preset-pill-row">
+              <span class="preset-pill-label">Eksklusif Redeem:</span>
+              <button type="button" class="preset-chip" onclick="selectTitlePreset('VIP YURANIME')">VIP YURANIME</button>
+              <button type="button" class="preset-chip" onclick="selectTitlePreset('KHALIFAH ANIME')">KHALIFAH ANIME</button>
+              <button type="button" class="preset-chip" onclick="selectTitlePreset('TEMPEST OVERLORD')">TEMPEST OVERLORD</button>
+              <button type="button" class="preset-chip" onclick="selectTitlePreset('ETERNAL PHOENIX')">ETERNAL PHOENIX</button>
+              <button type="button" class="preset-chip" onclick="selectTitlePreset('LUNAR PREDATOR')">LUNAR PREDATOR</button>
+              <button type="button" class="preset-chip" onclick="selectTitlePreset('DRAGON EMPEROR')">DRAGON EMPEROR</button>
+              <button type="button" class="preset-chip" onclick="selectTitlePreset('STARFALL GOD')">STARFALL GOD</button>
+              <button type="button" class="preset-chip" onclick="selectTitlePreset('')">Kosongkan</button>
+            </div>
+            <div class="field-hint">Title di atas bertanda <strong>Redeem Only</strong> di aplikasi dan hanya bisa dibuka lewat kode redeem.</div>
           </div>
 
           <!-- Hadiah Border ID (Optional) with Presets -->
@@ -2199,6 +2444,181 @@
     </div>
   </div>
 
+  <!-- Verified Badge Management Section -->
+  <div id="sectionVerified" class="redeem-container" style="display: none;">
+    <!-- Stats Row -->
+    <div class="redeem-stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Akun Terverifikasi</div>
+        <div class="stat-val" id="statVerifiedUsersCount" style="color: #38BDF8;">0</div>
+        <div class="stat-sub">Memiliki lencana centang gear aktif</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Akun Terdaftar</div>
+        <div class="stat-val" id="statTotalDirectoryUsers">0</div>
+        <div class="stat-sub">Koleksi Firestore <code>users</code></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Warna Badge Aktif</div>
+        <div class="stat-val" id="statSelectedVerifiedColor" style="font-size: 20px; color: #1D9BF0;">#1D9BF0</div>
+        <div class="stat-sub">Diterapkan di Chat, Profil &amp; Leaderboard</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Status Sinkronisasi</div>
+        <div class="stat-val" id="statVerifiedSyncState" style="font-size: 20px; color: #F59E0B;">Siap</div>
+        <div class="stat-sub">Perubahan langsung sinkron ke HP user</div>
+      </div>
+    </div>
+
+    <div class="redeem-grid">
+      <!-- Kolom Kiri: Kontrol Pemberian & Warna Centang Biru -->
+      <div class="redeem-form-card">
+        <div class="redeem-card-header">
+          <div class="form-mode-badge">⚙️ Kelola Lencana Centang Biru Akun</div>
+        </div>
+
+        <form id="verifiedBadgeForm" onsubmit="saveVerifiedBadgeStatus(event)">
+          <!-- Input ID / #UserTag / UID -->
+          <div class="form-group">
+            <label for="verifiedTargetUidInput" class="form-label">Masukkan ID Akun (`#1001`, `1001`), UID Firebase, atau Nama:</label>
+            <div class="verified-lookup-row">
+              <input
+                type="text"
+                id="verifiedTargetUidInput"
+                class="text-input"
+                placeholder="Contoh: 1001 atau UID lengkap pengguna"
+                autocomplete="off"
+                required
+              >
+              <button type="button" class="btn btn-secondary" onclick="lookupAndSelectUser()" style="width: auto; padding: 11px 16px; flex: 0 0 auto;">
+                <span>🔍</span> <span>Cari ID</span>
+              </button>
+            </div>
+            <div class="field-hint">Bisa pakai ID 4-digit profil (misal <code>1001</code>) atau UID akun langsung dari Firebase.</div>
+          </div>
+
+          <!-- Kartu Akun Terpilih -->
+          <div id="selectedVerifiedUserCard" class="verified-user-selected-card" style="display: none;"></div>
+
+          <!-- Toggle Aktif / Nonaktif Centang Biru -->
+          <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 12px 14px;">
+            <div>
+              <div style="font-size: 13.5px; font-weight: 700; color: #fff;">Aktifkan Lencana Centang Gear</div>
+              <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">Muncul permanen di Chat Global, Profil, Sheet, &amp; Leaderboard.</div>
+            </div>
+            <label class="switch" aria-label="Aktifkan Lencana Centang Gear">
+              <input type="checkbox" id="verifiedEnabledSwitch" checked onchange="updateVerifiedBadgePreview()">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- Warna Centang Biru -->
+          <div class="form-group">
+            <label for="verifiedColorHexInput" class="form-label">Warna Lencana Gear Centang:</label>
+            <div class="verified-color-row">
+              <input
+                type="color"
+                id="verifiedColorPicker"
+                class="verified-color-picker"
+                value="#1D9BF0"
+                aria-label="Pilih Warna Lencana"
+                oninput="syncVerifiedColorFromPicker(this.value)"
+              >
+              <input
+                type="text"
+                id="verifiedColorHexInput"
+                class="text-input"
+                value="#1D9BF0"
+                placeholder="#1D9BF0"
+                maxlength="9"
+                oninput="syncVerifiedColorFromHex(this.value)"
+              >
+            </div>
+            <div class="color-swatch-grid">
+              <button type="button" class="color-swatch-btn active" data-swatch="#1D9BF0" onclick="selectVerifiedColorPreset('#1D9BF0')">
+                <span class="color-swatch-dot" style="background: #1D9BF0;"></span>
+                <span>Biru Ori</span>
+              </button>
+              <button type="button" class="color-swatch-btn" data-swatch="#38BDF8" onclick="selectVerifiedColorPreset('#38BDF8')">
+                <span class="color-swatch-dot" style="background: #38BDF8;"></span>
+                <span>Cyan Neon</span>
+              </button>
+              <button type="button" class="color-swatch-btn" data-swatch="#F59E0B" onclick="selectVerifiedColorPreset('#F59E0B')">
+                <span class="color-swatch-dot" style="background: #F59E0B;"></span>
+                <span>Emas Sultan</span>
+              </button>
+              <button type="button" class="color-swatch-btn" data-swatch="#E11D48" onclick="selectVerifiedColorPreset('#E11D48')">
+                <span class="color-swatch-dot" style="background: #E11D48;"></span>
+                <span>Crimson</span>
+              </button>
+              <button type="button" class="color-swatch-btn" data-swatch="#10B981" onclick="selectVerifiedColorPreset('#10B981')">
+                <span class="color-swatch-dot" style="background: #10B981;"></span>
+                <span>Emerald</span>
+              </button>
+              <button type="button" class="color-swatch-btn" data-swatch="#A855F7" onclick="selectVerifiedColorPreset('#A855F7')">
+                <span class="color-swatch-dot" style="background: #A855F7;"></span>
+                <span>Violet</span>
+              </button>
+              <button type="button" class="color-swatch-btn" data-swatch="#EC4899" onclick="selectVerifiedColorPreset('#EC4899')">
+                <span class="color-swatch-dot" style="background: #EC4899;"></span>
+                <span>Sakura Pink</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Live Preview -->
+          <div class="verified-preview-box">
+            <div class="form-label" style="margin-bottom: 4px;">Pratinjau Lencana Gear di Aplikasi:</div>
+            <div class="verified-preview-stage" id="verifiedLivePreviewStage"></div>
+          </div>
+
+          <div class="action-btn-row">
+            <button type="submit" class="btn btn-primary" id="btnSaveVerifiedBadge">
+              <span>✓</span> <span>Simpan Centang Biru ke Akun</span>
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="revokeSelectedVerifiedBadge()" style="flex: 0 0 auto;">
+              <span>✕</span> <span>Cabut</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Kolom Kanan: Direktori Akun & Akun Terverifikasi -->
+      <div class="codes-list-card">
+        <div class="list-header-row">
+          <div>
+            <h3 style="margin: 0; font-size: 16px; color: #fff;">👥 Direktori Akun Yuranime</h3>
+            <span class="list-subtitle" id="verifiedUsersListSubtitle">Memuat daftar pengguna Firestore...</span>
+          </div>
+          <button type="button" class="btn-action-small" onclick="refreshUsersDirectory()" style="cursor: pointer;">
+            🔄 Muat Ulang
+          </button>
+        </div>
+
+        <div class="filter-bar">
+          <input
+            type="text"
+            id="filterUsersInput"
+            class="filter-input"
+            placeholder="🔍 Cari nama, #ID (mis. 1001), email, atau UID..."
+            oninput="renderVerifiedUsersList()"
+          >
+          <div class="filter-chips">
+            <button type="button" class="filter-chip active" id="userFilterAll" onclick="setVerifiedUserFilter('all')">Semua</button>
+            <button type="button" class="filter-chip" id="userFilterVerified" onclick="setVerifiedUserFilter('verified')">Terverifikasi</button>
+            <button type="button" class="filter-chip" id="userFilterUnverified" onclick="setVerifiedUserFilter('unverified')">Belum Verified</button>
+          </div>
+        </div>
+
+        <div class="codes-scroll-container" id="verifiedUsersListContainer">
+          <div class="sticker-state-box">
+            Menghubungkan ke Firestore koleksi <code>users</code>...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
   <!-- Modal Guide for Firestore Rules -->
   <div class="modal-overlay" id="rulesModal">
@@ -2368,7 +2788,7 @@ service cloud.firestore {
   <!-- Firebase Modular SDK via ESM -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, doc, onSnapshot, setDoc, collection, getDocs, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, onSnapshot, setDoc, collection, getDocs, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
     // Konfigurasi Default Resmi Firebase Proyek Baru dinz-62119
@@ -2867,16 +3287,20 @@ service cloud.firestore {
       const sectionPromo = document.getElementById("sectionPromo");
       const sectionRedeem = document.getElementById("sectionRedeem");
       const sectionStickers = document.getElementById("sectionStickers");
+      const sectionVerified = document.getElementById("sectionVerified");
       const tabNavPromo = document.getElementById("tabNavPromo");
       const tabNavRedeem = document.getElementById("tabNavRedeem");
       const tabNavStickers = document.getElementById("tabNavStickers");
+      const tabNavVerified = document.getElementById("tabNavVerified");
 
       sectionPromo.style.display = "none";
       sectionRedeem.style.display = "none";
       if (sectionStickers) sectionStickers.style.display = "none";
+      if (sectionVerified) sectionVerified.style.display = "none";
       tabNavPromo?.classList.remove("active");
       tabNavRedeem?.classList.remove("active");
       tabNavStickers?.classList.remove("active");
+      tabNavVerified?.classList.remove("active");
 
       if (tab === 'redeem') {
         sectionRedeem.style.display = "flex";
@@ -2886,6 +3310,11 @@ service cloud.firestore {
         if (sectionStickers) sectionStickers.style.display = "flex";
         tabNavStickers?.classList.add("active");
         loadGlobalStickerPacks();
+      } else if (tab === 'verified') {
+        if (sectionVerified) sectionVerified.style.display = "flex";
+        tabNavVerified?.classList.add("active");
+        listenToVerifiedUsers();
+        updateVerifiedBadgePreview();
       } else {
         sectionPromo.style.display = "grid";
         tabNavPromo?.classList.add("active");
@@ -3261,6 +3690,11 @@ service cloud.firestore {
       const code = `YURA-${rand}`;
       document.getElementById("redeemCodeInput").value = code;
       showToast(`Kode baru dibuat: ${code}`);
+    };
+
+    window.selectTitlePreset = function(titleName) {
+      const input = document.getElementById("redeemTitleInput");
+      if (input) input.value = titleName;
     };
 
     window.selectBorderPreset = function(id) {
@@ -4242,10 +4676,578 @@ service cloud.firestore {
       }
     };
 
-    // Auto load redeem codes & global sticker packs count badges on boot
+    // ==========================================
+    // VERIFIED BADGE (CENTANG BIRU) MANAGEMENT LOGIC
+    // ==========================================
+    let allDirectoryUsers = [];
+    let selectedDirectoryUser = null;
+    let verifiedUserFilterMode = 'all';
+    let usersUnsubscribe = null;
+
+    function normalizeHexColor(raw) {
+      let cleaned = String(raw || "").trim().toUpperCase().replace(/[^0-9A-F]/g, "");
+      if (cleaned.length === 8) cleaned = cleaned.slice(2); // Buang alpha #AARRGGBB -> #RRGGBB
+      if (cleaned.length === 3) {
+        cleaned = cleaned.split("").map((ch) => ch + ch).join("");
+      }
+      if (!/^[0-9A-F]{6}$/.test(cleaned)) {
+        return "#1D9BF0";
+      }
+      return `#${cleaned}`;
+    }
+
+    function buildGearSealBadgeSvg(colorHex, sizePx = 18) {
+      const hex = normalizeHexColor(colorHex);
+      const pts = [];
+      const steps = 40;
+      for (let i = 0; i < steps; i++) {
+        const theta = (i / steps) * Math.PI * 2 - Math.PI / 2;
+        const r = 9.75 + 1.35 * Math.cos(10 * theta);
+        const x = (12 + r * Math.cos(theta)).toFixed(2);
+        const y = (12 + r * Math.sin(theta)).toFixed(2);
+        pts.push(`${i === 0 ? "M" : "L"}${x} ${y}`);
+      }
+      const gearPath = pts.join(" ") + " Z";
+      return `
+        <svg width="${sizePx}" height="${sizePx}" viewBox="0 0 24 24" aria-label="Akun Terverifikasi" style="display:inline-block; vertical-align:middle; flex-shrink:0;">
+          <path d="${gearPath}" fill="${hex}" />
+          <circle cx="12" cy="12" r="7.2" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="0.9" />
+          <path d="M8.3 12.2 L10.9 14.8 L15.9 9.5" fill="none" stroke="#FFFFFF" stroke-width="2.35" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      `;
+    }
+
+    function parseUserFirestoreDoc(uid, data) {
+      return {
+        uid: uid || data?.uid || "",
+        name: String(data?.name || "Pengguna Yuranime"),
+        userTag: String(data?.userTag || "").replace(/^[@#]+/, ""),
+        email: String(data?.email || ""),
+        avatar: String(data?.avatar || ""),
+        role: String(data?.role || "Member"),
+        level: Number(data?.level || 1),
+        exp: Number(data?.exp || 0),
+        isVerified: Boolean(data?.isVerified),
+        verifiedColor: normalizeHexColor(data?.verifiedColor || "#1D9BF0")
+      };
+    }
+
+    function parseUserRestDoc(docItem) {
+      const uid = docItem?.name ? docItem.name.split("/").pop() : "";
+      const f = docItem?.fields || {};
+      return {
+        uid,
+        name: String(f.name?.stringValue || "Pengguna Yuranime"),
+        userTag: String(f.userTag?.stringValue || "").replace(/^[@#]+/, ""),
+        email: String(f.email?.stringValue || ""),
+        avatar: String(f.avatar?.stringValue || ""),
+        role: String(f.role?.stringValue || "Member"),
+        level: Number(f.level?.integerValue || f.level?.doubleValue || 1),
+        exp: Number(f.exp?.integerValue || f.exp?.doubleValue || 0),
+        isVerified: Boolean(f.isVerified?.booleanValue),
+        verifiedColor: normalizeHexColor(f.verifiedColor?.stringValue || "#1D9BF0")
+      };
+    }
+
+    function updateVerifiedStatsAndBadges() {
+      const verifiedCount = allDirectoryUsers.filter((u) => u.isVerified).length;
+      const totalCount = allDirectoryUsers.length;
+      const navBadge = document.getElementById("verifiedUsersCountBadge");
+      const statVerified = document.getElementById("statVerifiedUsersCount");
+      const statTotal = document.getElementById("statTotalDirectoryUsers");
+      const subEl = document.getElementById("verifiedUsersListSubtitle");
+
+      if (navBadge) navBadge.textContent = verifiedCount;
+      if (statVerified) statVerified.textContent = verifiedCount.toLocaleString();
+      if (statTotal) statTotal.textContent = totalCount.toLocaleString();
+      if (subEl) subEl.textContent = `${totalCount} akun dimuat (${verifiedCount} terverifikasi)`;
+    }
+
+    function setVerifiedSyncLabel(text, color = "#34D399") {
+      const el = document.getElementById("statVerifiedSyncState");
+      if (el) {
+        el.textContent = text;
+        el.style.color = color;
+      }
+    }
+
+    function listenToVerifiedUsers() {
+      if (usersUnsubscribe) return;
+      const activeDb = dbPrimary || dbFallback;
+      if (!activeDb) {
+        loadUsersFromRest();
+        return;
+      }
+
+      try {
+        setVerifiedSyncLabel("Memuat...", "#F59E0B");
+        const colRef = collection(activeDb, "users");
+        usersUnsubscribe = onSnapshot(colRef, (snapshot) => {
+          const list = [];
+          snapshot.forEach((d) => {
+            list.push(parseUserFirestoreDoc(d.id, d.data()));
+          });
+          allDirectoryUsers = list;
+          if (selectedDirectoryUser) {
+            const refreshed = list.find((u) => u.uid === selectedDirectoryUser.uid);
+            if (refreshed) {
+              selectedDirectoryUser = refreshed;
+              renderSelectedVerifiedUserCard();
+            }
+          }
+          updateVerifiedStatsAndBadges();
+          renderVerifiedUsersList();
+          setVerifiedSyncLabel("Real-Time", "#34D399");
+        }, (err) => {
+          console.warn("listenToVerifiedUsers fallback:", err);
+          usersUnsubscribe = null;
+          loadUsersFromRest();
+        });
+      } catch (err) {
+        console.warn("listenToVerifiedUsers error:", err);
+        loadUsersFromRest();
+      }
+    }
+
+    async function loadUsersFromRest() {
+      try {
+        setVerifiedSyncLabel("REST Sync", "#38BDF8");
+        const collected = [];
+        let pageToken = "";
+        for (let page = 0; page < 8; page++) {
+          const tokenParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "";
+          const restUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/users?pageSize=200${tokenParam}&key=${firebaseConfig.apiKey}`;
+          const res = await fetch(restUrl);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = await res.json();
+          const docs = Array.isArray(json.documents) ? json.documents : [];
+          docs.forEach((docItem) => collected.push(parseUserRestDoc(docItem)));
+          if (!json.nextPageToken) break;
+          pageToken = json.nextPageToken;
+        }
+        allDirectoryUsers = collected;
+        updateVerifiedStatsAndBadges();
+        renderVerifiedUsersList();
+        setVerifiedSyncLabel("Terhubung", "#34D399");
+      } catch (err) {
+        console.warn("REST load users failed:", err);
+        setVerifiedSyncLabel("Gagal Muat", "#F87171");
+        const box = document.getElementById("verifiedUsersListContainer");
+        if (box) {
+          box.innerHTML = `<div class="sticker-state-box error">Gagal memuat koleksi <code>users</code> (${escapeHtml(err.message)}). Anda tetap bisa memasukkan UID akun secara langsung di sebelah kiri.</div>`;
+        }
+      }
+    }
+
+    window.refreshUsersDirectory = async function() {
+      if (usersUnsubscribe) {
+        try { usersUnsubscribe(); } catch (_) {}
+        usersUnsubscribe = null;
+      }
+      allDirectoryUsers = [];
+      listenToVerifiedUsers();
+      showToast("Menyegarkan direktori akun pengguna...");
+    };
+
+    window.setVerifiedUserFilter = function(mode) {
+      verifiedUserFilterMode = mode;
+      document.getElementById("userFilterAll")?.classList.toggle("active", mode === "all");
+      document.getElementById("userFilterVerified")?.classList.toggle("active", mode === "verified");
+      document.getElementById("userFilterUnverified")?.classList.toggle("active", mode === "unverified");
+      renderVerifiedUsersList();
+    };
+
+    function renderSelectedVerifiedUserCard() {
+      const card = document.getElementById("selectedVerifiedUserCard");
+      if (!card) return;
+      if (!selectedDirectoryUser) {
+        card.style.display = "none";
+        card.innerHTML = "";
+        return;
+      }
+      const u = selectedDirectoryUser;
+      const initial = escapeHtml((u.name || "Y").charAt(0).toUpperCase());
+      const avatarHtml = u.avatar
+        ? `<img class="verified-user-avatar" src="${escapeHtml(u.avatar)}" alt="${escapeHtml(u.name)}" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
+        : `<div class="verified-user-avatar-fallback">${initial}</div>`;
+      const badgeHtml = u.isVerified ? buildGearSealBadgeSvg(u.verifiedColor, 18) : "";
+
+      card.style.display = "flex";
+      card.innerHTML = `
+        ${avatarHtml}
+        <div style="min-width: 0; flex: 1;">
+          <div style="display:flex; align-items:center; gap:6px; font-weight:700; color:#fff; font-size:14px;">
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(u.name)}</span>
+            ${badgeHtml}
+          </div>
+          <div style="font-size:12px; color:#94A3B8; margin-top:2px;">
+            ID: <strong style="color:#E2E8F0;">#${escapeHtml(u.userTag || "-")}</strong> • LV. ${u.level} • ${escapeHtml(u.role)}
+          </div>
+          <div style="font-size:11px; color:#64748B; font-family:monospace; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            UID: ${escapeHtml(u.uid)}${u.email ? ` • ${escapeHtml(u.email)}` : ""}
+          </div>
+        </div>
+      `;
+    }
+
+    function applyColorSelectionUI(rawColor) {
+      const hex = normalizeHexColor(rawColor);
+      const picker = document.getElementById("verifiedColorPicker");
+      const hexInput = document.getElementById("verifiedColorHexInput");
+      const statColor = document.getElementById("statSelectedVerifiedColor");
+
+      if (picker) picker.value = hex;
+      if (hexInput && document.activeElement !== hexInput) hexInput.value = hex;
+      if (statColor) {
+        statColor.textContent = hex;
+        statColor.style.color = hex;
+      }
+
+      document.querySelectorAll(".color-swatch-btn").forEach((btn) => {
+        const swatch = String(btn.getAttribute("data-swatch") || "").toUpperCase();
+        btn.classList.toggle("active", swatch === hex);
+      });
+      updateVerifiedBadgePreview();
+    }
+
+    window.syncVerifiedColorFromPicker = function(value) {
+      const hex = normalizeHexColor(value);
+      const hexInput = document.getElementById("verifiedColorHexInput");
+      if (hexInput) hexInput.value = hex;
+      applyColorSelectionUI(hex);
+    };
+
+    window.syncVerifiedColorFromHex = function(value) {
+      const cleaned = String(value || "").trim().replace(/[^#0-9A-Fa-f]/g, "");
+      if (/^#?[0-9A-Fa-f]{6}$/.test(cleaned)) {
+        applyColorSelectionUI(cleaned);
+      }
+    };
+
+    window.selectVerifiedColorPreset = function(hex) {
+      const norm = normalizeHexColor(hex);
+      const hexInput = document.getElementById("verifiedColorHexInput");
+      if (hexInput) hexInput.value = norm;
+      applyColorSelectionUI(norm);
+    };
+
+    window.updateVerifiedBadgePreview = function() {
+      const stage = document.getElementById("verifiedLivePreviewStage");
+      if (!stage) return;
+      const enabled = document.getElementById("verifiedEnabledSwitch")?.checked ?? true;
+      const hex = normalizeHexColor(
+        document.getElementById("verifiedColorHexInput")?.value ||
+        document.getElementById("verifiedColorPicker")?.value ||
+        "#1D9BF0"
+      );
+      const displayName = escapeHtml(selectedDirectoryUser?.name || "Akun Pilihanmu");
+      const tag = escapeHtml(selectedDirectoryUser?.userTag || "1001");
+      const badgeSmall = enabled ? buildGearSealBadgeSvg(hex, 18) : "";
+      const badgeLarge = buildGearSealBadgeSvg(hex, 36);
+
+      stage.innerHTML = `
+        <div class="verified-preview-bubble">
+          <div style="font-size:13.5px; font-weight:700; color:#fff;">${displayName}</div>
+          ${badgeSmall}
+          <span style="font-size:11.5px; color:#64748B;">#${tag}</span>
+          ${enabled ? "" : `<span style="font-size:11px; color:#F87171; font-weight:600;">(Nonaktif)</span>`}
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; padding:6px 12px; border-radius:12px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);">
+          ${badgeLarge}
+          <div>
+            <div style="font-size:11.5px; font-weight:700; color:#fff;">${enabled ? "Gear Badge Aktif" : "Badge Nonaktif"}</div>
+            <div style="font-size:11px; font-family:monospace; color:${hex};">${hex}</div>
+          </div>
+        </div>
+      `;
+    };
+
+    window.selectDirectoryUser = function(uid) {
+      const user = allDirectoryUsers.find((u) => u.uid === uid);
+      if (!user) return;
+      selectedDirectoryUser = user;
+      const targetInput = document.getElementById("verifiedTargetUidInput");
+      if (targetInput) targetInput.value = user.uid;
+
+      const sw = document.getElementById("verifiedEnabledSwitch");
+      if (sw) sw.checked = true; // Default aktif saat admin memilih akun untuk memberi/mengedit centang
+
+      applyColorSelectionUI(user.isVerified ? user.verifiedColor : (document.getElementById("verifiedColorHexInput")?.value || "#1D9BF0"));
+      renderSelectedVerifiedUserCard();
+      renderVerifiedUsersList();
+      showToast(`Akun "${user.name}" (#${user.userTag || "-"}) dipilih!`);
+    };
+
+    async function fetchSingleUserDoc(uid) {
+      const activeDb = dbPrimary || dbFallback;
+      if (activeDb) {
+        const snap = await getDoc(doc(activeDb, "users", uid));
+        if (snap.exists()) {
+          return parseUserFirestoreDoc(snap.id, snap.data());
+        }
+      }
+      const restUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/users/${encodeURIComponent(uid)}?key=${firebaseConfig.apiKey}`;
+      const res = await fetch(restUrl);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.fields) return parseUserRestDoc(json);
+      }
+      return null;
+    }
+
+    window.lookupAndSelectUser = async function() {
+      const raw = (document.getElementById("verifiedTargetUidInput")?.value || "").trim();
+      if (!raw) {
+        showToast("Masukkan ID (#tag), UID, atau nama akun terlebih dahulu.", true);
+        return;
+      }
+
+      const cleanTag = raw.replace(/^[@#]+/, "");
+      const lower = raw.toLowerCase();
+
+      // 1. Cek tepat berdasarkan UID atau #userTag atau Email di direktori cache
+      let found = allDirectoryUsers.find((u) => u.uid === raw)
+        || allDirectoryUsers.find((u) => u.userTag && u.userTag === cleanTag)
+        || allDirectoryUsers.find((u) => u.email && u.email.toLowerCase() === lower)
+        || allDirectoryUsers.find((u) => u.name.toLowerCase().includes(lower));
+
+      // 2. Jika tidak ada di cache, coba ambil langsung dokumen Firestore by UID
+      if (!found && !raw.includes(" ")) {
+        try {
+          found = await fetchSingleUserDoc(raw);
+          if (found) {
+            allDirectoryUsers.unshift(found);
+            updateVerifiedStatsAndBadges();
+          }
+        } catch (err) {
+          console.warn("Direct lookup error:", err);
+        }
+      }
+
+      if (found) {
+        selectedDirectoryUser = found;
+        const sw = document.getElementById("verifiedEnabledSwitch");
+        if (sw) sw.checked = true;
+        applyColorSelectionUI(found.isVerified ? found.verifiedColor : "#1D9BF0");
+        renderSelectedVerifiedUserCard();
+        renderVerifiedUsersList();
+        showToast(`Akun ditemukan: ${found.name} (#${found.userTag || "-"})`);
+      } else {
+        selectedDirectoryUser = null;
+        renderSelectedVerifiedUserCard();
+        updateVerifiedBadgePreview();
+        showToast(`ID "${raw}" belum ditemukan di daftar cache. Jika yakin ini UID valid, Anda tetap bisa klik Simpan.`, true);
+      }
+    };
+
+    function renderVerifiedUsersList() {
+      const container = document.getElementById("verifiedUsersListContainer");
+      if (!container) return;
+
+      const queryText = (document.getElementById("filterUsersInput")?.value || "").trim().toLowerCase();
+      const queryCleanTag = queryText.replace(/^[@#]+/, "");
+
+      let filtered = allDirectoryUsers.filter((u) => {
+        if (verifiedUserFilterMode === "verified" && !u.isVerified) return false;
+        if (verifiedUserFilterMode === "unverified" && u.isVerified) return false;
+        if (queryText) {
+          const matchName = u.name.toLowerCase().includes(queryText);
+          const matchTag = u.userTag.toLowerCase().includes(queryCleanTag);
+          const matchUid = u.uid.toLowerCase().includes(queryText);
+          const matchEmail = u.email.toLowerCase().includes(queryText);
+          if (!matchName && !matchTag && !matchUid && !matchEmail) return false;
+        }
+        return true;
+      });
+
+      filtered.sort((a, b) => {
+        if (a.isVerified !== b.isVerified) return a.isVerified ? -1 : 1;
+        return b.level - a.level;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-codes-box">
+            <div style="font-size: 30px;">👥</div>
+            <div style="font-size: 13.5px; font-weight: 700; color: #fff;">Tidak ada akun yang cocok</div>
+            <div style="font-size: 12px; color: var(--text-muted);">Coba kata kunci nama, ID 4-digit (misal 1001), atau ubah filter di atas.</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.slice(0, 120).map((u) => {
+        const isSelected = selectedDirectoryUser && selectedDirectoryUser.uid === u.uid;
+        const initial = escapeHtml((u.name || "Y").charAt(0).toUpperCase());
+        const avatarHtml = u.avatar
+          ? `<img class="verified-user-avatar" style="width:40px;height:40px;" src="${escapeHtml(u.avatar)}" alt="${escapeHtml(u.name)}" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.display='none'">`
+          : `<div class="verified-user-avatar-fallback" style="width:40px;height:40px;font-size:15px;">${initial}</div>`;
+        const badgeSvg = u.isVerified ? buildGearSealBadgeSvg(u.verifiedColor, 16) : "";
+        const safeUid = escapeHtml(u.uid);
+
+        return `
+          <div class="verified-user-item ${isSelected ? "selected" : ""}">
+            <div class="verified-user-meta">
+              ${avatarHtml}
+              <div class="verified-user-texts">
+                <div class="verified-user-name-row">
+                  <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(u.name)}</span>
+                  ${badgeSvg}
+                </div>
+                <div class="verified-user-sub">
+                  #${escapeHtml(u.userTag || "-")} • LV. ${u.level} • ${escapeHtml(u.role)} • <code>${safeUid}</code>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+              <button type="button" class="btn-action-small" data-select-uid="${safeUid}" onclick="selectDirectoryUser(this.getAttribute('data-select-uid'))" style="cursor:pointer;">
+                ${u.isVerified ? "Edit" : "Beri Badge"}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function writeVerifiedStatusToUid(uid, isVerified, verifiedColor) {
+      const updatedAt = Date.now();
+      const activeDb = dbPrimary || dbFallback;
+      if (activeDb) {
+        await setDoc(
+          doc(activeDb, "users", uid),
+          { isVerified, verifiedColor, updatedAt },
+          { merge: true }
+        );
+        return;
+      }
+
+      const restUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/users/${encodeURIComponent(uid)}?updateMask.fieldPaths=isVerified&updateMask.fieldPaths=verifiedColor&updateMask.fieldPaths=updatedAt&key=${firebaseConfig.apiKey}`;
+      const res = await fetch(restUrl, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fields: {
+            isVerified: { booleanValue: Boolean(isVerified) },
+            verifiedColor: { stringValue: String(verifiedColor) },
+            updatedAt: { integerValue: String(updatedAt) }
+          }
+        })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    }
+
+    async function persistVerifiedStatus(isVerified, verifiedColor) {
+      const rawInput = (document.getElementById("verifiedTargetUidInput")?.value || "").trim();
+      if (!rawInput && !selectedDirectoryUser) {
+        showToast("Masukkan ID atau pilih akun terlebih dahulu!", true);
+        return;
+      }
+
+      const cleanTag = rawInput.replace(/^[@#]+/, "");
+      const lowerInput = rawInput.toLowerCase();
+      let targetUids = [];
+      const matchesSelected = selectedDirectoryUser && (
+        !rawInput ||
+        selectedDirectoryUser.uid === rawInput ||
+        (selectedDirectoryUser.userTag && selectedDirectoryUser.userTag === cleanTag) ||
+        (selectedDirectoryUser.email && selectedDirectoryUser.email.toLowerCase() === lowerInput) ||
+        selectedDirectoryUser.name.toLowerCase().includes(lowerInput)
+      );
+
+      if (matchesSelected) {
+        const tagMatches = cleanTag
+          ? allDirectoryUsers.filter((u) => u.userTag && u.userTag === cleanTag)
+          : [];
+        targetUids = (tagMatches.length > 0 && selectedDirectoryUser.userTag === cleanTag && rawInput !== selectedDirectoryUser.uid)
+          ? tagMatches.map((u) => u.uid)
+          : [selectedDirectoryUser.uid];
+      } else {
+        const tagMatches = cleanTag
+          ? allDirectoryUsers.filter((u) => u.userTag && u.userTag === cleanTag)
+          : [];
+        if (tagMatches.length > 0) {
+          targetUids = tagMatches.map((u) => u.uid);
+          selectedDirectoryUser = tagMatches[0];
+        } else {
+          const direct = allDirectoryUsers.find((u) => u.uid === rawInput)
+            || allDirectoryUsers.find((u) => u.email && u.email.toLowerCase() === lowerInput);
+          targetUids = [direct ? direct.uid : rawInput];
+        }
+      }
+
+      const btn = document.getElementById("btnSaveVerifiedBadge");
+      const origHtml = btn ? btn.innerHTML : "";
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span>⏳</span> <span>Menyimpan...</span>`;
+      }
+      setVerifiedSyncLabel("Menyimpan...", "#F59E0B");
+
+      try {
+        for (const uid of targetUids) {
+          await writeVerifiedStatusToUid(uid, isVerified, verifiedColor);
+          const localMatch = allDirectoryUsers.find((u) => u.uid === uid);
+          if (localMatch) {
+            localMatch.isVerified = isVerified;
+            localMatch.verifiedColor = verifiedColor;
+          }
+        }
+        if (selectedDirectoryUser && targetUids.includes(selectedDirectoryUser.uid)) {
+          selectedDirectoryUser.isVerified = isVerified;
+          selectedDirectoryUser.verifiedColor = verifiedColor;
+        }
+        updateVerifiedStatsAndBadges();
+        renderSelectedVerifiedUserCard();
+        renderVerifiedUsersList();
+        updateVerifiedBadgePreview();
+        setVerifiedSyncLabel("Tersimpan", "#34D399");
+        showToast(
+          isVerified
+            ? `✓ Centang gear (${verifiedColor}) aktif pada ${targetUids.length} akun!`
+            : `✓ Centang gear dicabut dari ${targetUids.length} akun.`
+        );
+      } catch (err) {
+        console.error("saveVerifiedBadgeStatus error:", err);
+        setVerifiedSyncLabel("Gagal Simpan", "#F87171");
+        showToast("Gagal menyimpan status centang biru: " + err.message, true);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        }
+      }
+    }
+
+    window.saveVerifiedBadgeStatus = async function(event) {
+      event.preventDefault();
+      const isVerified = Boolean(document.getElementById("verifiedEnabledSwitch")?.checked);
+      const hex = normalizeHexColor(
+        document.getElementById("verifiedColorHexInput")?.value ||
+        document.getElementById("verifiedColorPicker")?.value ||
+        "#1D9BF0"
+      );
+      await persistVerifiedStatus(isVerified, hex);
+    };
+
+    window.revokeSelectedVerifiedBadge = async function() {
+      const sw = document.getElementById("verifiedEnabledSwitch");
+      if (sw) sw.checked = false;
+      const hex = normalizeHexColor(document.getElementById("verifiedColorHexInput")?.value || "#1D9BF0");
+      await persistVerifiedStatus(false, hex);
+    };
+
+    document.getElementById("verifiedTargetUidInput")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        window.lookupAndSelectUser();
+      }
+    });
+
+    // Auto load redeem codes, global sticker packs & verified users badge on boot
     setTimeout(() => {
       listenToRedeemCodes();
       listenToGlobalStickerPacks();
+      listenToVerifiedUsers();
     }, 600);
 
   </script>

@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -25,27 +26,34 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yuranime.dinz.ui.components.TitleIconCatalog.drawTitleVectorIcon
 import com.yuranime.dinz.ui.theme.JakartaSansFontFamily
 import com.yuranime.dinz.ui.theme.JetBrainsMonoFontFamily
 import com.yuranime.dinz.ui.theme.OutfitDisplayFontFamily
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -59,8 +67,71 @@ private data class BadgeTierPalette(
     val textTint: Color
 )
 
-private fun resolveTierPalette(tierLevel: Int): BadgeTierPalette {
+private fun resolveTierPalette(tierLevel: Int, vfxTier: TitleVfxTier): BadgeTierPalette {
     return when {
+        vfxTier == TitleVfxTier.BLAZING_INFERNO -> BadgeTierPalette(
+            primaryAccent = Color(0xFFFF6D00),
+            secondaryAccent = Color(0xFFE11D48),
+            wingDarkStart = Color(0xFF280D0B),
+            wingDarkEnd = Color(0xFF140709),
+            hexInnerDark = Color(0xFF1B0907),
+            highlightLine = Color(0xFFFDE047),
+            textTint = Color(0xFFFFFBEB)
+        )
+        vfxTier == TitleVfxTier.LIGHTNING_STORM -> BadgeTierPalette(
+            primaryAccent = Color(0xFF38BDF8),
+            secondaryAccent = Color(0xFF6366F1),
+            wingDarkStart = Color(0xFF0A162C),
+            wingDarkEnd = Color(0xFF080D1C),
+            hexInnerDark = Color(0xFF0B1124),
+            highlightLine = Color(0xFFBAE6FD),
+            textTint = Color(0xFFF0F9FF)
+        )
+        vfxTier == TitleVfxTier.SOLAR_FLARE -> BadgeTierPalette(
+            primaryAccent = Color(0xFFFBBF24),
+            secondaryAccent = Color(0xFFF97316),
+            wingDarkStart = Color(0xFF271907),
+            wingDarkEnd = Color(0xFF140C07),
+            hexInnerDark = Color(0xFF1E1306),
+            highlightLine = Color(0xFFFEF08A),
+            textTint = Color(0xFFFFFBEB)
+        )
+        vfxTier == TitleVfxTier.FROST_PRISM -> BadgeTierPalette(
+            primaryAccent = Color(0xFF22D3EE),
+            secondaryAccent = Color(0xFF0EA5E9),
+            wingDarkStart = Color(0xFF0B1F29),
+            wingDarkEnd = Color(0xFF08111B),
+            hexInnerDark = Color(0xFF091722),
+            highlightLine = Color(0xFFCFFAFE),
+            textTint = Color(0xFFECFEFF)
+        )
+        vfxTier == TitleVfxTier.VOID_NEBULA -> BadgeTierPalette(
+            primaryAccent = Color(0xFFC084FC),
+            secondaryAccent = Color(0xFFE11D48),
+            wingDarkStart = Color(0xFF1D0D2B),
+            wingDarkEnd = Color(0xFF0E0718),
+            hexInnerDark = Color(0xFF140921),
+            highlightLine = Color(0xFFF3E8FF),
+            textTint = Color(0xFFFAF5FF)
+        )
+        vfxTier == TitleVfxTier.HOLO_PRISM -> BadgeTierPalette(
+            primaryAccent = Color(0xFFF472B6),
+            secondaryAccent = Color(0xFF2DD4BF),
+            wingDarkStart = Color(0xFF19132B),
+            wingDarkEnd = Color(0xFF0D111C),
+            hexInnerDark = Color(0xFF130F21),
+            highlightLine = Color(0xFFFCE7F3),
+            textTint = Color(0xFFFFFFFF)
+        )
+        vfxTier == TitleVfxTier.PULSE_SCAN -> BadgeTierPalette(
+            primaryAccent = Color(0xFF10B981),
+            secondaryAccent = Color(0xFF06B6D4),
+            wingDarkStart = Color(0xFF0B1D1B),
+            wingDarkEnd = Color(0xFF081114),
+            hexInnerDark = Color(0xFF0A1716),
+            highlightLine = Color(0xFFA7F3D0),
+            textTint = Color(0xFFECFDF5)
+        )
         tierLevel >= 35 -> BadgeTierPalette(
             primaryAccent = Color(0xFFF59E0B),
             secondaryAccent = Color(0xFFEF4444),
@@ -70,51 +141,66 @@ private fun resolveTierPalette(tierLevel: Int): BadgeTierPalette {
             highlightLine = Color(0xFFFDE68A),
             textTint = Color(0xFFFFFBEB)
         )
-        tierLevel in 20..34 -> BadgeTierPalette(
-            primaryAccent = Color(0xFFA855F7),
-            secondaryAccent = Color(0xFFEC4899),
-            wingDarkStart = Color(0xFF20102D),
-            wingDarkEnd = Color(0xFF100A19),
-            hexInnerDark = Color(0xFF150A21),
-            highlightLine = Color(0xFFE9D5FF),
-            textTint = Color(0xFFFAF5FF)
-        )
-        tierLevel in 10..19 -> BadgeTierPalette(
-            primaryAccent = Color(0xFF06B6D4),
-            secondaryAccent = Color(0xFF3B82F6),
-            wingDarkStart = Color(0xFF0D1D2A),
-            wingDarkEnd = Color(0xFF091019),
-            hexInnerDark = Color(0xFF0A1520),
-            highlightLine = Color(0xFFA5F3FC),
-            textTint = Color(0xFFECFEFF)
-        )
-        tierLevel in 5..9 -> BadgeTierPalette(
+        tierLevel in 10..34 -> BadgeTierPalette(
             primaryAccent = Color(0xFFFF5722),
             secondaryAccent = Color(0xFFE11D48),
-            wingDarkStart = Color(0xFF261014),
-            wingDarkEnd = Color(0xFF12090C),
-            hexInnerDark = Color(0xFF190A0D),
-            highlightLine = Color(0xFFFFCCBC),
+            wingDarkStart = Color(0xFF241016),
+            wingDarkEnd = Color(0xFF11090D),
+            hexInnerDark = Color(0xFF190A0E),
+            highlightLine = Color(0xFFFECDD3),
             textTint = Color(0xFFFFF1F2)
         )
         else -> BadgeTierPalette(
-            primaryAccent = Color(0xFFF43F5E),
-            secondaryAccent = Color(0xFF9F1239),
-            wingDarkStart = Color(0xFF210F16),
-            wingDarkEnd = Color(0xFF10090E),
-            hexInnerDark = Color(0xFF170A10),
-            highlightLine = Color(0xFFFDA4AF),
-            textTint = Color(0xFFFFF1F2)
+            primaryAccent = Color(0xFF64748B),
+            secondaryAccent = Color(0xFF475569),
+            wingDarkStart = Color(0xFF171A23),
+            wingDarkEnd = Color(0xFF0F1118),
+            hexInnerDark = Color(0xFF13161E),
+            highlightLine = Color(0xFFCBD5E1),
+            textTint = Color(0xFFE2E8F0)
         )
     }
 }
 
+private fun resolveVfxForTitle(titleName: String, tierLevel: Int): TitleVfxTier {
+    val u = titleName.trim().uppercase(Locale.ROOT)
+    return when {
+        u == "WARGA YURANIME" || u == "PEMBURU KOLEKSI" -> TitleVfxTier.NONE
+        u == "PERINTIS ANIME" || u == "PENJELAJAH KOMIK" || u.contains("RAMEN") ||
+            u.contains("PUMPKIN") || u.contains("PEACEKEEPER") || u.contains("ALCHEMIST") ||
+            u.contains("ELIXIR") -> TitleVfxTier.SUBTLE_SHIMMER
+        u.contains("INFERNO") || u.contains("SEPUH") || u.contains("SHOGUN") ||
+            u.contains("METEOR") || u.contains("MYTHIC") || u.contains("PHOENIX") ||
+            u.contains("DRAGON") -> TitleVfxTier.BLAZING_INFERNO
+        u.contains("RAIJIN") || u.contains("THUNDER") || u.contains("STORM") ||
+            u.contains("TEMPEST") || u.contains("EMPEROR OF OTAKU") -> TitleVfxTier.LIGHTNING_STORM
+        u.contains("SOLAR") || u.contains("AKASHIC") || u.contains("KHALIFAH") ||
+            u.contains("STARFALL") || u.contains("CELESTIAL") -> TitleVfxTier.SOLAR_FLARE
+        u.contains("FROST") || u.contains("GLACIAL") -> TitleVfxTier.FROST_PRISM
+        u.contains("VOID") || u.contains("DIMENSI") || u.contains("REAPER") ||
+            u.contains("OBSIDIAN") || u.contains("LUNAR") || u.contains("SHINOBI") ||
+            u.contains("SKULL") || u.contains("CURSE") || u.contains("JESTER") -> TitleVfxTier.VOID_NEBULA
+        u.contains("VIP") || u.contains("BANGSAWAN") || u.contains("GRANDMASTER") ||
+            u.contains("SORCERER") || u.contains("WARDEN") -> TitleVfxTier.HOLO_PRISM
+        u.contains("NETRUNNER") || u.contains("MARATON") || u.contains("VANGUARD") ||
+            u.contains("DRUID") || u.contains("FORGE") || u.contains("BRAWLER") ||
+            u.contains("RIDER") -> TitleVfxTier.PULSE_SCAN
+        u.contains("CRIMSON") || u.contains("ISEKAI") || u.contains("GOBLIN") ||
+            u.contains("CLEAVER") || u.contains("BOMBARDIER") || u.contains("BEAST") ||
+            u.contains("KATANA") || u.contains("PYRO") -> TitleVfxTier.EMBER_SPARK
+        tierLevel >= 50 -> TitleVfxTier.BLAZING_INFERNO
+        tierLevel >= 35 -> TitleVfxTier.HOLO_PRISM
+        tierLevel >= 18 -> TitleVfxTier.PULSE_SCAN
+        else -> TitleVfxTier.SUBTLE_SHIMMER
+    }
+}
+
 /**
- * TAHAP 2: Komponen Utama Custom Title Badge (`GeometricTitleBadge`)
- * - Geometri Dinamis (`wrapContentWidth` + `drawBehind`): Sayap poligon kanan memanjang otomatis
- *   mengikuti panjang teks dengan ruang aman minimal 16.dp sebelum garis miring kanan (100% ANTI-KEPOTONG!).
- * - 160+ Ikon Vektor Unik (`TitleIconCatalog`) di dalam emblem heksagon kiri.
- * - 8 Variasi Animasi Berbeda (`TitleAnimationType`).
+ * Custom Title Badge (`GeometricTitleBadge`) bergaya Lower-Third Futuristik / Fantasi RPG:
+ * - 5 Gaya Geometris (`ROYAL_HEX`, `CIRCUIT_TECH`, `FACETED_SHARD`, `DIAGONAL_SLASH`, `MECHA_HUD`).
+ * - Menggunakan ikon vektor SVG asli dari folder `RPG ICON TITLE` & `RPG ICON V2` di dalam emblem kiri.
+ * - Membedakan jelas title sederhana/starter (`NONE`/`SUBTLE_SHIMMER`) dengan title berbayar/mewah
+ *   berupa efek kobaran api nyata, petir bercabang, korona surya, prisma holo, dan radar scan.
  */
 @Composable
 fun GeometricTitleBadge(
@@ -127,47 +213,66 @@ fun GeometricTitleBadge(
     isAnimated: Boolean = true,
     compact: Boolean = false,
     scaleFactor: Float = 1f,
+    vfxTier: TitleVfxTier? = null,
+    titleId: String = "",
     onClick: (() -> Unit)? = null
 ) {
-    val palette = remember(tierLevel) { resolveTierPalette(tierLevel) }
-    val resolvedIconId = remember(titleName, iconId) {
-        TitleIconCatalog.resolveIconId(titleName, iconId)
+    val resolvedVfx = remember(titleName, tierLevel, vfxTier) {
+        vfxTier ?: resolveVfxForTitle(titleName, tierLevel)
     }
-    val resolvedAnimType = remember(titleName, tierLevel, styleVariant, animationType) {
-        animationType ?: TitleAnimationType.resolveForTitle(titleName, tierLevel, styleVariant)
+    val shapeStyle = remember(styleVariant) { TitleShapeStyle.fromVariant(styleVariant) }
+    val palette = remember(tierLevel, resolvedVfx) { resolveTierPalette(tierLevel, resolvedVfx) }
+    val iconRes = remember(titleName, titleId) {
+        RpgSvgIconCatalog.resolveCustomTitleIcon(titleName, titleId)
     }
 
-    val isLongCompact = compact && titleName.length > 12
-    val heightDp: Dp = if (compact) 21.dp else 28.dp
+    val isLongCompact = compact && titleName.length > 13
+    val heightDp: Dp = if (compact) 23.dp else 32.dp
     val fontSize: TextUnit = when {
-        isLongCompact -> 7.2.sp
+        isLongCompact -> 7.4.sp
         compact -> 8.2.sp
         else -> 10.5.sp
     }
-    val startTextPad: Dp = if (compact) 23.dp else 34.dp
-    val endSafePad: Dp = if (compact) 22.dp else 30.dp
 
-    val phase = if (isAnimated) {
-        val transition = rememberInfiniteTransition(label = "titleBadgeAnim")
+    val iconBoxSize: Dp = when (shapeStyle) {
+        TitleShapeStyle.MECHA_HUD -> if (compact) 15.dp else 20.dp
+        TitleShapeStyle.FACETED_SHARD -> if (compact) 14.5.dp else 19.dp
+        else -> if (compact) 13.5.dp else 18.dp
+    }
+    val startTextPad: Dp = if (compact) 7.dp else 10.dp
+    val endSafePad: Dp = when (shapeStyle) {
+        TitleShapeStyle.CIRCUIT_TECH -> if (compact) 18.dp else 26.dp
+        TitleShapeStyle.DIAGONAL_SLASH -> if (compact) 18.dp else 26.dp
+        else -> if (compact) 15.dp else 22.dp
+    }
+
+    val shouldRunLoop = isAnimated && resolvedVfx != TitleVfxTier.NONE
+    val phase = if (shouldRunLoop) {
+        val transition = rememberInfiniteTransition(label = "titleVfxLoop")
         val anim by transition.animateFloat(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 2600, easing = LinearEasing),
+                animation = tween(
+                    durationMillis = when (resolvedVfx) {
+                        TitleVfxTier.LIGHTNING_STORM -> 1900
+                        TitleVfxTier.BLAZING_INFERNO -> 1600
+                        TitleVfxTier.SOLAR_FLARE -> 2800
+                        else -> 2600
+                    },
+                    easing = LinearEasing
+                ),
                 repeatMode = RepeatMode.Restart
             ),
             label = "titlePhase"
         )
         anim
     } else {
-        0.35f
+        0.25f
     }
 
     val baseMod = if (scaleFactor != 1f) {
-        modifier.graphicsLayer(
-            scaleX = scaleFactor,
-            scaleY = scaleFactor
-        )
+        modifier.graphicsLayer(scaleX = scaleFactor, scaleY = scaleFactor)
     } else {
         modifier
     }
@@ -188,332 +293,52 @@ fun GeometricTitleBadge(
             .wrapContentWidth()
             .height(heightDp)
             .drawBehind {
-                val w = size.width
-                val h = size.height
-                val cy = h / 2f
-                val hexRadius = h * 0.47f
-                val hexCenterX = hexRadius * 1.05f
-
-                val wingTopY = h * 0.13f
-                val wingBottomY = h * 0.87f
-                val wingHeight = wingBottomY - wingTopY
-                val cutSize = wingHeight * 0.42f
-                val wingStartX = hexCenterX + hexRadius * 0.32f
-                val wingEndX = w - 1.5.dp.toPx()
-
-                val wingPath = Path().apply {
-                    when (styleVariant % 4) {
-                        0 -> {
-                            moveTo(wingStartX, wingTopY)
-                            lineTo(wingEndX - cutSize * 0.42f, wingTopY)
-                            lineTo(wingEndX, cy)
-                            lineTo(wingEndX - cutSize * 0.78f, wingBottomY)
-                            lineTo(wingStartX, wingBottomY)
-                            close()
-                        }
-                        1 -> {
-                            moveTo(wingStartX, wingTopY)
-                            lineTo(wingEndX - cutSize * 0.8f, wingTopY)
-                            lineTo(wingEndX, wingTopY + cutSize * 0.62f)
-                            lineTo(wingEndX - cutSize * 0.32f, wingBottomY)
-                            lineTo(wingStartX, wingBottomY)
-                            close()
-                        }
-                        2 -> {
-                            moveTo(wingStartX, wingTopY)
-                            lineTo(wingEndX - cutSize * 0.65f, wingTopY)
-                            lineTo(wingEndX, cy)
-                            lineTo(wingEndX - cutSize * 0.65f, wingBottomY)
-                            lineTo(wingStartX, wingBottomY)
-                            close()
-                        }
-                        else -> {
-                            moveTo(wingStartX, wingTopY)
-                            lineTo(wingEndX, wingTopY)
-                            lineTo(wingEndX - cutSize * 0.78f, wingBottomY)
-                            lineTo(wingStartX, wingBottomY)
-                            close()
-                        }
-                    }
-                }
-
-                val accentBrush = Brush.linearGradient(
-                    colors = listOf(palette.primaryAccent, palette.secondaryAccent),
-                    start = Offset(0f, 0f),
-                    end = Offset(w, h)
+                drawBadgeFrameGeometry(
+                    shapeStyle = shapeStyle,
+                    vfxTier = resolvedVfx,
+                    palette = palette,
+                    phase = phase,
+                    isAnimated = shouldRunLoop,
+                    compact = compact
                 )
-                val wingFillBrush = Brush.horizontalGradient(
-                    colors = listOf(
-                        palette.wingDarkStart,
-                        palette.wingDarkEnd,
-                        palette.secondaryAccent.copy(alpha = 0.25f)
-                    ),
-                    startX = hexCenterX,
-                    endX = w
-                )
-
-                drawPath(path = wingPath, brush = wingFillBrush)
-
-                // Render 8 Variasi Animasi di Latar Sayap (Terkunci Sempurna di Dalam clipPath)
-                clipPath(wingPath) {
-                    val span = (wingEndX - wingStartX).coerceAtLeast(1f)
-                    if (isAnimated) {
-                        // Kilau metalik diagonal halus agar setiap Custom Title terasa hidup 60fps
-                        val sheenX = wingStartX + (span + 44.dp.toPx()) * phase - 22.dp.toPx()
-                        drawLine(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    palette.highlightLine.copy(alpha = 0.20f),
-                                    Color.White.copy(alpha = 0.24f),
-                                    Color.Transparent
-                                ),
-                                startX = sheenX - 16.dp.toPx(),
-                                endX = sheenX + 16.dp.toPx()
-                            ),
-                            start = Offset(sheenX, wingTopY - 4.dp.toPx()),
-                            end = Offset(sheenX - 14.dp.toPx(), wingBottomY + 4.dp.toPx()),
-                            strokeWidth = 22.dp.toPx()
-                        )
-                    }
-
-                    when (resolvedAnimType) {
-                        TitleAnimationType.HOLOGRAPHIC_FOIL -> {
-                            val sweepX = wingStartX + (span + 46.dp.toPx()) * phase - 23.dp.toPx()
-                            drawLine(
-                                brush = Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        Color(0x88A5F3FC),
-                                        Color(0x99F472B6),
-                                        Color(0x88FDE047),
-                                        Color.Transparent
-                                    ),
-                                    startX = sweepX - 18.dp.toPx(),
-                                    endX = sweepX + 18.dp.toPx()
-                                ),
-                                start = Offset(sweepX, wingTopY - 4.dp.toPx()),
-                                end = Offset(sweepX - 14.dp.toPx(), wingBottomY + 4.dp.toPx()),
-                                strokeWidth = 24.dp.toPx()
-                            )
-                        }
-                        TitleAnimationType.LIQUID_GOLD_WAVE -> {
-                            val waveX = wingStartX + (span + 40.dp.toPx()) * phase - 20.dp.toPx()
-                            drawLine(
-                                brush = Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        palette.primaryAccent.copy(alpha = 0.48f),
-                                        Color(0xCCFEF08A),
-                                        palette.primaryAccent.copy(alpha = 0.42f),
-                                        Color.Transparent
-                                    ),
-                                    startX = waveX - 18.dp.toPx(),
-                                    endX = waveX + 18.dp.toPx()
-                                ),
-                                start = Offset(waveX, wingTopY - 3.dp.toPx()),
-                                end = Offset(waveX - 12.dp.toPx(), wingBottomY + 3.dp.toPx()),
-                                strokeWidth = 22.dp.toPx()
-                            )
-                            val wave2Phase = (phase + 0.5f) % 1f
-                            val wave2X = wingStartX + (span + 30.dp.toPx()) * wave2Phase - 15.dp.toPx()
-                            drawLine(
-                                brush = Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        Color.White.copy(alpha = 0.50f),
-                                        Color.Transparent
-                                    ),
-                                    startX = wave2X - 6.dp.toPx(),
-                                    endX = wave2X + 6.dp.toPx()
-                                ),
-                                start = Offset(wave2X, wingTopY - 2.dp.toPx()),
-                                end = Offset(wave2X - 9.dp.toPx(), wingBottomY + 2.dp.toPx()),
-                                strokeWidth = 6.dp.toPx()
-                            )
-                        }
-                        TitleAnimationType.CRIMSON_EMBER_DRIFT -> {
-                            for (i in 0..5) {
-                                val pLocal = (phase + i * 0.167f) % 1f
-                                val ex = wingStartX + (span - 16.dp.toPx()) * ((i * 0.19f + 0.10f) % 1f)
-                                val ey = wingBottomY - wingHeight * pLocal
-                                drawCircle(
-                                    color = palette.highlightLine.copy(alpha = (1f - pLocal) * 0.85f),
-                                    radius = if (i % 2 == 0) 1.6.dp.toPx() else 1.15.dp.toPx(),
-                                    center = Offset(ex, ey)
-                                )
-                            }
-                        }
-                        TitleAnimationType.STARLIGHT_TWINKLE -> {
-                            for (i in 0..4) {
-                                val alpha = (0.2f + 0.78f * sin((phase * 2 * Math.PI + i * 1.35).toFloat()).let { (it + 1f) / 2f })
-                                val sx = wingStartX + (span - 16.dp.toPx()) * (0.14f + i * 0.19f)
-                                val sy = if (i % 2 == 0) wingTopY + wingHeight * 0.28f else wingBottomY - wingHeight * 0.28f
-                                drawCircle(
-                                    color = Color.White.copy(alpha = alpha * 0.85f),
-                                    radius = 1.4.dp.toPx(),
-                                    center = Offset(sx, sy)
-                                )
-                            }
-                        }
-                        TitleAnimationType.CYBER_PULSE_GLOW -> {
-                            val pulse = sin(phase * 2 * Math.PI).toFloat().let { (it + 1f) / 2f }
-                            drawRect(
-                                brush = Brush.horizontalGradient(
-                                    colors = listOf(
-                                        palette.primaryAccent.copy(alpha = 0.08f + 0.22f * pulse),
-                                        palette.highlightLine.copy(alpha = 0.14f + 0.26f * pulse),
-                                        Color.Transparent
-                                    ),
-                                    startX = wingStartX,
-                                    endX = wingEndX
-                                ),
-                                topLeft = Offset(wingStartX, wingTopY),
-                                size = androidx.compose.ui.geometry.Size(span, wingHeight)
-                            )
-                        }
-                        TitleAnimationType.PLASMA_BORDER_FLOW -> {
-                            val px = wingStartX + (span + 32.dp.toPx()) * ((1f - phase + 0.5f) % 1f) - 16.dp.toPx()
-                            drawLine(
-                                color = palette.secondaryAccent.copy(alpha = 0.35f),
-                                start = Offset(px, wingTopY),
-                                end = Offset(px - 10.dp.toPx(), wingBottomY),
-                                strokeWidth = 10.dp.toPx()
-                            )
-                        }
-                        TitleAnimationType.CELESTIAL_ORBIT -> {
-                            val pulse = sin(phase * 2 * Math.PI).toFloat().let { (it + 1f) / 2f }
-                            drawCircle(
-                                color = palette.highlightLine.copy(alpha = 0.22f * pulse),
-                                radius = 14.dp.toPx(),
-                                center = Offset(wingStartX + span * phase, cy)
-                            )
-                        }
-                        TitleAnimationType.LIGHTNING_ARC_SWEEP -> Unit
-                    }
-
-                    if (resolvedAnimType == TitleAnimationType.LIGHTNING_ARC_SWEEP && phase < 0.45f) {
-                        val lx = wingStartX + span * (phase / 0.45f)
-                        drawLine(
-                            color = Color.White.copy(alpha = 0.92f),
-                            start = Offset(lx, wingTopY),
-                            end = Offset(lx - 4.dp.toPx(), cy),
-                            strokeWidth = 1.6.dp.toPx(),
-                            cap = StrokeCap.Round
-                        )
-                        drawLine(
-                            color = palette.highlightLine.copy(alpha = 0.92f),
-                            start = Offset(lx - 4.dp.toPx(), cy),
-                            end = Offset(lx + 3.dp.toPx(), wingBottomY),
-                            strokeWidth = 1.6.dp.toPx(),
-                            cap = StrokeCap.Round
-                        )
-                    }
-                }
-
-                val borderAlpha = if (resolvedAnimType == TitleAnimationType.CYBER_PULSE_GLOW) {
-                    0.55f + 0.45f * sin(phase * 2 * Math.PI).toFloat().let { (it + 1f) / 2f }
-                } else {
-                    0.95f
-                }
-
-                drawPath(
-                    path = wingPath,
-                    brush = if (resolvedAnimType == TitleAnimationType.PLASMA_BORDER_FLOW) {
-                        val shift = w * phase
-                        Brush.linearGradient(
-                            colors = listOf(palette.primaryAccent, palette.highlightLine, palette.secondaryAccent),
-                            start = Offset(shift - w * 0.4f, 0f),
-                            end = Offset(shift + w * 0.4f, h)
-                        )
-                    } else {
-                        accentBrush
-                    },
-                    alpha = borderAlpha,
-                    style = Stroke(width = 1.25.dp.toPx(), join = StrokeJoin.Miter)
-                )
-
-                // Garis aksen paralel atas & bawah + chevron di ujung kanan (aman di belakang endSafePad)
-                val innerInset = 2.4.dp.toPx()
-                drawLine(
-                    color = palette.highlightLine.copy(alpha = 0.38f),
-                    start = Offset(wingStartX + hexRadius * 0.5f, wingTopY + innerInset),
-                    end = Offset(wingEndX - cutSize * 1.15f, wingTopY + innerInset),
-                    strokeWidth = 0.75.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
-                val chevronBaseX = wingEndX - cutSize * 0.9f
-                drawLine(
-                    color = palette.primaryAccent.copy(alpha = 0.55f),
-                    start = Offset(chevronBaseX, wingTopY + 3.dp.toPx()),
-                    end = Offset(chevronBaseX - 3.dp.toPx(), wingBottomY - 3.dp.toPx()),
-                    strokeWidth = 1.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
-
-                // 2. Emblem Heksagon Kiri Berlapis
-                fun buildHexagonPath(cx: Float, centerY: Float, radius: Float): Path {
-                    return Path().apply {
-                        for (i in 0 until 6) {
-                            val angleRad = Math.toRadians(60.0 * i - 30.0)
-                            val px = cx + (radius * cos(angleRad)).toFloat()
-                            val py = centerY + (radius * sin(angleRad)).toFloat()
-                            if (i == 0) moveTo(px, py) else lineTo(px, py)
-                        }
-                        close()
-                    }
-                }
-
-                val outerHexPath = buildHexagonPath(hexCenterX, cy, hexRadius)
-                val midHexPath = buildHexagonPath(hexCenterX, cy, hexRadius * 0.80f)
-                val innerHexPath = buildHexagonPath(hexCenterX, cy, hexRadius * 0.62f)
-
-                drawPath(path = outerHexPath, brush = accentBrush)
-                drawPath(path = midHexPath, color = palette.hexInnerDark)
-                drawPath(
-                    path = innerHexPath,
-                    color = palette.highlightLine.copy(alpha = 0.65f),
-                    style = Stroke(width = 0.9.dp.toPx(), join = StrokeJoin.Round)
-                )
-                drawPath(
-                    path = outerHexPath,
-                    color = palette.highlightLine.copy(alpha = 0.85f),
-                    style = Stroke(width = 1.dp.toPx(), join = StrokeJoin.Round)
-                )
-
-                if (resolvedAnimType == TitleAnimationType.CELESTIAL_ORBIT) {
-                    val orbitAngle = Math.toRadians((phase * 360.0))
-                    val ox = hexCenterX + (hexRadius * 0.92f * cos(orbitAngle)).toFloat()
-                    val oy = cy + (hexRadius * 0.92f * sin(orbitAngle)).toFloat()
-                    drawCircle(
-                        color = palette.highlightLine,
-                        radius = 1.8.dp.toPx(),
-                        center = Offset(ox, oy)
+            }
+            .drawWithContent {
+                drawContent()
+                if (shouldRunLoop) {
+                    drawForegroundRichFx(
+                        vfxTier = resolvedVfx,
+                        palette = palette,
+                        phase = phase,
+                        compact = compact
                     )
                 }
-
-                // Gambar Ikon Vektor Unik dari 160+ Katalog Ikon di Tengah Heksagon Kiri
-                drawTitleVectorIcon(
-                    iconId = resolvedIconId,
-                    center = Offset(hexCenterX, cy),
-                    radius = hexRadius * 0.46f,
-                    primaryColor = palette.highlightLine,
-                    secondaryColor = palette.primaryAccent,
-                    isAnimatedPulse = phase
-                )
             }
             .padding(start = startTextPad, end = endSafePad)
     ) {
+        Box(
+            modifier = Modifier.size(iconBoxSize),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = iconRes),
+                contentDescription = titleName,
+                colorFilter = ColorFilter.tint(palette.highlightLine),
+                modifier = Modifier.size(iconBoxSize * 0.86f)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(if (compact) 6.dp else 8.dp))
+
         Text(
             text = titleName.uppercase(Locale.ROOT),
             color = palette.textTint,
             fontSize = fontSize,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.ExtraBold,
             fontFamily = OutfitDisplayFontFamily,
             letterSpacing = when {
-                isLongCompact -> 0.15.sp
+                isLongCompact -> 0.2.sp
                 compact -> 0.45.sp
-                else -> 0.9.sp
+                else -> 0.85.sp
             },
             style = centeredBadgeTextStyle(fontSize),
             maxLines = 1,
@@ -522,22 +347,475 @@ fun GeometricTitleBadge(
     }
 }
 
-private fun centeredBadgeTextStyle(fontSize: TextUnit) = androidx.compose.ui.text.TextStyle(
+private fun DrawScope.drawBadgeFrameGeometry(
+    shapeStyle: TitleShapeStyle,
+    vfxTier: TitleVfxTier,
+    palette: BadgeTierPalette,
+    phase: Float,
+    isAnimated: Boolean,
+    compact: Boolean
+) {
+    val w = size.width
+    val h = size.height
+    val cy = h / 2f
+    val padY = h * 0.10f
+    val bodyTop = padY
+    val bodyBottom = h - padY
+    val bodyH = bodyBottom - bodyTop
+    val cut = bodyH * 0.36f
+    val iconAreaW = if (compact) 23.dp.toPx() else 31.dp.toPx()
+
+    val bodyPath = Path().apply {
+        when (shapeStyle) {
+            TitleShapeStyle.CIRCUIT_TECH -> {
+                val traceOffset = if (compact) 4.dp.toPx() else 6.dp.toPx()
+                val sx = traceOffset
+                val ex = w - traceOffset
+                moveTo(sx + cut * 0.8f, bodyTop)
+                lineTo(ex - cut * 0.8f, bodyTop)
+                lineTo(ex, bodyTop + cut * 0.7f)
+                lineTo(ex, bodyBottom - cut * 0.7f)
+                lineTo(ex - cut * 0.8f, bodyBottom)
+                lineTo(sx + cut * 0.8f, bodyBottom)
+                lineTo(sx, bodyBottom - cut * 0.7f)
+                lineTo(sx, bodyTop + cut * 0.7f)
+                close()
+            }
+            TitleShapeStyle.FACETED_SHARD -> {
+                moveTo(cut * 0.55f, bodyTop)
+                lineTo(w - cut * 1.1f, bodyTop)
+                lineTo(w - 2.dp.toPx(), bodyTop + bodyH * 0.42f)
+                lineTo(w - cut * 0.75f, bodyBottom)
+                lineTo(0f, bodyBottom)
+                lineTo(0f, bodyTop + cut * 0.65f)
+                close()
+            }
+            TitleShapeStyle.DIAGONAL_SLASH -> {
+                val skew = bodyH * 0.42f
+                moveTo(skew, bodyTop)
+                lineTo(w - 1.dp.toPx(), bodyTop)
+                lineTo(w - skew - 4.dp.toPx(), bodyBottom)
+                lineTo(0f, bodyBottom)
+                close()
+            }
+            TitleShapeStyle.MECHA_HUD -> {
+                val chamfer = bodyH * 0.32f
+                moveTo(chamfer, bodyTop - h * 0.04f)
+                lineTo(iconAreaW + chamfer * 0.5f, bodyTop - h * 0.04f)
+                lineTo(iconAreaW + chamfer, bodyTop + h * 0.04f)
+                lineTo(w - chamfer, bodyTop + h * 0.04f)
+                lineTo(w - 1.5.dp.toPx(), bodyTop + chamfer)
+                lineTo(w - 1.5.dp.toPx(), bodyBottom - chamfer * 0.7f)
+                lineTo(w - chamfer * 1.1f, bodyBottom)
+                lineTo(chamfer * 0.6f, bodyBottom)
+                lineTo(0f, bodyBottom - chamfer * 0.6f)
+                lineTo(0f, bodyTop + chamfer * 0.7f)
+                close()
+            }
+            TitleShapeStyle.ROYAL_HEX -> {
+                moveTo(cut * 0.6f, bodyTop)
+                lineTo(w - cut * 0.65f, bodyTop)
+                lineTo(w - 1.5.dp.toPx(), cy)
+                lineTo(w - cut * 0.65f, bodyBottom)
+                lineTo(cut * 0.6f, bodyBottom)
+                lineTo(0f, cy)
+                close()
+            }
+        }
+    }
+
+    val accentBrush = Brush.linearGradient(
+        colors = listOf(palette.primaryAccent, palette.secondaryAccent),
+        start = Offset(0f, 0f),
+        end = Offset(w, h)
+    )
+    val darkWingBrush = Brush.horizontalGradient(
+        colors = listOf(
+            palette.wingDarkStart,
+            palette.wingDarkEnd,
+            palette.secondaryAccent.copy(alpha = if (vfxTier == TitleVfxTier.NONE) 0.14f else 0.34f)
+        )
+    )
+
+    // 1. Sub-shard / Fin / Trace dekoratif sesuai gaya referensi
+    when (shapeStyle) {
+        TitleShapeStyle.CIRCUIT_TECH -> {
+            // Referensi DnaoiKY: garis trace sirkuit dengan node lingkaran kecil di kiri & kanan
+            val lineColor = palette.primaryAccent.copy(alpha = 0.75f)
+            val nodeR = if (compact) 1.5.dp.toPx() else 2.dp.toPx()
+            drawLine(lineColor, Offset(nodeR, cy), Offset(8.dp.toPx(), cy), strokeWidth = 1.dp.toPx())
+            drawCircle(palette.highlightLine, radius = nodeR, center = Offset(nodeR, cy))
+            drawLine(lineColor, Offset(w - 8.dp.toPx(), cy), Offset(w - nodeR, cy), strokeWidth = 1.dp.toPx())
+            drawCircle(palette.highlightLine, radius = nodeR, center = Offset(w - nodeR, cy))
+        }
+        TitleShapeStyle.FACETED_SHARD -> {
+            // Referensi vheY3Ze: sub-shard bawah runcing
+            val subShard = Path().apply {
+                moveTo(iconAreaW * 0.72f, bodyBottom - 1f)
+                lineTo(iconAreaW + 22.dp.toPx(), bodyBottom - 1f)
+                lineTo(iconAreaW + 15.dp.toPx(), h)
+                lineTo(iconAreaW * 0.85f, h)
+                close()
+            }
+            drawPath(subShard, palette.primaryAccent.copy(alpha = 0.85f))
+        }
+        TitleShapeStyle.MECHA_HUD -> {
+            // Referensi UGKkbof: 4 ventilasi HUD bawah + fin atas
+            val topFin = Path().apply {
+                moveTo(iconAreaW * 0.25f, 0f)
+                lineTo(iconAreaW * 0.9f, 0f)
+                lineTo(iconAreaW + 4.dp.toPx(), bodyTop)
+                lineTo(iconAreaW * 0.15f, bodyTop)
+                close()
+            }
+            drawPath(topFin, palette.primaryAccent)
+            val slitStart = iconAreaW + (w - iconAreaW) * 0.45f
+            for (i in 0..3) {
+                val sx = slitStart + i * (if (compact) 4.5.dp.toPx() else 6.dp.toPx())
+                if (sx < w - 10.dp.toPx()) {
+                    drawLine(
+                        color = palette.primaryAccent.copy(alpha = 0.8f),
+                        start = Offset(sx, bodyBottom - 0.5f),
+                        end = Offset(sx - 2.dp.toPx(), h),
+                        strokeWidth = (if (compact) 1.6.dp.toPx() else 2.2.dp.toPx()),
+                        cap = StrokeCap.Round
+                    )
+                }
+            }
+        }
+        else -> Unit
+    }
+
+    // 2. Isi utama pelat title
+    drawPath(path = bodyPath, brush = darkWingBrush)
+
+    // 3. Layer interior & animasi dalam pelat (clipped ke bodyPath)
+    clipPath(bodyPath) {
+        // Low-poly facets untuk FACETED_SHARD (referensi vheY3Ze)
+        if (shapeStyle == TitleShapeStyle.FACETED_SHARD) {
+            val facet1 = Path().apply {
+                moveTo(iconAreaW, bodyTop)
+                lineTo(iconAreaW + (w - iconAreaW) * 0.48f, bodyBottom)
+                lineTo(iconAreaW, bodyBottom)
+                close()
+            }
+            val facet2 = Path().apply {
+                moveTo(w, bodyTop)
+                lineTo(w - (w - iconAreaW) * 0.35f, bodyTop)
+                lineTo(w, bodyBottom)
+                close()
+            }
+            drawPath(facet1, palette.primaryAccent.copy(alpha = 0.14f))
+            drawPath(facet2, palette.secondaryAccent.copy(alpha = 0.18f))
+        }
+
+        // Left angled emblem backing untuk SVG icon
+        val emblemCap = Path().apply {
+            moveTo(0f, 0f)
+            lineTo(iconAreaW, 0f)
+            if (shapeStyle == TitleShapeStyle.DIAGONAL_SLASH) {
+                lineTo(iconAreaW - cut * 0.65f, h)
+            } else {
+                lineTo(iconAreaW + cut * 0.25f, cy)
+                lineTo(iconAreaW - cut * 0.2f, h)
+            }
+            lineTo(0f, h)
+            close()
+        }
+        drawPath(
+            path = emblemCap,
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    palette.primaryAccent.copy(alpha = if (vfxTier == TitleVfxTier.NONE) 0.30f else 0.72f),
+                    palette.hexInnerDark
+                )
+            )
+        )
+
+        // Strip miring `//` di ekor kanan untuk DIAGONAL_SLASH (referensi G9NqcmK) & CIRCUIT_TECH bar
+        if (shapeStyle == TitleShapeStyle.DIAGONAL_SLASH) {
+            val stripeW = if (compact) 3.dp.toPx() else 4.5.dp.toPx()
+            val gap = if (compact) 2.5.dp.toPx() else 3.5.dp.toPx()
+            for (s in 0..1) {
+                val rx = w - (if (compact) 11.dp.toPx() else 16.dp.toPx()) - s * (stripeW + gap)
+                val stripe = Path().apply {
+                    moveTo(rx + cut * 0.55f, bodyTop)
+                    lineTo(rx + cut * 0.55f + stripeW, bodyTop)
+                    lineTo(rx + stripeW, bodyBottom)
+                    lineTo(rx, bodyBottom)
+                    close()
+                }
+                drawPath(stripe, if (s == 0) palette.highlightLine else palette.primaryAccent)
+            }
+        } else if (shapeStyle == TitleShapeStyle.CIRCUIT_TECH) {
+            // Dot / slash bars kanan ala referensi DnaoiKY
+            val startBar = w - (if (compact) 16.dp.toPx() else 22.dp.toPx())
+            for (b in 0..2) {
+                val bx = startBar + b * (if (compact) 3.5.dp.toPx() else 4.5.dp.toPx())
+                drawLine(
+                    color = palette.highlightLine.copy(alpha = 0.75f),
+                    start = Offset(bx, bodyTop + bodyH * 0.30f),
+                    end = Offset(bx - 2.dp.toPx(), bodyTop + bodyH * 0.70f),
+                    strokeWidth = if (compact) 1.4.dp.toPx() else 1.8.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            }
+        }
+
+        // Render VFX interior pelat sesuai tier (Starter NONE tetap bersih tanpa efek berlebihan)
+        if (isAnimated && vfxTier != TitleVfxTier.NONE) {
+            drawInteriorVfx(
+                vfxTier = vfxTier,
+                palette = palette,
+                phase = phase,
+                startX = iconAreaW * 0.7f,
+                endX = w,
+                topY = bodyTop,
+                bottomY = bodyBottom
+            )
+        }
+    }
+
+    // 4. Outline bevel luar
+    drawPath(
+        path = bodyPath,
+        brush = accentBrush,
+        style = Stroke(
+            width = if (vfxTier == TitleVfxTier.NONE) 0.9.dp.toPx() else 1.35.dp.toPx(),
+            join = StrokeJoin.Round
+        )
+    )
+
+    // Rivet sudut halus untuk CIRCUIT_TECH & MECHA_HUD
+    if (shapeStyle == TitleShapeStyle.CIRCUIT_TECH || shapeStyle == TitleShapeStyle.MECHA_HUD) {
+        val rivetR = if (compact) 0.9.dp.toPx() else 1.2.dp.toPx()
+        drawCircle(palette.highlightLine.copy(alpha = 0.75f), rivetR, Offset(iconAreaW * 0.35f, bodyTop + 2.5.dp.toPx()))
+        drawCircle(palette.highlightLine.copy(alpha = 0.75f), rivetR, Offset(w - 10.dp.toPx(), bodyBottom - 2.5.dp.toPx()))
+    }
+}
+
+private fun DrawScope.drawInteriorVfx(
+    vfxTier: TitleVfxTier,
+    palette: BadgeTierPalette,
+    phase: Float,
+    startX: Float,
+    endX: Float,
+    topY: Float,
+    bottomY: Float
+) {
+    val span = (endX - startX).coerceAtLeast(1f)
+    val sheenX = startX + (span + 40.dp.toPx()) * phase - 20.dp.toPx()
+
+    // Kilau sapuan dasar untuk selain NONE
+    val sheenAlpha = when (vfxTier) {
+        TitleVfxTier.SUBTLE_SHIMMER -> 0.14f
+        TitleVfxTier.HOLO_PRISM -> 0.36f
+        TitleVfxTier.SOLAR_FLARE, TitleVfxTier.BLAZING_INFERNO -> 0.28f
+        else -> 0.22f
+    }
+    drawLine(
+        brush = Brush.horizontalGradient(
+            colors = if (vfxTier == TitleVfxTier.HOLO_PRISM) {
+                listOf(
+                    Color.Transparent,
+                    Color(0xFF22D3EE).copy(alpha = 0.30f),
+                    Color(0xFFF472B6).copy(alpha = 0.36f),
+                    Color(0xFFFACC15).copy(alpha = 0.30f),
+                    Color.Transparent
+                )
+            } else {
+                listOf(
+                    Color.Transparent,
+                    palette.highlightLine.copy(alpha = sheenAlpha),
+                    Color.White.copy(alpha = sheenAlpha * 1.15f),
+                    Color.Transparent
+                )
+            },
+            startX = sheenX - 18.dp.toPx(),
+            endX = sheenX + 18.dp.toPx()
+        ),
+        start = Offset(sheenX, topY - 4f),
+        end = Offset(sheenX - 14.dp.toPx(), bottomY + 4f),
+        strokeWidth = 22.dp.toPx()
+    )
+
+    when (vfxTier) {
+        TitleVfxTier.PULSE_SCAN -> {
+            val scanX = startX + span * phase
+            drawLine(
+                color = palette.highlightLine.copy(alpha = 0.65f),
+                start = Offset(scanX, topY),
+                end = Offset(scanX, bottomY),
+                strokeWidth = 1.6.dp.toPx()
+            )
+            drawLine(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(Color.Transparent, palette.primaryAccent.copy(alpha = 0.30f), Color.Transparent),
+                    startX = scanX - 14.dp.toPx(),
+                    endX = scanX + 14.dp.toPx()
+                ),
+                start = Offset(scanX, topY),
+                end = Offset(scanX, bottomY),
+                strokeWidth = 14.dp.toPx()
+            )
+        }
+        TitleVfxTier.EMBER_SPARK, TitleVfxTier.BLAZING_INFERNO -> {
+            val count = if (vfxTier == TitleVfxTier.BLAZING_INFERNO) 9 else 4
+            for (i in 0 until count) {
+                val p = (phase + i * (1f / count)) % 1f
+                val ex = startX + span * (((i * 0.27f) + p * 0.35f) % 1f)
+                val ey = bottomY - (bottomY - topY) * p
+                val r = (1.6f - p * 0.7f).coerceAtLeast(0.7f).dp.toPx()
+                drawCircle(
+                    color = if (i % 2 == 0) Color(0xFFFDE047) else Color(0xFFFF6D00),
+                    radius = r * (1f - p * 0.3f),
+                    center = Offset(ex, ey),
+                    alpha = (1f - p) * 0.9f
+                )
+            }
+        }
+        TitleVfxTier.FROST_PRISM -> {
+            for (i in 0..4) {
+                val p = (phase + i * 0.2f) % 1f
+                val fx = startX + span * (0.12f + i * 0.19f)
+                val fy = topY + (bottomY - topY) * (0.3f + 0.4f * sin(p * Math.PI * 2.0).toFloat())
+                val arm = 2.5.dp.toPx()
+                val alpha = abs(sin(p * Math.PI)).toFloat() * 0.85f
+                drawLine(Color(0xFFE0F2FE), Offset(fx - arm, fy), Offset(fx + arm, fy), 1.dp.toPx(), alpha = alpha)
+                drawLine(Color(0xFFE0F2FE), Offset(fx, fy - arm), Offset(fx, fy + arm), 1.dp.toPx(), alpha = alpha)
+            }
+        }
+        TitleVfxTier.VOID_NEBULA -> {
+            val pulse = 0.5f + 0.5f * sin(phase * Math.PI * 2.0).toFloat()
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFC084FC).copy(alpha = 0.38f * pulse), Color.Transparent),
+                    center = Offset(startX + span * (0.3f + 0.4f * phase), (topY + bottomY) * 0.5f),
+                    radius = span * 0.42f
+                ),
+                radius = span * 0.42f,
+                center = Offset(startX + span * (0.3f + 0.4f * phase), (topY + bottomY) * 0.5f)
+            )
+        }
+        TitleVfxTier.SOLAR_FLARE -> {
+            val rayX = startX + span * phase
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFFEF08A).copy(alpha = 0.55f), Color.Transparent),
+                    center = Offset(rayX, (topY + bottomY) * 0.5f),
+                    radius = (bottomY - topY) * 1.15f
+                ),
+                radius = (bottomY - topY) * 1.15f,
+                center = Offset(rayX, (topY + bottomY) * 0.5f)
+            )
+        }
+        else -> Unit
+    }
+}
+
+/**
+ * Efek meriah foreground di atas tepi bingkai khusus Title berbayar/mewah:
+ * - [TitleVfxTier.BLAZING_INFERNO]: Lidah api menari & percikan bara di atas pinggir badge.
+ * - [TitleVfxTier.LIGHTNING_STORM]: Sambaran petir zigzag bercabang melintasi sisi kiri/kanan.
+ * - [TitleVfxTier.SOLAR_FLARE]: Korona partikel bintang orbital di pinggir badge.
+ */
+private fun DrawScope.drawForegroundRichFx(
+    vfxTier: TitleVfxTier,
+    palette: BadgeTierPalette,
+    phase: Float,
+    compact: Boolean
+) {
+    val w = size.width
+    val h = size.height
+    when (vfxTier) {
+        TitleVfxTier.BLAZING_INFERNO -> {
+            val flameCount = if (compact) 7 else 10
+            val baseY = h * 0.16f
+            val maxFlameH = if (compact) 5.5.dp.toPx() else 8.5.dp.toPx()
+            for (i in 0 until flameCount) {
+                val norm = (i + 0.5f) / flameCount
+                val fx = w * (0.14f + norm * 0.78f)
+                val wave = sin((phase * 2.0 * Math.PI) + i * 1.3).toFloat()
+                val heightF = maxFlameH * (0.55f + 0.45f * abs(wave))
+                val sway = wave * (if (compact) 1.8.dp.toPx() else 2.8.dp.toPx())
+                val tongue = Path().apply {
+                    moveTo(fx - (if (compact) 3.dp.toPx() else 4.2.dp.toPx()), baseY + 1.5.dp.toPx())
+                    quadraticTo(fx - 1.5.dp.toPx(), baseY - heightF * 0.55f, fx + sway, baseY - heightF)
+                    quadraticTo(fx + 2.dp.toPx(), baseY - heightF * 0.45f, fx + (if (compact) 3.dp.toPx() else 4.2.dp.toPx()), baseY + 1.5.dp.toPx())
+                    close()
+                }
+                drawPath(
+                    path = tongue,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFFEF08A).copy(alpha = 0.85f),
+                            Color(0xFFFF6D00).copy(alpha = 0.72f),
+                            Color(0xFFE11D48).copy(alpha = 0.25f)
+                        ),
+                        startY = baseY - heightF,
+                        endY = baseY + 2.dp.toPx()
+                    )
+                )
+            }
+        }
+        TitleVfxTier.LIGHTNING_STORM -> {
+            // 2 busur petir bercabang di sisi kiri & kanan bingkai
+            val flashWindow = ((phase * 3f) % 1f)
+            val intensity = if (flashWindow < 0.75f) 0.95f else 0.35f
+
+            val bolt1Start = w * (0.18f + 0.52f * phase)
+            val boltPath1 = Path().apply {
+                moveTo(bolt1Start, h * 0.05f)
+                lineTo(bolt1Start + 5.dp.toPx(), h * 0.36f)
+                lineTo(bolt1Start - 2.dp.toPx(), h * 0.56f)
+                lineTo(bolt1Start + 7.dp.toPx(), h * 0.94f)
+            }
+            val branch1 = Path().apply {
+                moveTo(bolt1Start - 2.dp.toPx(), h * 0.56f)
+                lineTo(bolt1Start - 7.dp.toPx(), h * 0.82f)
+            }
+            drawPath(
+                path = boltPath1,
+                color = Color(0xFF38BDF8).copy(alpha = 0.50f * intensity),
+                style = Stroke(width = if (compact) 2.4.dp.toPx() else 3.2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Miter)
+            )
+            drawPath(
+                path = boltPath1,
+                color = Color(0xFFE0F2FE).copy(alpha = intensity),
+                style = Stroke(width = if (compact) 1.dp.toPx() else 1.4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Miter)
+            )
+            drawPath(
+                path = branch1,
+                color = Color(0xFFBAE6FD).copy(alpha = 0.85f * intensity),
+                style = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round)
+            )
+        }
+        TitleVfxTier.SOLAR_FLARE -> {
+            for (i in 0..3) {
+                val p = (phase + i * 0.25f) % 1f
+                val sx = w * p
+                val sy = if (i % 2 == 0) h * 0.11f else h * 0.89f
+                val sparkR = (if (compact) 1.8.dp.toPx() else 2.5.dp.toPx()) * abs(sin(p * Math.PI)).toFloat()
+                if (sparkR > 0.2f) {
+                    drawCircle(Color(0xFFFEF08A), radius = sparkR, center = Offset(sx, sy), alpha = 0.9f)
+                }
+            }
+        }
+        else -> Unit
+    }
+}
+
+private fun centeredBadgeTextStyle(fontSize: TextUnit) = TextStyle(
     lineHeight = fontSize,
-    platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false),
-    lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
-        alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
-        trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Center,
+        trim = LineHeightStyle.Trim.Both
     )
 )
 
 /**
- * TAHAP 1 Item 2: Komponen "Micro-Title Tags" (`StatusMicroTitleTagRow`)
- * Menggantikan kapsul abu-abu biasa di bawah bio pada `ProfileScreen` dengan 3 lencana mikro
- * berbentuk Sleek Chamfered Tag (sudut potong miring 4.dp di kiri-atas & kanan-bawah, border 0.75.dp):
- * 1. Role (`MEMBER` / `ADMIN`): Ikon Perisai/Mahkota Vektor Mikro + teks kapital 10.sp.
- * 2. Level (`LV. X`): Lencana Segienam Memanjang + Ikon Rank Chevron Militer (1..4 garis pangkat) + angka monospasi.
- * 3. Level Class (`PERINTIS ANIME`, dll.): Pita tipis bergradasi halus dengan ikon vektor kelas.
+ * Komponen Micro-Title Tags untuk Profil & Peer Profile Sheet (tetap mempertahankan tampilan default profil).
  */
 @Composable
 fun StatusMicroTitleTagRow(
@@ -548,68 +826,46 @@ fun StatusMicroTitleTagRow(
     modifier: Modifier = Modifier
 ) {
     val resolvedTitle = rankClassTitle.ifBlank { rankTitle }.ifBlank { "Wibu Biasa" }
+    val roleSpec = remember(role) { RpgSvgIconCatalog.resolveRoleSpec(role) }
+    val miniIconRes = remember(resolvedTitle, level) { RpgSvgIconCatalog.resolveMiniTitleIcon(resolvedTitle, level) }
+    val lvIconRes = remember(level) { RpgSvgIconCatalog.resolveLevelIcon(level) }
+
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Tag 1: Role (Sleek Chamfered Tag dengan Ikon Perisai/Mahkota)
-        val isAdmin = role.equals("Admin", ignoreCase = true) || role.equals("Moderator", ignoreCase = true)
-        val roleAccent = if (isAdmin) Color(0xFFF43F5E) else Color(0xFF94A3B8)
+        val roleAccent = Color(roleSpec.accentHex)
         SleekChamferedMicroTag(
             text = role.uppercase(Locale.ROOT),
             borderColor = roleAccent.copy(alpha = 0.55f),
             backgroundColor = Color(0xFF101219),
-            textColor = if (isAdmin) Color(0xFFFDA4AF) else Color(0xFFE2E8F0),
+            textColor = if (roleSpec.isExclusiveStaff) roleAccent else Color(0xFFE2E8F0),
             useMonospace = false
         ) {
-            Canvas(modifier = Modifier.size(11.dp)) {
-                val w = size.width
-                val h = size.height
-                if (isAdmin) {
-                    // Mahkota Mikro
-                    val p = Path().apply {
-                        moveTo(w * 0.1f, h * 0.82f)
-                        lineTo(w * 0.05f, h * 0.28f)
-                        lineTo(w * 0.35f, h * 0.55f)
-                        lineTo(w * 0.5f, h * 0.15f)
-                        lineTo(w * 0.65f, h * 0.55f)
-                        lineTo(w * 0.95f, h * 0.28f)
-                        lineTo(w * 0.9f, h * 0.82f)
-                        close()
-                    }
-                    drawPath(p, Color(0xFFF43F5E))
-                } else {
-                    // Perisai Ksatria Mikro
-                    val p = Path().apply {
-                        moveTo(w * 0.5f, h * 0.08f)
-                        lineTo(w * 0.88f, h * 0.26f)
-                        lineTo(w * 0.8f, h * 0.65f)
-                        lineTo(w * 0.5f, h * 0.92f)
-                        lineTo(w * 0.2f, h * 0.65f)
-                        lineTo(w * 0.12f, h * 0.26f)
-                        close()
-                    }
-                    drawPath(p, Color(0xFF94A3B8), style = Stroke(width = 1.2.dp.toPx(), join = StrokeJoin.Round))
-                }
-            }
+            Image(
+                painter = painterResource(id = roleSpec.iconRes),
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(roleAccent),
+                modifier = Modifier.size(11.dp)
+            )
         }
 
-        // Tag 2: Level (Elongated Hexagonal Tag dengan Ikon Rank Chevron Militer)
         val lvAccent = when {
+            level >= 60 -> Color(0xFFF59E0B)
             level >= 35 -> Color(0xFFF3C663)
             level >= 15 -> Color(0xFFA855F7)
             else -> Color(0xFFFF5722)
         }
         SleekHexChevronLevelTag(
             level = level,
-            accentColor = lvAccent
+            accentColor = lvAccent,
+            levelIconRes = lvIconRes
         )
 
-        // Tag 3: Level Class (Pita Tipis Bergradasi Halus)
         val classAccent = when {
-            level >= 35 -> Color(0xFFF59E0B)
-            level >= 15 -> Color(0xFFEC4899)
+            level >= 50 -> Color(0xFFF59E0B)
+            level >= 25 -> Color(0xFFEC4899)
             else -> Color(0xFFE11D48)
         }
         SleekChamferedMicroTag(
@@ -619,19 +875,12 @@ fun StatusMicroTitleTagRow(
             textColor = Color(0xFFFDA4AF),
             useMonospace = false
         ) {
-            Canvas(modifier = Modifier.size(10.dp)) {
-                val w = size.width
-                val h = size.height
-                val p = Path().apply {
-                    moveTo(w * 0.5f, h * 0.08f)
-                    lineTo(w * 0.92f, h * 0.5f)
-                    lineTo(w * 0.5f, h * 0.92f)
-                    lineTo(w * 0.08f, h * 0.5f)
-                    close()
-                }
-                drawPath(p, classAccent, style = Stroke(width = 1.2.dp.toPx()))
-                drawCircle(classAccent, radius = w * 0.16f, center = Offset(w * 0.5f, h * 0.5f))
-            }
+            Image(
+                painter = painterResource(id = miniIconRes),
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(classAccent),
+                modifier = Modifier.size(11.dp)
+            )
         }
     }
 }
@@ -694,7 +943,8 @@ fun SleekHexChevronLevelTag(
         level >= 35 -> Color(0xFFF3C663)
         level >= 15 -> Color(0xFFA855F7)
         else -> Color(0xFFFF5722)
-    }
+    },
+    levelIconRes: Int = RpgSvgIconCatalog.resolveLevelIcon(level)
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -723,38 +973,12 @@ fun SleekHexChevronLevelTag(
             }
             .padding(horizontal = 9.dp)
     ) {
-        // Ikon Rank Chevron (Garis Pangkat Militer yang berubah sesuai Level)
-        Canvas(modifier = Modifier.size(11.dp)) {
-            val w = size.width
-            val h = size.height
-            val chevronCount = when {
-                level >= 15 -> 3
-                level >= 5 -> 2
-                else -> 1
-            }
-            val spacing = h * 0.25f
-            val baseStartY = when (chevronCount) {
-                3 -> h * 0.78f
-                2 -> h * 0.68f
-                else -> h * 0.58f
-            }
-            for (i in 0 until chevronCount) {
-                val y = baseStartY - i * spacing
-                val chev = Path().apply {
-                    moveTo(w * 0.15f, y)
-                    lineTo(w * 0.5f, y - h * 0.24f)
-                    lineTo(w * 0.85f, y)
-                }
-                drawPath(
-                    path = chev,
-                    color = accentColor,
-                    style = Stroke(width = 1.25.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                )
-            }
-            if (level >= 15) {
-                drawCircle(accentColor, radius = w * 0.11f, center = Offset(w * 0.5f, h * 0.14f))
-            }
-        }
+        Image(
+            painter = painterResource(id = levelIconRes),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(accentColor),
+            modifier = Modifier.size(11.dp)
+        )
         Spacer(modifier = Modifier.width(4.5.dp))
         Text(
             text = "LV. $level",
@@ -771,8 +995,7 @@ fun SleekHexChevronLevelTag(
 }
 
 /**
- * Kerangka Heksagonal + Kapsul Bergaris Putus-Putus (`dashed outline #334155`, `height = 28.dp`)
- * ketika pengguna belum memasang Title khusus.
+ * Kerangka Heksagonal + Kapsul Bergaris Putus-Putus ketika pengguna belum memasang Title khusus.
  */
 @Composable
 fun EmptyTitleSlotBadge(

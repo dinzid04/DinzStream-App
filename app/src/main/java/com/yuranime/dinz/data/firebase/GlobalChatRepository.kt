@@ -43,6 +43,8 @@ data class GlobalChatMessage(
     val equippedTitleVariant: Int = 0,
     val equippedBorderUrl: String = "",
     val equippedProfileEffectUrl: String = "",
+    val isVerified: Boolean = false,
+    val verifiedColor: String = "#1D9BF0",
     val text: String = "",
     val stickerUrl: String = "",
     val imageUrl: String = "",
@@ -268,6 +270,8 @@ object GlobalChatRepository {
             equippedTitleVariant = live.equippedTitleVariant,
             equippedBorderUrl = live.equippedBorderUrl,
             equippedProfileEffectUrl = live.equippedProfileEffectUrl,
+            isVerified = live.isVerified,
+            verifiedColor = live.verifiedColor.ifBlank { "#1D9BF0" },
             replyToName = resolvedReplyName
         )
     }
@@ -358,6 +362,8 @@ object GlobalChatRepository {
                                 equippedTitleVariant = child.readLong("equippedTitleVariant", 0L).toInt(),
                                 equippedBorderUrl = child.readString("equippedBorderUrl"),
                                 equippedProfileEffectUrl = child.readString("equippedProfileEffectUrl"),
+                                isVerified = child.readBool("isVerified", false),
+                                verifiedColor = child.readString("verifiedColor").ifBlank { "#1D9BF0" },
                                 text = child.readString("text"),
                                 stickerUrl = child.readString("stickerUrl"),
                                 imageUrl = child.readString("imageUrl"),
@@ -551,6 +557,8 @@ object GlobalChatRepository {
             "equippedTitleVariant" to sender.equippedTitleVariant,
             "equippedBorderUrl" to sender.equippedBorderUrl,
             "equippedProfileEffectUrl" to sender.equippedProfileEffectUrl,
+            "isVerified" to sender.isVerified,
+            "verifiedColor" to sender.verifiedColor.ifBlank { "#1D9BF0" },
             "text" to text,
             "stickerUrl" to stickerUrl,
             "imageUrl" to imageUrl,

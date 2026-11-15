@@ -97,6 +97,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -139,7 +140,9 @@ import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.NavTab
 import com.yuranime.dinz.ui.components.PredictiveBackItemOverlay
 import com.yuranime.dinz.ui.components.PrimoPointIcon
+import com.yuranime.dinz.ui.components.RpgSvgIconCatalog
 import com.yuranime.dinz.ui.components.StatusMicroTitleTagRow
+import com.yuranime.dinz.ui.components.VerifiedBadgeIcon
 import com.yuranime.dinz.ui.components.liquidGlassBackdrop
 import com.yuranime.dinz.ui.leaderboard.LeaderboardScreen
 import com.yuranime.dinz.ui.profile.subscreens.DownloadsScreen
@@ -194,6 +197,7 @@ fun LoginProfileScreen(
     var isLoggingIn by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showTitlePickerDialog by remember { mutableStateOf(false) }
+    var showLevelProgressDialog by remember { mutableStateOf(false) }
     val isLiquidGlass by AppPreferences.liquidGlassEnabled.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -294,6 +298,17 @@ fun LoginProfileScreen(
         )
     }
 
+    if (showLevelProgressDialog) {
+        LevelProgressDialog(
+            profile = userProfile,
+            onDismiss = { showLevelProgressDialog = false },
+            onOpenShop = {
+                showLevelProgressDialog = false
+                currentSubScreen = ProfileSubScreen.SHOP
+            }
+        )
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Layar utama Profile tetap terpasang di bawah agar transisi Predictive Back bisa mengintip langsung
         if (!isUserLoggedIn) {
@@ -347,6 +362,7 @@ fun LoginProfileScreen(
                     onOpenPointsRewardsClick = { currentSubScreen = ProfileSubScreen.POINTS_REWARDS },
                     onOpenShopClick = { currentSubScreen = ProfileSubScreen.SHOP },
                     onOpenTitleSlotClick = { showTitlePickerDialog = true },
+                    onOpenLevelProgressClick = { showLevelProgressDialog = true },
                     onOpenDownloadsClick = { currentSubScreen = ProfileSubScreen.DOWNLOADS },
                     onOpenCollectionHistoryClick = { currentSubScreen = ProfileSubScreen.COLLECTION_HISTORY },
                     onOpenSettingsClick = { currentSubScreen = ProfileSubScreen.SETTINGS },
@@ -447,6 +463,7 @@ private fun UserProfileView(
     onOpenPointsRewardsClick: () -> Unit,
     onOpenShopClick: () -> Unit,
     onOpenTitleSlotClick: () -> Unit,
+    onOpenLevelProgressClick: () -> Unit = {},
     onOpenDownloadsClick: () -> Unit,
     onOpenCollectionHistoryClick: () -> Unit,
     onOpenSettingsClick: () -> Unit,
@@ -688,7 +705,7 @@ private fun UserProfileView(
                 .padding(horizontal = 20.dp)
                 .padding(top = 10.dp)
         ) {
-            // Baris 1: Username (SF Pro Bold 24.sp) + #ID unik (SF Pro 15.sp)
+            // Baris 1: Username + Gear Verified Badge + #ID unik
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -700,8 +717,18 @@ private fun UserProfileView(
                     fontFamily = SfProFontFamily,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.alignByBaseline()
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .alignByBaseline()
                 )
+                if (profile?.isVerified == true) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    VerifiedBadgeIcon(
+                        isVerified = true,
+                        colorHex = profile.verifiedColor,
+                        size = 18.dp
+                    )
+                }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "#$userTag",
@@ -769,22 +796,31 @@ private fun UserProfileView(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Baris 5: Status Row (MEMBER | LV. X | RANK TITLE) - Bersih Tanpa Polygon/Card Box Overlay
+            // Baris 5: Status Row (MEMBER | LV. X | RANK TITLE) - LV. X bisa diklik untuk buka Level Progress & Estimator
+            val roleSpec = remember(role) { RpgSvgIconCatalog.resolveRoleSpec(role) }
+            val roleAccent = Color(roleSpec.accentHex)
+            val lvIconRes = remember(level) { RpgSvgIconCatalog.resolveLevelIcon(level) }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Outlined.WorkspacePremium,
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onOpenLevelProgressClick() }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Image(
+                        painter = painterResource(id = roleSpec.iconRes),
                         contentDescription = null,
-                        tint = Color(0xFFFF5722),
+                        colorFilter = ColorFilter.tint(roleAccent),
                         modifier = Modifier.size(15.dp)
                     )
                     Spacer(modifier = Modifier.width(5.dp))
                     Text(
                         text = role.uppercase(),
-                        color = Color.White,
+                        color = if (roleSpec.isExclusiveStaff) roleAccent else Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = SfProFontFamily
@@ -799,11 +835,17 @@ private fun UserProfileView(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Outlined.KeyboardDoubleArrowUp,
-                        contentDescription = null,
-                        tint = Color(0xFF38BDF8),
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onOpenLevelProgressClick() }
+                        .padding(horizontal = 4.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Image(
+                        painter = painterResource(id = lvIconRes),
+                        contentDescription = "Lihat Progress Level",
+                        colorFilter = ColorFilter.tint(Color(0xFF38BDF8)),
                         modifier = Modifier.size(15.dp)
                     )
                     Spacer(modifier = Modifier.width(5.dp))
@@ -862,48 +904,66 @@ private fun UserProfileView(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Baris 7: Full-Width EXP Bar Sans-Serif Bold (NO slashed zero!)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "EXP",
-                    color = Color.White,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
-                )
-                Text(
-                    text = "${FirebaseManager.formatNumber(exp)} / ${FirebaseManager.formatNumber(nextTargetExp)}",
-                    color = Color.White,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily
-                )
-            }
-
-            Spacer(modifier = Modifier.height(7.dp))
-
-            Box(
+            // Baris 7: Full-Width EXP Bar Sans-Serif Bold (dapat diklik untuk Detail & Estimasi Level)
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(Color(0xFF1C1F2A))
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onOpenLevelProgressClick() }
+                    .padding(vertical = 8.dp)
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "EXP",
+                            color = Color.White,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SfProFontFamily
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "• Roadmap & Estimasi",
+                            color = Color(0xFF38BDF8),
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = SfProFontFamily
+                        )
+                    }
+                    Text(
+                        text = "${FirebaseManager.formatNumber(exp)} / ${FirebaseManager.formatNumber(nextTargetExp)}",
+                        color = Color.White,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(7.dp))
+
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(animatedExpProgress.coerceAtLeast(if (exp > 0L) 0.03f else 0f))
+                        .fillMaxWidth()
                         .height(6.dp)
                         .clip(RoundedCornerShape(50))
-                        .background(
-                            Brush.horizontalGradient(
-                                colors = listOf(Color(0xFFFF5722), Color(0xFFE11D48))
+                        .background(Color(0xFF1C1F2A))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(animatedExpProgress.coerceAtLeast(if (exp > 0L) 0.03f else 0f))
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(Color(0xFFFF5722), Color(0xFFE11D48))
+                                )
                             )
-                        )
-                )
+                    )
+                }
             }
         }
 
@@ -1507,6 +1567,8 @@ private fun QuickTitlePickerDialog(
                                 titleName = titleDef.titleName,
                                 tierLevel = titleDef.tierLevel,
                                 styleVariant = titleDef.styleVariant,
+                                vfxTier = titleDef.vfxTier,
+                                titleId = titleDef.id,
                                 compact = true
                             )
                         }
@@ -1529,7 +1591,15 @@ private fun QuickTitlePickerDialog(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = if (titleDef.pointCost > 0) "${titleDef.pointCost} Poin" else "Lv.${titleDef.requiredLevel}",
+                                    text = when (titleDef.unlockType) {
+                                        TitleUnlockType.REDEEM_ONLY -> "Redeem"
+                                        TitleUnlockType.POINTS_SHOP -> if (level < titleDef.requiredLevel) {
+                                            "Lv.${titleDef.requiredLevel} • ${titleDef.pointCost}P"
+                                        } else {
+                                            "${titleDef.pointCost} Poin"
+                                        }
+                                        TitleUnlockType.MILESTONE -> "Lv.${titleDef.requiredLevel}"
+                                    },
                                     color = Color(0xFF64748B),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,

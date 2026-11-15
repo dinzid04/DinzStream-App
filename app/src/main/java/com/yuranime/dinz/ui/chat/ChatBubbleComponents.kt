@@ -12,14 +12,25 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.MarqueeAnimationMode
+import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -102,6 +113,8 @@ import com.yuranime.dinz.data.firebase.InlineStickerCodec
 import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
 import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
+import com.yuranime.dinz.ui.components.RpgSvgIconCatalog
+import com.yuranime.dinz.ui.components.VerifiedBadgeIcon
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -340,8 +353,6 @@ fun ChatMessageRow(
     }
 
     val bubbleShape = remember(isOwn) { ModernTailChatBubbleShape(isOwn = isOwn) }
-    val roleUpper = remember(message.role) { message.role.ifBlank { "Member" }.uppercase(Locale.ROOT) }
-    val isPrivilegedRole = remember(roleUpper) { roleUpper == "ADMIN" || roleUpper == "OWNER" }
     val rankUpper = remember(message.rankTitle) { message.rankTitle.uppercase(Locale.ROOT) }
     val edgeGuardPx = with(density) { 26.dp.toPx() }
 
@@ -537,7 +548,7 @@ fun ChatMessageRow(
                             Spacer(modifier = Modifier.height(4.dp))
                         }
 
-                        // 2. Baris Identitas: Username + #Tag + Role Badge Ramping (1 baris)
+                        // 2. Baris Identitas: Username + Gear Verified Badge (tanpa #ID maupun Role di Global Chat)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -554,64 +565,36 @@ fun ChatMessageRow(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "#${message.userTag}",
-                                color = Color(0xFF94A3B8),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium,
-                                fontFamily = SfProFontFamily,
-                                maxLines = 1
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = roleUpper,
-                                color = if (isPrivilegedRole) Color(0xFFFB7185) else Color(0xFFCBD5E1),
-                                fontSize = 8.4.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.3.sp,
-                                fontFamily = SfProFontFamily,
-                                maxLines = 1,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(
-                                        if (isPrivilegedRole) Color(0x28FB7185) else Color(0x1894A3B8)
-                                    )
-                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-
-                        // 3. Baris Pangkat Horizontal Sejajar (1 baris rapih tanpa tumpuk ke bawah)
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Row(
-                            modifier = Modifier.horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(5.dp))
-                                    .background(Color(0x14FFFFFF))
-                                    .padding(horizontal = 5.dp, vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Diamond,
-                                    contentDescription = null,
-                                    tint = if (message.level >= 35) Color(0xFFF59E0B) else Color(0xFFE11D48),
-                                    modifier = Modifier.size(9.5.dp)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text(
-                                    text = rankUpper,
-                                    color = Color(0xFFE2E8F0),
-                                    fontSize = 8.2.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.25.sp,
-                                    fontFamily = SfProFontFamily,
-                                    maxLines = 1
+                            if (message.isVerified) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                VerifiedBadgeIcon(
+                                    isVerified = true,
+                                    colorHex = message.verifiedColor,
+                                    size = 13.5.dp
                                 )
                             }
+                        }
+
+                        // 3. Baris Pangkat Auto-Marquee Sejajar (Tanpa Kotak Overlay/Shadow di Mini-Title & Level)
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .basicMarquee(
+                                    iterations = Int.MAX_VALUE,
+                                    animationMode = MarqueeAnimationMode.Immediately,
+                                    repeatDelayMillis = 1200,
+                                    initialDelayMillis = 800,
+                                    spacing = MarqueeSpacing(24.dp),
+                                    velocity = 34.dp
+                                ),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ChatInlineMiniTitle(
+                                rankUpper = rankUpper,
+                                level = message.level
+                            )
 
                             if (message.equippedTitle.isNotBlank()) {
                                 GeometricTitleBadge(
@@ -623,30 +606,7 @@ fun ChatMessageRow(
                                 )
                             }
 
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(5.dp))
-                                    .background(Color(0x1C38BDF8))
-                                    .padding(horizontal = 5.dp, vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.KeyboardDoubleArrowUp,
-                                    contentDescription = null,
-                                    tint = Color(0xFF38BDF8),
-                                    modifier = Modifier.size(9.5.dp)
-                                )
-                                Spacer(modifier = Modifier.width(2.dp))
-                                Text(
-                                    text = "LV. ${message.level}",
-                                    color = Color(0xFFE2E8F0),
-                                    fontSize = 8.2.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.25.sp,
-                                    fontFamily = SfProFontFamily,
-                                    maxLines = 1
-                                )
-                            }
+                            ChatInlineLevelLabel(level = message.level)
                         }
 
                         // 4. Foto / Gambar CDN Telegram
@@ -987,6 +947,149 @@ private fun ContextMenuActionItem(
             contentDescription = label,
             tint = tint,
             modifier = Modifier.size(19.dp)
+        )
+    }
+}
+
+@Composable
+private fun ChatInlineMiniTitle(
+    rankUpper: String,
+    level: Int
+) {
+    val iconRes = remember(rankUpper, level) {
+        RpgSvgIconCatalog.resolveMiniTitleIcon(rankUpper, level)
+    }
+    val iconTint = remember(level) {
+        when {
+            level >= 85 -> Color(0xFFFDE047)
+            level >= 60 -> Color(0xFFFB7185)
+            level >= 45 -> Color(0xFFC084FC)
+            level >= 30 -> Color(0xFFF59E0B)
+            level >= 15 -> Color(0xFF38BDF8)
+            level >= 10 -> Color(0xFF22D3EE)
+            else -> Color(0xFF94A3B8)
+        }
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Image(
+            painter = painterResource(id = iconRes),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(iconTint),
+            modifier = Modifier.size(11.5.dp)
+        )
+        Spacer(modifier = Modifier.width(3.5.dp))
+
+        if (level < 15) {
+            Text(
+                text = rankUpper,
+                color = Color(0xFFCBD5E1),
+                fontSize = 8.6.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.3.sp,
+                fontFamily = SfProFontFamily,
+                maxLines = 1,
+                softWrap = false
+            )
+        } else {
+            val transition = rememberInfiniteTransition(label = "chatMiniTitleShimmer")
+            val shift by transition.animateFloat(
+                initialValue = -80f,
+                targetValue = 280f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(
+                        durationMillis = when {
+                            level >= 75 -> 1900
+                            level >= 45 -> 2400
+                            else -> 2900
+                        },
+                        easing = LinearEasing
+                    ),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "miniShimmerShift"
+            )
+            val shimmerColors = remember(level) {
+                when {
+                    level >= 85 -> listOf(
+                        Color(0xFFF59E0B),
+                        Color(0xFFFEF08A),
+                        Color(0xFFFF5722),
+                        Color(0xFF38BDF8),
+                        Color(0xFFF59E0B)
+                    )
+                    level >= 50 -> listOf(
+                        Color(0xFFE11D48),
+                        Color(0xFFFDE047),
+                        Color(0xFFFF5722),
+                        Color(0xFFF472B6),
+                        Color(0xFFE11D48)
+                    )
+                    level >= 30 -> listOf(
+                        Color(0xFFFB7185),
+                        Color(0xFFFDE047),
+                        Color(0xFFF59E0B),
+                        Color(0xFFFB7185)
+                    )
+                    else -> listOf(
+                        Color(0xFF38BDF8),
+                        Color(0xFFE0F2FE),
+                        Color(0xFF818CF8),
+                        Color(0xFF38BDF8)
+                    )
+                }
+            }
+            Text(
+                text = rankUpper,
+                maxLines = 1,
+                softWrap = false,
+                style = TextStyle(
+                    brush = Brush.linearGradient(
+                        colors = shimmerColors,
+                        start = Offset(shift - 70f, 0f),
+                        end = Offset(shift + 90f, 18f)
+                    ),
+                    fontSize = 8.8.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 0.35.sp,
+                    fontFamily = SfProFontFamily
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChatInlineLevelLabel(level: Int) {
+    val iconRes = remember(level) { RpgSvgIconCatalog.resolveLevelIcon(level) }
+    val accent = remember(level) {
+        when {
+            level >= 80 -> Color(0xFF2DD4BF)
+            level >= 60 -> Color(0xFFF59E0B)
+            level >= 35 -> Color(0xFFFB7185)
+            level >= 15 -> Color(0xFFA855F7)
+            else -> Color(0xFF38BDF8)
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Image(
+            painter = painterResource(id = iconRes),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(accent),
+            modifier = Modifier.size(11.dp)
+        )
+        Spacer(modifier = Modifier.width(3.dp))
+        Text(
+            text = "LV. $level",
+            color = accent,
+            fontSize = 8.8.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 0.3.sp,
+            fontFamily = SfProFontFamily,
+            maxLines = 1,
+            softWrap = false
         )
     }
 }

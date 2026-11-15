@@ -36,7 +36,7 @@ interface AnimeInApiService {
     @GET("/data/fyp2/list_scroll")
     suspend fun getCuplixFeed(
         @Query("limit") limit: Int = 30,
-        @Query("sort") sort: String = "views",
+        @Query("sort") sort: String = "new",
         @Query("cursor_new_id") cursorNewId: String? = null,
         @Query("cursor_new_time") cursorNewTime: String? = null
     ): CuplixResponse

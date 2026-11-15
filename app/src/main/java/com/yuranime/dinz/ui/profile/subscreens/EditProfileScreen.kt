@@ -71,6 +71,7 @@ import com.yuranime.dinz.data.firebase.BorderDefinition
 import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.firebase.ProfileEffectDefinition
 import com.yuranime.dinz.data.firebase.R2CdnUploader
+import com.yuranime.dinz.data.firebase.TitleUnlockType
 import com.yuranime.dinz.data.firebase.VideoToGifConverter
 import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
@@ -894,7 +895,7 @@ fun EditProfileScreen(
                     }
 
                     allTitles.forEach { titleDef ->
-                        val isOwned = userLevel >= titleDef.requiredLevel ||
+                        val isOwned = (titleDef.unlockType == TitleUnlockType.MILESTONE && userLevel >= titleDef.requiredLevel) ||
                             unlockedTitles.any { it.equals(titleDef.titleName, ignoreCase = true) }
                         val isEquipped = selectedTitle.equals(titleDef.titleName, ignoreCase = true)
 
@@ -913,7 +914,15 @@ fun EditProfileScreen(
                                         selectedTitle = titleDef.titleName
                                         lockedNoticeText = null
                                     } else {
-                                        lockedNoticeText = "🔒 Title \"${titleDef.titleName}\" butuh Level ${titleDef.requiredLevel}!"
+                                        lockedNoticeText = when (titleDef.unlockType) {
+                                            TitleUnlockType.REDEEM_ONLY -> "🎁 Title eksklusif \"${titleDef.titleName}\" hanya dibuka lewat Redeem Code!"
+                                            TitleUnlockType.POINTS_SHOP -> if (userLevel < titleDef.requiredLevel) {
+                                                "🔒 Title \"${titleDef.titleName}\" butuh Level ${titleDef.requiredLevel} dan ${titleDef.pointCost} Poin di Toko!"
+                                            } else {
+                                                "🛒 Beli Title \"${titleDef.titleName}\" di Toko seharga ${titleDef.pointCost} Poin!"
+                                            }
+                                            TitleUnlockType.MILESTONE -> "🔒 Title \"${titleDef.titleName}\" butuh Level ${titleDef.requiredLevel}!"
+                                        }
                                     }
                                 }
                                 .padding(12.dp),
@@ -929,7 +938,9 @@ fun EditProfileScreen(
                                 GeometricTitleBadge(
                                     titleName = titleDef.titleName,
                                     tierLevel = titleDef.tierLevel,
-                                    styleVariant = titleDef.styleVariant
+                                    styleVariant = titleDef.styleVariant,
+                                    vfxTier = titleDef.vfxTier,
+                                    titleId = titleDef.id
                                 )
                             }
 
@@ -958,7 +969,15 @@ fun EditProfileScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "Lv. ${titleDef.requiredLevel}",
+                                        text = when (titleDef.unlockType) {
+                                            TitleUnlockType.REDEEM_ONLY -> "Redeem"
+                                            TitleUnlockType.POINTS_SHOP -> if (userLevel < titleDef.requiredLevel) {
+                                                "Lv.${titleDef.requiredLevel} • ${titleDef.pointCost}P"
+                                            } else {
+                                                "${titleDef.pointCost} Poin"
+                                            }
+                                            TitleUnlockType.MILESTONE -> "Lv. ${titleDef.requiredLevel}"
+                                        },
                                         color = Color(0xFF64748B),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold,
