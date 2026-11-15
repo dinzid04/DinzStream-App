@@ -53,8 +53,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -563,10 +565,12 @@ fun ChatMessageRow(
                         Spacer(modifier = Modifier.height(2.5.dp))
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(5.dp),
-                            verticalArrangement = Arrangement.spacedBy(3.dp),
-                            itemVerticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                modifier = Modifier.align(Alignment.CenterVertically),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Icon(
                                     imageVector = Icons.Outlined.Diamond,
                                     contentDescription = null,
@@ -589,6 +593,7 @@ fun ChatMessageRow(
                             if (message.equippedTitle.isNotBlank()) {
                                 Box(
                                     modifier = Modifier
+                                        .align(Alignment.CenterVertically)
                                         .width(1.dp)
                                         .height(9.dp)
                                         .background(Color.White.copy(alpha = 0.22f))
@@ -596,6 +601,7 @@ fun ChatMessageRow(
                                 GeometricTitleBadge(
                                     titleName = message.equippedTitle,
                                     tierLevel = message.equippedTitleTier,
+                                    modifier = Modifier.align(Alignment.CenterVertically),
                                     styleVariant = message.equippedTitleVariant,
                                     isAnimated = true,
                                     compact = true
@@ -604,12 +610,16 @@ fun ChatMessageRow(
 
                             Box(
                                 modifier = Modifier
+                                    .align(Alignment.CenterVertically)
                                     .width(1.dp)
                                     .height(9.dp)
                                     .background(Color.White.copy(alpha = 0.22f))
                             )
 
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                modifier = Modifier.align(Alignment.CenterVertically),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
                                     text = roleUpper,
                                     color = if (isPrivilegedRole) Color(0xFFFB7185) else Color(0xFF94A3B8),
