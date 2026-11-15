@@ -1514,3 +1514,24 @@ Mengacu pada tata letak referensi `WA_1794546770520.jpg` (`1002213252.jpg`) deng
    - Menghapus `.statusBarsPadding()` dan `.navigationBarsPadding()` dari kontainer root di `ShopScreen.kt` dan `PointsRewardsScreen.kt`, memindahkan `.statusBarsPadding()` hanya pada top header bar sehingga background halaman mengalir tembus pandang di balik status bar dan tombol navigasi HP (`||| O <`).
    - Menghapus `.statusBarsPadding()` dari overlay `Profile Effect` di `LoginProfileScreen.kt` dan `EditProfileScreen.kt` agar animasi efek mengalir dari titik `(0,0)` layar paling atas.
    - Mengubah gradasi bawah `SeamlessTiltedPosterBackground` pada layar Login agar semi-transparan sehingga poster-poster miring mengalir mulus di balik navigation bar.
+
+---
+
+## 45. SPESIFIKASI FITUR 42: Global Chat (`GlobalChatScreen`), Engine Stiker (`StickerRepository`), Preservasi Profil Google & Tab Kelola Stiker di `promo-web-admin`
+
+### A. Preservasi Profil Login Google (`FirebaseManager.kt` & `LoginProfileScreen.kt`)
+- Saat login Google pada akun yang sudah memiliki dokumen di koleksi Firestore `users`, data yang sudah dikustomisasi user (`photoUrl`, `bannerUrl`, `displayName`, `username`, `bio`, `equippedTitle`, `equippedAvatarDecoration`, `equippedProfileEffect`) dipertahankan penuh dan disinkronkan ke `AppPreferences` lokal.
+- Data bawaan `GoogleSignInAccount` hanya dipakai sebagai nilai awal untuk pengguna baru yang belum memiliki dokumen di `users`.
+
+### B. Engine Stiker Cepat & Animasi (`StickerRepository.kt` & `YuranimeApp.kt`)
+- Menggabungkan koleksi admin Firestore `global_sticker_packs` (diletakkan di urutan teratas) dengan paket default otomatis dari kata kunci `kucing`, `bubu dudu`, `jomok`, `meme`, `anime`, dan `pentol`.
+- Metadata paket disimpan lokal (`DataStore` / cache disk) agar daftar stiker langsung muncul instan dan pre-warm gambar via Coil `ImageLoader` (`ImageDecoderDecoder` Android 9+ & `GifDecoder`) untuk mendukung stiker animasi WebP/GIF secara mulus.
+
+### C. Global Chat Real-Time (`GlobalChatScreen.kt`, `ChatBubbleComponents.kt`, `GlobalChatRepository.kt`)
+- Mengaktifkan komunikasi real-time lewat Firestore `global_chat_messages` dan status kehadiran online via `chat_presence` (menampilkan maks 4 avatar bertumpuk di header kanan + badge sisa `+N`, serta tombol kembali murni tanpa background overlay).
+- Menyembunyikan `LiquidGlassNavbar` selama berada di `GlobalChatScreen` agar bar komposer chat dan panel stiker tampil penuh bersama `android:windowSoftInputMode="adjustResize"`.
+- Mendukung inline stiker tag (`[s:URL]`), geser kanan untuk balas pesan (swipe-to-reply), menu konteks tahan lama iOS-style (Salin, Balas, Hapus), lampiran gambar hingga 10 MB ke CDN Worker Telegram (`R2CdnUploader`), dan `PeerProfileBottomSheet` animasi saat avatar/nama pengirim diketuk.
+
+### D. Tab 3 Admin Console (`promo-web-admin`): Kelola Stiker Chat Default
+- Ditambahkan pada `/storage/emulated/0/termux/Workspace_uiApp/promo-web-admin/index.html` bersama Vercel Serverless proxy `/storage/emulated/0/termux/Workspace_uiApp/promo-web-admin/api/stickerly.js` (`GET /api/stickerly?action=search&q=...` dan `?action=pack&url=...`).
+- Mendukung tambah paket langsung via URL/ID Sticker.ly, preview paket & animasi WebP/GIF sebelum disimpan, pencarian Sticker.ly dengan shortcut kata kunci populer, sinkronisasi real-time `onSnapshot` + REST fallback ke koleksi `global_sticker_packs`, dan penghapusan paket.

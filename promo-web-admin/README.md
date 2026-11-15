@@ -78,6 +78,11 @@ Cukup buka file `index.html` langsung di browser Chrome / Firefox / Safari Anda.
 
 ---
 
+## 🧩 Fitur Tab 3: Kelola Stiker Chat Default (`global_sticker_packs`)
+1. **Tambah Langsung dari Link / ID Sticker.ly:** Tempel URL (`https://sticker.ly/s/BI9F13`) atau kode paket untuk preview dan simpan langsung ke koleksi `global_sticker_packs`.
+2. **Pencarian Sticker.ly Terintegrasi:** Cari stiker berdasarkan kata kunci atau shortcut populer (`kucing`, `bubu dudu`, `jomok`, `meme`, `anime`, `pentol`, `dino`) via serverless proxy `/api/stickerly` + browser fallback.
+3. **Preview & Animasi WebP/GIF Real-Time:** Tampilkan isi stiker per paket beserta penanda stiker bergerak (`GIF`) dan sinkronisasi hapus/tambah ke aplikasi Android (`StickerRepository`).
+
 ## 🔒 Konfigurasi Firebase Firestore
 - **Project ID:** `dinz-62119`
 - **Database ID:** `(default)`
@@ -91,4 +96,12 @@ Cukup buka file `index.html` langsung di browser Chrome / Firefox / Safari Anda.
     - `borderId: String?`
     - `effectId: String?`
     - `message: String`
+    - `updatedAt: Long`
+  - `global_sticker_packs/{packId}`: Koleksi paket stiker default untuk panel stiker `GlobalChatScreen`:
+    - `id: String`
+    - `name: String`
+    - `author: String`
+    - `thumbnailUrl: String`
+    - `sourceUrl: String`
+    - `stickers: Array<{ url: String, isAnimated: Boolean }>`
     - `updatedAt: Long`

@@ -894,6 +894,12 @@
       margin: 0 auto;
       display: flex;
       gap: 12px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .admin-tab-nav::-webkit-scrollbar {
+      display: none;
     }
 
     .admin-tab-item {
@@ -910,6 +916,8 @@
       cursor: pointer;
       transition: all 0.2s ease;
       font-family: inherit;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .admin-tab-item:hover {
@@ -1403,6 +1411,227 @@
       gap: 12px;
     }
 
+    /* Global Stickers Manager Styles */
+    .sticker-section-divider {
+      height: 1px;
+      background: var(--border-subtle);
+      margin: 4px 0;
+    }
+
+    .sticker-search-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .sticker-search-row .text-input {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sticker-preview-panel {
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .sticker-preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .sticker-pack-identity {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .sticker-pack-thumb {
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      object-fit: contain;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      flex-shrink: 0;
+      padding: 3px;
+    }
+
+    .sticker-pack-thumb-fallback {
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      background: rgba(225, 29, 72, 0.14);
+      border: 1px solid rgba(225, 29, 72, 0.3);
+      color: #FDA4AF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .sticker-pack-meta {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .sticker-pack-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sticker-pack-sub {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .sticker-results-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 360px;
+      overflow-y: auto;
+      padding-right: 4px;
+      margin-top: 8px;
+    }
+
+    .sticker-result-item {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .sticker-result-item:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .sticker-result-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .sticker-mini-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+      gap: 8px;
+    }
+
+    .sticker-tile {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      overflow: hidden;
+    }
+
+    .sticker-tile img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .sticker-gif-tag {
+      position: absolute;
+      bottom: 3px;
+      right: 3px;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      background: rgba(16, 185, 129, 0.9);
+      color: #052E16;
+      padding: 1px 4px;
+      border-radius: 4px;
+      line-height: 1.2;
+    }
+
+    .sticker-state-box {
+      padding: 24px 16px;
+      text-align: center;
+      border: 1px dashed var(--border-subtle);
+      border-radius: var(--radius-md);
+      color: var(--text-muted);
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+
+    .sticker-state-box.error {
+      border-color: rgba(239, 68, 68, 0.35);
+      color: #FCA5A5;
+      background: rgba(239, 68, 68, 0.06);
+    }
+
+    .btn-inline-primary {
+      background: var(--accent-red);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #fff;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+
+    .btn-inline-primary:hover:not(:disabled) {
+      opacity: 0.92;
+      transform: translateY(-1px);
+    }
+
+    .btn-inline-primary:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .badge-saved-pack {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34D399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
   </style>
 </head>
 <body>
@@ -1432,14 +1661,19 @@
   <!-- Subheader Navigation Tabs -->
   <div class="admin-tab-nav-wrapper">
     <div class="admin-tab-nav">
-      <button class="admin-tab-item active" id="tabNavPromo" onclick="switchMainTab('promo')">
+      <button type="button" class="admin-tab-item active" id="tabNavPromo" onclick="switchMainTab('promo')">
         <span>📢</span>
         <span>Popup Promosi</span>
       </button>
-      <button class="admin-tab-item" id="tabNavRedeem" onclick="switchMainTab('redeem')">
+      <button type="button" class="admin-tab-item" id="tabNavRedeem" onclick="switchMainTab('redeem')">
         <span>🎁</span>
         <span>Kelola Kode Redeem</span>
         <span class="tab-badge" id="redeemCodesCountBadge">0</span>
+      </button>
+      <button type="button" class="admin-tab-item" id="tabNavStickers" onclick="switchMainTab('stickers')">
+        <span>🧩</span>
+        <span>Kelola Stiker Chat</span>
+        <span class="tab-badge" id="globalStickersCountBadge">0</span>
       </button>
     </div>
   </div>
@@ -1833,6 +2067,138 @@
     </div>
   </div>
 
+  <!-- Global Stickers Management Section -->
+  <div id="sectionStickers" class="redeem-container" style="display: none;">
+    <!-- Stats Row -->
+    <div class="redeem-stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Paket Default Aktif</div>
+        <div class="stat-val" id="statTotalStickerPacks">0</div>
+        <div class="stat-sub">Collection Firestore <code>global_sticker_packs</code></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Stiker Dimuat</div>
+        <div class="stat-val" id="statTotalStickerItems" style="color: #38BDF8;">0</div>
+        <div class="stat-sub">Muncul di baris teratas panel stiker aplikasi</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Stiker Bergerak (GIF/WebP)</div>
+        <div class="stat-val" id="statAnimatedStickerItems" style="color: var(--accent-green);">0</div>
+        <div class="stat-sub">Mendukung animasi langsung di Chat Global</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Status Sinkronisasi</div>
+        <div class="stat-val" id="statStickerSyncState" style="font-size: 20px; color: #F59E0B;">Memuat...</div>
+        <div class="stat-sub">Real-time listener Android &amp; Web Dashboard</div>
+      </div>
+    </div>
+
+    <!-- 2 Column Grid for Stickers -->
+    <div class="redeem-grid">
+      <!-- Kolom Kiri: Tambah dari URL atau Cari Sticker.ly -->
+      <div class="redeem-form-card">
+        <div class="redeem-card-header">
+          <div class="form-mode-badge">🧩 Tambah Paket Stiker Default</div>
+        </div>
+
+        <!-- Form A: Paste URL / Code Sticker.ly -->
+        <form id="stickerAddUrlForm" onsubmit="handleAddStickerByUrl(event)">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label for="stickerUrlInput" class="form-label">URL atau Kode Paket Sticker.ly (Langsung):</label>
+            <input
+              type="text"
+              id="stickerUrlInput"
+              class="text-input"
+              placeholder="Contoh: https://sticker.ly/s/BI9F13 atau BI9F13"
+              autocomplete="off"
+              required
+            >
+            <div class="field-hint">Tempel link Sticker.ly lalu klik Preview atau langsung simpan sebagai stiker default aplikasi.</div>
+          </div>
+
+          <div class="action-btn-row">
+            <button type="button" class="btn btn-secondary" id="btnPreviewStickerUrl" onclick="previewStickerPackFromInput()">
+              <span>👁️</span> <span>Preview Paket</span>
+            </button>
+            <button type="submit" class="btn btn-primary" id="btnAddStickerByUrl">
+              <span>+</span> <span>Tambah ke Stiker Default</span>
+            </button>
+          </div>
+        </form>
+
+        <!-- Inline Preview Box before saving -->
+        <div id="stickerUrlPreviewBox" class="sticker-preview-panel" style="display: none;"></div>
+
+        <div class="sticker-section-divider"></div>
+
+        <!-- Form B: Search Sticker.ly -->
+        <form id="stickerSearchForm" onsubmit="handleStickerSearchSubmit(event)">
+          <div class="form-group" style="margin-bottom: 10px;">
+            <label for="stickerSearchInput" class="form-label">Cari Paket Stiker dari Sticker.ly:</label>
+            <div class="sticker-search-row">
+              <input
+                type="text"
+                id="stickerSearchInput"
+                class="text-input"
+                placeholder="Cari karakter, meme, anime (misal: kucing)"
+                autocomplete="off"
+              >
+              <button type="submit" class="btn btn-primary" id="btnSearchStickers" style="width: auto; padding: 11px 18px; flex: 0 0 auto;">
+                <span>🔍</span> <span>Cari</span>
+              </button>
+            </div>
+            <div class="preset-pill-row" style="margin-top: 8px;">
+              <span class="preset-pill-label">Populer:</span>
+              <button type="button" class="preset-chip" onclick="quickSearchStickers('kucing')">kucing</button>
+              <button type="button" class="preset-chip" onclick="quickSearchStickers('bubu dudu')">bubu dudu</button>
+              <button type="button" class="preset-chip" onclick="quickSearchStickers('jomok')">jomok</button>
+              <button type="button" class="preset-chip" onclick="quickSearchStickers('meme')">meme</button>
+              <button type="button" class="preset-chip" onclick="quickSearchStickers('anime')">anime</button>
+              <button type="button" class="preset-chip" onclick="quickSearchStickers('pentol')">pentol</button>
+              <button type="button" class="preset-chip" onclick="quickSearchStickers('dino')">dino</button>
+            </div>
+          </div>
+        </form>
+
+        <!-- Search Results Container -->
+        <div id="stickerSearchResultsBox">
+          <div class="sticker-state-box">
+            Ketik kata kunci atau klik salah satu kata kunci populer di atas untuk melihat paket Sticker.ly yang tersedia.
+          </div>
+        </div>
+      </div>
+
+      <!-- Kolom Kanan: Daftar Paket Default Aktif di Firestore -->
+      <div class="redeem-list-card">
+        <div class="list-card-header">
+          <div>
+            <div class="list-title">Daftar Paket Default di Chat Global</div>
+            <div class="list-sub" id="stickerPacksSubtitle">Menghubungkan ke Firestore <code>global_sticker_packs</code>...</div>
+          </div>
+          <button type="button" class="btn-action-small" onclick="refreshGlobalStickerPacks()" title="Muat ulang daftar stiker">
+            <span>↻</span> <span>Muat Ulang</span>
+          </button>
+        </div>
+
+        <div class="filter-bar">
+          <input
+            type="text"
+            id="filterStickerPackInput"
+            class="filter-input"
+            placeholder="🔍 Cari paket default tersimpan (nama, author, ID)..."
+            oninput="renderGlobalStickerPacksList()"
+          >
+        </div>
+
+        <div class="codes-scroll-container" id="globalStickerPacksContainer">
+          <div class="sticker-state-box">
+            Memuat daftar paket stiker dari Firestore <code>global_sticker_packs</code>...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
   <!-- Modal Guide for Firestore Rules -->
   <div class="modal-overlay" id="rulesModal">
@@ -1897,7 +2263,12 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // 3. Aturan umum untuk database
+    // 4. Izinkan baca dan kelola stiker chat global default
+    match /global_sticker_packs/{packId} {
+      allow read, write: if true;
+    }
+
+    // 5. Aturan umum untuk database
     match /{document=**} {
       allow read, write: if true;
     }
@@ -2495,20 +2866,29 @@ service cloud.firestore {
     window.switchMainTab = function(tab) {
       const sectionPromo = document.getElementById("sectionPromo");
       const sectionRedeem = document.getElementById("sectionRedeem");
+      const sectionStickers = document.getElementById("sectionStickers");
       const tabNavPromo = document.getElementById("tabNavPromo");
       const tabNavRedeem = document.getElementById("tabNavRedeem");
+      const tabNavStickers = document.getElementById("tabNavStickers");
+
+      sectionPromo.style.display = "none";
+      sectionRedeem.style.display = "none";
+      if (sectionStickers) sectionStickers.style.display = "none";
+      tabNavPromo?.classList.remove("active");
+      tabNavRedeem?.classList.remove("active");
+      tabNavStickers?.classList.remove("active");
 
       if (tab === 'redeem') {
-        sectionPromo.style.display = "none";
         sectionRedeem.style.display = "flex";
-        tabNavPromo.classList.remove("active");
-        tabNavRedeem.classList.add("active");
+        tabNavRedeem?.classList.add("active");
         loadRedeemCodes();
+      } else if (tab === 'stickers') {
+        if (sectionStickers) sectionStickers.style.display = "flex";
+        tabNavStickers?.classList.add("active");
+        loadGlobalStickerPacks();
       } else {
         sectionPromo.style.display = "grid";
-        sectionRedeem.style.display = "none";
-        tabNavPromo.classList.add("active");
-        tabNavRedeem.classList.remove("active");
+        tabNavPromo?.classList.add("active");
       }
     };
 
@@ -3058,9 +3438,784 @@ service cloud.firestore {
       renderRedeemCodesList();
     };
 
-    // Auto load redeem codes count badge on boot
+    // ==========================================
+    // GLOBAL CHAT DEFAULT STICKERS MANAGER
+    // ==========================================
+    let allGlobalStickerPacks = [];
+    let stickerSearchResults = [];
+    let previewedStickerPack = null;
+    let expandedStickerPackIds = new Set();
+    let stickerPacksUnsubscribe = null;
+    let stickerSyncModeLabel = "Memuat...";
+
+    function escapeHtml(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function safeStickerUrl(url) {
+      const raw = String(url ?? "").trim();
+      if (/^https?:\/\//i.test(raw)) return raw;
+      return "";
+    }
+
+    function extractStickerlyId(raw) {
+      const trimmed = String(raw ?? "").trim();
+      if (!trimmed) return "";
+      const match = trimmed.match(/sticker\.ly\/s\/([A-Za-z0-9_-]{3,24})/i);
+      if (match) return match[1];
+      if (/^[A-Za-z0-9_-]{4,16}$/.test(trimmed)) return trimmed;
+      return "";
+    }
+
+    function normalizeStickerItems(rawList) {
+      if (!Array.isArray(rawList)) return [];
+      const seen = new Set();
+      const items = [];
+      for (const entry of rawList) {
+        const url = safeStickerUrl(
+          typeof entry === "string"
+            ? entry
+            : entry?.url || entry?.image || entry?.src || ""
+        );
+        if (!url || seen.has(url)) continue;
+        seen.add(url);
+        const lower = url.toLowerCase();
+        const isAnimated =
+          typeof entry === "object" && entry !== null && entry.isAnimated !== undefined
+            ? Boolean(entry.isAnimated)
+            : typeof entry === "object" && entry !== null && entry.is_animated !== undefined
+              ? Boolean(entry.is_animated)
+              : lower.endsWith(".gif") || lower.endsWith(".webp");
+        items.push({ url, isAnimated });
+      }
+      return items;
+    }
+
+    function parsePackFromFirestoreData(docId, data) {
+      const stickers = normalizeStickerItems(data?.stickers || []);
+      const thumbnailUrl =
+        safeStickerUrl(data?.thumbnailUrl || data?.thumbnail || "") ||
+        (stickers[0]?.url || "");
+      return {
+        id: docId,
+        name: String(data?.name || data?.title || `Pack ${docId}`).trim(),
+        author: String(data?.author || data?.creator || "sticker.ly").trim(),
+        thumbnailUrl,
+        sourceUrl: safeStickerUrl(data?.sourceUrl || data?.url || "") || `https://sticker.ly/s/${docId}`,
+        stickers,
+        updatedAt: Number(data?.updatedAt || 0)
+      };
+    }
+
+    function parsePackFromRestDocument(docItem) {
+      const parts = (docItem?.name || "").split("/");
+      const docId = parts[parts.length - 1];
+      const f = docItem?.fields || {};
+      const restStickers = (f.stickers?.arrayValue?.values || []).map((val) => {
+        if (val?.stringValue) return val.stringValue;
+        const mf = val?.mapValue?.fields || {};
+        return {
+          url: mf.url?.stringValue || "",
+          isAnimated: Boolean(mf.isAnimated?.booleanValue)
+        };
+      });
+      const stickers = normalizeStickerItems(restStickers);
+      const thumbnailUrl =
+        safeStickerUrl(f.thumbnailUrl?.stringValue || f.thumbnail?.stringValue || "") ||
+        (stickers[0]?.url || "");
+      return {
+        id: docId,
+        name: String(f.name?.stringValue || f.title?.stringValue || `Pack ${docId}`).trim(),
+        author: String(f.author?.stringValue || f.creator?.stringValue || "sticker.ly").trim(),
+        thumbnailUrl,
+        sourceUrl: safeStickerUrl(f.sourceUrl?.stringValue || f.url?.stringValue || "") || `https://sticker.ly/s/${docId}`,
+        stickers,
+        updatedAt: Number(f.updatedAt?.integerValue || f.updatedAt?.doubleValue || 0)
+      };
+    }
+
+    function buildFirestoreRestFieldsForPack(pack) {
+      return {
+        id: { stringValue: String(pack.id) },
+        name: { stringValue: String(pack.name) },
+        author: { stringValue: String(pack.author) },
+        thumbnailUrl: { stringValue: String(pack.thumbnailUrl || "") },
+        sourceUrl: { stringValue: String(pack.sourceUrl) },
+        updatedAt: { integerValue: String(pack.updatedAt) },
+        stickers: {
+          arrayValue: {
+            values: pack.stickers.map((s) => ({
+              mapValue: {
+                fields: {
+                  url: { stringValue: String(s.url) },
+                  isAnimated: { booleanValue: Boolean(s.isAnimated) }
+                }
+              }
+            }))
+          }
+        }
+      };
+    }
+
+    function listenToGlobalStickerPacks() {
+      const activeDb = dbPrimary || dbFallback;
+      if (stickerPacksUnsubscribe) {
+        try { stickerPacksUnsubscribe(); } catch {}
+        stickerPacksUnsubscribe = null;
+      }
+
+      loadGlobalStickerPacksFromRest();
+      if (!activeDb) {
+        stickerSyncModeLabel = "REST API";
+        updateStickerStats();
+        return;
+      }
+
+      try {
+        const colRef = collection(activeDb, "global_sticker_packs");
+        stickerPacksUnsubscribe = onSnapshot(colRef, (snapshot) => {
+          const list = [];
+          snapshot.forEach((d) => {
+            list.push(parsePackFromFirestoreData(d.id, d.data()));
+          });
+          list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+          allGlobalStickerPacks = list;
+          stickerSyncModeLabel = "Real-time";
+          renderGlobalStickerPacksList();
+          renderStickerSearchResults();
+          updateStickerStats();
+        }, (err) => {
+          console.warn("Global stickers Firestore realtime error, fallback to REST:", err);
+          stickerSyncModeLabel = "REST Fallback";
+          loadGlobalStickerPacksFromRest();
+        });
+      } catch (err) {
+        console.warn("Error setting up global stickers listener:", err);
+        stickerSyncModeLabel = "REST Fallback";
+        loadGlobalStickerPacksFromRest();
+      }
+    }
+
+    async function loadGlobalStickerPacksFromRest() {
+      try {
+        const restUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/global_sticker_packs?pageSize=200&key=${firebaseConfig.apiKey}`;
+        const res = await fetch(restUrl);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const json = await res.json();
+        const docs = Array.isArray(json?.documents) ? json.documents : [];
+        const list = docs.map(parsePackFromRestDocument);
+        list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+        allGlobalStickerPacks = list;
+        if (stickerSyncModeLabel === "Memuat...") {
+          stickerSyncModeLabel = "Tersinkron";
+        }
+        renderGlobalStickerPacksList();
+        renderStickerSearchResults();
+        updateStickerStats();
+      } catch (e) {
+        console.warn("REST load global_sticker_packs failed:", e);
+        const container = document.getElementById("globalStickerPacksContainer");
+        if (container && allGlobalStickerPacks.length === 0) {
+          container.innerHTML = `
+            <div class="sticker-state-box error">
+              Gagal membaca koleksi <code>global_sticker_packs</code> (${escapeHtml(e.message)}).
+              Periksa aturan Firestore Rules di menu kanan atas.
+            </div>
+          `;
+        }
+        stickerSyncModeLabel = "Error Koneksi";
+        updateStickerStats();
+      }
+    }
+
+    function loadGlobalStickerPacks() {
+      if (!stickerPacksUnsubscribe && allGlobalStickerPacks.length === 0) {
+        listenToGlobalStickerPacks();
+      } else {
+        updateStickerStats();
+        renderGlobalStickerPacksList();
+      }
+    }
+
+    window.refreshGlobalStickerPacks = function() {
+      stickerSyncModeLabel = "Menyegarkan...";
+      updateStickerStats();
+      listenToGlobalStickerPacks();
+      showToast("Menyegarkan daftar paket stiker dari Firestore...");
+    };
+
+    function updateStickerStats() {
+      const packCount = allGlobalStickerPacks.length;
+      const totalStickers = allGlobalStickerPacks.reduce((sum, p) => sum + (p.stickers?.length || 0), 0);
+      const animatedCount = allGlobalStickerPacks.reduce(
+        (sum, p) => sum + (p.stickers || []).filter((s) => s.isAnimated || String(s.url).toLowerCase().endsWith(".gif")).length,
+        0
+      );
+
+      const elPacks = document.getElementById("statTotalStickerPacks");
+      const elItems = document.getElementById("statTotalStickerItems");
+      const elAnim = document.getElementById("statAnimatedStickerItems");
+      const elSync = document.getElementById("statStickerSyncState");
+      const badge = document.getElementById("globalStickersCountBadge");
+      const sub = document.getElementById("stickerPacksSubtitle");
+
+      if (elPacks) elPacks.textContent = packCount.toLocaleString();
+      if (elItems) elItems.textContent = totalStickers.toLocaleString();
+      if (elAnim) elAnim.textContent = animatedCount.toLocaleString();
+      if (elSync) {
+        elSync.textContent = stickerSyncModeLabel;
+        elSync.style.color = stickerSyncModeLabel.includes("Error") ? "#F87171" : "var(--accent-green)";
+      }
+      if (badge) badge.textContent = packCount;
+      if (sub) {
+        sub.textContent = packCount === 0
+          ? "Belum ada paket stiker default di Firestore"
+          : `${packCount} paket (${totalStickers} stiker) aktif di Chat Global`;
+      }
+    }
+
+    function buildThumbMarkup(thumbUrl, name) {
+      const safeSrc = safeStickerUrl(thumbUrl);
+      const rawFirst = String(name || "S").trim().charAt(0).toUpperCase();
+      const initial = /^[A-Z0-9]$/.test(rawFirst) ? rawFirst : "S";
+      if (!safeSrc) {
+        return `<div class="sticker-pack-thumb-fallback">${initial}</div>`;
+      }
+      return `<img class="sticker-pack-thumb" src="${escapeHtml(safeSrc)}" alt="${escapeHtml(name)}" referrerpolicy="no-referrer" loading="lazy" onerror="this.outerHTML='<div class=&quot;sticker-pack-thumb-fallback&quot;>${initial}</div>'">`;
+    }
+
+    function renderGlobalStickerPacksList() {
+      const container = document.getElementById("globalStickerPacksContainer");
+      if (!container) return;
+
+      const filterText = (document.getElementById("filterStickerPackInput")?.value || "").trim().toLowerCase();
+      const filtered = allGlobalStickerPacks.filter((p) => {
+        if (!filterText) return true;
+        return (
+          p.name.toLowerCase().includes(filterText) ||
+          p.author.toLowerCase().includes(filterText) ||
+          p.id.toLowerCase().includes(filterText)
+        );
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-codes-box">
+            <div style="font-size: 34px;">🧩</div>
+            <div style="font-size: 14px; font-weight: 700; color: #fff;">
+              ${allGlobalStickerPacks.length === 0 ? "Belum ada paket stiker default" : "Paket stiker tidak ditemukan"}
+            </div>
+            <div style="font-size: 12px; max-width: 340px;">
+              ${allGlobalStickerPacks.length === 0
+                ? "Tambahkan paket Sticker.ly lewat URL atau pencarian di panel kiri. Semua paket di sini otomatis tampil di baris teratas panel stiker aplikasi."
+                : "Coba ubah kata kunci filter pencarian di atas."}
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map((pack) => {
+        const isExpanded = expandedStickerPackIds.has(pack.id);
+        const visibleStickers = isExpanded ? pack.stickers : pack.stickers.slice(0, 12);
+        const animCount = pack.stickers.filter((s) => s.isAnimated).length;
+        const safeId = escapeHtml(pack.id);
+
+        return `
+          <div class="code-card-item" id="sticker-pack-card-${safeId}">
+            <div class="code-header-row" style="align-items: flex-start; flex-wrap: wrap;">
+              <div class="sticker-pack-identity" style="flex: 1; min-width: 190px;">
+                ${buildThumbMarkup(pack.thumbnailUrl, pack.name)}
+                <div class="sticker-pack-meta">
+                  <div class="sticker-pack-title" title="${escapeHtml(pack.name)}">${escapeHtml(pack.name)}</div>
+                  <div class="sticker-pack-sub">
+                    <span>@${escapeHtml(pack.author)}</span>
+                    <span class="code-pill" style="font-size: 11px; padding: 2px 7px;" onclick="copyStickerPackUrl('${safeId}')" title="Salin link Sticker.ly">${safeId}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="code-actions-row">
+                <a class="btn-action-small" href="${escapeHtml(pack.sourceUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">
+                  ↗ Sticker.ly
+                </a>
+                <button type="button" class="btn-action-small danger" onclick="deleteGlobalStickerPack('${safeId}')" title="Hapus dari stiker default">
+                  🗑️ Hapus
+                </button>
+              </div>
+            </div>
+
+            <div class="rewards-badges-row">
+              <span class="reward-badge exp">${pack.stickers.length} Stiker</span>
+              ${animCount > 0 ? `<span class="reward-badge" style="background: rgba(16, 185, 129, 0.14); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.28);">GIF/Animasi: ${animCount}</span>` : ""}
+            </div>
+
+            ${pack.stickers.length > 0 ? `
+              <div class="sticker-mini-grid">
+                ${visibleStickers.map((s) => `
+                  <div class="sticker-tile">
+                    <img src="${escapeHtml(s.url)}" alt="Stiker" referrerpolicy="no-referrer" loading="lazy">
+                    ${s.isAnimated ? `<span class="sticker-gif-tag">GIF</span>` : ""}
+                  </div>
+                `).join("")}
+              </div>
+              ${pack.stickers.length > 12 ? `
+                <div style="display: flex; justify-content: flex-start;">
+                  <button type="button" class="btn-small-link" onclick="toggleExpandStickerPack('${safeId}')">
+                    ${isExpanded ? "Ringkas tampilan stiker" : `Lihat semua ${pack.stickers.length} stiker`}
+                  </button>
+                </div>
+              ` : ""}
+            ` : `<div class="field-hint">Daftar gambar stiker kosong.</div>`}
+          </div>
+        `;
+      }).join("");
+    }
+
+    window.toggleExpandStickerPack = function(packId) {
+      if (expandedStickerPackIds.has(packId)) {
+        expandedStickerPackIds.delete(packId);
+      } else {
+        expandedStickerPackIds.add(packId);
+      }
+      renderGlobalStickerPacksList();
+    };
+
+    window.copyStickerPackUrl = function(packId) {
+      const url = `https://sticker.ly/s/${packId}`;
+      navigator.clipboard.writeText(url).then(() => {
+        showToast(`Link paket disalin: ${url}`);
+      }).catch(() => {
+        showToast(url);
+      });
+    };
+
+    async function fetchJsonWithTimeout(url, timeoutMs = 8000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function apiSearchStickerly(query) {
+      const q = String(query || "").trim();
+      const candidates = [];
+
+      if (window.location.protocol.startsWith("http")) {
+        candidates.push(async () => {
+          const json = await fetchJsonWithTimeout(`/api/stickerly?action=search&q=${encodeURIComponent(q)}`, 9000);
+          const list = Array.isArray(json?.results) ? json.results : [];
+          if (list.length === 0) throw new Error("Empty local API results");
+          return list;
+        });
+      }
+
+      candidates.push(async () => {
+        const json = await fetchJsonWithTimeout(`https://api.snowping.cfd/api/search/stikerly?query=${encodeURIComponent(q)}`, 6000);
+        const raw = Array.isArray(json?.result) ? json.result : Array.isArray(json?.results) ? json.results : [];
+        const mapped = raw.map((item) => {
+          const id = extractStickerlyId(item?.url || item?.packUrl || item?.id);
+          if (!id) return null;
+          return {
+            id,
+            name: String(item?.name || item?.title || `Pack ${id}`),
+            author: String(item?.author || item?.creator || "sticker.ly"),
+            thumbnailUrl: safeStickerUrl(item?.thumbnail || item?.thumbnailUrl || ""),
+            sourceUrl: `https://sticker.ly/s/${id}`
+          };
+        }).filter(Boolean);
+        if (mapped.length === 0) throw new Error("Empty snowping results");
+        return mapped;
+      });
+
+      candidates.push(async () => {
+        const json = await fetchJsonWithTimeout(`https://dinz-streaming-khaki.vercel.app/api/stickerly/search?q=${encodeURIComponent(q)}`, 8500);
+        const list = Array.isArray(json?.results) ? json.results : [];
+        if (list.length === 0) throw new Error("Empty fallback results");
+        return list.map((item) => {
+          const id = item?.id || extractStickerlyId(item?.sourceUrl || item?.url);
+          return {
+            id,
+            name: String(item?.name || item?.title || `Pack ${id}`),
+            author: String(item?.author || item?.creator || "sticker.ly"),
+            thumbnailUrl: safeStickerUrl(item?.thumbnailUrl || item?.thumbnail || ""),
+            sourceUrl: `https://sticker.ly/s/${id}`
+          };
+        }).filter((p) => Boolean(p.id));
+      });
+
+      return await Promise.any(candidates.map((fn) => fn()));
+    }
+
+    async function apiFetchStickerlyPack(urlOrId) {
+      const packId = extractStickerlyId(urlOrId);
+      if (!packId) {
+        throw new Error("Format link atau ID Sticker.ly tidak valid. Contoh: https://sticker.ly/s/BI9F13");
+      }
+      const packUrl = `https://sticker.ly/s/${packId}`;
+      const candidates = [];
+
+      if (window.location.protocol.startsWith("http")) {
+        candidates.push(async () => {
+          const json = await fetchJsonWithTimeout(`/api/stickerly?action=pack&url=${encodeURIComponent(packUrl)}`, 9500);
+          if (!json?.status || !Array.isArray(json?.pack?.stickers) || json.pack.stickers.length === 0) {
+            throw new Error(json?.error || "Empty local pack response");
+          }
+          return parsePackFromFirestoreData(packId, json.pack);
+        });
+      }
+
+      candidates.push(async () => {
+        const json = await fetchJsonWithTimeout(`https://api.snowping.cfd/api/downloader/stikerly?url=${encodeURIComponent(packUrl)}`, 6500);
+        const root = json?.result || json?.data || json;
+        const stickers = normalizeStickerItems(root?.stickers || root?.sticker || []);
+        if (stickers.length === 0) throw new Error("Empty snowping pack");
+        return parsePackFromFirestoreData(packId, {
+          name: root?.name || root?.title || `Pack ${packId}`,
+          author: root?.author || root?.creator || "sticker.ly",
+          thumbnailUrl: root?.thumbnail || root?.thumbnailUrl || stickers[0].url,
+          sourceUrl: packUrl,
+          stickers
+        });
+      });
+
+      candidates.push(async () => {
+        const json = await fetchJsonWithTimeout(`https://dinz-streaming-khaki.vercel.app/api/stickerly/pack?url=${encodeURIComponent(packUrl)}`, 9500);
+        const root = json?.pack || json;
+        if (!Array.isArray(root?.stickers) || root.stickers.length === 0) {
+          throw new Error("Empty fallback pack");
+        }
+        return parsePackFromFirestoreData(packId, root);
+      });
+
+      return await Promise.any(candidates.map((fn) => fn()));
+    }
+
+    async function saveStickerPackToFirestore(packData) {
+      const payload = {
+        id: String(packData.id),
+        name: String(packData.name || `Pack ${packData.id}`),
+        author: String(packData.author || "sticker.ly"),
+        thumbnailUrl: String(packData.thumbnailUrl || packData.stickers?.[0]?.url || ""),
+        sourceUrl: String(packData.sourceUrl || `https://sticker.ly/s/${packData.id}`),
+        stickers: normalizeStickerItems(packData.stickers),
+        updatedAt: Date.now()
+      };
+
+      const activeDb = dbPrimary || dbFallback;
+      if (activeDb) {
+        await setDoc(doc(activeDb, "global_sticker_packs", payload.id), payload, { merge: true });
+      } else {
+        const restUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/global_sticker_packs/${encodeURIComponent(payload.id)}?key=${firebaseConfig.apiKey}`;
+        const res = await fetch(restUrl, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fields: buildFirestoreRestFieldsForPack(payload) })
+        });
+        if (!res.ok) {
+          throw new Error(`Firestore REST HTTP ${res.status}`);
+        }
+      }
+
+      // Update local state immediately for snappy UX
+      const idx = allGlobalStickerPacks.findIndex((p) => p.id === payload.id);
+      if (idx >= 0) {
+        allGlobalStickerPacks[idx] = payload;
+      } else {
+        allGlobalStickerPacks.unshift(payload);
+      }
+      renderGlobalStickerPacksList();
+      renderStickerSearchResults();
+      updateStickerStats();
+      return payload;
+    }
+
+    function renderUrlPreviewBox() {
+      const box = document.getElementById("stickerUrlPreviewBox");
+      if (!box) return;
+      if (!previewedStickerPack) {
+        box.style.display = "none";
+        box.innerHTML = "";
+        return;
+      }
+
+      const p = previewedStickerPack;
+      const alreadySaved = allGlobalStickerPacks.some((item) => item.id === p.id);
+      const animCount = p.stickers.filter((s) => s.isAnimated).length;
+
+      box.style.display = "flex";
+      box.innerHTML = `
+        <div class="sticker-preview-header">
+          <div class="sticker-pack-identity">
+            ${buildThumbMarkup(p.thumbnailUrl, p.name)}
+            <div class="sticker-pack-meta">
+              <div class="sticker-pack-title">${escapeHtml(p.name)}</div>
+              <div class="sticker-pack-sub">
+                <span>@${escapeHtml(p.author)}</span>
+                <span>&middot; ${p.stickers.length} stiker</span>
+                ${animCount > 0 ? `<span>&middot; ${animCount} animasi</span>` : ""}
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn-action-small" onclick="closeStickerUrlPreview()">✕ Tutup</button>
+        </div>
+
+        <div class="sticker-mini-grid">
+          ${p.stickers.slice(0, 18).map((s) => `
+            <div class="sticker-tile">
+              <img src="${escapeHtml(s.url)}" alt="Preview" referrerpolicy="no-referrer" loading="lazy">
+              ${s.isAnimated ? `<span class="sticker-gif-tag">GIF</span>` : ""}
+            </div>
+          `).join("")}
+        </div>
+        ${p.stickers.length > 18 ? `<div class="field-hint">Menampilkan 18 dari ${p.stickers.length} stiker dalam paket.</div>` : ""}
+
+        <div class="action-btn-row" style="margin-top: 2px;">
+          <button type="button" class="btn btn-primary" id="btnSavePreviewedPack" onclick="savePreviewedStickerPack()">
+            <span>💾</span> <span>${alreadySaved ? "Perbarui Paket di Default" : "Simpan Paket Ini ke Stiker Default"}</span>
+          </button>
+        </div>
+      `;
+    }
+
+    window.closeStickerUrlPreview = function() {
+      previewedStickerPack = null;
+      renderUrlPreviewBox();
+    };
+
+    window.previewStickerPackFromInput = async function() {
+      const input = document.getElementById("stickerUrlInput");
+      const btn = document.getElementById("btnPreviewStickerUrl");
+      const raw = (input?.value || "").trim();
+      if (!raw) {
+        showToast("Masukkan URL atau kode paket Sticker.ly terlebih dahulu.", true);
+        return;
+      }
+
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = "<span>⏳</span> <span>Mengambil...</span>";
+
+      try {
+        previewedStickerPack = await apiFetchStickerlyPack(raw);
+        renderUrlPreviewBox();
+        showToast(`Preview siap: ${previewedStickerPack.name} (${previewedStickerPack.stickers.length} stiker)`);
+      } catch (err) {
+        previewedStickerPack = null;
+        renderUrlPreviewBox();
+        showToast("Gagal preview paket: " + (err.message || "Periksa URL Sticker.ly"), true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
+    };
+
+    window.savePreviewedStickerPack = async function() {
+      if (!previewedStickerPack) return;
+      const btn = document.getElementById("btnSavePreviewedPack");
+      const originalHtml = btn ? btn.innerHTML : "";
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = "<span>⏳</span> <span>Menyimpan ke Firestore...</span>";
+      }
+
+      try {
+        const saved = await saveStickerPackToFirestore(previewedStickerPack);
+        showToast(`Paket "${saved.name}" (${saved.stickers.length} stiker) ditambahkan ke stiker default!`);
+        previewedStickerPack = null;
+        renderUrlPreviewBox();
+      } catch (err) {
+        showToast("Gagal menyimpan ke Firestore: " + err.message, true);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+      }
+    };
+
+    window.handleAddStickerByUrl = async function(event) {
+      event.preventDefault();
+      const input = document.getElementById("stickerUrlInput");
+      const btn = document.getElementById("btnAddStickerByUrl");
+      const raw = (input?.value || "").trim();
+      if (!raw) {
+        showToast("Tempel URL atau ID Sticker.ly terlebih dahulu.", true);
+        return;
+      }
+
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = "<span>⏳</span> <span>Mengambil &amp; Menyimpan...</span>";
+
+      try {
+        const pack = await apiFetchStickerlyPack(raw);
+        const saved = await saveStickerPackToFirestore(pack);
+        input.value = "";
+        previewedStickerPack = null;
+        renderUrlPreviewBox();
+        showToast(`Berhasil! "${saved.name}" (${saved.stickers.length} stiker) masuk ke default Chat Global.`);
+      } catch (err) {
+        console.error("Add sticker by URL failed:", err);
+        showToast("Gagal menambahkan paket: " + (err.message || "Pastikan link Sticker.ly valid"), true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
+    };
+
+    function renderStickerSearchResults() {
+      const box = document.getElementById("stickerSearchResultsBox");
+      if (!box) return;
+      if (!Array.isArray(stickerSearchResults) || stickerSearchResults.length === 0) return;
+
+      box.innerHTML = `
+        <div class="field-hint" style="margin-bottom: 4px;">Ditemukan ${stickerSearchResults.length} paket Sticker.ly:</div>
+        <div class="sticker-results-list">
+          ${stickerSearchResults.map((item) => {
+            const saved = allGlobalStickerPacks.some((p) => p.id === item.id);
+            const safeId = escapeHtml(item.id);
+            return `
+              <div class="sticker-result-item">
+                <div class="sticker-pack-identity" style="flex: 1;">
+                  ${buildThumbMarkup(item.thumbnailUrl, item.name)}
+                  <div class="sticker-pack-meta">
+                    <div class="sticker-pack-title" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+                    <div class="sticker-pack-sub">
+                      <span>@${escapeHtml(item.author)}</span>
+                      <span style="font-family: monospace; color: var(--text-muted);">${safeId}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="sticker-result-actions">
+                  <button type="button" class="btn-action-small" onclick="previewSearchedPack('${safeId}')" title="Lihat isi stiker">
+                    👁️ Isi
+                  </button>
+                  ${saved
+                    ? `<span class="badge-saved-pack">Sudah Ada</span>`
+                    : `<button type="button" class="btn-inline-primary" id="btnAddSearch-${safeId}" onclick="addSearchedPackToDefault('${safeId}')">+ Tambah</button>`
+                  }
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    async function searchStickerPacks(query) {
+      const q = String(query || "").trim();
+      const box = document.getElementById("stickerSearchResultsBox");
+      const btn = document.getElementById("btnSearchStickers");
+      if (!q) {
+        showToast("Masukkan kata kunci pencarian stiker.", true);
+        return;
+      }
+
+      if (btn) btn.disabled = true;
+      if (box) {
+        box.innerHTML = `<div class="sticker-state-box">⏳ Mencari paket Sticker.ly untuk kata kunci "<strong>${escapeHtml(q)}</strong>"...</div>`;
+      }
+
+      try {
+        stickerSearchResults = await apiSearchStickerly(q);
+        renderStickerSearchResults();
+      } catch (err) {
+        console.warn("Sticker search failed:", err);
+        stickerSearchResults = [];
+        if (box) {
+          box.innerHTML = `
+            <div class="sticker-state-box error">
+              Pencarian Sticker.ly untuk "<strong>${escapeHtml(q)}</strong>" gagal atau tidak menemukan hasil.
+              Coba kata kunci lain atau tempel langsung URL paket <code>https://sticker.ly/s/...</code> di form atas.
+            </div>
+          `;
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    window.handleStickerSearchSubmit = function(event) {
+      event.preventDefault();
+      const q = document.getElementById("stickerSearchInput")?.value || "";
+      searchStickerPacks(q);
+    };
+
+    window.quickSearchStickers = function(keyword) {
+      const input = document.getElementById("stickerSearchInput");
+      if (input) input.value = keyword;
+      searchStickerPacks(keyword);
+    };
+
+    window.previewSearchedPack = async function(packId) {
+      const urlInput = document.getElementById("stickerUrlInput");
+      if (urlInput) urlInput.value = `https://sticker.ly/s/${packId}`;
+      await window.previewStickerPackFromInput();
+      document.getElementById("stickerUrlPreviewBox")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    };
+
+    window.addSearchedPackToDefault = async function(packId) {
+      const btn = document.getElementById(`btnAddSearch-${packId}`);
+      const orig = btn ? btn.innerHTML : "";
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Menyimpan...";
+      }
+
+      try {
+        const pack = await apiFetchStickerlyPack(packId);
+        const saved = await saveStickerPackToFirestore(pack);
+        showToast(`Paket "${saved.name}" (${saved.stickers.length} stiker) ditambahkan ke stiker default!`);
+      } catch (err) {
+        console.error("Add searched pack failed:", err);
+        showToast(`Gagal menambahkan paket ${packId}: ${err.message}`, true);
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = orig;
+        }
+      }
+    };
+
+    window.deleteGlobalStickerPack = async function(packId) {
+      const pack = allGlobalStickerPacks.find((p) => p.id === packId);
+      const label = pack ? `${pack.name} (${packId})` : packId;
+      if (!confirm(`Hapus paket stiker "${label}" dari daftar stiker default Chat Global?`)) return;
+
+      try {
+        const activeDb = dbPrimary || dbFallback;
+        if (activeDb) {
+          await deleteDoc(doc(activeDb, "global_sticker_packs", packId));
+        } else {
+          const restUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/global_sticker_packs/${encodeURIComponent(packId)}?key=${firebaseConfig.apiKey}`;
+          const res = await fetch(restUrl, { method: "DELETE" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        }
+        allGlobalStickerPacks = allGlobalStickerPacks.filter((p) => p.id !== packId);
+        renderGlobalStickerPacksList();
+        renderStickerSearchResults();
+        updateStickerStats();
+        showToast(`Paket stiker "${label}" dihapus dari Firestore.`);
+      } catch (err) {
+        showToast("Gagal menghapus paket stiker: " + err.message, true);
+      }
+    };
+
+    // Auto load redeem codes & global sticker packs count badges on boot
     setTimeout(() => {
       listenToRedeemCodes();
+      listenToGlobalStickerPacks();
     }, 600);
 
   </script>
