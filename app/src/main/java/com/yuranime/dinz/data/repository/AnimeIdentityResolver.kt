@@ -193,7 +193,7 @@ object AnimeIdentityResolver {
         finalMapping
     }
 
-    suspend fun searchAniList(query: String): List<CandidateAnime> = withContext(Dispatchers.IO) {
+    private suspend fun searchAniList(query: String): List<CandidateAnime> = withContext(Dispatchers.IO) {
         if (query.isBlank()) return@withContext emptyList()
         val payload = JsonObject().apply {
             addProperty("query", SEARCH_ANILIST_QUERY)
