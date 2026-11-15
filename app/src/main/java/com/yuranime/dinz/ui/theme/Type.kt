@@ -1,9 +1,12 @@
 package com.yuranime.dinz.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.yuranime.dinz.R
@@ -15,6 +18,90 @@ val SfProFontFamily = FontFamily(
     Font(R.font.sf_pro_display_semibold, FontWeight.SemiBold),
     Font(R.font.sf_pro_display_bold, FontWeight.Bold),
     Font(R.font.sf_pro_display_bold, FontWeight.ExtraBold)
+)
+
+// Font family resmi WibiShop / YuraStyle untuk paritas 100% tampilan Style Nama
+val PlusJakartaFontFamily = FontFamily(
+    Font(R.font.plus_jakarta_sans_regular, FontWeight.Normal),
+    Font(R.font.plus_jakarta_sans_regular, FontWeight.Medium),
+    Font(R.font.plus_jakarta_sans_semibold, FontWeight.SemiBold),
+    Font(R.font.plus_jakarta_sans_bold, FontWeight.Bold),
+    Font(R.font.plus_jakarta_sans_extrabold, FontWeight.ExtraBold)
+)
+
+val ManropeFontFamily = FontFamily(
+    Font(R.font.manrope_regular, FontWeight.Normal),
+    Font(R.font.manrope_medium, FontWeight.Medium),
+    Font(R.font.manrope_semibold, FontWeight.SemiBold),
+    Font(R.font.manrope_bold, FontWeight.Bold),
+    Font(R.font.manrope_extrabold, FontWeight.ExtraBold)
+)
+
+@OptIn(ExperimentalTextApi::class)
+val TourneyItalicFontFamily = FontFamily(
+    Font(
+        resId = R.font.tourney_italic_variable,
+        weight = FontWeight.Normal,
+        style = FontStyle.Italic,
+        variationSettings = FontVariation.Settings(
+            FontVariation.weight(400),
+            FontVariation.width(100f)
+        )
+    ),
+    Font(
+        resId = R.font.tourney_italic_variable,
+        weight = FontWeight.Medium,
+        style = FontStyle.Italic,
+        variationSettings = FontVariation.Settings(
+            FontVariation.weight(500),
+            FontVariation.width(100f)
+        )
+    ),
+    Font(
+        resId = R.font.tourney_italic_variable,
+        weight = FontWeight.SemiBold,
+        style = FontStyle.Italic,
+        variationSettings = FontVariation.Settings(
+            FontVariation.weight(600),
+            FontVariation.width(100f)
+        )
+    ),
+    Font(
+        resId = R.font.tourney_italic_variable,
+        weight = FontWeight.Bold,
+        style = FontStyle.Italic,
+        variationSettings = FontVariation.Settings(
+            FontVariation.weight(700),
+            FontVariation.width(100f)
+        )
+    ),
+    Font(
+        resId = R.font.tourney_italic_variable,
+        weight = FontWeight.ExtraBold,
+        style = FontStyle.Italic,
+        variationSettings = FontVariation.Settings(
+            FontVariation.weight(800),
+            FontVariation.width(100f)
+        )
+    ),
+    Font(
+        resId = R.font.tourney_italic_variable,
+        weight = FontWeight.Black,
+        style = FontStyle.Italic,
+        variationSettings = FontVariation.Settings(
+            FontVariation.weight(900),
+            FontVariation.width(100f)
+        )
+    )
+)
+
+val PiedraFontFamily = FontFamily(
+    Font(R.font.piedra_regular, FontWeight.Normal),
+    Font(R.font.piedra_regular, FontWeight.Medium),
+    Font(R.font.piedra_regular, FontWeight.SemiBold),
+    Font(R.font.piedra_regular, FontWeight.Bold),
+    Font(R.font.piedra_regular, FontWeight.ExtraBold),
+    Font(R.font.piedra_regular, FontWeight.Black)
 )
 
 // Alias terpadu ke SF Pro Display agar seluruh komponen otomatis menggunakan font tegas sans-serif tanpa angka nol bergaris

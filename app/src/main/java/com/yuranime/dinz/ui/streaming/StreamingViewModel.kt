@@ -5,9 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.yuranime.dinz.data.local.AppPreferences
 import com.yuranime.dinz.data.model.EpisodeCommentItem
 import com.yuranime.dinz.data.model.EpisodeItem
+import com.yuranime.dinz.data.model.MovieDetailData
 import com.yuranime.dinz.data.model.ServerItem
 import com.yuranime.dinz.data.model.StreamData
 import com.yuranime.dinz.data.repository.AnimeRepository
+import com.yuranime.dinz.data.repository.SkipTimestampsRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +39,7 @@ class StreamingViewModel(
     private val preloadedStreams = mutableMapOf<String, StreamData>()
     private var episodeJob: Job? = null
     private var preloadJob: Job? = null
+    private var skipJob: Job? = null
     private var manualServerSelected: Boolean = false
 
     fun syncPlaybackPreferences(
@@ -119,6 +122,41 @@ class StreamingViewModel(
         }
     }
 
+    private fun launchSkipTimestampsFetch(
+        forEpisodeId: String,
+        episodeNumberRaw: String?,
+        movieDetailData: MovieDetailData?,
+        expectedEpisodes: Int?
+    ) {
+        val movie = movieDetailData?.movie ?: return
+        val title = movie.title?.trim()?.takeIf { it.isNotBlank() } ?: return
+        val epNum = episodeNumberRaw?.trim()?.takeIf { it.isNotBlank() } ?: return
+
+        skipJob?.cancel()
+        skipJob = viewModelScope.launch {
+            val result = SkipTimestampsRepository.getSkipTimestamps(
+                title = title,
+                synonymsRaw = movie.synonyms,
+                yearHint = movie.year,
+                airedStartHint = movie.airedStart,
+                expectedEpisodeCount = expectedEpisodes?.takeIf { it > 0 },
+                formatHint = movie.type,
+                movieId = movie.id ?: _uiState.value.movieId,
+                episodeNumberRaw = epNum,
+                episodeDurationMs = _uiState.value.durationMs
+            )
+            if (_uiState.value.episodeId == forEpisodeId) {
+                _uiState.update {
+                    it.copy(
+                        introSegment = result?.intro,
+                        outroSegment = result?.outro,
+                        skipSourceLabel = result?.sourceSummary
+                    )
+                }
+            }
+        }
+    }
+
     fun loadStreaming(episodeId: String, movieId: String) {
         if (_uiState.value.episodeId == episodeId && (_uiState.value.selectedServer != null || _uiState.value.isLoading)) {
             return
@@ -131,6 +169,7 @@ class StreamingViewModel(
         }
 
         episodeJob?.cancel()
+        skipJob?.cancel()
         manualServerSelected = false
 
         _uiState.update {
@@ -142,6 +181,9 @@ class StreamingViewModel(
                 currentPositionMs = 0L,
                 durationMs = 0L,
                 isPlaying = false,
+                introSegment = null,
+                outroSegment = null,
+                skipSourceLabel = null,
                 isServerPickerOpen = false,
                 isLoveItDialogOpen = false,
                 isGallerySheetOpen = false,
@@ -254,6 +296,13 @@ class StreamingViewModel(
                     )
                 }
             }
+
+            launchSkipTimestampsFetch(
+                forEpisodeId = episodeId,
+                episodeNumberRaw = streamData?.episode?.index ?: _uiState.value.episode?.index,
+                movieDetailData = movieDetail,
+                expectedEpisodes = maxOf(maxEpNum, _uiState.value.episodes.size)
+            )
         }
     }
 
@@ -270,6 +319,7 @@ class StreamingViewModel(
         }
 
         episodeJob?.cancel()
+        skipJob?.cancel()
         manualServerSelected = false
 
         val existingEp = _uiState.value.episodes.firstOrNull { it.id == newEpisodeId }
@@ -294,8 +344,22 @@ class StreamingViewModel(
                 currentPositionMs = 0L,
                 durationMs = 0L,
                 isPlaying = false,
+                introSegment = null,
+                outroSegment = null,
+                skipSourceLabel = null,
                 comments = emptyList(),
                 activeCommentForReplies = null
+            )
+        }
+
+        val currentMovieDetail = _uiState.value.movieDetail
+        val currentTotalEps = _uiState.value.totalEpisodesCount
+        if (currentMovieDetail != null && !targetEpNumber.isNullOrBlank()) {
+            launchSkipTimestampsFetch(
+                forEpisodeId = newEpisodeId,
+                episodeNumberRaw = targetEpNumber,
+                movieDetailData = currentMovieDetail,
+                expectedEpisodes = currentTotalEps.takeIf { it > 0 } ?: _uiState.value.episodes.size
             )
         }
 
@@ -338,6 +402,17 @@ class StreamingViewModel(
                 )
             }
             schedulePreloadNextEpisode(streamData, newEpisodeId)
+
+            val finalEpNum = streamData?.episode?.index ?: targetEpNumber
+            val mDetail = _uiState.value.movieDetail
+            if (mDetail != null && !finalEpNum.isNullOrBlank() && finalEpNum != targetEpNumber) {
+                launchSkipTimestampsFetch(
+                    forEpisodeId = newEpisodeId,
+                    episodeNumberRaw = finalEpNum,
+                    movieDetailData = mDetail,
+                    expectedEpisodes = _uiState.value.totalEpisodesCount.takeIf { it > 0 } ?: _uiState.value.episodes.size
+                )
+            }
         }
     }
 

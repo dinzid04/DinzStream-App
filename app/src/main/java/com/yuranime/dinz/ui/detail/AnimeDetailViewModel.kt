@@ -2,7 +2,10 @@ package com.yuranime.dinz.ui.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.yuranime.dinz.data.model.MovieDetail
+import com.yuranime.dinz.data.repository.AniListCharacterRepository
 import com.yuranime.dinz.data.repository.AnimeRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,19 +21,24 @@ class AnimeDetailViewModel(
     val uiState: StateFlow<AnimeDetailUiState> = _uiState.asStateFlow()
 
     private var currentMovieId: String? = null
+    private var creditsJob: Job? = null
 
     fun loadAnimeDetail(movieId: String) {
         if (currentMovieId == movieId && !_uiState.value.isLoading && _uiState.value.movieDetail != null) {
             return
         }
         currentMovieId = movieId
+        creditsJob?.cancel()
         _uiState.update {
             it.copy(
                 isLoading = true,
                 errorMessage = null,
                 currentEpisodePage = 0,
                 hasMoreEpisodes = true,
-                episodes = emptyList()
+                episodes = emptyList(),
+                isLoadingCredits = false,
+                creditsError = null,
+                creditsData = null
             )
         }
 
@@ -60,6 +68,10 @@ class AnimeDetailViewModel(
                     seasons = seasons,
                     isFavorite = isFav
                 )
+            }
+
+            if (movie != null) {
+                launchCreditsFetch(movie = movie, forceRefresh = false)
             }
 
             // Fetch secondary tabs concurrently
@@ -140,5 +152,73 @@ class AnimeDetailViewModel(
 
     fun closeFullScreenImage() {
         _uiState.update { it.copy(fullScreenPreviewUrl = null) }
+    }
+
+    fun selectCreditsSection(section: CreditsSectionTab) {
+        _uiState.update { it.copy(selectedCreditsSection = section) }
+    }
+
+    fun selectVaLanguage(language: String) {
+        _uiState.update { it.copy(selectedVaLanguage = language) }
+    }
+
+    fun retryLoadCredits(forceRefresh: Boolean = true) {
+        val movie = _uiState.value.movieDetail ?: return
+        launchCreditsFetch(movie = movie, forceRefresh = forceRefresh)
+    }
+
+    private fun launchCreditsFetch(movie: MovieDetail, forceRefresh: Boolean) {
+        val title = movie.title?.trim().takeIf { !it.isNullOrBlank() } ?: return
+        val expectedId = currentMovieId
+
+        creditsJob?.cancel()
+        _uiState.update {
+            it.copy(
+                isLoadingCredits = true,
+                creditsError = null
+            )
+        }
+
+        creditsJob = viewModelScope.launch {
+            val result = AniListCharacterRepository.getCreditsForAnime(
+                title = title,
+                synonymsRaw = movie.synonyms,
+                yearHint = movie.year,
+                airedStartHint = movie.airedStart,
+                expectedEpisodeCount = null,
+                formatHint = movie.type,
+                movieId = movie.id ?: expectedId,
+                forceRefresh = forceRefresh
+            )
+            if (currentMovieId != expectedId) return@launch
+
+            result.fold(
+                onSuccess = { data ->
+                    val preferredLang = when {
+                        data.availableVaLanguages.any { it.equals("Japanese", ignoreCase = true) } ->
+                            data.availableVaLanguages.first { it.equals("Japanese", ignoreCase = true) }
+                        data.availableVaLanguages.isNotEmpty() ->
+                            data.availableVaLanguages.first()
+                        else -> "Japanese"
+                    }
+                    _uiState.update {
+                        it.copy(
+                            isLoadingCredits = false,
+                            creditsError = null,
+                            creditsData = data,
+                            selectedVaLanguage = preferredLang
+                        )
+                    }
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isLoadingCredits = false,
+                            creditsError = err.message ?: "Gagal memuat Karakter & Staff dari AniList"
+                        )
+                    }
+                }
+            )
+        }
     }
 }

@@ -134,6 +134,8 @@ import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.model.CommunityMediaItem
 import com.yuranime.dinz.data.model.EpisodeCommentItem
 import com.yuranime.dinz.data.model.ServerItem
+import com.yuranime.dinz.data.model.SkipSegment
+import com.yuranime.dinz.data.model.SkipSegmentType
 import com.yuranime.dinz.ui.components.CoachmarkStep
 import com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay
 import com.yuranime.dinz.ui.components.onboardingTarget
@@ -1284,20 +1286,6 @@ private fun CustomExoPlayerView(
                     val duration = exoPlayer.duration
                     val pos = exoPlayer.currentPosition
                     viewModel.updatePosition(pos, duration)
-                    val epIdNow = activeState.episodeId
-                    if (
-                        activeState.autoSkipIntro &&
-                        autoSkippedIntroForEp != epIdNow &&
-                        duration >= 180_000L &&
-                        pos in 0L..12_000L
-                    ) {
-                        autoSkippedIntroForEp = epIdNow
-                        val skipTarget = 85_000L.coerceAtMost((duration - 5_000L).coerceAtLeast(0L))
-                        if (skipTarget > pos + 5_000L) {
-                            exoPlayer.seekTo(skipTarget)
-                            Toast.makeText(context, "Intro dilewati otomatis (+85d)", Toast.LENGTH_SHORT).show()
-                        }
-                    }
                 } else if (playbackState == Player.STATE_ENDED && activeState.autoNextEpisode) {
                     val nextEp = activeState.episodeNext ?: run {
                         val currentIdx = activeState.episode?.index?.toIntOrNull()
@@ -1354,13 +1342,48 @@ private fun CustomExoPlayerView(
         exoPlayer.playbackParameters = PlaybackParameters(uiState.playbackSpeed)
     }
 
-    // Periodic time tracking
+    // Periodic time tracking (real-time 250ms untuk tombol Skip Intro / Skip Outro akurat)
     LaunchedEffect(uiState.isPlaying) {
         while (true) {
             if (exoPlayer.isPlaying && !isSeeking) {
                 viewModel.updatePosition(exoPlayer.currentPosition, exoPlayer.duration)
             }
-            delay(500)
+            delay(250)
+        }
+    }
+
+    // Auto-skip Intro HANYA jika timestamp API terverifikasi tersedia
+    LaunchedEffect(
+        uiState.episodeId,
+        uiState.introSegment,
+        uiState.autoSkipIntro,
+        uiState.currentPositionMs,
+        uiState.isPlaying
+    ) {
+        val epIdNow = uiState.episodeId
+        val intro = uiState.introSegment ?: return@LaunchedEffect
+        if (!uiState.autoSkipIntro || autoSkippedIntroForEp == epIdNow || !uiState.isPlaying) {
+            return@LaunchedEffect
+        }
+        val pos = uiState.currentPositionMs
+        val dur = uiState.durationMs
+        if (dur > 30_000L && intro.startMs >= dur - 4_000L) return@LaunchedEffect
+        if (intro.containsPosition(pos)) {
+            autoSkippedIntroForEp = epIdNow
+            val targetMs = if (dur > 2_000L) {
+                intro.endMs.coerceAtMost((dur - 1_000L).coerceAtLeast(intro.startMs))
+            } else {
+                intro.endMs
+            }
+            if (targetMs > pos + 1_000L) {
+                exoPlayer.seekTo(targetMs)
+                viewModel.updatePosition(targetMs, exoPlayer.duration)
+                Toast.makeText(
+                    context,
+                    "Intro dilewati otomatis (${intro.source})",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 
@@ -1490,6 +1513,7 @@ private fun CustomExoPlayerView(
                         onClick = {
                             val newPos = (exoPlayer.currentPosition - 10000).coerceAtLeast(0)
                             exoPlayer.seekTo(newPos)
+                            viewModel.updatePosition(newPos, exoPlayer.duration)
                         },
                         modifier = Modifier.size(44.dp)
                     ) {
@@ -1539,6 +1563,7 @@ private fun CustomExoPlayerView(
                         onClick = {
                             val newPos = (exoPlayer.currentPosition + 10000).coerceAtMost(exoPlayer.duration.coerceAtLeast(0))
                             exoPlayer.seekTo(newPos)
+                            viewModel.updatePosition(newPos, exoPlayer.duration)
                         },
                         modifier = Modifier.size(44.dp)
                     ) {
@@ -1594,6 +1619,7 @@ private fun CustomExoPlayerView(
                             },
                             onValueChangeFinished = {
                                 exoPlayer.seekTo(sliderPosition)
+                                viewModel.updatePosition(sliderPosition, exoPlayer.duration)
                                 isSeeking = false
                             },
                             colors = SliderDefaults.colors(
@@ -1633,12 +1659,21 @@ private fun CustomExoPlayerView(
             }
         }
 
-        // Lewati Intro Floating Pill (selama segmen opening, jika durasi >= 3 menit)
-        val canManualSkipIntro = !uiState.isLocked &&
-            uiState.durationMs >= 180_000L &&
-            uiState.currentPositionMs in 5_000L..95_000L
+        // Skip Intro / Skip Outro Floating Pill (murni dari data API AniSkip/TheIntroDB/OAT)
+        val introSeg = uiState.introSegment
+        val outroSeg = uiState.outroSegment
+        val activeSkipSegment: SkipSegment? = when {
+            uiState.isLocked -> null
+            introSeg != null &&
+                !(uiState.durationMs > 30_000L && introSeg.startMs >= uiState.durationMs - 4_000L) &&
+                introSeg.containsPosition(uiState.currentPositionMs) -> introSeg
+            outroSeg != null &&
+                !(uiState.durationMs > 30_000L && outroSeg.startMs >= uiState.durationMs - 4_000L) &&
+                outroSeg.containsPosition(uiState.currentPositionMs) -> outroSeg
+            else -> null
+        }
         AnimatedVisibility(
-            visible = canManualSkipIntro,
+            visible = activeSkipSegment != null,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -1651,29 +1686,38 @@ private fun CustomExoPlayerView(
                     }
                 )
         ) {
+            val seg = activeSkipSegment ?: return@AnimatedVisibility
+            val buttonLabel = if (seg.type == SkipSegmentType.INTRO) "Skip Intro" else "Skip Outro"
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xCC11131A))
+                    .background(Color(0xD911131A))
                     .border(1.dp, Color(0x44FFFFFF), RoundedCornerShape(10.dp))
                     .clickable {
-                        val target = (uiState.currentPositionMs + 85_000L)
-                            .coerceAtMost((uiState.durationMs - 5_000L).coerceAtLeast(85_000L))
-                        autoSkippedIntroForEp = uiState.episodeId
-                        exoPlayer.seekTo(target)
+                        val maxSeek = if (uiState.durationMs > 2_000L) {
+                            (uiState.durationMs - 1_000L).coerceAtLeast(seg.startMs)
+                        } else {
+                            seg.endMs
+                        }
+                        val targetMs = seg.endMs.coerceAtMost(maxSeek)
+                        if (seg.type == SkipSegmentType.INTRO) {
+                            autoSkippedIntroForEp = uiState.episodeId
+                        }
+                        exoPlayer.seekTo(targetMs)
+                        viewModel.updatePosition(targetMs, exoPlayer.duration)
                     }
                     .padding(horizontal = 12.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     imageVector = Icons.Default.FastForward,
-                    contentDescription = "Lewati Intro",
+                    contentDescription = buttonLabel,
                     tint = Color.White,
                     modifier = Modifier.size(15.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Lewati Intro",
+                    text = buttonLabel,
                     color = Color.White,
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.SemiBold

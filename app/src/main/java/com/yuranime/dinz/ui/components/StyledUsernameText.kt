@@ -20,8 +20,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
@@ -39,7 +41,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import com.yuranime.dinz.data.firebase.FirebaseManager
+import com.yuranime.dinz.ui.theme.PiedraFontFamily
+import com.yuranime.dinz.ui.theme.PlusJakartaFontFamily
 import com.yuranime.dinz.ui.theme.SfProFontFamily
+import com.yuranime.dinz.ui.theme.TourneyItalicFontFamily
 import kotlinx.coroutines.isActive
 import java.text.BreakIterator
 import java.util.Locale
@@ -73,11 +78,13 @@ private data class SparkleAnchor(
 )
 
 private val STAR_SPARKLE_ANCHORS = listOf(
-    SparkleAnchor(0.10f, 0.18f, 7300, 5100, 2600, 0.95f, 0.12f),
-    SparkleAnchor(0.32f, 0.78f, 9100, 6200, 3100, 0.80f, 0.43f),
-    SparkleAnchor(0.56f, 0.14f, 6400, 7700, 2300, 1.05f, 0.68f),
-    SparkleAnchor(0.79f, 0.80f, 8200, 5600, 3400, 0.88f, 0.27f),
-    SparkleAnchor(0.94f, 0.25f, 10100, 6900, 2800, 0.92f, 0.81f)
+    // Bintang utama jelas di sudut kanan-atas tepi huruf (tanpa menutupi huruf)
+    SparkleAnchor(1.01f, 0.14f, 6800, 4900, 2600, 1.15f, 0.10f),
+    // Kilau aksen kecil di kiri atas, bawah tengah-kiri, dan kanan bawah
+    SparkleAnchor(-0.02f, 0.22f, 8200, 5600, 3100, 0.64f, 0.44f),
+    SparkleAnchor(0.28f, 0.94f, 7400, 6200, 2900, 0.54f, 0.72f),
+    SparkleAnchor(0.76f, 0.04f, 9100, 5400, 3300, 0.58f, 0.29f),
+    SparkleAnchor(0.95f, 0.88f, 8700, 6500, 2700, 0.68f, 0.58f)
 )
 
 /**
@@ -219,13 +226,21 @@ fun StyledUsernameText(
         parseNameStyleColor(colorHex, styleDef.id)
     }
     val palette = remember(accentColor) { buildNameStylePalette(accentColor) }
+    val resolvedFontFamily = remember(styleDef.id, fontFamily) {
+        when (styleDef.id) {
+            "glitch" -> TourneyItalicFontFamily
+            "magma" -> PiedraFontFamily
+            "ruby", "wave", "star", "twilight", "slash", "sonar" -> PlusJakartaFontFamily
+            else -> fontFamily ?: SfProFontFamily
+        }
+    }
     val resolvedFontStyle = if (styleDef.id == "glitch") FontStyle.Italic else FontStyle.Normal
 
-    val resolvedTextStyle = remember(fontSize, fontWeight, fontFamily, resolvedFontStyle, textAlign) {
+    val resolvedTextStyle = remember(fontSize, fontWeight, resolvedFontFamily, resolvedFontStyle, textAlign) {
         TextStyle(
             fontSize = fontSize,
             fontWeight = fontWeight,
-            fontFamily = fontFamily,
+            fontFamily = resolvedFontFamily,
             fontStyle = resolvedFontStyle,
             textAlign = textAlign,
             platformStyle = PlatformTextStyle(includeFontPadding = false)
@@ -324,16 +339,25 @@ fun StyledUsernameText(
     )
 }
 
+private fun lineBoundsX(layout: TextLayoutResult, canvasSize: Size): Pair<Float, Float> {
+    if (layout.lineCount <= 0) return 0f to canvasSize.width.coerceAtLeast(1f)
+    val left = layout.getLineLeft(0).coerceIn(0f, canvasSize.width)
+    val right = layout.getLineRight(0).coerceIn(left + 1f, canvasSize.width.coerceAtLeast(left + 1f))
+    return left to right
+}
+
 private fun DrawScope.drawRubyStyle(
     layout: TextLayoutResult,
     palette: NameStylePalette,
     timeMs: Long,
     canvasSize: Size
 ) {
+    val (textLeft, textRight) = lineBoundsX(layout, canvasSize)
+    val textWidth = (textRight - textLeft).coerceAtLeast(1f)
     val phase = cycle01(0f, 2200, timeMs)
-    val bandWidth = max(canvasSize.width * 0.55f, 140.dp.toPx())
-    val travel = canvasSize.width + bandWidth * 2f
-    val startX = -bandWidth + phase * travel
+    val bandWidth = max(textWidth * 0.55f, 110.dp.toPx())
+    val travel = textWidth + bandWidth * 2f
+    val startX = textLeft - bandWidth + phase * travel
 
     val brush = Brush.linearGradient(
         colors = listOf(
@@ -341,12 +365,14 @@ private fun DrawScope.drawRubyStyle(
             palette.accent,
             palette.bright,
             palette.specular,
+            Color.White.copy(alpha = 0.96f),
+            palette.specular,
             palette.bright,
             palette.accent,
             palette.deep
         ),
         start = Offset(startX, 0f),
-        end = Offset(startX + bandWidth, canvasSize.height * 0.85f),
+        end = Offset(startX + bandWidth, canvasSize.height * 0.88f),
         tileMode = TileMode.Clamp
     )
     drawText(textLayoutResult = layout, brush = brush, alpha = 1f)
@@ -363,11 +389,14 @@ private fun DrawScope.drawWaveStyle(
     canvasSize: Size
 ) {
     val basePhase = cycle01(0f, 1800, timeMs)
-    val amp = min(fontSizePx * 0.16f, maxAmpPx)
-    val waveBrush = Brush.verticalGradient(
-        colors = listOf(palette.specular, palette.bright, palette.accent),
-        startY = -amp,
-        endY = canvasSize.height + amp
+    val amp = min(fontSizePx * 0.145f, maxAmpPx)
+    val (textLeft, textRight) = lineBoundsX(layout, canvasSize)
+    val sheenX = lerpFloat(textLeft - 60f, textRight + 60f, basePhase)
+    val waveBrush = Brush.linearGradient(
+        colors = listOf(palette.accent, palette.bright, palette.specular, palette.bright, palette.accent),
+        start = Offset(sheenX - 80f, -amp),
+        end = Offset(sheenX + 80f, canvasSize.height + amp),
+        tileMode = TileMode.Mirror
     )
 
     val canPerGlyph = ranges.isNotEmpty() &&
@@ -382,7 +411,8 @@ private fun DrawScope.drawWaveStyle(
             if (r.first >= textLen) break
             val glyphLayout = clusterLayouts[i]
             val p = (((basePhase - i * 0.0555556f) % 1f) + 1f) % 1f
-            val dy = cos(p * 2.0 * PI).toFloat() * amp
+            val waveFactor = cos(p * 2.0 * PI).toFloat()
+            val dy = waveFactor * amp
             val xPos = runCatching {
                 val cursorX = layout.getHorizontalPosition(r.first, true)
                 val endCursorX = if (r.last + 1 <= textLen) {
@@ -393,9 +423,18 @@ private fun DrawScope.drawWaveStyle(
                 min(cursorX, endCursorX)
             }.getOrDefault(0f)
 
+            val crestColor = lerp(
+                palette.accent,
+                palette.specular,
+                ((waveFactor * 0.5f + 0.5f) * 0.85f).coerceIn(0f, 1f)
+            )
             drawText(
                 textLayoutResult = glyphLayout,
-                brush = waveBrush,
+                brush = Brush.verticalGradient(
+                    colors = listOf(crestColor, palette.bright, palette.accent),
+                    startY = 0f,
+                    endY = glyphLayout.size.height.toFloat().coerceAtLeast(1f)
+                ),
                 topLeft = Offset(xPos, dy),
                 alpha = 1f
             )
@@ -405,14 +444,12 @@ private fun DrawScope.drawWaveStyle(
 
     // Fallback aman jika teks multi-baris atau terpotong elipsis (...)
     val sliceCount = 12
-    val lineRight = layout.getLineRight(0).coerceAtMost(canvasSize.width)
-    val lineLeft = layout.getLineLeft(0).coerceAtLeast(0f)
-    val span = (lineRight - lineLeft).coerceAtLeast(1f)
+    val span = (textRight - textLeft).coerceAtLeast(1f)
     val step = span / sliceCount
     for (s in 0 until sliceCount) {
         val p = (((basePhase - s * 0.08f) % 1f) + 1f) % 1f
         val dy = cos(p * 2.0 * PI).toFloat() * amp
-        val l = lineLeft + s * step
+        val l = textLeft + s * step
         val r = if (s == sliceCount - 1) canvasSize.width + 2f else l + step + 0.5f
         clipRect(
             left = l,
@@ -438,49 +475,52 @@ private fun DrawScope.drawStarStyle(
     smallStar: Path,
     largeStar: Path
 ) {
-    val shimmer = cycle01(0f, 2500, timeMs)
-    val sweepX = shimmer * (canvasSize.width + 140.dp.toPx()) - 70.dp.toPx()
+    val (textLeft, textRight) = lineBoundsX(layout, canvasSize)
+    val textWidth = (textRight - textLeft).coerceAtLeast(1f)
+    val shimmer = cycle01(0f, 3400, timeMs)
+    val sweepX = textLeft + shimmer * (textWidth + 120.dp.toPx()) - 60.dp.toPx()
     val textBrush = Brush.linearGradient(
         colors = listOf(palette.accent, palette.bright, palette.specular, palette.accent),
         start = Offset(sweepX, 0f),
-        end = Offset(sweepX + 120.dp.toPx(), canvasSize.height)
+        end = Offset(sweepX + 96.dp.toPx(), canvasSize.height)
     )
     drawText(textLayoutResult = layout, brush = textBrush, alpha = 1f)
 
-    // 5 bintang 4-sudut (✦) berkedip & berputar sesuai Lgh/l0;->d,e
+    // Bintang utama di sudut kanan atas & kilau halus di tepi huruf agar keterbacaan tetap tajam
     STAR_SPARKLE_ANCHORS.forEachIndexed { idx, anchor ->
         val twinkle = cycle01(anchor.phaseOffset, anchor.twinklePeriod, timeMs)
         val alpha: Float
-        val scale: Float
+        val scaleFactor: Float
         val angleDeg: Float
         if (twinkle < 0.45f) {
             val u = smoothStep01(twinkle / 0.45f)
             alpha = u
-            scale = 0.3f + 0.7f * u
+            scaleFactor = (0.35f + 0.72f * u) * anchor.sizeScale
             angleDeg = 45f * u
         } else if (twinkle < 0.70f) {
             val u = (twinkle - 0.45f) / 0.25f
             alpha = 1f - 0.15f * u
-            scale = 1f - 0.1f * u
-            angleDeg = 45f + 20f * u
+            scaleFactor = (1.07f - 0.12f * u) * anchor.sizeScale
+            angleDeg = 45f + 22f * u
         } else {
             val u = smoothStep01((twinkle - 0.70f) / 0.30f)
             alpha = (1f - u) * 0.85f
-            scale = 0.9f * (1f - u * 0.65f)
-            angleDeg = 65f + 25f * u
+            scaleFactor = (0.95f * (1f - u * 0.65f)) * anchor.sizeScale
+            angleDeg = 67f + 23f * u
         }
         if (alpha <= 0.04f) return@forEachIndexed
 
-        val driftX = sin(cycle01(anchor.phaseOffset, anchor.periodX, timeMs) * 2f * PI.toFloat()) * 3.dp.toPx()
-        val driftY = cos(cycle01(anchor.phaseOffset * 1.3f, anchor.periodY, timeMs) * 2f * PI.toFloat()) * 2.dp.toPx()
-        val cx = (canvasSize.width * anchor.xRatio + driftX).coerceIn(2f, canvasSize.width - 2f)
+        val driftX = sin(cycle01(anchor.phaseOffset, anchor.periodX, timeMs) * 2f * PI.toFloat()) * 2.dp.toPx()
+        val driftY = cos(cycle01(anchor.phaseOffset * 1.3f, anchor.periodY, timeMs) * 2f * PI.toFloat()) * 1.6.dp.toPx()
+        val rawX = textLeft + textWidth * anchor.xRatio + driftX + if (idx == 0) 3.dp.toPx() else 0f
+        val cx = rawX.coerceIn(-4.dp.toPx(), canvasSize.width - 1f)
         val cy = (canvasSize.height * anchor.yRatio + driftY).coerceIn(1f, canvasSize.height - 1f)
 
-        val starPath = if (idx % 2 == 0) largeStar else smallStar
-        val glowRadius = (if (idx % 2 == 0) 6.5.dp.toPx() else 4.5.dp.toPx()) * scale
+        val starPath = if (idx == 0) largeStar else smallStar
+        val glowRadius = (if (idx == 0) 6.5.dp.toPx() else 3.8.dp.toPx()) * scaleFactor
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(palette.specular.copy(alpha = 0.55f * alpha), Color.Transparent),
+                colors = listOf(palette.specular.copy(alpha = 0.50f * alpha), Color.Transparent),
                 center = Offset(cx, cy),
                 radius = glowRadius.coerceAtLeast(1f)
             ),
@@ -488,8 +528,10 @@ private fun DrawScope.drawStarStyle(
             center = Offset(cx, cy)
         )
         rotate(degrees = angleDeg, pivot = Offset(cx, cy)) {
-            translate(left = cx, top = cy) {
-                drawPath(path = starPath, color = Color.White.copy(alpha = alpha * 0.96f))
+            scale(scale = scaleFactor.coerceIn(0.25f, 1.35f), pivot = Offset(cx, cy)) {
+                translate(left = cx, top = cy) {
+                    drawPath(path = starPath, color = Color.White.copy(alpha = alpha * 0.96f))
+                }
             }
         }
     }
@@ -501,45 +543,53 @@ private fun DrawScope.drawTwilightStyle(
     timeMs: Long,
     canvasSize: Size
 ) {
-    val shift = cycle01(0f, 3600, timeMs)
-    val pan = shift * canvasSize.width
+    val (textLeft, textRight) = lineBoundsX(layout, canvasSize)
+    val textWidth = (textRight - textLeft).coerceAtLeast(1f)
+    val shiftA = cycle01(0f, 9000, timeMs)
+    val shiftB = cycle01(0.35f, 13000, timeMs)
+    val pan = (shiftA * 0.7f + sin(shiftB * 2f * PI.toFloat()) * 0.15f) * textWidth
+
+    val duskDeep = lerp(palette.twilightCompanion, Color(0xFF3B2C7A), 0.32f)
     val textBrush = Brush.linearGradient(
         colors = listOf(
+            duskDeep,
             palette.twilightCompanion,
             palette.accent,
             palette.specular,
             palette.bright,
             palette.twilightCompanion
         ),
-        start = Offset(-canvasSize.width * 0.5f + pan, 0f),
-        end = Offset(canvasSize.width * 1.1f + pan, canvasSize.height),
+        start = Offset(textLeft - textWidth * 0.45f + pan, 0f),
+        end = Offset(textLeft + textWidth * 1.15f + pan, canvasSize.height),
         tileMode = TileMode.Mirror
     )
     drawText(textLayoutResult = layout, brush = textBrush, alpha = 1f)
 
-    // Kunang-kunang / partikel debu bintang senja (Lgh/i0;)
-    val particleCount = 8
+    // Kunang-kunang senja lembut mengorbit tepi atas/bawah nama
+    val particleCount = 7
     for (i in 0 until particleCount) {
         val u1 = hashUnit(i, 101)
         val u2 = hashUnit(i, 202)
         val u3 = hashUnit(i, 303)
-        val pulse = 0.12f + 0.76f * (sin(cycle01(u3, 2300 + i * 210, timeMs) * 2f * PI.toFloat()) * 0.5f + 0.5f)
-        val x = canvasSize.width * ((u1 + sin(cycle01(u2, 5400, timeMs) * 2f * PI.toFloat()) * 0.06f).coerceIn(0.03f, 0.97f))
-        val y = canvasSize.height * ((u2 + cos(cycle01(u1, 4300, timeMs) * 2f * PI.toFloat()) * 0.12f).coerceIn(0.08f, 0.92f))
-        val r = (1.6f + u3 * 1.4f).dp.toPx()
+        val pulse = 0.15f + 0.80f * (sin(cycle01(u3, 2400 + i * 240, timeMs) * 2f * PI.toFloat()) * 0.5f + 0.5f)
+        val x = textLeft + textWidth * ((u1 + sin(cycle01(u2, 5400, timeMs) * 2f * PI.toFloat()) * 0.05f).coerceIn(0.02f, 0.98f))
+        val bandY = if (i % 2 == 0) 0.14f + u2 * 0.20f else 0.72f + u2 * 0.22f
+        val y = canvasSize.height * ((bandY + cos(cycle01(u1, 4300, timeMs) * 2f * PI.toFloat()) * 0.08f).coerceIn(0.06f, 0.94f))
+        val orbColor = if (i % 3 == 0) Color(0xFFFDE68A) else palette.specular
+        val r = (1.3f + u3 * 1.1f).dp.toPx()
 
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(palette.specular.copy(alpha = 0.75f * pulse), Color.Transparent),
+                colors = listOf(orbColor.copy(alpha = 0.72f * pulse), Color.Transparent),
                 center = Offset(x, y),
-                radius = r * 2.2f
+                radius = r * 2.4f
             ),
-            radius = r * 2.2f,
+            radius = r * 2.4f,
             center = Offset(x, y)
         )
         drawCircle(
-            color = palette.specular.copy(alpha = pulse),
-            radius = r * 0.45f,
+            color = orbColor.copy(alpha = pulse * 0.95f),
+            radius = r * 0.42f,
             center = Offset(x, y)
         )
     }
@@ -551,80 +601,116 @@ private fun DrawScope.drawSlashStyle(
     timeMs: Long,
     canvasSize: Size
 ) {
+    val (textLeft, textRight) = lineBoundsX(layout, canvasSize)
+    val textWidth = (textRight - textLeft).coerceAtLeast(1f)
     val cycle = cycle01(0f, 2400, timeMs)
     val baseBrush = Brush.linearGradient(
         colors = listOf(palette.bright, palette.specular, palette.accent),
-        start = Offset(0f, 0f),
-        end = Offset(canvasSize.width, canvasSize.height)
+        start = Offset(textLeft, 0f),
+        end = Offset(textRight, canvasSize.height)
     )
 
-    val slashActive = cycle in 0.06f..0.44f
+    val slashActive = cycle in 0.08f..0.46f
     if (!slashActive) {
         drawText(textLayoutResult = layout, brush = baseBrush, alpha = 1f)
         return
     }
 
-    val p = smoothStep01((cycle - 0.06f) / 0.38f)
-    val impactFactor = sin(p * PI.toFloat()).coerceIn(0f, 1f)
-    val splitShift = impactFactor * 2.2.dp.toPx()
-    val midY = canvasSize.height * 0.52f
+    val p = ((cycle - 0.08f) / 0.38f).coerceIn(0f, 1f)
+    val cutX = textLeft + textWidth * 0.52f
+    val slopeOffset = canvasSize.height * 0.46f
+    val topCutX = cutX + slopeOffset
+    val botCutX = cutX - slopeOffset
 
-    // Split top & bottom along impact
-    if (impactFactor > 0.15f) {
-        clipRect(0f, -4f, canvasSize.width + 8f, midY) {
-            drawText(
-                textLayoutResult = layout,
-                color = Color(0xFF19E6F5).copy(alpha = 0.55f * impactFactor),
-                topLeft = Offset(-splitShift, -0.5.dp.toPx())
-            )
+    // Geser dua belahan teks sepanjang bidang tebasan diagonal katana (Lgh/o0;->b/c)
+    val impactEnvelope = if (p < 0.25f) {
+        smoothStep01(p / 0.25f)
+    } else {
+        1f - smoothStep01((p - 0.25f) / 0.75f)
+    }
+    val shearDist = impactEnvelope * 3.8.dp.toPx()
+    val shearDx = shearDist * 0.88f
+    val shearDy = shearDist * 0.42f
+
+    if (impactEnvelope > 0.03f) {
+        val leftHalfPath = Path().apply {
+            moveTo(-24f, -8f)
+            lineTo(topCutX, -8f)
+            lineTo(botCutX, canvasSize.height + 8f)
+            lineTo(-24f, canvasSize.height + 8f)
+            close()
+        }
+        val rightHalfPath = Path().apply {
+            moveTo(topCutX, -8f)
+            lineTo(canvasSize.width + 24f, -8f)
+            lineTo(canvasSize.width + 24f, canvasSize.height + 8f)
+            lineTo(botCutX, canvasSize.height + 8f)
+            close()
+        }
+
+        clipPath(leftHalfPath) {
             drawText(
                 textLayoutResult = layout,
                 brush = baseBrush,
-                topLeft = Offset(splitShift * 0.45f, 0f)
+                topLeft = Offset(-shearDx, -shearDy),
+                alpha = 1f
             )
         }
-        clipRect(-8f, midY, canvasSize.width + 8f, canvasSize.height + 4f) {
-            drawText(
-                textLayoutResult = layout,
-                color = Color(0xFFFF2FD6).copy(alpha = 0.52f * impactFactor),
-                topLeft = Offset(splitShift, 0.5.dp.toPx())
-            )
+        clipPath(rightHalfPath) {
             drawText(
                 textLayoutResult = layout,
                 brush = baseBrush,
-                topLeft = Offset(-splitShift * 0.45f, 0f)
+                topLeft = Offset(shearDx, shearDy),
+                alpha = 1f
             )
         }
     } else {
         drawText(textLayoutResult = layout, brush = baseBrush, alpha = 1f)
     }
 
-    // Tebasan pedang katana diagonal tajam menyapu kiri -> kanan
-    val beamCenterX = lerpFloat(-0.15f * canvasSize.width, 1.15f * canvasSize.width, p)
-    val dx = canvasSize.height * 0.55f
-    val beamStart = Offset(beamCenterX - dx, -canvasSize.height * 0.15f)
-    val beamEnd = Offset(beamCenterX + dx, canvasSize.height * 1.15f)
-    val slashBrush = Brush.linearGradient(
-        0.0f to Color.Transparent,
-        0.35f to Color(0xFF19E6F5).copy(alpha = 0.85f * impactFactor),
-        0.5f to Color.White.copy(alpha = impactFactor),
-        0.65f to palette.accent.copy(alpha = 0.90f * impactFactor),
-        1.0f to Color.Transparent,
-        start = beamStart,
-        end = beamEnd
-    )
-    drawLine(
-        brush = slashBrush,
-        start = beamStart,
-        end = beamEnd,
-        strokeWidth = 2.4.dp.toPx()
-    )
-    drawLine(
-        color = Color.White.copy(alpha = 0.95f * impactFactor),
-        start = Offset(beamCenterX - dx * 0.45f, canvasSize.height * 0.12f),
-        end = Offset(beamCenterX + dx * 0.45f, canvasSize.height * 0.88f),
-        strokeWidth = 1.1.dp.toPx()
-    )
+    // Kilat sabetan katana diagonal sejajar bidang belah
+    val bladeFlash = if (p < 0.38f) sin((p / 0.38f) * PI.toFloat()).coerceIn(0f, 1f) else 0f
+    if (bladeFlash > 0.02f) {
+        val bladeStart = Offset(topCutX + 10.dp.toPx(), -canvasSize.height * 0.14f)
+        val bladeEnd = Offset(botCutX - 10.dp.toPx(), canvasSize.height * 1.14f)
+        val auraBrush = Brush.linearGradient(
+            0.0f to Color.Transparent,
+            0.30f to palette.accent.copy(alpha = 0.88f * bladeFlash),
+            0.50f to Color.White.copy(alpha = bladeFlash),
+            0.70f to palette.specular.copy(alpha = 0.90f * bladeFlash),
+            1.0f to Color.Transparent,
+            start = bladeStart,
+            end = bladeEnd
+        )
+        drawLine(
+            brush = auraBrush,
+            start = bladeStart,
+            end = bladeEnd,
+            strokeWidth = 3.0.dp.toPx()
+        )
+        drawLine(
+            color = Color.White.copy(alpha = 0.98f * bladeFlash),
+            start = Offset(topCutX + 4.dp.toPx(), 0f),
+            end = Offset(botCutX - 4.dp.toPx(), canvasSize.height),
+            strokeWidth = 1.25.dp.toPx()
+        )
+
+        // Percikan bilah katana tegak lurus garis tebasan
+        for (k in 0 until 4) {
+            val h = hashUnit(k, 91)
+            val frac = 0.22f + k * 0.19f
+            val sx = lerpFloat(bladeStart.x, bladeEnd.x, frac)
+            val sy = lerpFloat(bladeStart.y, bladeEnd.y, frac)
+            val side = if (k % 2 == 0) 1f else -1f
+            val len = (5f + h * 7f).dp.toPx() * bladeFlash
+            drawLine(
+                color = lerp(palette.specular, Color.White, 0.7f).copy(alpha = bladeFlash * 0.9f),
+                start = Offset(sx, sy),
+                end = Offset(sx + side * len * 0.85f, sy - side * len * 0.48f),
+                strokeWidth = 1.1.dp.toPx()
+            )
+        }
+    }
 }
 
 private fun DrawScope.drawGlitchStyle(
@@ -633,14 +719,17 @@ private fun DrawScope.drawGlitchStyle(
     timeMs: Long,
     canvasSize: Size
 ) {
-    // Kuantisasi bucket 46ms sesuai Lgh/j0;->x Case 3
+    // Kuantisasi bucket 46ms sesuai Lgh/j0;->x Case 3 pada font Tourney Italic
     val bucket = (timeMs / 46L).toInt()
     val burstRoll = hashUnit(bucket / 3, 71)
-    val isBurst = burstRoll > 0.58f
+    val isBurst = burstRoll > 0.55f
     val stepRoll = hashUnit(bucket, 19)
 
+    val (textLeft, textRight) = lineBoundsX(layout, canvasSize)
     val mainBrush = Brush.horizontalGradient(
-        colors = listOf(palette.bright, palette.accent, palette.specular)
+        colors = listOf(palette.specular, palette.bright, palette.accent),
+        startX = textLeft,
+        endX = textRight
     )
 
     if (!isBurst) {
@@ -648,34 +737,40 @@ private fun DrawScope.drawGlitchStyle(
         return
     }
 
-    val jitterX = (stepRoll - 0.5f) * 5.2.dp.toPx()
+    val jitterX = (stepRoll - 0.5f) * 5.6.dp.toPx()
     val jitterY = (hashUnit(bucket, 37) - 0.5f) * 1.4.dp.toPx()
+    val ghostShift = max(jitterX.let { if (it < 0f) -it else it }, 1.6.dp.toPx())
 
-    // RGB chromatic ghosts
+    // Jejak kromatik siber kontras tinggi (Cyan & Hot Pink/Crimson)
     drawText(
         textLayoutResult = layout,
-        color = Color(0xFF19E6F5).copy(alpha = 0.85f),
-        topLeft = Offset(-jitterX.coerceAtLeast(1.4.dp.toPx()), jitterY)
+        color = Color(0xFF00F5D4).copy(alpha = 0.88f),
+        topLeft = Offset(-ghostShift, jitterY)
     )
     drawText(
         textLayoutResult = layout,
-        color = Color(0xFFFF2FD6).copy(alpha = 0.80f),
-        topLeft = Offset(jitterX.coerceAtLeast(1.4.dp.toPx()), -jitterY)
+        color = Color(0xFFFF2A6D).copy(alpha = 0.84f),
+        topLeft = Offset(ghostShift, -jitterY)
     )
 
-    // Horizontal slice displacement (2 pita terpotong)
-    val cut1 = canvasSize.height * (0.25f + hashUnit(bucket, 53) * 0.25f)
+    // Pergeseran 3 pita horizontal tajam
+    val cut1 = canvasSize.height * (0.24f + hashUnit(bucket, 53) * 0.24f)
     val cut2 = canvasSize.height * (0.58f + hashUnit(bucket, 61) * 0.22f)
-    val sliceDx = (hashUnit(bucket, 83) - 0.5f) * 7.5.dp.toPx()
+    val sliceDx = (hashUnit(bucket, 83) - 0.5f) * 8.0.dp.toPx()
 
-    clipRect(-10f, -2f, canvasSize.width + 10f, cut1) {
+    clipRect(-14f, -2f, canvasSize.width + 14f, cut1) {
         drawText(textLayoutResult = layout, brush = mainBrush, topLeft = Offset(0f, 0f))
     }
-    clipRect(-12f, cut1, canvasSize.width + 12f, cut2) {
-        drawText(textLayoutResult = layout, brush = mainBrush, topLeft = Offset(sliceDx, 0f))
+    clipRect(-14f, cut1, canvasSize.width + 14f, cut2) {
+        val midFlash = if (hashUnit(bucket, 97) > 0.72f) Color.White else palette.specular
+        drawText(
+            textLayoutResult = layout,
+            color = midFlash,
+            topLeft = Offset(sliceDx, 0f)
+        )
     }
-    clipRect(-10f, cut2, canvasSize.width + 10f, canvasSize.height + 2f) {
-        drawText(textLayoutResult = layout, brush = mainBrush, topLeft = Offset(-sliceDx * 0.4f, 0f))
+    clipRect(-14f, cut2, canvasSize.width + 14f, canvasSize.height + 2f) {
+        drawText(textLayoutResult = layout, brush = mainBrush, topLeft = Offset(-sliceDx * 0.45f, 0f))
     }
 }
 
@@ -685,45 +780,48 @@ private fun DrawScope.drawMagmaStyle(
     timeMs: Long,
     canvasSize: Size
 ) {
+    val (textLeft, textRight) = lineBoundsX(layout, canvasSize)
+    val textWidth = (textRight - textLeft).coerceAtLeast(1f)
     val flow = cycle01(0f, 3400, timeMs)
     val flare = sin(cycle01(0f, 5200, timeMs) * 2f * PI.toFloat()) * 0.5f + 0.5f
-    val yShift = flow * canvasSize.height * 2f
+    val yShift = flow * canvasSize.height * 2.1f
 
-    // Gradien magma pijar bergerak 16° sesuai Lgh/j0;->x Case 2
-    val emberHot = lerp(palette.accent, Color(0xFFFF8A00), 0.35f)
-    val moltenCore = lerp(emberHot, Color(0xFFFFF1C1), 0.72f + flare * 0.15f)
+    // Gradien lava pijar di atas siluet batu Piedra (3400ms + 5200ms)
+    val charred = lerp(palette.deep, Color(0xFF2B0600), 0.35f)
+    val emberHot = lerp(palette.accent, Color(0xFFFF6A00), 0.48f)
+    val moltenCore = lerp(emberHot, Color(0xFFFFF1B8), 0.75f + flare * 0.16f)
     val magmaBrush = Brush.linearGradient(
-        colors = listOf(palette.deep, emberHot, moltenCore, palette.accent, palette.deep),
-        start = Offset(0f, canvasSize.height + yShift),
-        end = Offset(canvasSize.height * 0.30f, -canvasSize.height + yShift),
+        colors = listOf(charred, emberHot, moltenCore, palette.accent, charred),
+        start = Offset(textLeft, canvasSize.height + yShift),
+        end = Offset(textLeft + canvasSize.height * 0.34f, -canvasSize.height + yShift),
         tileMode = TileMode.Mirror
     )
     drawText(textLayoutResult = layout, brush = magmaBrush, alpha = 1f)
 
-    // Percikan bara api naik dari bagian bawah huruf (Lgh/e0;->k)
+    // Percikan bara api naik halus dari dasar huruf (Lgh/e0;->k)
     val emberCount = 8
     for (i in 0 until emberCount) {
         val h1 = hashUnit(i, 411)
         val h2 = hashUnit(i, 523)
         val life = cycle01(h1, 1800 + i * 190, timeMs)
         val alpha = if (life < 0.25f) life / 0.25f else (1f - life) / 0.75f
-        val x = canvasSize.width * (0.06f + h2 * 0.88f) +
-            sin(life * 4f * PI.toFloat() + h1 * 6f) * 2.5.dp.toPx()
-        val y = canvasSize.height * (0.95f - life * 1.15f)
-        val radius = ((1.2f + h1 * 1.3f) * (1f - life * 0.5f)).dp.toPx().coerceAtLeast(0.8f)
+        val x = textLeft + textWidth * (0.04f + h2 * 0.92f) +
+            sin(life * 4f * PI.toFloat() + h1 * 6f) * 2.2.dp.toPx()
+        val y = canvasSize.height * (0.94f - life * 1.12f)
+        val radius = ((1.1f + h1 * 1.2f) * (1f - life * 0.5f)).dp.toPx().coerceAtLeast(0.75f)
 
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(emberHot.copy(alpha = 0.65f * alpha), Color.Transparent),
                 center = Offset(x, y),
-                radius = radius * 2.4f
+                radius = radius * 2.3f
             ),
-            radius = radius * 2.4f,
+            radius = radius * 2.3f,
             center = Offset(x, y)
         )
         drawCircle(
             color = moltenCore.copy(alpha = alpha),
-            radius = radius * 0.55f,
+            radius = radius * 0.52f,
             center = Offset(x, y)
         )
     }
@@ -735,62 +833,57 @@ private fun DrawScope.drawSonarStyle(
     timeMs: Long,
     canvasSize: Size
 ) {
-    // Base muted body so scan beam pops with high contrast
-    val baseBrush = Brush.horizontalGradient(
-        colors = listOf(
-            lerp(palette.deep, palette.accent, 0.55f),
-            palette.accent.copy(alpha = 0.85f),
-            lerp(palette.deep, palette.accent, 0.55f)
-        )
+    val (textLeft, textRight) = lineBoundsX(layout, canvasSize)
+    val textWidth = (textRight - textLeft).coerceAtLeast(1f)
+    val center = Offset((textLeft + textRight) * 0.5f, canvasSize.height * 0.5f)
+    val maxRadius = max(textWidth * 0.62f, canvasSize.height * 1.15f).coerceAtLeast(12f)
+
+    // 1. Sapuan ping radial menyebar dari pusat nama (Lgh/j0;->x case 0 & Lm1/r;->j)
+    val primaryPhase = cycle01(0f, 3400, timeMs)
+    val waveRadius = (maxRadius * (0.14f + primaryPhase * 0.94f)).coerceAtLeast(6f)
+    val innerStop = ((waveRadius - maxRadius * 0.24f) / waveRadius).coerceIn(0.02f, 0.72f)
+    val crestStop = (innerStop + 0.14f).coerceIn(innerStop + 0.02f, 0.88f)
+    val trailStop = (crestStop + 0.08f).coerceIn(crestStop + 0.02f, 0.98f)
+    val baseMuted = lerp(palette.deep, palette.accent, 0.62f)
+
+    val radialTextBrush = Brush.radialGradient(
+        0.0f to baseMuted,
+        innerStop to palette.accent,
+        crestStop to palette.specular,
+        trailStop to palette.bright,
+        1.0f to baseMuted,
+        center = center,
+        radius = waveRadius
     )
-    drawText(textLayoutResult = layout, brush = baseBrush, alpha = 1f)
+    drawText(textLayoutResult = layout, brush = radialTextBrush, alpha = 1f)
 
-    // Gelombang sonar vertikal bolak-balik (ping-pong smooth)
-    val t = cycle01(0f, 2500, timeMs)
-    val pingPong = if (t <= 0.5f) smoothStep01(t * 2f) else smoothStep01((1f - t) * 2f)
-    val scanX = lerpFloat(-0.08f * canvasSize.width, 1.08f * canvasSize.width, pingPong)
-    val bandHalf = max(canvasSize.width * 0.14f, 16.dp.toPx())
+    // 2. Tiga cincin radar konsentris memancar keluar berurutan (3400ms)
+    val ringOffsets = floatArrayOf(0f, 0.33f, 0.66f)
+    for (offset in ringOffsets) {
+        val p = cycle01(offset, 3400, timeMs)
+        val fade = (1f - p) * (1f - p * 0.35f)
+        if (fade <= 0.02f) continue
+        val r = 4.dp.toPx() + p * maxRadius
 
-    clipRect(
-        left = (scanX - bandHalf).coerceAtLeast(0f),
-        top = -2f,
-        right = (scanX + bandHalf).coerceAtMost(canvasSize.width),
-        bottom = canvasSize.height + 2f
-    ) {
-        val beamTextBrush = Brush.horizontalGradient(
-            0.0f to palette.accent,
-            0.35f to palette.bright,
-            0.5f to palette.specular,
-            0.65f to palette.bright,
-            1.0f to palette.accent,
-            startX = scanX - bandHalf,
-            endX = scanX + bandHalf
+        drawCircle(
+            brush = Brush.radialGradient(
+                0.72f to Color.Transparent,
+                0.96f to palette.accent.copy(alpha = fade * 0.14f),
+                1.0f to Color.Transparent,
+                center = center,
+                radius = r
+            ),
+            radius = r,
+            center = center
         )
-        drawText(textLayoutResult = layout, brush = beamTextBrush, alpha = 1f)
+        drawCircle(
+            color = lerp(palette.accent, palette.specular, (1f - p) * 0.65f).copy(alpha = fade * 0.72f),
+            radius = r,
+            center = center,
+            style = Stroke(width = 1.2.dp.toPx()),
+            blendMode = BlendMode.SrcOver
+        )
     }
-
-    // Garis pemindai sonar tipis & lingkaran riak gelombang halus
-    val lineTop = canvasSize.height * 0.04f
-    val lineBottom = canvasSize.height * 0.96f
-    drawLine(
-        brush = Brush.verticalGradient(
-            colors = listOf(Color.Transparent, palette.specular, Color.Transparent),
-            startY = lineTop,
-            endY = lineBottom
-        ),
-        start = Offset(scanX, lineTop),
-        end = Offset(scanX, lineBottom),
-        strokeWidth = 1.8.dp.toPx()
-    )
-    val ripplePhase = cycle01(0f, 1250, timeMs)
-    val rippleR = (canvasSize.height * 0.45f) + ripplePhase * canvasSize.height * 0.45f
-    drawCircle(
-        color = palette.accent.copy(alpha = (1f - ripplePhase) * 0.35f),
-        radius = rippleR,
-        center = Offset(scanX, canvasSize.height * 0.5f),
-        style = Stroke(width = 1.dp.toPx()),
-        blendMode = BlendMode.SrcOver
-    )
 }
 
 private fun lerpFloat(start: Float, stop: Float, fraction: Float): Float {

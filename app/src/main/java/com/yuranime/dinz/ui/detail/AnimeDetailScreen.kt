@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,8 +32,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -42,6 +46,8 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ScrollableTabRow
@@ -79,6 +85,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.yuranime.dinz.R
+import com.yuranime.dinz.data.model.AniListCharacterEntry
+import com.yuranime.dinz.data.model.AniListCreditsData
+import com.yuranime.dinz.data.model.AniListStaffEntry
 import com.yuranime.dinz.data.model.CommunityMediaItem
 import com.yuranime.dinz.data.model.CuplixItem
 import com.yuranime.dinz.data.model.EpisodeItem
@@ -243,7 +252,11 @@ fun AnimeDetailScreen(
                     // 3. Tab Content
                     Box(modifier = Modifier.weight(1f)) {
                         when (uiState.selectedTab) {
-                            DetailTab.INFO -> TabInfoContent(movie = movie)
+                            DetailTab.INFO -> TabInfoContent(
+                                movie = movie,
+                                creditsData = uiState.creditsData,
+                                onOpenCreditsTab = { viewModel.selectTab(DetailTab.CREDITS) }
+                            )
                             DetailTab.EPISODE -> TabEpisodeContent(
                                 episodes = uiState.filteredEpisodes,
                                 searchQuery = uiState.episodeSearchQuery,
@@ -255,6 +268,17 @@ fun AnimeDetailScreen(
                                 onEpisodeClick = { ep ->
                                     ep.id?.let { onEpisodeClick(it) }
                                 }
+                            )
+                            DetailTab.CREDITS -> TabCharactersAndStaffContent(
+                                isLoading = uiState.isLoadingCredits,
+                                errorMessage = uiState.creditsError,
+                                creditsData = uiState.creditsData,
+                                selectedSection = uiState.selectedCreditsSection,
+                                selectedVaLanguage = uiState.selectedVaLanguage,
+                                onSelectSection = { viewModel.selectCreditsSection(it) },
+                                onSelectVaLanguage = { viewModel.selectVaLanguage(it) },
+                                onRetry = { viewModel.retryLoadCredits(forceRefresh = true) },
+                                onImageClick = { viewModel.openFullScreenImage(it) }
                             )
                             DetailTab.SEASON -> TabSeasonContent(
                                 seasons = uiState.seasons,
@@ -558,7 +582,11 @@ private fun HeroCoverHeader(
 // ==================== 2. TAB INFO ====================
 
 @Composable
-private fun TabInfoContent(movie: MovieDetail) {
+private fun TabInfoContent(
+    movie: MovieDetail,
+    creditsData: AniListCreditsData? = null,
+    onOpenCreditsTab: () -> Unit = {}
+) {
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -679,6 +707,47 @@ private fun TabInfoContent(movie: MovieDetail) {
                     fontWeight = FontWeight.Bold,
                     lineHeight = 18.sp
                 )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Akses Cepat ke Karakter & Staff (AniList)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF11131A))
+                        .border(1.dp, Color(0xFF1E222E), RoundedCornerShape(12.dp))
+                        .clickable { onOpenCreditsTab() }
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Karakter, Seiyuu & Staff",
+                            color = ColorTextPrimary,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        val subtitle = if (creditsData != null) {
+                            "${creditsData.characters.size} Karakter • ${creditsData.staff.size} Staff (AniList)"
+                        } else {
+                            "Lihat profil karakter, pengisi suara & kreator di AniList"
+                        }
+                        Text(
+                            text = subtitle,
+                            color = Color(0xFF94A3B8),
+                            fontSize = 11.5.sp
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "Buka Karakter & Staff",
+                        tint = ColorAccentPrimary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
         }
 
@@ -1177,6 +1246,522 @@ private fun TabCoverContent(
                     contentScale = ContentScale.Crop
                 )
             }
+        }
+    }
+}
+
+// ==================== 6B. TAB KARAKTER & STAFF (ANILIST AUTO-DETECT) ====================
+
+@Composable
+private fun TabCharactersAndStaffContent(
+    isLoading: Boolean,
+    errorMessage: String?,
+    creditsData: AniListCreditsData?,
+    selectedSection: CreditsSectionTab,
+    selectedVaLanguage: String,
+    onSelectSection: (CreditsSectionTab) -> Unit,
+    onSelectVaLanguage: (String) -> Unit,
+    onRetry: () -> Unit,
+    onImageClick: (String) -> Unit
+) {
+    if (isLoading && creditsData == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(
+                    color = ColorAccentPrimary,
+                    strokeWidth = 2.5.dp,
+                    modifier = Modifier.size(30.dp)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Mendeteksi anime & memuat Karakter/Staff AniList...",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 12.5.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+        return
+    }
+
+    if (creditsData == null && !errorMessage.isNullOrBlank()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = errorMessage,
+                    color = Color(0xFFCBD5E1),
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF1A1C24))
+                        .border(1.dp, Color(0xFF2B3040), RoundedCornerShape(10.dp))
+                        .clickable { onRetry() }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Muat ulang",
+                        tint = ColorAccentPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Coba Muat Ulang",
+                        color = Color.White,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+        return
+    }
+
+    val data = creditsData
+    val languages = data?.availableVaLanguages.orEmpty()
+    val characters = data?.characters.orEmpty()
+    val staffList = data?.staff.orEmpty()
+
+    var isLangMenuExpanded by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Header Kontrol: Segmented Karakter / Staff + Filter Bahasa Seiyuu
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF11131A))
+                    .border(1.dp, Color(0xFF1E222E), RoundedCornerShape(10.dp))
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                CreditsSectionTab.entries.forEach { section ->
+                    val active = selectedSection == section
+                    val count = if (section == CreditsSectionTab.CHARACTERS) characters.size else staffList.size
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (active) ColorAccentPrimary else Color.Transparent)
+                            .clickable { onSelectSection(section) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${section.label} ($count)",
+                            color = if (active) Color.White else Color(0xFF94A3B8),
+                            fontSize = 12.sp,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            if (selectedSection == CreditsSectionTab.CHARACTERS && languages.isNotEmpty()) {
+                Box {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF11131A))
+                            .border(1.dp, Color(0xFF1E222E), RoundedCornerShape(10.dp))
+                            .clickable { isLangMenuExpanded = true }
+                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = selectedVaLanguage,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Pilih Bahasa Seiyuu",
+                            tint = Color(0xFF94A3B8),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = isLangMenuExpanded,
+                        onDismissRequest = { isLangMenuExpanded = false },
+                        modifier = Modifier
+                            .background(Color(0xFF161922))
+                            .border(1.dp, Color(0xFF232838), RoundedCornerShape(8.dp))
+                    ) {
+                        languages.forEach { lang ->
+                            val isLangSelected = lang.equals(selectedVaLanguage, ignoreCase = true)
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = lang,
+                                        color = if (isLangSelected) ColorAccentPrimary else Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isLangSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                onClick = {
+                                    onSelectVaLanguage(lang)
+                                    isLangMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Caption kecocokan AniList + tombol refresh manual
+        if (data != null && data.matchedTitle.isNotBlank()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "AniList: ${data.matchedTitle}",
+                    color = Color(0xFF64748B),
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Segarkan data AniList",
+                    tint = Color(0xFF64748B),
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clickable { onRetry() }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        if (selectedSection == CreditsSectionTab.CHARACTERS) {
+            if (characters.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Belum ada data karakter di AniList untuk judul ini.",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 13.sp
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 72.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(characters, key = { it.id }) { character ->
+                        val matchedVa = character.voiceActors.firstOrNull {
+                            it.language.equals(selectedVaLanguage, ignoreCase = true)
+                        }
+                        PairedCharacterCard(
+                            character = character,
+                            voiceActorName = matchedVa?.name,
+                            voiceActorLanguage = matchedVa?.language,
+                            voiceActorImage = matchedVa?.imageUrl,
+                            onImageClick = onImageClick
+                        )
+                    }
+                }
+            }
+        } else {
+            if (staffList.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Belum ada data staff produksi di AniList untuk judul ini.",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 13.sp
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 72.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(staffList, key = { it.id }) { staff ->
+                        StaffCreditCard(
+                            staff = staff,
+                            onImageClick = onImageClick
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PairedCharacterCard(
+    character: AniListCharacterEntry,
+    voiceActorName: String?,
+    voiceActorLanguage: String?,
+    voiceActorImage: String?,
+    onImageClick: (String) -> Unit
+) {
+    val isMain = character.role.equals("MAIN", ignoreCase = true)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(92.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF11131A))
+            .border(1.dp, Color(0xFF1E222E), RoundedCornerShape(12.dp)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Kiri: Karakter
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(62.dp)
+                    .fillMaxHeight()
+                    .background(Color(0xFF181922))
+                    .clickable(enabled = !character.imageUrl.isNullOrBlank()) {
+                        character.imageUrl?.let(onImageClick)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (!character.imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(character.imageUrl)
+                            .crossfade(true)
+                            .placeholder(R.drawable.placeholder_yuranime)
+                            .error(R.drawable.placeholder_yuranime)
+                            .build(),
+                        contentDescription = character.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = Color(0xFF475569),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = character.name,
+                    color = ColorTextPrimary,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    lineHeight = 16.sp,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = character.formattedRole(),
+                    color = if (isMain) Color(0xFFF43F5E) else Color(0xFF94A3B8),
+                    fontSize = 11.sp,
+                    fontWeight = if (isMain) FontWeight.Bold else FontWeight.Medium
+                )
+            }
+        }
+
+        // Pemisah vertikal halus
+        Box(
+            modifier = Modifier
+                .width(1.dp)
+                .fillMaxHeight()
+                .background(Color(0xFF1E222E))
+        )
+
+        // Kanan: Voice Actor / Seiyuu
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = voiceActorName ?: "-",
+                    color = if (voiceActorName != null) Color(0xFFE2E8F0) else Color(0xFF64748B),
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.End,
+                    maxLines = 2,
+                    lineHeight = 16.sp,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = voiceActorLanguage ?: "Seiyuu tidak tersedia",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 10.5.sp,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .width(62.dp)
+                    .fillMaxHeight()
+                    .background(Color(0xFF181922))
+                    .clickable(enabled = !voiceActorImage.isNullOrBlank()) {
+                        voiceActorImage?.let(onImageClick)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (!voiceActorImage.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(voiceActorImage)
+                            .crossfade(true)
+                            .placeholder(R.drawable.placeholder_yuranime)
+                            .error(R.drawable.placeholder_yuranime)
+                            .build(),
+                        contentDescription = voiceActorName ?: "Seiyuu",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = Color(0xFF475569),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StaffCreditCard(
+    staff: AniListStaffEntry,
+    onImageClick: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(76.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF11131A))
+            .border(1.dp, Color(0xFF1E222E), RoundedCornerShape(12.dp)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(56.dp)
+                .fillMaxHeight()
+                .background(Color(0xFF181922))
+                .clickable(enabled = !staff.imageUrl.isNullOrBlank()) {
+                    staff.imageUrl?.let(onImageClick)
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            if (!staff.imageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(staff.imageUrl)
+                        .crossfade(true)
+                        .placeholder(R.drawable.placeholder_yuranime)
+                        .error(R.drawable.placeholder_yuranime)
+                        .build(),
+                    contentDescription = staff.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    tint = Color(0xFF475569),
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = staff.name,
+                color = ColorTextPrimary,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (!staff.nativeName.isNullOrBlank()) {
+                Text(
+                    text = staff.nativeName,
+                    color = Color(0xFF64748B),
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = staff.role,
+                color = Color(0xFFF87171),
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

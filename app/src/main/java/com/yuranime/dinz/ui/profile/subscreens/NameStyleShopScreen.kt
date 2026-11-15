@@ -72,7 +72,7 @@ import com.yuranime.dinz.data.firebase.NameStyleTier
 import com.yuranime.dinz.ui.components.PrimoPointIcon
 import com.yuranime.dinz.ui.components.StyledUsernameText
 import com.yuranime.dinz.ui.components.parseNameStyleColor
-import com.yuranime.dinz.ui.theme.SfProFontFamily
+import com.yuranime.dinz.ui.theme.ManropeFontFamily
 import kotlinx.coroutines.launch
 
 /**
@@ -273,7 +273,7 @@ fun NameStyleShopScreen(
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily,
+                        fontFamily = ManropeFontFamily,
                         modifier = Modifier.weight(1f)
                     )
 
@@ -294,7 +294,7 @@ fun NameStyleShopScreen(
                             color = Color.White,
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
+                            fontFamily = ManropeFontFamily
                         )
                     }
                 }
@@ -325,7 +325,7 @@ fun NameStyleShopScreen(
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 letterSpacing = 0.6.sp,
-                                fontFamily = SfProFontFamily,
+                                fontFamily = ManropeFontFamily,
                                 style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
                             )
                         }
@@ -335,7 +335,7 @@ fun NameStyleShopScreen(
                             color = Color(0xFF94A3B8),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            fontFamily = SfProFontFamily
+                            fontFamily = ManropeFontFamily
                         )
                     }
 
@@ -380,7 +380,7 @@ fun NameStyleShopScreen(
                             color = Color.White,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
+                            fontFamily = ManropeFontFamily
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         NameStyleTierPill(tier = selectedStyle.tier)
@@ -501,7 +501,7 @@ private fun NameStyleTierPill(tier: NameStyleTier) {
             color = Color.White,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            fontFamily = SfProFontFamily,
+            fontFamily = ManropeFontFamily,
             style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
         )
     }
@@ -567,14 +567,14 @@ private fun NameStyleSectionHeader(
             fontSize = 11.5.sp,
             fontWeight = FontWeight.ExtraBold,
             letterSpacing = 1.4.sp,
-            fontFamily = SfProFontFamily
+            fontFamily = ManropeFontFamily
         )
         Text(
             text = count.toString(),
             color = Color(0xFF64748B),
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
-            fontFamily = SfProFontFamily
+            fontFamily = ManropeFontFamily
         )
     }
 }
@@ -628,7 +628,7 @@ private fun NameStyleCatalogRow(
                 color = if (isSelected) Color.White else Color(0xFFE2E8F0),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
-                fontFamily = SfProFontFamily,
+                fontFamily = ManropeFontFamily,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.width(80.dp)
@@ -663,7 +663,7 @@ private fun NameStyleCatalogRow(
                             color = Color(0xFFFDA4AF),
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily,
+                            fontFamily = ManropeFontFamily,
                             style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
                         )
                     }
@@ -674,7 +674,7 @@ private fun NameStyleCatalogRow(
                         color = Color(0xFF4ADE80),
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.SemiBold,
-                        fontFamily = SfProFontFamily
+                        fontFamily = ManropeFontFamily
                     )
                 }
                 else -> {
@@ -686,7 +686,7 @@ private fun NameStyleCatalogRow(
                             color = Color(0xFFFACC15),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
+                            fontFamily = ManropeFontFamily
                         )
                     }
                 }
@@ -768,7 +768,7 @@ private fun NameStyleBottomActionBar(
                             color = if (canAfford) Color.White else Color(0xFF94A3B8),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
+                            fontFamily = ManropeFontFamily
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         PrimoPointIcon(size = 18.dp)
@@ -778,7 +778,7 @@ private fun NameStyleBottomActionBar(
                             color = if (canAfford) Color.White else Color(0xFFFACC15),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
+                            fontFamily = ManropeFontFamily
                         )
                     }
                 } else {
@@ -787,7 +787,7 @@ private fun NameStyleBottomActionBar(
                         color = if (isEquipped) Color(0xFFE2E8F0) else Color.White,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
+                        fontFamily = ManropeFontFamily
                     )
                 }
             }
@@ -799,7 +799,7 @@ private fun NameStyleBottomActionBar(
                     color = Color(0xFFFBBF24),
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Medium,
-                    fontFamily = SfProFontFamily,
+                    fontFamily = ManropeFontFamily,
                     modifier = Modifier.clickable(onClick = onNavigateToRewards)
                 )
             } else if (!isOwned && canAfford) {
@@ -808,7 +808,7 @@ private fun NameStyleBottomActionBar(
                     text = "Saldo saat ini: ${FirebaseManager.formatNumber(userPoints)} Primo Poin",
                     color = Color(0xFF64748B),
                     fontSize = 11.5.sp,
-                    fontFamily = SfProFontFamily
+                    fontFamily = ManropeFontFamily
                 )
             }
         }

@@ -1652,3 +1652,29 @@ Mengacu pada tata letak referensi `WA_1794546770520.jpg` (`1002213252.jpg`) deng
 
 ### B. Anti-Kliping Daftar Level & Estimator (`LevelProgressDialog.kt`)
 - Menambahkan `Modifier.clipToBounds()` dan `contentPadding = PaddingValues(vertical = 10.dp)` pada kedua `LazyColumn` (tab `"Level & Estimator"` serta tab `"Role & Lencana"`), memastikan setiap kartu level dan baris `"Bonus Custom Title:"` + `GeometricTitleBadge` memakai `FlowRow` bermargin aman dan tinggi fleksibel agar teks deskripsi atas maupun bawah tidak pernah terpotong tepi viewport dialog.
+
+---
+
+## 52. Paritas Font & Animasi `YuraStyle`, Multi-Source `Skip Intro`/`Outro` Tanpa Hardcode, & `Karakter & Staff` AniList
+
+### A. Paritas Font & Efek `wibutime` (`res/font/`, `Type.kt`, `StyledUsernameText.kt`, `NameStyleShopScreen.kt`)
+- Membundel keluarga font asli dari hasil reverse engineering `wibutime` ke `res/font/` dan `Type.kt`:
+  - `PlusJakartaFontFamily` (`plus_jakarta_sans_semibold/bold/extrabold.ttf`) untuk style dasar (`Star`, `Twilight`, `Slash`, `Sonar`, `Ruby`, `Wave`).
+  - `ManropeFontFamily` (`manrope_regular/medium/semibold/bold/extrabold.ttf`) untuk UI Chrome & katalog `NameStyleShopScreen`.
+  - `TourneyItalicFontFamily` (`tourney_italic_variable.ttf`, sumbu variabel `'wght'` `400..900` + `'wdth' = 100f`, `FontStyle.Italic`) khusus style `Glitch`.
+  - `PiedraFontFamily` (`piedra_regular.ttf`) khusus style `Magma`.
+- Menyempurnakan ke-8 renderer di `StyledUsernameText.kt` dengan jangkar batas teks aktif (`lineBoundsX`): `Slash` membelah dua sisi secara diagonal dengan `clipPath` miring + bilah katana & percikan tegak lurus; `Sonar` memancarkan sapuan ping radial dari pusat nama dengan 3 cincin radar konsentris (`3400ms`); `Star` menempatkan kilau bintang utama di tepi sudut kanan atas & perimeter huruf tanpa menutupi karakter; `Glitch`, `Magma`, `Twilight`, `Ruby`, dan `Wave` diselaraskan ke ritme serta palet spesifikasi `wibutime`.
+
+### B. Sistem `Skip Intro` & `Skip Outro` Multi-Source Otomatis (`ExternalAnimeModels.kt`, `AnimeExternalCacheStore.kt`, `AnimeIdentityResolver.kt`, `SkipTimestampsRepository.kt`, `StreamingViewModel.kt`, `StreamingScreen.kt`)
+- **Resolver Identitas Lintas Bahasa & Sinonim (`AnimeIdentityResolver`):** Menormalisasi judul lokal (termasuk membersihkan tag fansub dan angka season/part), mencocokkan variasi Romaji/Inggris/Native/Sinonim terhadap AniList GraphQL dan Jikan v4 dengan pembobotan teks, Hepburn folding (`ou->o`, `uu->u`), tahun rilis, jumlah episode, serta format, lalu memperkaya silang ID (`anilistId`, `malId`, `tmdbId`, `tmdbSeason`, `anidbId`) via Yuna Relations v2 & `api.ani.zip`.
+- **Rantai Fallback Terverifikasi (`SkipTimestampsRepository`):**
+  1. Prioritas 1: **AniSkip API v2** (`/v2/skip-times/{malId}/{episode}`) untuk rentang `op`/`ed`.
+  2. Prioritas 2 Fallback: **TheIntroDB API v3** (`/v3/media?tmdb_id=...&season=...&episode=...`) untuk segmen `intro`/`credits` bila AniSkip kosong/404.
+  3. Prioritas 3 Fallback: **Open Anime Timestamps** (`timestamps.json` berbasis `anidbId`) hanya bila batas `start` & `end` eksplisit tersedia di database.
+  - Menghapus total hardcode `+85 detik` / heuristic `>= 180_000L` di `StreamingScreen.kt`. Jika semua sumber API kosong, tombol tidak ditampilkan sama sekali dan auto-skip tidak dijalankan.
+- **Kontrol Player Real-Time & Cache Persisten (`AnimeExternalCacheStore`):** Menyimpan hasil mapping ID & timestamp di `filesDir/yuranime_media_cache/`, memantau posisi playback tiap `250ms` serta saat seek, menampilkan `"Skip Intro"` / `"Skip Outro"` hanya di dalam `[startMs, endMs)`, melompat langsung ke `endMs` saat diklik, dan otomatis bersembunyi setelah melewati `endMs`.
+
+### C. Tab `Karakter & Staff` AniList (`AniListCharacterRepository.kt`, `AnimeDetailUiState.kt`, `AnimeDetailViewModel.kt`, `AnimeDetailScreen.kt`)
+- Menambahkan tab `DetailTab.CREDITS` (`"KARAKTER & STAFF"`) pada `AnimeDetailScreen` beserta kartu akses cepat di akhir tab `INFO`.
+- Menggunakan `AnimeIdentityResolver` untuk mencocokkan judul anime secara otomatis ke AniList GraphQL dan memuat daftar Karakter (`MAIN`/`SUPPORTING`/`BACKGROUND`) beserta pengisi suara multi-bahasa serta daftar Staff produksi.
+- Menyajikan segmented switcher (`Karakter` / `Staff`), filter dropdown bahasa seiyuu (`Japanese`, `English`, dll. sesuai data AniList), dan kartu horizontal berpasangan berdesain obsidian `#11131A` dengan divider tipis `#1E222E` serta dukungan pratinjau foto layar penuh.

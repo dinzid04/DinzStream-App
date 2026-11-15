@@ -30,6 +30,7 @@ class YuranimeApp : Application(), ImageLoaderFactory {
             } catch (ignored: Exception) {}
         }
         com.yuranime.dinz.data.local.AppPreferences.init(this)
+        com.yuranime.dinz.data.local.AnimeExternalCacheStore.init(this)
         try {
             coil.Coil.setImageLoader(this)
         } catch (ignored: Exception) {}

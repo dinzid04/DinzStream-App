@@ -5,6 +5,7 @@ import com.yuranime.dinz.data.model.EpisodeCommentItem
 import com.yuranime.dinz.data.model.EpisodeItem
 import com.yuranime.dinz.data.model.MovieDetailData
 import com.yuranime.dinz.data.model.ServerItem
+import com.yuranime.dinz.data.model.SkipSegment
 
 enum class SettingsSubMenu {
     MAIN,
@@ -49,6 +50,10 @@ data class StreamingUiState(
     val isFullScreen: Boolean = false,
     val isLocked: Boolean = false,
     val autoNextEpisode: Boolean = true,
+    // Multi-source verified Skip Intro / Skip Outro
+    val introSegment: SkipSegment? = null,
+    val outroSegment: SkipSegment? = null,
+    val skipSourceLabel: String? = null,
     // Overlays / Sheets
     val isServerPickerOpen: Boolean = false,
     val isLoveItDialogOpen: Boolean = false,
