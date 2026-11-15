@@ -645,6 +645,12 @@ fun ChatStickerPanel(
                                             is StickerGridEntry.Header -> "hdr_${entry.sectionKey}_$idx"
                                             is StickerGridEntry.Cell -> "stk_${entry.sectionKey}_${entry.keySuffix}_${entry.item.url}"
                                         }
+                                    },
+                                    contentType = { _, entry ->
+                                        when (entry) {
+                                            is StickerGridEntry.Header -> "header"
+                                            is StickerGridEntry.Cell -> "sticker_cell"
+                                        }
                                     }
                                 ) { _, entry ->
                                     if (entry is StickerGridEntry.Cell) {
@@ -722,7 +728,8 @@ fun ChatStickerPanel(
                     ) {
                         itemsIndexed(
                             items = searchResults,
-                            key = { _, pack -> pack.id }
+                            key = { _, pack -> pack.id },
+                            contentType = { _, _ -> "search_pack" }
                         ) { _, pack ->
                             Column(
                                 modifier = Modifier
@@ -833,6 +840,12 @@ fun ChatStickerPanel(
                                 when (entry) {
                                     is StickerGridEntry.Header -> "hdr_${entry.sectionKey}_$idx"
                                     is StickerGridEntry.Cell -> "stk_${entry.sectionKey}_${entry.keySuffix}_${entry.item.url}"
+                                }
+                            },
+                            contentType = { _, entry ->
+                                when (entry) {
+                                    is StickerGridEntry.Header -> "header"
+                                    is StickerGridEntry.Cell -> "sticker_cell"
                                 }
                             },
                             span = { _, entry ->
@@ -1002,13 +1015,15 @@ private fun StickerImageWithPngFallback(
     url: String,
     contentDescription: String,
     contentScale: ContentScale,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sizePx: Int = 120
 ) {
     val context = LocalContext.current
     var resolvedUrl by remember(url) { mutableStateOf(url) }
-    AsyncImage(
-        model = ImageRequest.Builder(context)
+    val request = remember(context, resolvedUrl, sizePx) {
+        ImageRequest.Builder(context)
             .data(resolvedUrl)
+            .size(sizePx, sizePx)
             .crossfade(false)
             .memoryCachePolicy(CachePolicy.ENABLED)
             .diskCachePolicy(CachePolicy.ENABLED)
@@ -1023,7 +1038,10 @@ private fun StickerImageWithPngFallback(
                     }
                 }
             )
-            .build(),
+            .build()
+    }
+    AsyncImage(
+        model = request,
         contentDescription = contentDescription,
         contentScale = contentScale,
         modifier = modifier

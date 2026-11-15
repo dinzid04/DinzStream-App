@@ -142,11 +142,13 @@ import com.yuranime.dinz.ui.components.PredictiveBackItemOverlay
 import com.yuranime.dinz.ui.components.PrimoPointIcon
 import com.yuranime.dinz.ui.components.RpgSvgIconCatalog
 import com.yuranime.dinz.ui.components.StatusMicroTitleTagRow
+import com.yuranime.dinz.ui.components.StyledUsernameText
 import com.yuranime.dinz.ui.components.VerifiedBadgeIcon
 import com.yuranime.dinz.ui.components.liquidGlassBackdrop
 import com.yuranime.dinz.ui.leaderboard.LeaderboardScreen
 import com.yuranime.dinz.ui.profile.subscreens.DownloadsScreen
 import com.yuranime.dinz.ui.profile.subscreens.EditProfileScreen
+import com.yuranime.dinz.ui.profile.subscreens.NameStyleShopScreen
 import com.yuranime.dinz.ui.profile.subscreens.PointsRewardsScreen
 import com.yuranime.dinz.ui.profile.subscreens.SettingsScreen
 import com.yuranime.dinz.ui.profile.subscreens.ShopScreen
@@ -163,6 +165,7 @@ import kotlinx.coroutines.withContext
 enum class ProfileSubScreen {
     MAIN,
     EDIT_PROFILE,
+    NAME_STYLE_SHOP,
     LEADERBOARD,
     POINTS_REWARDS,
     SHOP,
@@ -392,13 +395,26 @@ fun LoginProfileScreen(
         PredictiveBackItemOverlay(
             targetItem = currentSubScreen.takeIf { it != ProfileSubScreen.MAIN },
             isTopmost = isTabActive && currentSubScreen != ProfileSubScreen.MAIN,
-            onBack = { currentSubScreen = ProfileSubScreen.MAIN }
+            onBack = {
+                currentSubScreen = if (currentSubScreen == ProfileSubScreen.NAME_STYLE_SHOP) {
+                    ProfileSubScreen.EDIT_PROFILE
+                } else {
+                    ProfileSubScreen.MAIN
+                }
+            }
         ) { subScreen ->
             when (subScreen) {
                 ProfileSubScreen.EDIT_PROFILE -> {
                     EditProfileScreen(
                         authDb = authDb,
-                        onBackClick = { currentSubScreen = ProfileSubScreen.MAIN }
+                        onBackClick = { currentSubScreen = ProfileSubScreen.MAIN },
+                        onOpenNameStyleShop = { currentSubScreen = ProfileSubScreen.NAME_STYLE_SHOP }
+                    )
+                }
+                ProfileSubScreen.NAME_STYLE_SHOP -> {
+                    NameStyleShopScreen(
+                        onBackClick = { currentSubScreen = ProfileSubScreen.EDIT_PROFILE },
+                        onNavigateToRewards = { currentSubScreen = ProfileSubScreen.POINTS_REWARDS }
                     )
                 }
                 ProfileSubScreen.LEADERBOARD -> {
@@ -437,6 +453,17 @@ fun LoginProfileScreen(
                 ProfileSubScreen.SETTINGS -> {
                     SettingsScreen(
                         onBackClick = { currentSubScreen = ProfileSubScreen.MAIN },
+                        onNavigateToDownloads = { currentSubScreen = ProfileSubScreen.DOWNLOADS },
+                        onSignOutClick = {
+                            FirebaseManager.signOut(context)
+                            authDb.setLoggedIn(false)
+                            currentSubScreen = ProfileSubScreen.MAIN
+                            Toast.makeText(
+                                context,
+                                "Berhasil keluar dari akun",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
                         onCheckUpdateClick = onCheckUpdateClick
                     )
                 }
@@ -493,7 +520,14 @@ private fun UserProfileView(
     val equippedTitleVariant = profile?.equippedTitleVariant ?: 0
     val equippedBorderUrl = profile?.equippedBorderUrl.orEmpty()
     val equippedProfileEffectUrl = profile?.equippedProfileEffectUrl.orEmpty()
-    val cosmeticAnimate = profile?.cosmeticAnimate ?: true
+    val viewerCosmeticAnimate by AppPreferences.cosmeticAnimate.collectAsState()
+    val cosmeticAnimate = if (profile != null) profile.cosmeticAnimate else viewerCosmeticAnimate
+    val prefShowMiniTitle by AppPreferences.showMiniTitle.collectAsState()
+    val prefShowCustomTitle by AppPreferences.showCustomTitle.collectAsState()
+    val prefShowRole by AppPreferences.showRole.collectAsState()
+    val showMiniTitle = if (profile != null) profile.showMiniTitle else prefShowMiniTitle
+    val showCustomTitle = if (profile != null) profile.showCustomTitle else prefShowCustomTitle
+    val showRole = if (profile != null) profile.showRole else prefShowRole
 
     // URUTAN 2 & 3: Jeda 2 detik sebelum Profile Effect muncul + Preload seluruh multi-layer
     var isEffectReadyToShow by remember { mutableStateOf(false) }
@@ -709,14 +743,16 @@ private fun UserProfileView(
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = displayName,
-                    color = Color.White,
+                StyledUsernameText(
+                    name = displayName,
+                    styleId = profile?.equippedNameStyle,
+                    colorHex = profile?.equippedNameColor,
                     fontSize = 24.sp,
+                    defaultColor = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    animate = cosmeticAnimate,
                     modifier = Modifier
                         .weight(1f, fill = false)
                         .alignByBaseline()
@@ -804,36 +840,38 @@ private fun UserProfileView(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { onOpenLevelProgressClick() }
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Image(
-                        painter = painterResource(id = roleSpec.iconRes),
-                        contentDescription = null,
-                        colorFilter = ColorFilter.tint(roleAccent),
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Spacer(modifier = Modifier.width(5.dp))
-                    Text(
-                        text = role.uppercase(),
-                        color = if (roleSpec.isExclusiveStaff) roleAccent else Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
-                    )
-                }
+                if (showRole) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { onOpenLevelProgressClick() }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Image(
+                            painter = painterResource(id = roleSpec.iconRes),
+                            contentDescription = null,
+                            colorFilter = ColorFilter.tint(roleAccent),
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = role.uppercase(),
+                            color = if (roleSpec.isExclusiveStaff) roleAccent else Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SfProFontFamily
+                        )
+                    }
 
-                Spacer(modifier = Modifier.width(10.dp))
-                VerticalDivider(
-                    modifier = Modifier.height(12.dp),
-                    thickness = 1.dp,
-                    color = Color(0xFF262934)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    VerticalDivider(
+                        modifier = Modifier.height(12.dp),
+                        thickness = 1.dp,
+                        color = Color(0xFF262934)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                }
 
                 Row(
                     modifier = Modifier
@@ -858,48 +896,53 @@ private fun UserProfileView(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(10.dp))
-                VerticalDivider(
-                    modifier = Modifier.height(12.dp),
-                    thickness = 1.dp,
-                    color = Color(0xFF262934)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
+                if (showMiniTitle) {
+                    Spacer(modifier = Modifier.width(10.dp))
+                    VerticalDivider(
+                        modifier = Modifier.height(12.dp),
+                        thickness = 1.dp,
+                        color = Color(0xFF262934)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Outlined.Diamond,
-                        contentDescription = null,
-                        tint = Color(0xFFE11D48),
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Spacer(modifier = Modifier.width(5.dp))
-                    Text(
-                        text = rankTitle.uppercase(),
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Outlined.Diamond,
+                            contentDescription = null,
+                            tint = Color(0xFFE11D48),
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = rankTitle.uppercase(),
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SfProFontFamily,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            if (showCustomTitle) {
+                Spacer(modifier = Modifier.height(12.dp))
 
-            // Baris 6: Slot Custom Title Badge
-            if (equippedTitle.isNotBlank()) {
-                GeometricTitleBadge(
-                    titleName = equippedTitle,
-                    tierLevel = equippedTitleTier,
-                    styleVariant = equippedTitleVariant,
-                    onClick = { if (!isPublicPreviewMode) onOpenTitleSlotClick() }
-                )
-            } else {
-                EmptyTitleSlotBadge(
-                    onClick = { if (!isPublicPreviewMode) onOpenTitleSlotClick() }
-                )
+                // Baris 6: Slot Custom Title Badge
+                if (equippedTitle.isNotBlank()) {
+                    GeometricTitleBadge(
+                        titleName = equippedTitle,
+                        tierLevel = equippedTitleTier,
+                        styleVariant = equippedTitleVariant,
+                        isAnimated = cosmeticAnimate,
+                        onClick = { if (!isPublicPreviewMode) onOpenTitleSlotClick() }
+                    )
+                } else {
+                    EmptyTitleSlotBadge(
+                        onClick = { if (!isPublicPreviewMode) onOpenTitleSlotClick() }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))

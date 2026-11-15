@@ -1586,3 +1586,69 @@ Mengacu pada tata letak referensi `WA_1794546770520.jpg` (`1002213252.jpg`) deng
 - Mengaktifkan `com.google.firebase:firebase-database-ktx`, memperbarui `app/google-services.json` (project `dinz-62119`, URL RTDB `asia-southeast1`, dukungan SHA-1 debug & release), dan menyesuaikan fallback `FirebaseOptions` di `YuranimeApp.kt`.
 - Memindahkan `global_chat_messages` (`orderByChild("timestamp").limitToLast(120)`, `ServerValue.TIMESTAMP`, `push()`) dan `chat_presence` (`.info/connected` auto-rearm + `.onDisconnect().removeValue()`, `PRESENCE_TTL_MS = 300_000L`) sepenuhnya ke Firebase Realtime Database serta menghapus loop polling 20 detik di `GlobalChatScreen.kt`.
 - Mengganti listener koleksi penuh Firestore `users` di `GlobalChatRepository.kt` dengan query `whereIn(FieldPath.documentId(), chunk)` per batch 30 UID yang benar-benar tampil di riwayat pesan & kutipan reply.
+
+---
+
+## 48. Fitur `YuraStyle` / `Style Nama` Hasil Reverse Engineering `wibutime` (`StyledUsernameText.kt`, `NameStyleShopScreen.kt`, `FirebaseManager.kt`)
+
+### A. Kontrak Engine Render & Palet `Style Nama` (`StyledUsernameText.kt`, `FirebaseManager.kt`)
+- **8 Style Nama & Tier Harga Primo Poin:**
+  - `MYTHIC` (`4.500` Poin): `Star` (`star`), `Twilight` (`twilight`), `Slash` (`slash`), `Glitch` (`glitch`), `Magma` (`magma`), `Sonar` (`sonar`).
+  - `LEGENDARY` (`2.000` Poin): `Ruby` (`ruby`), `Wave` (`wave`).
+- **8 Swatch Warna Bebas (`NAME_STYLE_SWATCHES`):** Emerald Green (`#4ADE80`), Amber Gold (`#FACC15`), Sky Cyan (`#38BDF8`), Royal Purple (`#A855F7`), Crimson Ruby (`#F43F5E`), Silver Mist (`#94A3B8`), Pure White (`#FFFFFF`), Mint Teal (`#2DD4BF`). Pengguna bebas mengganti warna pada preview dan style yang sudah dimiliki tanpa kunci premium tambahan.
+- **Zero-Recomposition Draw-Phase Renderer (`StyledUsernameText`):** Seluruh rumus animasi hasil reverse engineering `wibutime` (`Wave` per-grapheme cosine oscillation `1800ms`, `Ruby` diagonal specular sheen `2200ms`, `Star` 4-point sparkles, `Twilight` cosmic shimmer + fireflies, `Slash` katana diagonal beam + cyan/magenta split, `Glitch` italic `46ms` quantized slice & RGB ghosts, `Magma` `16°` molten gradient + rising embers, `Sonar` ping-pong vertical radar scan beam) berjalan strictly di dalam `drawWithCache` + `onDrawWithContent` tanpa memicu recomposition frame-by-frame, dengan `timeMillisProvider` opsional untuk berbagi clock tunggal pada daftar berskala besar.
+
+### B. Akses, Hierarki UI & Sinkronisasi Global (`NameStyleShopScreen.kt`, `EditProfileScreen.kt`, `GlobalChatRepository.kt`, `LoginProfileScreen.kt`, `ChatBubbleComponents.kt`, `GlobalChatScreen.kt`, `PeerProfileBottomSheet.kt`, `LeaderboardScreen.kt`)
+- **Titik Masuk Khusus:** Diakses melalui kartu navigasi `"Gaya & Animasi Nama (Name Style)"` di dalam `EditProfileScreen.kt` (via `ProfileSubScreen.NAME_STYLE_SHOP` di `LoginProfileScreen.kt` dengan dukungan Predictive Back kembali ke `EDIT_PROFILE`).
+- **Tata Letak `NameStyleShopScreen`:**
+  - Header pojok kiri atas memakai panah kembali `<` bersih tanpa overlay/kotak bayangan + judul `YuraStyle` (`20.sp` SF Pro Bold).
+  - Watermark siluet logo `R.drawable.ic_yuranime_monochrome` (`alpha = 0.07f`) menyatu langsung pada latar `#0B0B0E`.
+  - Pojok kanan atas hanya menampilkan 1 kapsul saldo `PrimoPointIcon` + jumlah Poin (tanpa kapsul koin).
+  - Live Preview `34.sp` Bold di bawah badge `MILIKMU` (`#E11D48`) + `[owned] dari 8`, 8 lingkaran swatch warna `28.dp`, daftar 2 kategori (`MYTHIC` & `LEGENDARY`), dan 1 tombol CTA bawah adaptif (`Beli [Primo] [Harga]` / `Pasang Style Nama` / `Lepas Style Nama`).
+- **Sinkronisasi Real-Time & Tampil Lintas Pengguna:** Field `equippedNameStyle`, `equippedNameColor`, dan `unlockedNameStyles` tersimpan lokal & Firestore `users/{uid}`, disisipkan ke payload RTDB chat (`equippedNameStyle`, `equippedNameColor`, `replyToNameStyle`, `replyToNameColor`) dan overlay real-time `mergeLiveUserOverlay`, serta dirender konsisten di Profil, Bubble Global Chat, Kutipan Reply, Bar Membalas, `PeerProfileBottomSheet`, dan `LeaderboardScreen`.
+
+---
+
+## 49. Optimasi 60/120 FPS Chat Global, Render Inline Stiker Reply & Redesign Composer (`GlobalChatScreen.kt`, `ChatBubbleComponents.kt`, `ChatStickerPanel.kt`, `GeometricTitleBadge.kt`, `InlineStickerComposer.kt`, `GlobalChatRepository.kt`, `StickerRepository.kt`)
+
+### A. Single Shared Animation Clock & Zero-Recomposition Draw Phase
+- Menghapus `rememberInfiniteTransition()` per-item pada `GeometricTitleBadge.kt` dan `ChatInlineMiniTitle` (`ChatBubbleComponents.kt`), menggantinya dengan **Single Shared Clock** kontinu berbasis `withInfiniteAnimationFrameMillis` pada `GlobalChatScreen.kt` (`sharedTimeProvider`).
+- Selama `listState.isScrollInProgress == true`, akumulasi delta clock dijeda otomatis tanpa lonjakan frame, dan seluruh efek (`GeometricTitleBadge`, `StyledUsernameText`, `ChatInlineMiniTitle` dengan `CompositingStrategy.Offscreen` + `BlendMode.SrcAtop`) dibaca **strictly di dalam fase Draw** sehingga scroll/fling `LazyColumn` berjalan mulus tanpa recomposition per frame.
+- Membungkus `GlobalChatMessage`, `ChatPresenceUser`, `StickerItem`, dan `StickerPack` dengan `@Immutable`, serta menambahkan `key` + `contentType` pada `LazyColumn` pesan dan `LazyVerticalGrid` stiker.
+
+### B. Render Inline Stiker pada Kutipan Reply, Badge `FlowRow`, & Cache Coil Terukur
+- `InlineStickerCodec.buildReplySnippet` mempertahankan token `[s:URL]` (serta stiker tunggal `[s:stickerUrl]`), dan `GlobalChatRepository.mergeLiveUserOverlay` memperkaya kutipan reply historis berbasis `replyToId` terhadap pesan sumber aktif.
+- `InlineStickerText` merender stiker inline (`16.dp` di kutipan reply & bar membalas, `24.dp` di isi pesan) memakai Coil `ImageRequest` yang di-`remember(...)` berukuran eksplisit `.size(64, 64)` (serta `.size(120, 120)` di `ChatStickerPanel.kt` dan `.size(240, 240)` untuk stiker mandiri) dengan `crossfade(false)` & fallback ikon vektor bila `[Stiker]` historis di luar jendela 120 pesan.
+- Mengganti `Row(...basicMarquee(...))` pada baris badge bubble menjadi `FlowRow` bermargin aman dan memperlebar `endSafePad` pada `GeometricTitleBadge(compact = true)` agar badge panjang seperti `MYTHIC SOVEREIGN` tidak pernah terpotong tepi kanan bubble.
+
+### C. Kesejajaran Bar Input Chat Bawah (`GlobalChatScreen.kt`)
+- Kapsul input bawah (`heightIn(min = 50.dp)`, `RoundedCornerShape(26.dp)`, latar `#14161E`, border `#232734`) menyusun lingkaran tombol `+` (`38.dp`), tombol Emoji/Stiker (`38.dp`), kolom ketik `"Tulis pesan..."` (`weight(1f)` sejajar tengah vertikal), dan tombol Kirim `Icons.AutoMirrored.Rounded.Send` (`38.dp`) bergradien aktif `#E11D48 -> #FF5722`.
+
+---
+
+## 50. Redesign Halaman Pengaturan (`SettingsScreen`), Preferensi Pemutaran Nyata & Kontrol Visibilitas Title/Role (URUTAN 3)
+
+### A. Tata Letak Apple-Style Grouped Dark Cards & Header Anti-Tabrakan (`SettingsScreen.kt`)
+- **Perbaikan Scroll Collision:** Tombol kembali bulat (`38.dp`, `#171A24`, border `#232734`) berada di bar navigasi atas tersendiri (dengan judul ringkas `"Pengaturan"` yang muncul saat di-scroll), sementara judul besar **`PENGATURAN`** (`26.sp` Black putih) + sub-teks `"Sesuaikan pengalaman menonton dan aplikasi."` (`13.5.sp` `#94A3B8`) berada di `item` teratas `LazyColumn` sehingga ikut tergulir ke atas dan tidak pernah bertabrakan dengan baris pengaturan.
+- **Kartu Seksi & Ikon:** Lima seksi ber-tracking label (`11.5.sp` Bold `#64748B`): `PEMUTARAN`, `PENYIMPANAN`, `TAMPILAN`, `TENTANG`, dan `SESI`, masing-masing dibungkus kartu `#11131A` (`RoundedCornerShape(20.dp)`, border `1.dp` `#1E222E`) ber-divider `0.5.dp` `#1C202B`, ubin ikon `34.dp` (`RoundedCornerShape(10.dp)`, `tint.copy(alpha = 0.15f)`), serta toggle custom `IosToggleSwitch` (`#22C55E` ON / `#262A36` OFF) dan footer `Y U R A N I M E` (`letterSpacing = 4.sp`) / `Dibuat dengan presisi`.
+
+### B. Integrasi Fungsional Nyata ke Player, Penyimpanan, Ping Server & Visibilitas
+- **Pemutaran (`AppPreferences` -> `StreamingViewModel` -> `StreamingScreen`):**
+  - **`Kualitas Anime`** (`Auto`, `360p`, `480p`, `720p`, `1080p`) & **`Kecepatan Putar`** (`0.5x` - `2.0x`) dipilih via `ModalBottomSheet` dan otomatis diterapkan saat episode dimuat/dipilih (`resolvePreferredServer` + `PlaybackParameters`).
+  - **`Putar Otomatis`** mengendalikan `exoPlayer.playWhenReady = uiState.autoPlayEnabled` saat episode baru dibuka (`rememberUpdatedState` mencegah *stale state* di `Player.Listener`).
+  - **`Lewati Intro Otomatis`** melewati segmen opening (`+85s`) secara otomatis saat `STATE_READY` pada episode berdurasi `>= 3 menit`, dilengkapi tombol cepat `"Lewati Intro"` di overlay player.
+  - **`Pramuat Episode Berikutnya`** memuat `StreamData` episode berikutnya (`schedulePreloadNextEpisode`) di latar belakang sehingga `selectEpisode` berjalan instan dari memori.
+- **Penyimpanan (`AppPreferences.readAppStorageStats`):** Menghitung kapasitas bebas/total HP secara nyata lewat `StatFs(Environment.getDataDirectory().path)`, jumlah & ukuran unduhan (`offline_comics` / `LocalAuthDatabase`), serta total ukuran `cacheDir` + `externalCacheDir` (`Bersihkan Cache` menghapus isi cache & Coil cache menjadi `0 B`).
+- **Tampilan (`FirebaseManager.setDisplayVisibility` & `setCosmeticAnimate`):** Toggle `Tampilkan Mini-Title`, `Tampilkan Custom Title`, `Tampilkan Role & Lencana`, `Efek Liquid Glass Navbar`, dan `Animasi Kosmetik & Efek` disimpan di `AppPreferences` **dan** disinkronkan ke Firestore `users/{uid}` serta payload/overlay `GlobalChatRepository`, sehingga perubahan langsung berlaku pada Profil, `PeerProfileBottomSheet`, dan Bubble Chat Global.
+- **Tentang & Ping Real-Time:** Membaca `BuildConfig.VERSION_NAME`, `BuildConfig.VERSION_CODE`, `BuildConfig.APPLICATION_ID`, `Build.VERSION.RELEASE`, `Build.VERSION.SDK_INT`, `Build.MANUFACTURER`, `Build.MODEL`, mengukur latensi server via `measureTimeMillis` setiap 5 detik (`Status Server` dengan indikator titik warna `<300ms` hijau / `<=800ms` kuning / `>800ms` atau offline merah), serta modal `Privasi & FAQ`.
+
+---
+
+## 51. Panel Penyimpanan Multi-Segmen `Unduhan` & Perbaikan Kliping `LevelProgressDialog` (URUTAN 4)
+
+### A. Panel Info Penyimpanan `StatFs` Multi-Segmen (`DownloadsScreen.kt`)
+- Menggunakan `AppPreferences.readAppStorageStats(context)` untuk menghitung kapasitas total internal HP, sisa ruang tersedia (`Sisa Ruang: X tersedia dari Y`), total unduhan Yuranime (`Anime & Komik`), ukuran cache aplikasi (`cacheDir` + `externalCacheDir`), serta penggunaan sistem/aplikasi lain.
+- Menampilkan **horizontal multi-segment storage bar** (`10.dp`, 4 segmen: Sistem & Lainnya `#475569`, Unduhan Yuranime gradasi `#E11D48 -> #FF5722`, Cache `#818CF8`, Ruang Tersedia `#1E222E`) dan legend interaktif termasuk aksi cepat **`Hapus Cache`** serta pembaruan real-time tiap kali unduhan dihapus.
+
+### B. Anti-Kliping Daftar Level & Estimator (`LevelProgressDialog.kt`)
+- Menambahkan `Modifier.clipToBounds()` dan `contentPadding = PaddingValues(vertical = 10.dp)` pada kedua `LazyColumn` (tab `"Level & Estimator"` serta tab `"Role & Lencana"`), memastikan setiap kartu level dan baris `"Bonus Custom Title:"` + `GeometricTitleBadge` memakai `FlowRow` bermargin aman dan tinggi fleksibel agar teks deskripsi atas maupun bawah tidak pernah terpotong tepi viewport dialog.

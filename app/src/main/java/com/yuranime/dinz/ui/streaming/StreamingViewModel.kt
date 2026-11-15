@@ -2,9 +2,11 @@ package com.yuranime.dinz.ui.streaming
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.yuranime.dinz.data.local.AppPreferences
 import com.yuranime.dinz.data.model.EpisodeCommentItem
 import com.yuranime.dinz.data.model.EpisodeItem
 import com.yuranime.dinz.data.model.ServerItem
+import com.yuranime.dinz.data.model.StreamData
 import com.yuranime.dinz.data.repository.AnimeRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -18,12 +20,104 @@ class StreamingViewModel(
     private val repository: AnimeRepository = AnimeRepository()
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(StreamingUiState())
+    private val _uiState = MutableStateFlow(
+        StreamingUiState(
+            preferredQuality = AppPreferences.defaultAnimeQuality.value,
+            playbackSpeed = AppPreferences.defaultPlaybackSpeed.value,
+            autoPlayEnabled = AppPreferences.autoPlayEnabled.value,
+            autoSkipIntro = AppPreferences.autoSkipIntro.value,
+            preloadNextEpisode = AppPreferences.preloadNextEpisode.value,
+            autoNextEpisode = AppPreferences.autoNext.value
+        )
+    )
     val uiState: StateFlow<StreamingUiState> = _uiState.asStateFlow()
 
     private var cachedMovieId: String? = null
     private val episodesPageCache = mutableMapOf<Int, List<EpisodeItem>>()
+    private val preloadedStreams = mutableMapOf<String, StreamData>()
     private var episodeJob: Job? = null
+    private var preloadJob: Job? = null
+    private var manualServerSelected: Boolean = false
+
+    fun syncPlaybackPreferences(
+        preferredQuality: String,
+        playbackSpeed: Float,
+        autoPlayEnabled: Boolean,
+        autoSkipIntro: Boolean,
+        preloadNextEpisode: Boolean
+    ) {
+        _uiState.update { state ->
+            val updatedServer = if (!manualServerSelected && state.servers.isNotEmpty()) {
+                resolvePreferredServer(state.servers, preferredQuality) ?: state.selectedServer
+            } else {
+                state.selectedServer
+            }
+            state.copy(
+                preferredQuality = preferredQuality,
+                playbackSpeed = playbackSpeed,
+                autoPlayEnabled = autoPlayEnabled,
+                autoSkipIntro = autoSkipIntro,
+                preloadNextEpisode = preloadNextEpisode,
+                selectedServer = updatedServer
+            )
+        }
+        if (preloadNextEpisode) {
+            schedulePreloadNextEpisode(null, _uiState.value.episodeId)
+        } else {
+            preloadJob?.cancel()
+            preloadedStreams.clear()
+        }
+    }
+
+    private fun resolvePreferredServer(servers: List<ServerItem>, preferredQuality: String): ServerItem? {
+        if (servers.isEmpty()) return null
+        val cleanPref = preferredQuality.trim()
+        if (cleanPref.equals("Auto", ignoreCase = true) || cleanPref.isBlank()) {
+            return servers.firstOrNull { it.quality?.contains("720", ignoreCase = true) == true }
+                ?: servers.firstOrNull { it.quality?.contains("480", ignoreCase = true) == true }
+                ?: servers.firstOrNull()
+        }
+        val numToken = cleanPref.removeSuffix("p")
+        servers.firstOrNull {
+            it.quality?.equals(cleanPref, ignoreCase = true) == true ||
+                it.quality?.contains(numToken, ignoreCase = true) == true
+        }?.let { return it }
+
+        val fallbackOrder = when {
+            cleanPref.contains("1080") -> listOf("1080", "720", "480", "360")
+            cleanPref.contains("720") -> listOf("720", "480", "1080", "360")
+            cleanPref.contains("480") -> listOf("480", "360", "720", "1080")
+            cleanPref.contains("360") -> listOf("360", "480", "720", "1080")
+            else -> listOf("720", "480", "360", "1080")
+        }
+        for (q in fallbackOrder) {
+            servers.firstOrNull { it.quality?.contains(q, ignoreCase = true) == true }?.let { return it }
+        }
+        return servers.firstOrNull()
+    }
+
+    private fun schedulePreloadNextEpisode(streamData: StreamData?, currentEpisodeId: String) {
+        if (!_uiState.value.preloadNextEpisode) return
+        val nextId = streamData?.episodeNext?.id
+            ?: _uiState.value.episodeNext?.id
+            ?: run {
+                val curIdx = _uiState.value.episode?.index?.toIntOrNull()
+                if (curIdx != null) {
+                    _uiState.value.episodes.firstOrNull { it.index == (curIdx + 1).toString() }?.id
+                } else null
+            }
+        if (nextId.isNullOrBlank() || nextId == currentEpisodeId || preloadedStreams.containsKey(nextId)) return
+        preloadJob?.cancel()
+        preloadJob = viewModelScope.launch {
+            val result = repository.getEpisodeStream(nextId)
+            result.getOrNull()?.let { prefetched ->
+                if (preloadedStreams.size >= 4) {
+                    preloadedStreams.keys.firstOrNull()?.let { preloadedStreams.remove(it) }
+                }
+                preloadedStreams[nextId] = prefetched
+            }
+        }
+    }
 
     fun loadStreaming(episodeId: String, movieId: String) {
         if (_uiState.value.episodeId == episodeId && (_uiState.value.selectedServer != null || _uiState.value.isLoading)) {
@@ -37,6 +131,7 @@ class StreamingViewModel(
         }
 
         episodeJob?.cancel()
+        manualServerSelected = false
 
         _uiState.update {
             it.copy(
@@ -55,7 +150,8 @@ class StreamingViewModel(
         }
 
         episodeJob = viewModelScope.launch {
-            val streamResult = repository.getEpisodeStream(episodeId)
+            val streamResult = preloadedStreams.remove(episodeId)?.let { Result.success(it) }
+                ?: repository.getEpisodeStream(episodeId)
             if (streamResult.isFailure) {
                 _uiState.update {
                     it.copy(
@@ -68,10 +164,7 @@ class StreamingViewModel(
 
             val streamData = streamResult.getOrNull()
             val servers = streamData?.servers ?: emptyList()
-            // Default select 720p or highest available resolution
-            val defaultServer = servers.firstOrNull { it.quality == "720p" }
-                ?: servers.firstOrNull { it.quality == "480p" }
-                ?: servers.firstOrNull()
+            val defaultServer = resolvePreferredServer(servers, _uiState.value.preferredQuality)
 
             _uiState.update {
                 it.copy(
@@ -82,6 +175,7 @@ class StreamingViewModel(
                     selectedServer = defaultServer
                 )
             }
+            schedulePreloadNextEpisode(streamData, episodeId)
 
             // Fetch movie detail, comments, covers/posters, and episodes in parallel
             val resolvedMovieId = effectiveMovieId.ifBlank { streamData?.episode?.idMovie ?: "" }
@@ -176,6 +270,7 @@ class StreamingViewModel(
         }
 
         episodeJob?.cancel()
+        manualServerSelected = false
 
         val existingEp = _uiState.value.episodes.firstOrNull { it.id == newEpisodeId }
             ?: _uiState.value.episodes.firstOrNull { newEpisodeNumber != null && it.index == newEpisodeNumber }
@@ -205,7 +300,10 @@ class StreamingViewModel(
         }
 
         episodeJob = viewModelScope.launch {
-            val streamDeferred = async { repository.getEpisodeStream(newEpisodeId) }
+            val streamDeferred = async {
+                preloadedStreams.remove(newEpisodeId)?.let { Result.success(it) }
+                    ?: repository.getEpisodeStream(newEpisodeId)
+            }
             val commentsDeferred = async { repository.getEpisodeComments(newEpisodeId, page = 0, sort = "new") }
 
             val streamResult = streamDeferred.await()
@@ -223,9 +321,7 @@ class StreamingViewModel(
 
             val streamData = streamResult.getOrNull()
             val servers = streamData?.servers ?: emptyList()
-            val defaultServer = servers.firstOrNull { it.quality == "720p" }
-                ?: servers.firstOrNull { it.quality == "480p" }
-                ?: servers.firstOrNull()
+            val defaultServer = resolvePreferredServer(servers, _uiState.value.preferredQuality)
 
             val comments = commentsResult.getOrDefault(emptyList())
 
@@ -241,6 +337,7 @@ class StreamingViewModel(
                     durationMs = 0L
                 )
             }
+            schedulePreloadNextEpisode(streamData, newEpisodeId)
         }
     }
 
@@ -249,6 +346,7 @@ class StreamingViewModel(
     }
 
     fun selectServer(server: ServerItem) {
+        manualServerSelected = true
         // Duration synchronization: preserves currentPositionMs!
         _uiState.update {
             it.copy(

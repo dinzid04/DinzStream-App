@@ -60,6 +60,7 @@ import com.yuranime.dinz.ui.components.ApngStackedEffectView
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.MultiLayerProfileEffectView
 import com.yuranime.dinz.ui.components.RpgSvgIconCatalog
+import com.yuranime.dinz.ui.components.StyledUsernameText
 import com.yuranime.dinz.ui.components.VerifiedBadgeIcon
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import kotlinx.coroutines.Dispatchers
@@ -112,14 +113,20 @@ fun PeerProfileBottomSheet(
     val equippedTitle = latestProfile?.equippedTitle ?: peerMessage.equippedTitle
     val equippedTitleTier = latestProfile?.equippedTitleTier ?: peerMessage.equippedTitleTier
     val equippedTitleVariant = latestProfile?.equippedTitleVariant ?: peerMessage.equippedTitleVariant
+    val equippedNameStyle = latestProfile?.equippedNameStyle ?: peerMessage.equippedNameStyle
+    val equippedNameColor = latestProfile?.equippedNameColor ?: peerMessage.equippedNameColor
     val borderUrl = latestProfile?.equippedBorderUrl ?: peerMessage.equippedBorderUrl
     val effectUrl = latestProfile?.equippedProfileEffectUrl ?: peerMessage.equippedProfileEffectUrl
+    val cosmeticAnimate = latestProfile?.cosmeticAnimate ?: peerMessage.cosmeticAnimate
+    val showMiniTitle = latestProfile?.showMiniTitle ?: peerMessage.showMiniTitle
+    val showCustomTitle = latestProfile?.showCustomTitle ?: peerMessage.showCustomTitle
+    val showRole = latestProfile?.showRole ?: peerMessage.showRole
     val isVerified = latestProfile?.isVerified ?: peerMessage.isVerified
     val verifiedColor = latestProfile?.verifiedColor?.ifBlank { null } ?: peerMessage.verifiedColor
 
-    val animatedBorderUrl = remember(borderUrl) {
+    val animatedBorderUrl = remember(borderUrl, cosmeticAnimate) {
         if (borderUrl.isNotBlank()) {
-            DiscordCosmeticsRepository.getOptimizedUrl(borderUrl, size = 240, animated = true)
+            DiscordCosmeticsRepository.getOptimizedUrl(borderUrl, size = 240, animated = cosmeticAnimate)
         } else ""
     }
     val effectDef = remember(effectUrl, cosmeticsLoaded) {
@@ -250,7 +257,7 @@ fun PeerProfileBottomSheet(
                         if (animatedBorderUrl.isNotBlank()) {
                             AnimatedCosmeticImage(
                                 url = animatedBorderUrl,
-                                isAnimated = true,
+                                isAnimated = cosmeticAnimate,
                                 contentDescription = "Avatar Decoration",
                                 modifier = Modifier.size(96.dp)
                             )
@@ -268,14 +275,16 @@ fun PeerProfileBottomSheet(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = displayName,
-                            color = Color.White,
+                        StyledUsernameText(
+                            name = displayName,
+                            styleId = equippedNameStyle,
+                            colorHex = equippedNameColor,
                             fontSize = 22.sp,
+                            defaultColor = Color.White,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            animate = cosmeticAnimate,
                             modifier = Modifier.weight(1f, fill = false)
                         )
                         if (isVerified) {
@@ -306,33 +315,35 @@ fun PeerProfileBottomSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        val roleSpec = remember(role) { RpgSvgIconCatalog.resolveRoleSpec(role) }
-                        val roleAccent = Color(roleSpec.accentHex)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Image(
-                                painter = painterResource(id = roleSpec.iconRes),
-                                contentDescription = null,
-                                colorFilter = ColorFilter.tint(roleAccent),
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = role.uppercase(Locale.ROOT),
-                                color = if (roleSpec.isExclusiveStaff) roleAccent else Color.White,
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.4.sp,
-                                fontFamily = SfProFontFamily
+                        if (showRole) {
+                            val roleSpec = remember(role) { RpgSvgIconCatalog.resolveRoleSpec(role) }
+                            val roleAccent = Color(roleSpec.accentHex)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Image(
+                                    painter = painterResource(id = roleSpec.iconRes),
+                                    contentDescription = null,
+                                    colorFilter = ColorFilter.tint(roleAccent),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = role.uppercase(Locale.ROOT),
+                                    color = if (roleSpec.isExclusiveStaff) roleAccent else Color.White,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.4.sp,
+                                    fontFamily = SfProFontFamily
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.CenterVertically)
+                                    .width(1.dp)
+                                    .height(12.dp)
+                                    .background(Color.White.copy(alpha = 0.24f))
                             )
                         }
-
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterVertically)
-                                .width(1.dp)
-                                .height(12.dp)
-                                .background(Color.White.copy(alpha = 0.24f))
-                        )
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             val lvIconRes = remember(level) { RpgSvgIconCatalog.resolveLevelIcon(level) }
@@ -353,41 +364,43 @@ fun PeerProfileBottomSheet(
                             )
                         }
 
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterVertically)
-                                .width(1.dp)
-                                .height(12.dp)
-                                .background(Color.White.copy(alpha = 0.24f))
-                        )
+                        if (showMiniTitle) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.CenterVertically)
+                                    .width(1.dp)
+                                    .height(12.dp)
+                                    .background(Color.White.copy(alpha = 0.24f))
+                            )
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Outlined.Diamond,
-                                contentDescription = null,
-                                tint = if (level >= 35) Color(0xFFF59E0B) else Color(0xFFE11D48),
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = rankTitle.uppercase(Locale.ROOT),
-                                color = Color.White,
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 0.5.sp,
-                                fontFamily = SfProFontFamily
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Diamond,
+                                    contentDescription = null,
+                                    tint = if (level >= 35) Color(0xFFF59E0B) else Color(0xFFE11D48),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = rankTitle.uppercase(Locale.ROOT),
+                                    color = Color.White,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 0.5.sp,
+                                    fontFamily = SfProFontFamily
+                                )
+                            }
                         }
                     }
 
-                    // Custom Title Besar jika sedang dipasang akun tersebut
-                    if (equippedTitle.isNotBlank()) {
+                    // Custom Title Besar jika sedang dipasang & diaktifkan di pengaturan tampilan
+                    if (showCustomTitle && equippedTitle.isNotBlank()) {
                         Spacer(modifier = Modifier.height(10.dp))
                         GeometricTitleBadge(
                             titleName = equippedTitle,
                             tierLevel = equippedTitleTier,
                             styleVariant = equippedTitleVariant,
-                            isAnimated = true,
+                            isAnimated = cosmeticAnimate,
                             compact = false
                         )
                     }
@@ -406,7 +419,7 @@ fun PeerProfileBottomSheet(
             }
 
             // Profile Effect terpotong rapih pada batas atas preview sheet (lebar penuh, jeda 10 detik)
-            if (effectUrl.isNotBlank() && effectLayers.isNotEmpty()) {
+            if (cosmeticAnimate && effectUrl.isNotBlank() && effectLayers.isNotEmpty()) {
                 Box(
                     modifier = Modifier
                         .matchParentSize()

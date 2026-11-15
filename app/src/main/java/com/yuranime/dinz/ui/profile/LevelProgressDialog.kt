@@ -8,6 +8,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -45,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -70,6 +74,7 @@ import kotlin.math.ceil
  * Dialog Progres Level, Estimator Target EXP (mis. menuju Lv. 85),
  * Katalog Ikon Level SVG, & Daftar Role Resmi Yuranime (`Owner`, `Admin`, `Perintis Yuranime`, `Member`).
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LevelProgressDialog(
     profile: UserProfile?,
@@ -303,7 +308,10 @@ fun LevelProgressDialog(
 
             if (selectedTab == 0) {
                 LazyColumn(
-                    modifier = Modifier.weight(1f, fill = false),
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .clipToBounds(),
+                    contentPadding = PaddingValues(vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // KALKULATOR / ESTIMATOR TARGET LEVEL
@@ -539,23 +547,25 @@ fun LevelProgressDialog(
                                 Spacer(modifier = Modifier.width(10.dp))
 
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = "LV. ${step.level} • ${step.tierLabel}",
-                                            color = if (isReached) Color.White else Color(0xFFCBD5E1),
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = SfProFontFamily
-                                        )
-                                    }
+                                    Text(
+                                        text = "LV. ${step.level} • ${step.tierLabel}",
+                                        color = if (isReached) Color.White else Color(0xFFCBD5E1),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = SfProFontFamily
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
                                     Text(
                                         text = "Mini-Title: ${step.rankTitle} • Syarat ${FirebaseManager.formatNumber(reqExp)} EXP",
                                         color = if (isReached) stepAccent else Color(0xFF64748B),
                                         fontSize = 11.sp,
+                                        lineHeight = 15.sp,
                                         fontWeight = FontWeight.Medium,
                                         fontFamily = SfProFontFamily
                                     )
                                 }
+
+                                Spacer(modifier = Modifier.width(8.dp))
 
                                 Icon(
                                     imageVector = if (isReached) Icons.Outlined.CheckCircle else Icons.Outlined.Lock,
@@ -567,16 +577,17 @@ fun LevelProgressDialog(
 
                             if (titleDef != null) {
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Row(
+                                FlowRow(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Text(
                                         text = "Bonus Custom Title:",
                                         color = Color(0xFF94A3B8),
                                         fontSize = 10.5.sp,
-                                        fontFamily = SfProFontFamily
+                                        fontFamily = SfProFontFamily,
+                                        modifier = Modifier.align(Alignment.CenterVertically)
                                     )
                                     GeometricTitleBadge(
                                         titleName = titleDef.titleName,
@@ -595,7 +606,10 @@ fun LevelProgressDialog(
             } else {
                 // TAB 2: DAFTAR ROLE KOMUNITAS (Owner, Admin, Moderator, Perintis Yuranime, Partner VIP, Member)
                 LazyColumn(
-                    modifier = Modifier.weight(1f, fill = false),
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .clipToBounds(),
+                    contentPadding = PaddingValues(vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     item {

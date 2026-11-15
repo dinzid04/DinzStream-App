@@ -100,6 +100,27 @@ data class ProfileEffectDefinition(
     val layers: List<ProfileEffectLayer> = emptyList()
 )
 
+enum class NameStyleTier(val label: String, val pointCost: Long) {
+    MYTHIC("Mythic", 4500L),
+    LEGENDARY("Legendary", 2000L)
+}
+
+data class NameStyleDefinition(
+    val id: String,
+    val name: String,
+    val tier: NameStyleTier,
+    val pointCost: Long = tier.pointCost,
+    val defaultColorHex: String = "#FFFFFF",
+    val description: String = ""
+)
+
+data class NameStyleColorSwatch(
+    val id: String,
+    val label: String,
+    val hex: String,
+    val colorValue: Long
+)
+
 data class UserProfile(
     val uid: String = "",
     val name: String = "Member Yuranime",
@@ -118,10 +139,16 @@ data class UserProfile(
     val equippedTitle: String = "",
     val equippedTitleTier: Int = 1,
     val equippedTitleVariant: Int = 0,
+    val equippedNameStyle: String = "",
+    val equippedNameColor: String = "",
     val equippedBorderUrl: String = "",
     val equippedProfileEffectUrl: String = "",
     val cosmeticAnimate: Boolean = true,
+    val showMiniTitle: Boolean = true,
+    val showCustomTitle: Boolean = true,
+    val showRole: Boolean = true,
     val unlockedTitles: List<String> = emptyList(),
+    val unlockedNameStyles: List<String> = emptyList(),
     val unlockedBorders: List<String> = emptyList(),
     val unlockedEffects: List<String> = emptyList(),
     val claimedRedeemCodes: List<String> = emptyList(),
@@ -152,6 +179,8 @@ data class LeaderboardUser(
     val equippedTitle: String = "",
     val equippedTitleTier: Int = 1,
     val equippedTitleVariant: Int = 0,
+    val equippedNameStyle: String = "",
+    val equippedNameColor: String = "",
     val equippedBorderUrl: String = "",
     val equippedProfileEffectUrl: String = "",
     val isVerified: Boolean = false,
@@ -191,6 +220,92 @@ object FirebaseManager {
     const val TOP_1_BORDER_URL = "https://yuranime-tg-cdn.gadingkencana04.workers.dev/f/BQACAgUAAyEGAAMBCfs22gADBWr42b3FJPD7cmmoFeKiMPzulw5nAAJQKgAC6K7IV6gYJVEAAb5wBT0E/top_1_border_url.png"
     const val TOP_2_BORDER_URL = "https://yuranime-tg-cdn.gadingkencana04.workers.dev/f/BQACAgUAAyEGAAMBCfs22gADBmr42cstH_akk1CXWyCItkIXZJ6mAAJRKgAC6K7IV6NESEpi9FYxPQQ/top_2_border_url.png"
     const val TOP_3_BORDER_URL = "https://yuranime-tg-cdn.gadingkencana04.workers.dev/f/BQACAgUAAyEGAAMBCfs22gADB2r42dDemUCiG2gxsx0FrPdq8WzNAAJTKgAC6K7IV0VQ5hQdaw9mPQQ/top_3_border_url.png"
+
+    // 8 Pilihan Warna Bebas Style Nama (YuraStyle)
+    val NAME_STYLE_SWATCHES: List<NameStyleColorSwatch> = listOf(
+        NameStyleColorSwatch("emerald", "Emerald Green", "#4ADE80", 0xFF4ADE80),
+        NameStyleColorSwatch("gold", "Amber Gold", "#FACC15", 0xFFFACC15),
+        NameStyleColorSwatch("cyan", "Sky Cyan", "#38BDF8", 0xFF38BDF8),
+        NameStyleColorSwatch("purple", "Royal Purple", "#A855F7", 0xFFA855F7),
+        NameStyleColorSwatch("crimson", "Crimson Ruby", "#F43F5E", 0xFFF43F5E),
+        NameStyleColorSwatch("silver", "Silver Mist", "#94A3B8", 0xFF94A3B8),
+        NameStyleColorSwatch("white", "Pure White", "#FFFFFF", 0xFFFFFFFF),
+        NameStyleColorSwatch("teal", "Mint Teal", "#2DD4BF", 0xFF2DD4BF)
+    )
+
+    // Katalog 8 Style Nama (6 Mythic + 2 Legendary hasil reverse engineering WibuTime)
+    val NAME_STYLE_CATALOG: List<NameStyleDefinition> = listOf(
+        NameStyleDefinition(
+            id = "star",
+            name = "Star",
+            tier = NameStyleTier.MYTHIC,
+            pointCost = 4500L,
+            defaultColorHex = "#FACC15",
+            description = "Partikel bintang 4-sudut berkilau halus di sekitar huruf nama"
+        ),
+        NameStyleDefinition(
+            id = "twilight",
+            name = "Twilight",
+            tier = NameStyleTier.MYTHIC,
+            pointCost = 4500L,
+            defaultColorHex = "#A855F7",
+            description = "Sapuan gradasi kosmik dengan taburan debu bintang senja"
+        ),
+        NameStyleDefinition(
+            id = "slash",
+            name = "Slash",
+            tier = NameStyleTier.MYTHIC,
+            pointCost = 4500L,
+            defaultColorHex = "#38BDF8",
+            description = "Tebasan pedang katana diagonal dengan kilatan cahaya tajam"
+        ),
+        NameStyleDefinition(
+            id = "glitch",
+            name = "Glitch",
+            tier = NameStyleTier.MYTHIC,
+            pointCost = 4500L,
+            defaultColorHex = "#38BDF8",
+            description = "Teks miring distorsi siber dengan slice horizontal & RGB chromatic"
+        ),
+        NameStyleDefinition(
+            id = "magma",
+            name = "Magma",
+            tier = NameStyleTier.MYTHIC,
+            pointCost = 4500L,
+            defaultColorHex = "#F43F5E",
+            description = "Aliran magma pijar dengan percikan bara api naik dari dasar nama"
+        ),
+        NameStyleDefinition(
+            id = "sonar",
+            name = "Sonar",
+            tier = NameStyleTier.MYTHIC,
+            pointCost = 4500L,
+            defaultColorHex = "#2DD4BF",
+            description = "Garis pemindai gelombang sonar vertikal menyapu bolak-balik"
+        ),
+        NameStyleDefinition(
+            id = "ruby",
+            name = "Ruby",
+            tier = NameStyleTier.LEGENDARY,
+            pointCost = 2000L,
+            defaultColorHex = "#F43F5E",
+            description = "Kilau permata merah dengan pantulan cahaya diagonal elegan"
+        ),
+        NameStyleDefinition(
+            id = "wave",
+            name = "Wave",
+            tier = NameStyleTier.LEGENDARY,
+            pointCost = 2000L,
+            defaultColorHex = "#38BDF8",
+            description = "Setiap huruf bergerak naik-turun membentuk gelombang sinus mulus"
+        )
+    )
+
+    fun resolveNameStyleDefinition(styleId: String?): NameStyleDefinition? {
+        val clean = styleId?.trim()?.lowercase(Locale.ROOT).orEmpty()
+        if (clean.isBlank()) return null
+        return NAME_STYLE_CATALOG.firstOrNull { it.id == clean || it.name.equals(clean, ignoreCase = true) }
+    }
 
     // Katalog Title Resmi (Milestone Level, Shop Bertingkat, & Redeem Eksklusif)
     val ALL_TITLES: List<TitleDefinition> = listOf(
@@ -1040,11 +1155,18 @@ object FirebaseManager {
             ?: formatJoinDate(System.currentTimeMillis())
         val cachedEquippedTitle = prefs.getString("profile_title_${session.id}", "") ?: ""
         val cachedTitleDef = resolveTitleDefinition(cachedEquippedTitle, level)
+        val cachedNameStyle = prefs.getString("profile_name_style_${session.id}", "") ?: ""
+        val cachedNameColor = prefs.getString("profile_name_color_${session.id}", "") ?: ""
         val cachedBorderUrl = prefs.getString("profile_border_${session.id}", "") ?: ""
         val cachedEffectUrl = prefs.getString("profile_effect_${session.id}", "") ?: ""
         val cachedCosmeticAnimate = prefs.getBoolean("cosmetic_animate_${session.id}", true)
+        val cachedShowMiniTitle = prefs.getBoolean("show_mini_title_${session.id}", true)
+        val cachedShowCustomTitle = prefs.getBoolean("show_custom_title_${session.id}", true)
+        val cachedShowRole = prefs.getBoolean("show_role_${session.id}", true)
         val cachedUnlockedTitles = prefs.getStringSet("profile_unlocked_titles_${session.id}", setOf("WARGA YURANIME"))
             ?.toList() ?: listOf("WARGA YURANIME")
+        val cachedUnlockedNameStyles = prefs.getStringSet("profile_unlocked_name_styles_${session.id}", emptySet())
+            ?.toList() ?: emptyList()
         val cachedUnlockedBorders = prefs.getStringSet("profile_unlocked_borders_${session.id}", emptySet())
             ?.toList() ?: emptyList()
         val cachedUnlockedEffects = prefs.getStringSet("profile_unlocked_effects_${session.id}", emptySet())
@@ -1075,10 +1197,16 @@ object FirebaseManager {
             equippedTitle = cachedEquippedTitle,
             equippedTitleTier = cachedTitleDef?.tierLevel ?: level,
             equippedTitleVariant = cachedTitleDef?.styleVariant ?: 0,
+            equippedNameStyle = cachedNameStyle,
+            equippedNameColor = cachedNameColor,
             equippedBorderUrl = cachedBorderUrl,
             equippedProfileEffectUrl = cachedEffectUrl,
             cosmeticAnimate = cachedCosmeticAnimate,
+            showMiniTitle = cachedShowMiniTitle,
+            showCustomTitle = cachedShowCustomTitle,
+            showRole = cachedShowRole,
             unlockedTitles = cachedUnlockedTitles,
+            unlockedNameStyles = cachedUnlockedNameStyles,
             unlockedBorders = cachedUnlockedBorders,
             unlockedEffects = cachedUnlockedEffects,
             claimedRedeemCodes = cachedClaimedCodes,
@@ -1106,10 +1234,16 @@ object FirebaseManager {
             .putString("profile_role_${profile.uid}", profile.role)
             .putString("profile_joindate_${profile.uid}", profile.joinDate)
             .putString("profile_title_${profile.uid}", profile.equippedTitle)
+            .putString("profile_name_style_${profile.uid}", profile.equippedNameStyle)
+            .putString("profile_name_color_${profile.uid}", profile.equippedNameColor)
             .putString("profile_border_${profile.uid}", profile.equippedBorderUrl)
             .putString("profile_effect_${profile.uid}", profile.equippedProfileEffectUrl)
             .putBoolean("cosmetic_animate_${profile.uid}", profile.cosmeticAnimate)
+            .putBoolean("show_mini_title_${profile.uid}", profile.showMiniTitle)
+            .putBoolean("show_custom_title_${profile.uid}", profile.showCustomTitle)
+            .putBoolean("show_role_${profile.uid}", profile.showRole)
             .putStringSet("profile_unlocked_titles_${profile.uid}", profile.unlockedTitles.toSet())
+            .putStringSet("profile_unlocked_name_styles_${profile.uid}", profile.unlockedNameStyles.toSet())
             .putStringSet("profile_unlocked_borders_${profile.uid}", profile.unlockedBorders.toSet())
             .putStringSet("profile_unlocked_effects_${profile.uid}", profile.unlockedEffects.toSet())
             .putStringSet("profile_claimed_codes_${profile.uid}", profile.claimedRedeemCodes.toSet())
@@ -1440,10 +1574,20 @@ object FirebaseManager {
             level = level,
             rankTitle = computeRankTitle(level),
             equippedTitle = prefs?.getString("profile_title_$canonicalUid", "") ?: "",
+            equippedNameStyle = prefs?.getString("profile_name_style_$canonicalUid", "") ?: "",
+            equippedNameColor = prefs?.getString("profile_name_color_$canonicalUid", "") ?: "",
             equippedBorderUrl = prefs?.getString("profile_border_$canonicalUid", "") ?: "",
             equippedProfileEffectUrl = prefs?.getString("profile_effect_$canonicalUid", "") ?: "",
             cosmeticAnimate = prefs?.getBoolean("cosmetic_animate_$canonicalUid", true) ?: true,
+            showMiniTitle = prefs?.getBoolean("show_mini_title_$canonicalUid", AppPreferences.showMiniTitle.value)
+                ?: AppPreferences.showMiniTitle.value,
+            showCustomTitle = prefs?.getBoolean("show_custom_title_$canonicalUid", AppPreferences.showCustomTitle.value)
+                ?: AppPreferences.showCustomTitle.value,
+            showRole = prefs?.getBoolean("show_role_$canonicalUid", AppPreferences.showRole.value)
+                ?: AppPreferences.showRole.value,
             unlockedTitles = listOf("WARGA YURANIME"),
+            unlockedNameStyles = prefs?.getStringSet("profile_unlocked_name_styles_$canonicalUid", emptySet())?.toList()
+                ?: emptyList(),
             unlockedBorders = prefs?.getStringSet("profile_unlocked_borders_$canonicalUid", emptySet())?.toList()
                 ?: emptyList(),
             unlockedEffects = prefs?.getStringSet("profile_unlocked_effects_$canonicalUid", emptySet())?.toList()
@@ -1499,12 +1643,18 @@ object FirebaseManager {
                     "level" to initialProfile.level,
                     "rankTitle" to initialProfile.rankTitle,
                     "equippedTitle" to initialProfile.equippedTitle,
+                    "equippedNameStyle" to initialProfile.equippedNameStyle,
+                    "equippedNameColor" to initialProfile.equippedNameColor,
                     "equippedBorderUrl" to initialProfile.equippedBorderUrl,
                     "equippedAvatarDecoration" to initialProfile.equippedBorderUrl,
                     "equippedProfileEffectUrl" to initialProfile.equippedProfileEffectUrl,
                     "equippedProfileEffect" to initialProfile.equippedProfileEffectUrl,
                     "cosmeticAnimate" to initialProfile.cosmeticAnimate,
+                    "showMiniTitle" to initialProfile.showMiniTitle,
+                    "showCustomTitle" to initialProfile.showCustomTitle,
+                    "showRole" to initialProfile.showRole,
                     "unlockedTitles" to initialProfile.unlockedTitles,
+                    "unlockedNameStyles" to initialProfile.unlockedNameStyles,
                     "unlockedBorders" to initialProfile.unlockedBorders,
                     "unlockedEffects" to initialProfile.unlockedEffects,
                     "claimedRedeemCodes" to initialProfile.claimedRedeemCodes,
@@ -1575,6 +1725,8 @@ object FirebaseManager {
         val equippedTitleVariant = (snapshot.getLong("equippedTitleVariant")?.toInt())
             ?: titleDef?.styleVariant
             ?: 0
+        val equippedNameStyle = snapshot.getString("equippedNameStyle")?.trim()?.lowercase(Locale.ROOT).orEmpty()
+        val equippedNameColor = snapshot.getString("equippedNameColor")?.trim().orEmpty()
         val equippedBorderUrl = (snapshot.getString("equippedBorderUrl")?.takeIf { it.isNotBlank() }
             ?: snapshot.getString("equippedAvatarDecoration")?.takeIf { it.isNotBlank() }
             ?: "").trim()
@@ -1582,6 +1734,9 @@ object FirebaseManager {
             ?: snapshot.getString("equippedProfileEffect")?.takeIf { it.isNotBlank() }
             ?: "").trim()
         val cosmeticAnimate = snapshot.getBoolean("cosmeticAnimate") ?: true
+        val showMiniTitle = snapshot.getBoolean("showMiniTitle") ?: true
+        val showCustomTitle = snapshot.getBoolean("showCustomTitle") ?: true
+        val showRole = snapshot.getBoolean("showRole") ?: true
 
         val rawUnlockedTitles = (snapshot.get("unlockedTitles") as? List<*>)
             ?.mapNotNull { it?.toString()?.trim() }
@@ -1591,6 +1746,12 @@ object FirebaseManager {
             .filter { it.unlockType == TitleUnlockType.MILESTONE && computedLevel >= it.requiredLevel }
             .map { it.titleName }
         val unlockedTitles = (rawUnlockedTitles + autoMilestoneTitles).distinct()
+
+        val unlockedNameStyles = (snapshot.get("unlockedNameStyles") as? List<*>)
+            ?.mapNotNull { it?.toString()?.trim()?.lowercase(Locale.ROOT) }
+            ?.filter { it.isNotEmpty() }
+            .orEmpty()
+            .distinct()
 
         val unlockedBorders = (snapshot.get("unlockedBorders") as? List<*>)
             ?.mapNotNull { it?.toString()?.trim() }
@@ -1639,10 +1800,16 @@ object FirebaseManager {
             equippedTitle = equippedTitle,
             equippedTitleTier = equippedTitleTier,
             equippedTitleVariant = equippedTitleVariant,
+            equippedNameStyle = equippedNameStyle,
+            equippedNameColor = equippedNameColor,
             equippedBorderUrl = equippedBorderUrl,
             equippedProfileEffectUrl = equippedProfileEffectUrl,
             cosmeticAnimate = cosmeticAnimate,
+            showMiniTitle = showMiniTitle,
+            showCustomTitle = showCustomTitle,
+            showRole = showRole,
             unlockedTitles = unlockedTitles,
+            unlockedNameStyles = unlockedNameStyles,
             unlockedBorders = unlockedBorders,
             unlockedEffects = unlockedEffects,
             claimedRedeemCodes = claimedRedeemCodes,
@@ -1832,6 +1999,12 @@ object FirebaseManager {
                     val mergedTitleVariant = (preferredNameDoc.getLong("equippedTitleVariant")?.toInt())
                         ?: titleDef?.styleVariant
                         ?: 0
+                    val mergedNameStyle = (preferredNameDoc.getString("equippedNameStyle")?.takeIf { it.isNotBlank() }
+                        ?: docs.firstNotNullOfOrNull { it.getString("equippedNameStyle")?.trim()?.takeIf { s -> s.isNotBlank() } })
+                        .orEmpty()
+                    val mergedNameColor = (preferredNameDoc.getString("equippedNameColor")?.takeIf { it.isNotBlank() }
+                        ?: docs.firstNotNullOfOrNull { it.getString("equippedNameColor")?.trim()?.takeIf { c -> c.isNotBlank() } })
+                        .orEmpty()
                     val mergedBorder = (preferredNameDoc.getString("equippedBorderUrl")?.takeIf { it.isNotBlank() }
                         ?: docs.firstNotNullOfOrNull { it.getString("equippedBorderUrl")?.trim()?.takeIf { b -> b.isNotBlank() } })
                         .orEmpty()
@@ -1841,6 +2014,10 @@ object FirebaseManager {
 
                     val mergedUnlockedTitles = docs.flatMap {
                         (it.get("unlockedTitles") as? List<*>)?.mapNotNull { x -> x?.toString() } ?: emptyList()
+                    }.distinct()
+                    val mergedUnlockedNameStyles = docs.flatMap {
+                        (it.get("unlockedNameStyles") as? List<*>)?.mapNotNull { x -> x?.toString()?.lowercase(Locale.ROOT) }
+                            ?: emptyList()
                     }.distinct()
                     val mergedUnlockedBorders = docs.flatMap {
                         (it.get("unlockedBorders") as? List<*>)?.mapNotNull { x -> x?.toString() } ?: emptyList()
@@ -1879,9 +2056,12 @@ object FirebaseManager {
                         "equippedTitle" to mergedTitle,
                         "equippedTitleTier" to mergedTitleTier,
                         "equippedTitleVariant" to mergedTitleVariant,
+                        "equippedNameStyle" to mergedNameStyle,
+                        "equippedNameColor" to mergedNameColor,
                         "equippedBorderUrl" to mergedBorder,
                         "equippedProfileEffectUrl" to mergedEffect,
                         "unlockedTitles" to mergedUnlockedTitles,
+                        "unlockedNameStyles" to mergedUnlockedNameStyles,
                         "unlockedBorders" to mergedUnlockedBorders,
                         "unlockedEffects" to mergedUnlockedEffects,
                         "claimedRedeemCodes" to mergedClaimedCodes,
@@ -1975,6 +2155,8 @@ object FirebaseManager {
                         val equippedTitleVariant = (doc.getLong("equippedTitleVariant")?.toInt())
                             ?: titleDef?.styleVariant
                             ?: 0
+                        val equippedNameStyle = doc.getString("equippedNameStyle")?.trim()?.lowercase(Locale.ROOT).orEmpty()
+                        val equippedNameColor = doc.getString("equippedNameColor")?.trim().orEmpty()
                         val equippedBorderUrl = doc.getString("equippedBorderUrl")?.trim().orEmpty()
                         val equippedProfileEffectUrl = doc.getString("equippedProfileEffectUrl")?.trim().orEmpty()
                         val isVerified = doc.getBoolean("isVerified") ?: false
@@ -2024,6 +2206,8 @@ object FirebaseManager {
                                 equippedTitle = equippedTitle,
                                 equippedTitleTier = equippedTitleTier,
                                 equippedTitleVariant = equippedTitleVariant,
+                                equippedNameStyle = equippedNameStyle,
+                                equippedNameColor = equippedNameColor,
                                 equippedBorderUrl = equippedBorderUrl,
                                 equippedProfileEffectUrl = equippedProfileEffectUrl,
                                 isVerified = isVerified,
@@ -2053,6 +2237,12 @@ object FirebaseManager {
                             val bestTitle = primary.equippedTitle.ifBlank {
                                 group.firstNotNullOfOrNull { it.user.equippedTitle.takeIf { t -> t.isNotBlank() } }.orEmpty()
                             }
+                            val bestNameStyle = primary.equippedNameStyle.ifBlank {
+                                group.firstNotNullOfOrNull { it.user.equippedNameStyle.takeIf { s -> s.isNotBlank() } }.orEmpty()
+                            }
+                            val bestNameColor = primary.equippedNameColor.ifBlank {
+                                group.firstNotNullOfOrNull { it.user.equippedNameColor.takeIf { c -> c.isNotBlank() } }.orEmpty()
+                            }
                             val bestVerified = group.any { it.user.isVerified }
                             val bestVerifiedColor = primary.verifiedColor.takeIf { it.isNotBlank() }
                                 ?: group.firstNotNullOfOrNull { it.user.verifiedColor.takeIf { c -> c.isNotBlank() } }
@@ -2065,6 +2255,8 @@ object FirebaseManager {
                                 equippedBorderUrl = bestBorder,
                                 equippedProfileEffectUrl = bestEffect,
                                 equippedTitle = bestTitle,
+                                equippedNameStyle = bestNameStyle,
+                                equippedNameColor = bestNameColor,
                                 isVerified = bestVerified,
                                 verifiedColor = bestVerifiedColor
                             )
@@ -2100,6 +2292,8 @@ object FirebaseManager {
             equippedTitle = profile.equippedTitle,
             equippedTitleTier = profile.equippedTitleTier,
             equippedTitleVariant = profile.equippedTitleVariant,
+            equippedNameStyle = profile.equippedNameStyle,
+            equippedNameColor = profile.equippedNameColor,
             equippedBorderUrl = profile.equippedBorderUrl,
             equippedProfileEffectUrl = profile.equippedProfileEffectUrl,
             isVerified = profile.isVerified,
@@ -2247,6 +2441,9 @@ object FirebaseManager {
                 "equippedTitle" to updated.equippedTitle,
                 "equippedTitleTier" to updated.equippedTitleTier,
                 "equippedTitleVariant" to updated.equippedTitleVariant,
+                "equippedNameStyle" to updated.equippedNameStyle,
+                "equippedNameColor" to updated.equippedNameColor,
+                "unlockedNameStyles" to updated.unlockedNameStyles,
                 "equippedBorderUrl" to updated.equippedBorderUrl,
                 "equippedAvatarDecoration" to updated.equippedBorderUrl,
                 "equippedProfileEffectUrl" to updated.equippedProfileEffectUrl,
@@ -2390,6 +2587,131 @@ object FirebaseManager {
             } catch (e: Exception) {
                 CoroutineScope(Dispatchers.Main).launch {
                     onComplete(true, "Title \"${titleDefinition.titleName}\" berhasil dipasang!")
+                }
+            }
+        }
+    }
+
+    /**
+     * Memasang atau melepas Style Nama (`equippedNameStyle`) beserta warna pilihan bebas (`equippedNameColor`)
+     * dan menyinkronkannya real-time ke Firestore sehingga langsung terlihat di Chat Global, Profil, & Leaderboard.
+     */
+    fun equipNameStyle(
+        context: Context? = null,
+        styleId: String,
+        colorHex: String,
+        onComplete: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        val uid = getActiveUid()
+        if (uid == null) {
+            onComplete(false, "Silakan login terlebih dahulu")
+            return
+        }
+        val current = _userProfile.value ?: return
+        val cleanId = styleId.trim().lowercase(Locale.ROOT)
+        val cleanColor = colorHex.trim().ifBlank { "#FFFFFF" }
+
+        if (cleanId.isNotEmpty() && !current.unlockedNameStyles.any { it.equals(cleanId, ignoreCase = true) }) {
+            onComplete(false, "Beli Style Nama ini terlebih dahulu sebelum memasang.")
+            return
+        }
+
+        val updated = current.copy(
+            equippedNameStyle = cleanId,
+            equippedNameColor = cleanColor
+        )
+        _userProfile.value = updated
+        if (context != null) saveProfileToPrefs(context, updated)
+        refreshLeaderboardWithCurrentUser(updated)
+
+        val def = resolveNameStyleDefinition(cleanId)
+        scope.launch {
+            try {
+                firestore.collection("users").document(uid).set(
+                    mapOf(
+                        "equippedNameStyle" to cleanId,
+                        "equippedNameColor" to cleanColor
+                    ),
+                    SetOptions.merge()
+                ).await()
+                CoroutineScope(Dispatchers.Main).launch {
+                    val msg = if (cleanId.isBlank()) {
+                        "Style Nama dilepas dari profil"
+                    } else {
+                        "Style Nama \"${def?.name ?: cleanId}\" berhasil dipasang!"
+                    }
+                    onComplete(true, msg)
+                }
+            } catch (e: Exception) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    val msg = if (cleanId.isBlank()) {
+                        "Style Nama dilepas dari profil"
+                    } else {
+                        "Style Nama \"${def?.name ?: cleanId}\" berhasil dipasang!"
+                    }
+                    onComplete(true, msg)
+                }
+            }
+        }
+    }
+
+    /**
+     * Membeli Style Nama menggunakan Primo Poin (Mythic 4.500 / Legendary 2.000), langsung membuka kunci,
+     * dan memasangnya beserta warna yang dipilih ke akun pengguna.
+     */
+    fun purchaseAndEquipNameStyle(
+        context: Context? = null,
+        styleDefinition: NameStyleDefinition,
+        colorHex: String,
+        onComplete: (Boolean, String) -> Unit
+    ) {
+        val uid = getActiveUid()
+        if (uid == null) {
+            onComplete(false, "Silakan login terlebih dahulu")
+            return
+        }
+        val current = _userProfile.value ?: return
+        val cleanColor = colorHex.trim().ifBlank { styleDefinition.defaultColorHex }
+
+        if (current.unlockedNameStyles.any { it.equals(styleDefinition.id, ignoreCase = true) }) {
+            equipNameStyle(context, styleDefinition.id, cleanColor, onComplete)
+            return
+        }
+
+        if (current.points < styleDefinition.pointCost) {
+            onComplete(false, "Poin belum cukup! Butuh ${formatNumber(styleDefinition.pointCost)} Poin.")
+            return
+        }
+
+        val newPoints = (current.points - styleDefinition.pointCost).coerceAtLeast(0L)
+        val newUnlocked = (current.unlockedNameStyles + styleDefinition.id).distinct()
+        val updated = current.copy(
+            points = newPoints,
+            unlockedNameStyles = newUnlocked,
+            equippedNameStyle = styleDefinition.id,
+            equippedNameColor = cleanColor
+        )
+        _userProfile.value = updated
+        if (context != null) saveProfileToPrefs(context, updated)
+        refreshLeaderboardWithCurrentUser(updated)
+
+        scope.launch {
+            try {
+                firestore.collection("users").document(uid).set(
+                    mapOf(
+                        "points" to newPoints,
+                        "unlockedNameStyles" to newUnlocked,
+                        "equippedNameStyle" to styleDefinition.id,
+                        "equippedNameColor" to cleanColor
+                    ),
+                    SetOptions.merge()
+                ).await()
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, "Style Nama \"${styleDefinition.name}\" berhasil dibeli & dipasang!")
+                }
+            } catch (e: Exception) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    onComplete(true, "Style Nama \"${styleDefinition.name}\" berhasil dipasang!")
                 }
             }
         }
@@ -2554,8 +2876,13 @@ object FirebaseManager {
         enabled: Boolean,
         onComplete: ((Boolean) -> Unit)? = null
     ) {
+        if (context != null) AppPreferences.setCosmeticAnimatePref(context, enabled)
         val uid = getActiveUid()
-        val current = _userProfile.value ?: return
+        val current = _userProfile.value
+        if (current == null) {
+            onComplete?.invoke(true)
+            return
+        }
         val updated = current.copy(cosmeticAnimate = enabled)
         _userProfile.value = updated
         if (context != null) saveProfileToPrefs(context, updated)
@@ -2570,6 +2897,59 @@ object FirebaseManager {
                 onComplete?.let { cb ->
                     CoroutineScope(Dispatchers.Main).launch { cb(true) }
                 }
+            }
+        } else {
+            onComplete?.invoke(true)
+        }
+    }
+
+    fun setDisplayVisibility(
+        context: Context? = null,
+        showMiniTitle: Boolean? = null,
+        showCustomTitle: Boolean? = null,
+        showRole: Boolean? = null,
+        onComplete: ((Boolean) -> Unit)? = null
+    ) {
+        if (context != null) {
+            if (showMiniTitle != null) AppPreferences.setShowMiniTitle(context, showMiniTitle)
+            if (showCustomTitle != null) AppPreferences.setShowCustomTitle(context, showCustomTitle)
+            if (showRole != null) AppPreferences.setShowRole(context, showRole)
+        }
+        val uid = getActiveUid()
+        val current = _userProfile.value
+        if (current == null) {
+            onComplete?.invoke(true)
+            return
+        }
+        val resolvedMini = showMiniTitle ?: current.showMiniTitle
+        val resolvedCustom = showCustomTitle ?: current.showCustomTitle
+        val resolvedRole = showRole ?: current.showRole
+        val updated = current.copy(
+            showMiniTitle = resolvedMini,
+            showCustomTitle = resolvedCustom,
+            showRole = resolvedRole
+        )
+        _userProfile.value = updated
+        if (context != null) saveProfileToPrefs(context, updated)
+        if (uid != null) {
+            val patch = mutableMapOf<String, Any>()
+            if (showMiniTitle != null) patch["showMiniTitle"] = resolvedMini
+            if (showCustomTitle != null) patch["showCustomTitle"] = resolvedCustom
+            if (showRole != null) patch["showRole"] = resolvedRole
+            if (patch.isNotEmpty()) {
+                scope.launch {
+                    try {
+                        firestore.collection("users").document(uid).set(
+                            patch,
+                            SetOptions.merge()
+                        ).await()
+                    } catch (_: Exception) {}
+                    onComplete?.let { cb ->
+                        CoroutineScope(Dispatchers.Main).launch { cb(true) }
+                    }
+                }
+            } else {
+                onComplete?.invoke(true)
             }
         } else {
             onComplete?.invoke(true)

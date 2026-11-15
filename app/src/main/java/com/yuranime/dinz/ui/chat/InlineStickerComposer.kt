@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -226,8 +227,8 @@ fun InlineStickerInputField(
             },
         textStyle = TextStyle(
             color = Color.White,
-            fontSize = 15.sp,
-            lineHeight = 22.sp,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
             fontFamily = SfProFontFamily
         ),
         cursorBrush = SolidColor(Color(0xFFFF5722)),
@@ -245,7 +246,7 @@ fun InlineStickerInputField(
                     Text(
                         text = placeholder,
                         color = Color(0xFF64748B),
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         fontFamily = SfProFontFamily
                     )
                 }
@@ -268,14 +269,18 @@ fun InlineStickerInputField(
                                 val iconSize = minOf(wDp, hDp).coerceIn(20.dp, 24.dp)
                                 val offsetX = (box.left + ((box.right - box.left) - with(density) { iconSize.toPx() }) / 2f).roundToInt()
                                 val offsetY = (box.top + ((box.bottom - box.top) - with(density) { iconSize.toPx() }) / 2f).roundToInt()
-
-                                AsyncImage(
-                                    model = ImageRequest.Builder(context)
+                                val request = remember(context, url) {
+                                    ImageRequest.Builder(context)
                                         .data(url)
+                                        .size(64, 64)
                                         .crossfade(false)
                                         .memoryCachePolicy(CachePolicy.ENABLED)
                                         .diskCachePolicy(CachePolicy.ENABLED)
-                                        .build(),
+                                        .build()
+                                }
+
+                                AsyncImage(
+                                    model = request,
                                     contentDescription = "Stiker inline",
                                     contentScale = ContentScale.Fit,
                                     modifier = Modifier

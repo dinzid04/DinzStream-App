@@ -1,11 +1,5 @@
 package com.yuranime.dinz.ui.components
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -21,8 +15,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -32,6 +28,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -52,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import com.yuranime.dinz.ui.theme.JakartaSansFontFamily
 import com.yuranime.dinz.ui.theme.JetBrainsMonoFontFamily
 import com.yuranime.dinz.ui.theme.OutfitDisplayFontFamily
+import kotlinx.coroutines.isActive
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.cos
@@ -215,6 +213,7 @@ fun GeometricTitleBadge(
     scaleFactor: Float = 1f,
     vfxTier: TitleVfxTier? = null,
     titleId: String = "",
+    timeMillisProvider: (() -> Long)? = null,
     onClick: (() -> Unit)? = null
 ) {
     val resolvedVfx = remember(titleName, tierLevel, vfxTier) {
@@ -226,10 +225,10 @@ fun GeometricTitleBadge(
         RpgSvgIconCatalog.resolveCustomTitleIcon(titleName, titleId)
     }
 
-    val isLongCompact = compact && titleName.length > 13
+    val isLongCompact = compact && titleName.length > 12
     val heightDp: Dp = if (compact) 23.dp else 32.dp
     val fontSize: TextUnit = when {
-        isLongCompact -> 7.4.sp
+        isLongCompact -> 7.2.sp
         compact -> 8.2.sp
         else -> 10.5.sp
     }
@@ -241,40 +240,44 @@ fun GeometricTitleBadge(
     }
     val startTextPad: Dp = if (compact) 7.dp else 10.dp
     val endSafePad: Dp = when (shapeStyle) {
-        TitleShapeStyle.CIRCUIT_TECH -> if (compact) 18.dp else 26.dp
-        TitleShapeStyle.DIAGONAL_SLASH -> if (compact) 18.dp else 26.dp
-        else -> if (compact) 15.dp else 22.dp
+        TitleShapeStyle.CIRCUIT_TECH -> if (compact) 20.dp else 28.dp
+        TitleShapeStyle.DIAGONAL_SLASH -> if (compact) 20.dp else 28.dp
+        else -> if (compact) 16.dp else 24.dp
     }
 
     val shouldRunLoop = isAnimated && resolvedVfx != TitleVfxTier.NONE
-    val phase = if (shouldRunLoop) {
-        val transition = rememberInfiniteTransition(label = "titleVfxLoop")
-        val anim by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(
-                    durationMillis = when (resolvedVfx) {
-                        TitleVfxTier.LIGHTNING_STORM -> 1900
-                        TitleVfxTier.BLAZING_INFERNO -> 1600
-                        TitleVfxTier.SOLAR_FLARE -> 2800
-                        else -> 2600
-                    },
-                    easing = LinearEasing
-                ),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "titlePhase"
-        )
-        anim
-    } else {
-        0.25f
+    val periodMs = remember(resolvedVfx) {
+        when (resolvedVfx) {
+            TitleVfxTier.LIGHTNING_STORM -> 1900L
+            TitleVfxTier.BLAZING_INFERNO -> 1600L
+            TitleVfxTier.SOLAR_FLARE -> 2800L
+            else -> 2600L
+        }
+    }
+    // Clock lokal ringan hanya dibuat bila parent tidak menyediakan Shared Clock
+    val localClockMs = remember { mutableLongStateOf(0L) }
+    if (shouldRunLoop && timeMillisProvider == null) {
+        LaunchedEffect(resolvedVfx) {
+            while (isActive) {
+                withFrameMillis { frameMs ->
+                    localClockMs.longValue = frameMs
+                }
+            }
+        }
+    }
+    val readTimeMs: () -> Long = remember(timeMillisProvider, shouldRunLoop) {
+        when {
+            !shouldRunLoop -> { -> 0L }
+            timeMillisProvider != null -> timeMillisProvider
+            else -> { -> localClockMs.longValue }
+        }
     }
 
-    val baseMod = if (scaleFactor != 1f) {
-        modifier.graphicsLayer(scaleX = scaleFactor, scaleY = scaleFactor)
-    } else {
-        modifier
+    // Dibaca STRICTLY di dalam fase Draw agar 0 recomposition saat animasi/scroll
+    val baseMod = modifier.graphicsLayer {
+        scaleX = scaleFactor
+        scaleY = scaleFactor
+        compositingStrategy = CompositingStrategy.Offscreen
     }
 
     val clickMod = if (onClick != null) {
@@ -293,6 +296,12 @@ fun GeometricTitleBadge(
             .wrapContentWidth()
             .height(heightDp)
             .drawBehind {
+                val phase = if (shouldRunLoop) {
+                    val nowMs = readTimeMs()
+                    ((nowMs % periodMs).toFloat() / periodMs.toFloat()).coerceIn(0f, 1f)
+                } else {
+                    0.25f
+                }
                 drawBadgeFrameGeometry(
                     shapeStyle = shapeStyle,
                     vfxTier = resolvedVfx,
@@ -305,6 +314,8 @@ fun GeometricTitleBadge(
             .drawWithContent {
                 drawContent()
                 if (shouldRunLoop) {
+                    val nowMs = readTimeMs()
+                    val phase = ((nowMs % periodMs).toFloat() / periodMs.toFloat()).coerceIn(0f, 1f)
                     drawForegroundRichFx(
                         vfxTier = resolvedVfx,
                         palette = palette,

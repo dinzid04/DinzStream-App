@@ -7,9 +7,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,7 +33,6 @@ import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,10 +42,12 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -54,10 +59,15 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.yuranime.dinz.R
+import com.yuranime.dinz.data.local.AppPreferences
+import com.yuranime.dinz.data.local.AppStorageStats
 import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.model.DownloadedComicChapter
 import com.yuranime.dinz.data.repository.ComicDownloader
 import com.yuranime.dinz.ui.theme.SfProFontFamily
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class DownloadedEpisode(
     val id: String,
@@ -68,6 +78,7 @@ data class DownloadedEpisode(
     val localFilePath: String = ""
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DownloadsScreen(
     onBackClick: () -> Unit,
@@ -75,6 +86,7 @@ fun DownloadsScreen(
     onReadComicOffline: (DownloadedComicChapter) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val localDb = remember { LocalAuthDatabase(context) }
 
     // 0: Semua, 1: Anime, 2: Komik
@@ -82,20 +94,42 @@ fun DownloadsScreen(
 
     val downloadedEpisodes = remember { mutableStateListOf<DownloadedEpisode>() }
     val downloadedComics = remember { mutableStateListOf<DownloadedComicChapter>() }
+    var storageStats by remember {
+        mutableStateOf(
+            AppStorageStats(
+                totalDeviceBytes = 0L,
+                availableDeviceBytes = 0L,
+                downloadBytes = 0L,
+                downloadItemCount = 0,
+                cacheBytes = 0L
+            )
+        )
+    }
+    var isClearingCache by remember { mutableStateOf(false) }
+
+    fun refreshStorageStats() {
+        scope.launch {
+            val loaded = withContext(Dispatchers.IO) {
+                AppPreferences.readAppStorageStats(context)
+            }
+            storageStats = loaded
+        }
+    }
 
     fun refreshData() {
         downloadedComics.clear()
         downloadedComics.addAll(localDb.getDownloadedComicChapters())
+        refreshStorageStats()
     }
 
     LaunchedEffect(Unit) {
         refreshData()
     }
 
-    val totalComicBytes = remember(downloadedComics.size) {
+    val totalDownloadBytes = maxOf(
+        storageStats.downloadBytes,
         downloadedComics.sumOf { it.totalBytes }
-    }
-    val totalComicMb = totalComicBytes / (1024f * 1024f)
+    )
 
     Box(
         modifier = Modifier
@@ -132,47 +166,176 @@ fun DownloadsScreen(
                 )
             }
 
-            // 1. Indikator Penggunaan Penyimpanan Minimalis
-            Box(
+            // 1. Panel Info Penyimpanan Multi-Segmen (StatFs + Unduhan Anime/Komik + Cache)
+            val totalDeviceBytes = storageStats.totalDeviceBytes
+            val availableDeviceBytes = storageStats.availableDeviceBytes
+            val cacheBytes = storageStats.cacheBytes
+            val usedOtherBytes = storageStats.usedOtherBytes
+            val hasDeviceMetrics = totalDeviceBytes > 0L
+
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF161B26))
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFF11131A))
+                    .border(1.dp, Color(0xFF1E222E), RoundedCornerShape(16.dp))
                     .padding(14.dp)
             ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Memori Unduhan Internal",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            fontFamily = SfProFontFamily
-                        )
-                        Text(
-                            text = "Terpakai %.1f MB".format(totalComicMb),
-                            color = Color(0xFF94A3B8),
-                            fontSize = 12.sp,
-                            fontFamily = SfProFontFamily
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Penyimpanan Internal",
+                        color = Color.White,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily
+                    )
+                    Text(
+                        text = if (hasDeviceMetrics) {
+                            "Sisa Ruang: ${AppPreferences.formatByteSize(availableDeviceBytes)} tersedia dari ${AppPreferences.formatByteSize(totalDeviceBytes)}"
+                        } else {
+                            "Menghitung penyimpanan..."
+                        },
+                        color = Color(0xFF22C55E),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = SfProFontFamily,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Multi-segment horizontal storage bar
+                val denom = if (hasDeviceMetrics) totalDeviceBytes.toFloat() else 1f
+                val rawOtherFrac = if (hasDeviceMetrics) (usedOtherBytes.toFloat() / denom).coerceIn(0f, 1f) else 0f
+                val rawDownloadFrac = if (hasDeviceMetrics) {
+                    val f = totalDownloadBytes.toFloat() / denom
+                    if (totalDownloadBytes > 0L) f.coerceAtLeast(0.018f) else 0f
+                } else 0f
+                val rawCacheFrac = if (hasDeviceMetrics) {
+                    val f = cacheBytes.toFloat() / denom
+                    if (cacheBytes > 0L) f.coerceAtLeast(0.018f) else 0f
+                } else 0f
+
+                val totalShownUsed = rawOtherFrac + rawDownloadFrac + rawCacheFrac
+                val scale = if (totalShownUsed > 0.96f && totalShownUsed > 0f) 0.96f / totalShownUsed else 1f
+                val otherFrac = rawOtherFrac * scale
+                val downloadFrac = rawDownloadFrac * scale
+                val cacheFrac = rawCacheFrac * scale
+                val freeFrac = (1f - otherFrac - downloadFrac - cacheFrac).coerceAtLeast(0f)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(Color(0xFF1C202B)),
+                    horizontalArrangement = Arrangement.spacedBy(1.5.dp)
+                ) {
+                    if (otherFrac > 0.002f) {
+                        Box(
+                            modifier = Modifier
+                                .weight(otherFrac)
+                                .fillMaxHeight()
+                                .background(Color(0xFF475569))
                         )
                     }
+                    if (downloadFrac > 0.002f) {
+                        Box(
+                            modifier = Modifier
+                                .weight(downloadFrac)
+                                .fillMaxHeight()
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(Color(0xFFE11D48), Color(0xFFFF5722))
+                                    )
+                                )
+                        )
+                    }
+                    if (cacheFrac > 0.002f) {
+                        Box(
+                            modifier = Modifier
+                                .weight(cacheFrac)
+                                .fillMaxHeight()
+                                .background(Color(0xFF818CF8))
+                        )
+                    }
+                    if (freeFrac > 0.002f) {
+                        Box(
+                            modifier = Modifier
+                                .weight(freeFrac)
+                                .fillMaxHeight()
+                                .background(Color(0xFF1E222E))
+                        )
+                    }
+                }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                    val storageFraction = (totalComicMb / 1000f).coerceIn(0.02f, 1f)
-                    LinearProgressIndicator(
-                        progress = { storageFraction },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp)),
+                // Rincian segmen penyimpanan & tombol bersih cache cepat
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    StorageLegendChip(
                         color = Color(0xFFFF5722),
-                        trackColor = Color(0xFF1E2024),
+                        label = "Unduhan Yuranime (${downloadedEpisodes.size + downloadedComics.size})",
+                        value = AppPreferences.formatByteSize(totalDownloadBytes)
                     )
+                    StorageLegendChip(
+                        color = Color(0xFF818CF8),
+                        label = "Cache",
+                        value = if (isClearingCache) "..." else AppPreferences.formatByteSize(cacheBytes)
+                    )
+                    StorageLegendChip(
+                        color = Color(0xFF475569),
+                        label = "Sistem & Lainnya",
+                        value = AppPreferences.formatByteSize(usedOtherBytes)
+                    )
+                    StorageLegendChip(
+                        color = Color(0xFF22C55E),
+                        label = "Tersedia",
+                        value = AppPreferences.formatByteSize(availableDeviceBytes)
+                    )
+
+                    if (cacheBytes > 0L && !isClearingCache) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF1A1E2B))
+                                .border(0.8.dp, Color(0xFF2C3245), RoundedCornerShape(8.dp))
+                                .clickable {
+                                    isClearingCache = true
+                                    scope.launch {
+                                        withContext(Dispatchers.IO) {
+                                            AppPreferences.clearImageCache(context)
+                                        }
+                                        val updated = withContext(Dispatchers.IO) {
+                                            AppPreferences.readAppStorageStats(context)
+                                        }
+                                        storageStats = updated
+                                        isClearingCache = false
+                                        Toast.makeText(context, "Cache aplikasi dibersihkan", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "Hapus Cache",
+                                color = Color(0xFFA5B4FC),
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = SfProFontFamily
+                            )
+                        }
+                    }
                 }
             }
 
@@ -237,6 +400,7 @@ fun DownloadsScreen(
                                 onPlay = { onPlayOffline(item) },
                                 onDelete = {
                                     downloadedEpisodes.remove(item)
+                                    refreshStorageStats()
                                     Toast.makeText(context, "Unduhan berhasil dihapus", Toast.LENGTH_SHORT).show()
                                 }
                             )
@@ -573,5 +737,35 @@ private fun DownloadItemCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun StorageLegendChip(
+    color: Color,
+    label: String,
+    value: String
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Spacer(modifier = Modifier.width(5.dp))
+        Text(
+            text = "$label: ",
+            color = Color(0xFF94A3B8),
+            fontSize = 11.sp,
+            fontFamily = SfProFontFamily
+        )
+        Text(
+            text = value,
+            color = Color(0xFFE2E8F0),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            fontFamily = SfProFontFamily
+        )
     }
 }

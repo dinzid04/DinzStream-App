@@ -2,6 +2,7 @@ package com.yuranime.dinz.data.firebase
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.runtime.Immutable
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -26,6 +27,7 @@ import kotlinx.coroutines.withContext
 /**
  * Representasi satu pesan di halaman Chat Global Yuranime.
  */
+@Immutable
 data class GlobalChatMessage(
     val id: String = "",
     val uid: String = "",
@@ -41,8 +43,14 @@ data class GlobalChatMessage(
     val equippedTitle: String = "",
     val equippedTitleTier: Int = 1,
     val equippedTitleVariant: Int = 0,
+    val equippedNameStyle: String = "",
+    val equippedNameColor: String = "",
     val equippedBorderUrl: String = "",
     val equippedProfileEffectUrl: String = "",
+    val cosmeticAnimate: Boolean = true,
+    val showMiniTitle: Boolean = true,
+    val showCustomTitle: Boolean = true,
+    val showRole: Boolean = true,
     val isVerified: Boolean = false,
     val verifiedColor: String = "#1D9BF0",
     val text: String = "",
@@ -51,6 +59,8 @@ data class GlobalChatMessage(
     val replyToId: String = "",
     val replyToUid: String = "",
     val replyToName: String = "",
+    val replyToNameStyle: String = "",
+    val replyToNameColor: String = "",
     val replyToSnippet: String = "",
     val timestamp: Long = 0L,
     val isEdited: Boolean = false
@@ -59,6 +69,7 @@ data class GlobalChatMessage(
 /**
  * Kehadiran real-time user di dalam ruang Chat Global (`chat_presence`).
  */
+@Immutable
 data class ChatPresenceUser(
     val uid: String = "",
     val name: String = "Member Yuranime",
@@ -146,12 +157,12 @@ object InlineStickerCodec {
     fun buildReplySnippet(msg: GlobalChatMessage): String {
         if (msg.text.isNotBlank()) {
             return msg.text
-                .replace(TOKEN_REGEX, "[Stiker]")
                 .replace('\n', ' ')
+                .replace(Regex("\\s+"), " ")
                 .trim()
                 .ifBlank { "[Stiker]" }
         }
-        if (msg.stickerUrl.isNotBlank()) return "[Stiker]"
+        if (msg.stickerUrl.isNotBlank()) return "[s:${msg.stickerUrl}]"
         if (msg.imageUrl.isNotBlank()) return "[Foto]"
         return "Pesan"
     }
@@ -219,7 +230,8 @@ object GlobalChatRepository {
                 _liveUsersByUid,
                 FirebaseManager.userProfile
             ) { rawList, usersByUid, myProfile ->
-                rawList.map { msg -> mergeLiveUserOverlay(msg, usersByUid, myProfile) }
+                val rawById = rawList.associateBy { it.id }
+                rawList.map { msg -> mergeLiveUserOverlay(msg, rawById, usersByUid, myProfile) }
             }.collect { merged ->
                 _messages.value = merged
             }
@@ -237,6 +249,7 @@ object GlobalChatRepository {
 
     private fun mergeLiveUserOverlay(
         msg: GlobalChatMessage,
+        rawById: Map<String, GlobalChatMessage>,
         usersByUid: Map<String, UserProfile>,
         myProfile: UserProfile?
     ): GlobalChatMessage {
@@ -249,9 +262,21 @@ object GlobalChatRepository {
             if (myProfile != null && myProfile.uid == rUid) myProfile else usersByUid[rUid]
         }
         val resolvedReplyName = replyLive?.name?.takeIf { it.isNotBlank() } ?: msg.replyToName
+        val resolvedReplySnippet = if (
+            msg.replyToId.isNotBlank() &&
+            !InlineStickerCodec.TOKEN_REGEX.containsMatchIn(msg.replyToSnippet) &&
+            (msg.replyToSnippet.contains("[Stiker]", ignoreCase = true) || msg.replyToSnippet.isBlank())
+        ) {
+            rawById[msg.replyToId]?.let { InlineStickerCodec.buildReplySnippet(it) } ?: msg.replyToSnippet
+        } else {
+            msg.replyToSnippet
+        }
         if (live == null) {
-            return if (resolvedReplyName != msg.replyToName) {
-                msg.copy(replyToName = resolvedReplyName)
+            return if (resolvedReplyName != msg.replyToName || resolvedReplySnippet != msg.replyToSnippet) {
+                msg.copy(
+                    replyToName = resolvedReplyName,
+                    replyToSnippet = resolvedReplySnippet
+                )
             } else msg
         }
         val resolvedLevel = live.level.coerceAtLeast(1)
@@ -268,11 +293,20 @@ object GlobalChatRepository {
             equippedTitle = live.equippedTitle,
             equippedTitleTier = live.equippedTitleTier,
             equippedTitleVariant = live.equippedTitleVariant,
+            equippedNameStyle = live.equippedNameStyle,
+            equippedNameColor = live.equippedNameColor,
             equippedBorderUrl = live.equippedBorderUrl,
             equippedProfileEffectUrl = live.equippedProfileEffectUrl,
+            cosmeticAnimate = live.cosmeticAnimate,
+            showMiniTitle = live.showMiniTitle,
+            showCustomTitle = live.showCustomTitle,
+            showRole = live.showRole,
             isVerified = live.isVerified,
             verifiedColor = live.verifiedColor.ifBlank { "#1D9BF0" },
-            replyToName = resolvedReplyName
+            replyToName = resolvedReplyName,
+            replyToNameStyle = replyLive?.equippedNameStyle ?: msg.replyToNameStyle,
+            replyToNameColor = replyLive?.equippedNameColor ?: msg.replyToNameColor,
+            replyToSnippet = resolvedReplySnippet
         )
     }
 
@@ -360,8 +394,14 @@ object GlobalChatRepository {
                                 equippedTitle = child.readString("equippedTitle"),
                                 equippedTitleTier = child.readLong("equippedTitleTier", level.toLong()).toInt(),
                                 equippedTitleVariant = child.readLong("equippedTitleVariant", 0L).toInt(),
+                                equippedNameStyle = child.readString("equippedNameStyle"),
+                                equippedNameColor = child.readString("equippedNameColor"),
                                 equippedBorderUrl = child.readString("equippedBorderUrl"),
                                 equippedProfileEffectUrl = child.readString("equippedProfileEffectUrl"),
+                                cosmeticAnimate = child.readBool("cosmeticAnimate", true),
+                                showMiniTitle = child.readBool("showMiniTitle", true),
+                                showCustomTitle = child.readBool("showCustomTitle", true),
+                                showRole = child.readBool("showRole", true),
                                 isVerified = child.readBool("isVerified", false),
                                 verifiedColor = child.readString("verifiedColor").ifBlank { "#1D9BF0" },
                                 text = child.readString("text"),
@@ -370,6 +410,8 @@ object GlobalChatRepository {
                                 replyToId = child.readString("replyToId"),
                                 replyToUid = child.readString("replyToUid"),
                                 replyToName = child.readString("replyToName"),
+                                replyToNameStyle = child.readString("replyToNameStyle"),
+                                replyToNameColor = child.readString("replyToNameColor"),
                                 replyToSnippet = child.readString("replyToSnippet"),
                                 timestamp = rawTs,
                                 isEdited = child.readBool("isEdited", false)
@@ -555,8 +597,14 @@ object GlobalChatRepository {
             "equippedTitle" to sender.equippedTitle,
             "equippedTitleTier" to sender.equippedTitleTier,
             "equippedTitleVariant" to sender.equippedTitleVariant,
+            "equippedNameStyle" to sender.equippedNameStyle,
+            "equippedNameColor" to sender.equippedNameColor,
             "equippedBorderUrl" to sender.equippedBorderUrl,
             "equippedProfileEffectUrl" to sender.equippedProfileEffectUrl,
+            "cosmeticAnimate" to sender.cosmeticAnimate,
+            "showMiniTitle" to sender.showMiniTitle,
+            "showCustomTitle" to sender.showCustomTitle,
+            "showRole" to sender.showRole,
             "isVerified" to sender.isVerified,
             "verifiedColor" to sender.verifiedColor.ifBlank { "#1D9BF0" },
             "text" to text,
@@ -565,6 +613,8 @@ object GlobalChatRepository {
             "replyToId" to (replyTo?.id ?: ""),
             "replyToUid" to (replyTo?.uid ?: ""),
             "replyToName" to (replyTo?.name ?: ""),
+            "replyToNameStyle" to (replyTo?.equippedNameStyle ?: ""),
+            "replyToNameColor" to (replyTo?.equippedNameColor ?: ""),
             "replyToSnippet" to (replyTo?.let { InlineStickerCodec.buildReplySnippet(it) } ?: ""),
             "timestamp" to ServerValue.TIMESTAMP,
             "isEdited" to false

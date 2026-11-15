@@ -90,11 +90,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -127,6 +129,7 @@ import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import coil.request.ImageRequest
 import com.yuranime.dinz.R
+import com.yuranime.dinz.data.local.AppPreferences
 import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.model.CommunityMediaItem
 import com.yuranime.dinz.data.model.EpisodeCommentItem
@@ -157,7 +160,22 @@ fun StreamingScreen(
     viewModel: StreamingViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val prefQuality by AppPreferences.defaultAnimeQuality.collectAsState()
+    val prefSpeed by AppPreferences.defaultPlaybackSpeed.collectAsState()
+    val prefAutoPlay by AppPreferences.autoPlayEnabled.collectAsState()
+    val prefAutoSkipIntro by AppPreferences.autoSkipIntro.collectAsState()
+    val prefPreloadNext by AppPreferences.preloadNextEpisode.collectAsState()
     val context = LocalContext.current
+
+    LaunchedEffect(prefQuality, prefSpeed, prefAutoPlay, prefAutoSkipIntro, prefPreloadNext) {
+        viewModel.syncPlaybackPreferences(
+            preferredQuality = prefQuality,
+            playbackSpeed = prefSpeed,
+            autoPlayEnabled = prefAutoPlay,
+            autoSkipIntro = prefAutoSkipIntro,
+            preloadNextEpisode = prefPreloadNext
+        )
+    }
     val activity = context as? ComponentActivity
     val episodeRowState = rememberLazyListState()
     val targetBounds = remember { mutableStateMapOf<String, Rect>() }
@@ -1242,11 +1260,14 @@ private fun CustomExoPlayerView(
     var showControls by remember { mutableStateOf(true) }
     var isSeeking by remember { mutableStateOf(false) }
     var sliderPosition by remember { mutableLongStateOf(0L) }
+    var autoSkippedIntroForEp by remember { mutableStateOf<String?>(null) }
+    val latestUiState by rememberUpdatedState(uiState)
+    val latestOnEpisodeChange by rememberUpdatedState(onEpisodeChange)
 
     // Initialize ExoPlayer
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
-            playWhenReady = true
+            playWhenReady = uiState.autoPlayEnabled
             repeatMode = Player.REPEAT_MODE_OFF
         }
     }
@@ -1258,13 +1279,30 @@ private fun CustomExoPlayerView(
                 viewModel.setPlaying(isPlaying)
             }
             override fun onPlaybackStateChanged(playbackState: Int) {
+                val activeState = latestUiState
                 if (playbackState == Player.STATE_READY) {
-                    viewModel.updatePosition(exoPlayer.currentPosition, exoPlayer.duration)
-                } else if (playbackState == Player.STATE_ENDED && uiState.autoNextEpisode) {
-                    val nextEp = uiState.episodeNext ?: run {
-                        val currentIdx = uiState.episode?.index?.toIntOrNull()
+                    val duration = exoPlayer.duration
+                    val pos = exoPlayer.currentPosition
+                    viewModel.updatePosition(pos, duration)
+                    val epIdNow = activeState.episodeId
+                    if (
+                        activeState.autoSkipIntro &&
+                        autoSkippedIntroForEp != epIdNow &&
+                        duration >= 180_000L &&
+                        pos in 0L..12_000L
+                    ) {
+                        autoSkippedIntroForEp = epIdNow
+                        val skipTarget = 85_000L.coerceAtMost((duration - 5_000L).coerceAtLeast(0L))
+                        if (skipTarget > pos + 5_000L) {
+                            exoPlayer.seekTo(skipTarget)
+                            Toast.makeText(context, "Intro dilewati otomatis (+85d)", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else if (playbackState == Player.STATE_ENDED && activeState.autoNextEpisode) {
+                    val nextEp = activeState.episodeNext ?: run {
+                        val currentIdx = activeState.episode?.index?.toIntOrNull()
                         if (currentIdx != null) {
-                            uiState.episodes.firstOrNull { it.index == (currentIdx + 1).toString() }
+                            activeState.episodes.firstOrNull { it.index == (currentIdx + 1).toString() }
                         } else null
                     }
                     val nextId = nextEp?.id
@@ -1272,7 +1310,7 @@ private fun CustomExoPlayerView(
                         exoPlayer.stop()
                         exoPlayer.clearMediaItems()
                         viewModel.selectEpisode(nextId, nextEp.index)
-                        onEpisodeChange?.invoke(nextId)
+                        latestOnEpisodeChange?.invoke(nextId)
                     }
                 }
             }
@@ -1299,7 +1337,7 @@ private fun CustomExoPlayerView(
             exoPlayer.setMediaItem(MediaItem.fromUri(currentStreamUrl))
             exoPlayer.prepare()
             exoPlayer.seekTo(if (isResolutionChangeOnly) savedPosition else 0L)
-            exoPlayer.playWhenReady = true
+            exoPlayer.playWhenReady = if (isResolutionChangeOnly) exoPlayer.playWhenReady else uiState.autoPlayEnabled
 
             lastLoadedEpisodeId = currentEpisodeId
         } else {
@@ -1592,6 +1630,54 @@ private fun CustomExoPlayerView(
                         }
                     }
                 }
+            }
+        }
+
+        // Lewati Intro Floating Pill (selama segmen opening, jika durasi >= 3 menit)
+        val canManualSkipIntro = !uiState.isLocked &&
+            uiState.durationMs >= 180_000L &&
+            uiState.currentPositionMs in 5_000L..95_000L
+        AnimatedVisibility(
+            visible = canManualSkipIntro,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .then(
+                    if (uiState.isFullScreen) {
+                        Modifier.padding(end = 36.dp, bottom = 58.dp)
+                    } else {
+                        Modifier.padding(end = 14.dp, bottom = 54.dp)
+                    }
+                )
+        ) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xCC11131A))
+                    .border(1.dp, Color(0x44FFFFFF), RoundedCornerShape(10.dp))
+                    .clickable {
+                        val target = (uiState.currentPositionMs + 85_000L)
+                            .coerceAtMost((uiState.durationMs - 5_000L).coerceAtLeast(85_000L))
+                        autoSkippedIntroForEp = uiState.episodeId
+                        exoPlayer.seekTo(target)
+                    }
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FastForward,
+                    contentDescription = "Lewati Intro",
+                    tint = Color.White,
+                    modifier = Modifier.size(15.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Lewati Intro",
+                    color = Color.White,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
 

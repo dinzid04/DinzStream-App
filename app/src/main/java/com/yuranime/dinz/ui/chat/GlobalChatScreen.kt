@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -42,12 +44,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.Send
-import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.SentimentSatisfiedAlt
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Keyboard
+import androidx.compose.material.icons.rounded.SentimentSatisfiedAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,6 +62,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -69,7 +72,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -88,10 +93,12 @@ import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.firebase.GlobalChatMessage
 import com.yuranime.dinz.data.firebase.GlobalChatRepository
 import com.yuranime.dinz.data.firebase.InlineStickerCodec
+import com.yuranime.dinz.ui.components.StyledUsernameText
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -128,6 +135,28 @@ fun GlobalChatScreen(
     val listState = rememberLazyListState()
     val composerState = remember { InlineStickerComposerState() }
     val inputFocusRequester = remember { FocusRequester() }
+
+    // Single Shared Animation Clock (kontinu ms, membeku saat list scroll/fling, dibaca di fase Draw)
+    val sharedClockMs = remember { mutableLongStateOf(0L) }
+    LaunchedEffect(Unit) {
+        var accumulatedMs = 0L
+        var lastFrameMs = 0L
+        while (isActive) {
+            withInfiniteAnimationFrameMillis { frameMs ->
+                if (lastFrameMs == 0L) {
+                    lastFrameMs = frameMs
+                } else {
+                    val delta = (frameMs - lastFrameMs).coerceIn(0L, 64L)
+                    lastFrameMs = frameMs
+                    if (!listState.isScrollInProgress) {
+                        accumulatedMs += delta
+                        sharedClockMs.longValue = accumulatedMs
+                    }
+                }
+            }
+        }
+    }
+    val sharedTimeProvider = remember { { sharedClockMs.longValue } }
 
     var showStickerPanel by remember { mutableStateOf(false) }
     var replyingTo by remember { mutableStateOf<GlobalChatMessage?>(null) }
@@ -511,13 +540,22 @@ fun GlobalChatScreen(
                         ) {
                             items(
                                 items = messages,
-                                key = { msg -> msg.id }
+                                key = { msg -> msg.id },
+                                contentType = { msg ->
+                                    when {
+                                        msg.imageUrl.isNotBlank() -> "image"
+                                        msg.stickerUrl.isNotBlank() -> "sticker"
+                                        msg.replyToId.isNotBlank() -> "reply"
+                                        else -> "text"
+                                    }
+                                }
                             ) { msg ->
                                 val isOwn = currentUid.isNotBlank() && msg.uid == currentUid
                                 ChatMessageRow(
                                     message = msg,
                                     isOwn = isOwn,
                                     isHighlighted = highlightedMessageId == msg.id,
+                                    sharedTimeMillisProvider = sharedTimeProvider,
                                     onAvatarOrNameClick = { clicked -> previewPeer = clicked },
                                     onReplyTriggered = { target ->
                                         editingMessage = null
@@ -610,30 +648,52 @@ fun GlobalChatScreen(
                                 .weight(1f)
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Text(
-                                text = if (edit != null) {
-                                    "Mengedit pesan"
-                                } else {
-                                    "Membalas ${reply?.name.orEmpty()}"
-                                },
-                                color = Color(0xFFFF5722),
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = SfProFontFamily,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = if (edit != null) {
+                            if (edit != null) {
+                                Text(
+                                    text = "Mengedit pesan",
+                                    color = Color(0xFFFF5722),
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            } else {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Membalas ",
+                                        color = Color(0xFFFF5722),
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = SfProFontFamily
+                                    )
+                                    StyledUsernameText(
+                                        name = reply?.name.orEmpty(),
+                                        styleId = reply?.equippedNameStyle,
+                                        colorHex = reply?.equippedNameColor,
+                                        fontSize = 12.5.sp,
+                                        defaultColor = Color(0xFFFF5722),
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        timeMillisProvider = sharedTimeProvider,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                }
+                            }
+                            InlineStickerText(
+                                rawText = if (edit != null) {
                                     InlineStickerCodec.buildReplySnippet(edit)
                                 } else {
                                     reply?.let { InlineStickerCodec.buildReplySnippet(it) }.orEmpty()
                                 },
-                                color = Color(0xFFCBD5E1),
+                                textColor = Color(0xFFCBD5E1),
                                 fontSize = 12.sp,
-                                fontFamily = SfProFontFamily,
+                                lineHeight = 16.sp,
+                                stickerSizeSp = 16.sp,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
+                                renderLegacyStickerPlaceholder = true
                             )
                         }
                     }
@@ -696,123 +756,129 @@ fun GlobalChatScreen(
                 }
             } else {
                 val canSend = composerState.hasSendableContent() && !isSendingMessage && !isUploadingImage
+                val sendBackgroundBrush = remember(canSend) {
+                    if (canSend) {
+                        Brush.linearGradient(
+                            colors = listOf(Color(0xFFE11D48), Color(0xFFFF5722))
+                        )
+                    } else {
+                        SolidColor(Color(0xFF1E222E))
+                    }
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.Bottom
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .heightIn(min = 50.dp)
+                        .background(Color(0xFF14161E), RoundedCornerShape(26.dp))
+                        .border(1.dp, Color(0xFF232734), RoundedCornerShape(26.dp))
+                        .padding(horizontal = 6.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
+                    // 1. Tombol "+" (Upload Gambar) presisi 38.dp
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(26.dp))
-                            .background(Color(0xFF161923))
-                            .border(0.85.dp, Color(0xFF272C3C), RoundedCornerShape(26.dp))
-                            .padding(horizontal = 5.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.Bottom
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF1E222E))
+                            .clickable(enabled = !isUploadingImage) {
+                                if (requireLoggedInProfile()) {
+                                    imagePickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                }
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
-                        // Tombol "+" upload foto/GIF menyatu di sisi kiri kapsul
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.06f))
-                                .clickable(enabled = !isUploadingImage) {
-                                    if (requireLoggedInProfile()) {
-                                        imagePickerLauncher.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                        )
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isUploadingImage) {
-                                CircularProgressIndicator(
-                                    color = Color(0xFFFF5722),
-                                    strokeWidth = 2.dp,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Outlined.Add,
-                                    contentDescription = "Kirim foto",
-                                    tint = Color(0xFFCBD5E1),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(3.dp))
-
-                        // Ikon Stiker / Keyboard menyatu tepat di sebelah tombol "+"
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(if (showStickerPanel) Color(0xFF262B3B) else Color.Transparent)
-                                .clickable {
-                                    if (showStickerPanel) {
-                                        showStickerPanel = false
-                                        inputFocusRequester.requestFocus()
-                                        keyboardController?.show()
-                                    } else {
-                                        keyboardController?.hide()
-                                        showStickerPanel = true
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
+                        if (isUploadingImage) {
+                            CircularProgressIndicator(
+                                color = Color(0xFFFF5722),
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        } else {
                             Icon(
-                                imageVector = if (showStickerPanel) {
-                                    Icons.Outlined.Keyboard
-                                } else {
-                                    Icons.Outlined.SentimentSatisfiedAlt
-                                },
-                                contentDescription = if (showStickerPanel) "Tampilkan keyboard" else "Buka stiker",
-                                tint = if (showStickerPanel) Color(0xFFFF5722) else Color(0xFFCBD5E1),
+                                imageVector = Icons.Rounded.Add,
+                                contentDescription = "Kirim foto",
+                                tint = Color(0xFFCBD5E1),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
+                    }
 
-                        // Kolom ketik memanjang penuh mengisi ruang tengah kapsul
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 6.dp, vertical = 7.dp),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            InlineStickerInputField(
-                                state = composerState,
-                                placeholder = if (editingMessage != null) "Edit pesan..." else "Tulis pesan...",
-                                enabled = !isSendingMessage,
-                                modifier = Modifier.focusRequester(inputFocusRequester),
-                                onFocused = { showStickerPanel = false }
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // 2. Tombol Emoji / Stiker / Keyboard presisi 38.dp
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (showStickerPanel) Color(0xFFE11D48).copy(alpha = 0.18f)
+                                else Color(0xFF1E222E)
                             )
-                        }
-
-                        // Tombol Kirim menempel di ujung kanan kapsul panjang
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(if (canSend) Color(0xFFFF5722) else Color(0xFF232837))
-                                .clickable(enabled = canSend) { submitCurrentMessage() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isSendingMessage) {
-                                CircularProgressIndicator(
-                                    color = Color.White,
-                                    strokeWidth = 2.dp,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                            .clickable {
+                                if (showStickerPanel) {
+                                    showStickerPanel = false
+                                    inputFocusRequester.requestFocus()
+                                    keyboardController?.show()
+                                } else {
+                                    keyboardController?.hide()
+                                    showStickerPanel = true
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (showStickerPanel) {
+                                Icons.Rounded.Keyboard
                             } else {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.Send,
-                                    contentDescription = "Kirim pesan",
-                                    tint = if (canSend) Color.White else Color(0xFF64748B),
-                                    modifier = Modifier.size(17.dp)
-                                )
-                            }
+                                Icons.Rounded.SentimentSatisfiedAlt
+                            },
+                            contentDescription = if (showStickerPanel) "Tampilkan keyboard" else "Buka stiker",
+                            tint = if (showStickerPanel) Color(0xFFE11D48) else Color(0xFFCBD5E1),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // 3. Kolom Ketik sejajar tengah vertikal
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 10.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        InlineStickerInputField(
+                            state = composerState,
+                            placeholder = if (editingMessage != null) "Edit pesan..." else "Tulis pesan...",
+                            enabled = !isSendingMessage,
+                            modifier = Modifier.focusRequester(inputFocusRequester),
+                            onFocused = { showStickerPanel = false }
+                        )
+                    }
+
+                    // 4. Tombol Kirim presisi 38.dp dengan gradasi aktif Crimson-Orange
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(sendBackgroundBrush)
+                            .clickable(enabled = canSend) { submitCurrentMessage() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isSendingMessage) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.Send,
+                                contentDescription = "Kirim pesan",
+                                tint = if (canSend) Color.White else Color(0xFF64748B),
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }

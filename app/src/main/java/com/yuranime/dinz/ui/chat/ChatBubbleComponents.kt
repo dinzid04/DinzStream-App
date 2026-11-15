@@ -13,24 +13,24 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.MarqueeAnimationMode
-import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.res.painterResource
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.SpanStyle
+import kotlinx.coroutines.isActive
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -114,6 +114,7 @@ import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
 import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.RpgSvgIconCatalog
+import com.yuranime.dinz.ui.components.StyledUsernameText
 import com.yuranime.dinz.ui.components.VerifiedBadgeIcon
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import kotlinx.coroutines.launch
@@ -246,63 +247,154 @@ fun StaticChatAvatarWithBorder(
 /**
  * Merender teks chat yang dapat mengandung token stiker inline `[s:URL]` secara sebaris.
  */
+private val LEGACY_STICKER_TAG_REGEX = Regex("\\[stiker\\]", RegexOption.IGNORE_CASE)
+
+private sealed interface InlineRenderToken {
+    data class Plain(val text: String) : InlineRenderToken
+    data class StickerUrl(val url: String) : InlineRenderToken
+    data object LegacyStickerBadge : InlineRenderToken
+}
+
 @Composable
 fun InlineStickerText(
     rawText: String,
     textColor: Color = Color(0xFFF8FAFC),
     fontSize: TextUnit = 14.5.sp,
     lineHeight: TextUnit = 21.sp,
-    stickerSizeSp: TextUnit = 24.sp
+    stickerSizeSp: TextUnit = 24.sp,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
+    renderLegacyStickerPlaceholder: Boolean = false
 ) {
-    val segments = remember(rawText) { InlineStickerCodec.parseSegments(rawText) }
-    val annotated = remember(segments) {
-        buildAnnotatedString {
-            segments.forEachIndexed { idx, seg ->
+    val tokens = remember(rawText, renderLegacyStickerPlaceholder) {
+        val baseSegments = InlineStickerCodec.parseSegments(rawText)
+        if (!renderLegacyStickerPlaceholder) {
+            baseSegments.map { seg ->
                 when (seg) {
-                    is ChatTextSegment.TextChunk -> append(seg.text)
-                    is ChatTextSegment.StickerChunk -> appendInlineContent("stk_$idx", "[stiker]")
+                    is ChatTextSegment.TextChunk -> InlineRenderToken.Plain(seg.text)
+                    is ChatTextSegment.StickerChunk -> InlineRenderToken.StickerUrl(seg.url)
+                }
+            }
+        } else {
+            val out = mutableListOf<InlineRenderToken>()
+            baseSegments.forEach { seg ->
+                when (seg) {
+                    is ChatTextSegment.StickerChunk -> out.add(InlineRenderToken.StickerUrl(seg.url))
+                    is ChatTextSegment.TextChunk -> {
+                        var cursor = 0
+                        for (m in LEGACY_STICKER_TAG_REGEX.findAll(seg.text)) {
+                            if (m.range.first > cursor) {
+                                out.add(InlineRenderToken.Plain(seg.text.substring(cursor, m.range.first)))
+                            }
+                            out.add(InlineRenderToken.LegacyStickerBadge)
+                            cursor = m.range.last + 1
+                        }
+                        if (cursor < seg.text.length) {
+                            out.add(InlineRenderToken.Plain(seg.text.substring(cursor)))
+                        }
+                    }
+                }
+            }
+            out
+        }
+    }
+    val annotated = remember(tokens) {
+        buildAnnotatedString {
+            tokens.forEachIndexed { idx, tok ->
+                when (tok) {
+                    is InlineRenderToken.Plain -> append(tok.text)
+                    is InlineRenderToken.StickerUrl -> appendInlineContent("stk_$idx", "[stiker]")
+                    is InlineRenderToken.LegacyStickerBadge -> appendInlineContent("lgc_$idx", "[stiker]")
                 }
             }
         }
     }
-    val inlineMap = remember(segments, stickerSizeSp) {
+    val inlineMap = remember(tokens, stickerSizeSp) {
         val map = mutableMapOf<String, InlineTextContent>()
-        segments.forEachIndexed { idx, seg ->
-            if (seg is ChatTextSegment.StickerChunk) {
-                map["stk_$idx"] = InlineTextContent(
-                    Placeholder(
-                        width = stickerSizeSp,
-                        height = stickerSizeSp,
-                        placeholderVerticalAlign = PlaceholderVerticalAlign.Center
-                    )
-                ) {
-                    val inlineCtx = LocalContext.current
-                    var resolvedInlineUrl by remember(seg.url) { mutableStateOf(seg.url) }
-                    AsyncImage(
-                        model = ImageRequest.Builder(inlineCtx)
-                            .data(resolvedInlineUrl)
-                            .crossfade(false)
-                            .memoryCachePolicy(CachePolicy.ENABLED)
-                            .diskCachePolicy(CachePolicy.ENABLED)
-                            .listener(
-                                onError = { _, _ ->
-                                    if (resolvedInlineUrl.contains("stickerly.pstatic.net", ignoreCase = true) &&
-                                        resolvedInlineUrl.contains(".webp", ignoreCase = true)
-                                    ) {
-                                        resolvedInlineUrl = resolvedInlineUrl.replace(
-                                            Regex("""\.webp(\?.*)?$""", RegexOption.IGNORE_CASE)
-                                        ) { ".png${it.groupValues.getOrNull(1).orEmpty()}" }
+        tokens.forEachIndexed { idx, tok ->
+            when (tok) {
+                is InlineRenderToken.StickerUrl -> {
+                    map["stk_$idx"] = InlineTextContent(
+                        Placeholder(
+                            width = stickerSizeSp,
+                            height = stickerSizeSp,
+                            placeholderVerticalAlign = PlaceholderVerticalAlign.Center
+                        )
+                    ) {
+                        val inlineCtx = LocalContext.current
+                        var resolvedInlineUrl by remember(tok.url) { mutableStateOf(tok.url) }
+                        val inlineRequest = remember(inlineCtx, resolvedInlineUrl) {
+                            ImageRequest.Builder(inlineCtx)
+                                .data(resolvedInlineUrl)
+                                .size(64, 64)
+                                .crossfade(false)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .diskCachePolicy(CachePolicy.ENABLED)
+                                .listener(
+                                    onError = { _, _ ->
+                                        if (resolvedInlineUrl.contains("stickerly.pstatic.net", ignoreCase = true) &&
+                                            resolvedInlineUrl.contains(".webp", ignoreCase = true)
+                                        ) {
+                                            resolvedInlineUrl = resolvedInlineUrl.replace(
+                                                Regex("""\.webp(\?.*)?$""", RegexOption.IGNORE_CASE)
+                                            ) { ".png${it.groupValues.getOrNull(1).orEmpty()}" }
+                                        }
                                     }
-                                }
-                            )
-                            .build(),
-                        contentDescription = "Stiker inline",
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 1.dp)
-                    )
+                                )
+                                .build()
+                        }
+                        AsyncImage(
+                            model = inlineRequest,
+                            contentDescription = "Stiker inline",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 1.dp)
+                        )
+                    }
                 }
+                is InlineRenderToken.LegacyStickerBadge -> {
+                    map["lgc_$idx"] = InlineTextContent(
+                        Placeholder(
+                            width = stickerSizeSp,
+                            height = stickerSizeSp,
+                            placeholderVerticalAlign = PlaceholderVerticalAlign.Center
+                        )
+                    ) {
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(1.5.dp)
+                        ) {
+                            val w = size.width
+                            val h = size.height
+                            val r = w * 0.22f
+                            val fold = w * 0.34f
+                            val stroke = 1.25.dp.toPx()
+                            val tint = Color(0xFFFF8A65)
+                            val outline = Path().apply {
+                                moveTo(r, stroke)
+                                lineTo(w - r, stroke)
+                                quadraticTo(w - stroke, stroke, w - stroke, r)
+                                lineTo(w - stroke, h - fold)
+                                lineTo(w - fold, h - stroke)
+                                lineTo(r, h - stroke)
+                                quadraticTo(stroke, h - stroke, stroke, h - r)
+                                lineTo(stroke, r)
+                                quadraticTo(stroke, stroke, r, stroke)
+                                close()
+                            }
+                            drawPath(outline, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                            val corner = Path().apply {
+                                moveTo(w - fold, h - stroke)
+                                lineTo(w - fold, h - fold)
+                                lineTo(w - stroke, h - fold)
+                            }
+                            drawPath(corner, tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                        }
+                    }
+                }
+                is InlineRenderToken.Plain -> Unit
             }
         }
         map
@@ -313,7 +405,9 @@ fun InlineStickerText(
         color = textColor,
         fontSize = fontSize,
         lineHeight = lineHeight,
-        fontFamily = SfProFontFamily
+        fontFamily = SfProFontFamily,
+        maxLines = maxLines,
+        overflow = overflow
     )
 }
 
@@ -323,6 +417,7 @@ fun ChatMessageRow(
     message: GlobalChatMessage,
     isOwn: Boolean,
     isHighlighted: Boolean,
+    sharedTimeMillisProvider: (() -> Long)? = null,
     onAvatarOrNameClick: (GlobalChatMessage) -> Unit,
     onReplyTriggered: (GlobalChatMessage) -> Unit,
     onReplyQuoteClick: (String) -> Unit,
@@ -522,22 +617,27 @@ fun ChatMessageRow(
                                         .weight(1f)
                                         .padding(horizontal = 7.dp, vertical = 4.dp)
                                 ) {
-                                    Text(
-                                        text = message.replyToName.ifBlank { "Member" },
-                                        color = Color(0xFFFF784E),
+                                    StyledUsernameText(
+                                        name = message.replyToName.ifBlank { "Member" },
+                                        styleId = message.replyToNameStyle,
+                                        colorHex = message.replyToNameColor,
                                         fontSize = 10.5.sp,
+                                        defaultColor = Color(0xFFFF784E),
                                         fontWeight = FontWeight.Bold,
-                                        fontFamily = SfProFontFamily,
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        overflow = TextOverflow.Ellipsis,
+                                        animate = message.cosmeticAnimate,
+                                        timeMillisProvider = sharedTimeMillisProvider
                                     )
-                                    Text(
-                                        text = message.replyToSnippet.ifBlank { "Pesan" },
-                                        color = Color(0xFFCBD5E1),
-                                        fontSize = 10.5.sp,
-                                        fontFamily = SfProFontFamily,
+                                    InlineStickerText(
+                                        rawText = message.replyToSnippet.ifBlank { "Pesan" },
+                                        textColor = Color(0xFFCBD5E1),
+                                        fontSize = 11.sp,
+                                        lineHeight = 15.sp,
+                                        stickerSizeSp = 16.sp,
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        overflow = TextOverflow.Ellipsis,
+                                        renderLegacyStickerPlaceholder = true
                                     )
                                 }
                                 DiagonalJumpArrow(
@@ -555,14 +655,17 @@ fun ChatMessageRow(
                                 .clickable { onAvatarOrNameClick(message) },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = message.name,
-                                color = if (isOwn) Color(0xFFFDA4AF) else Color.White,
+                            StyledUsernameText(
+                                name = message.name,
+                                styleId = message.equippedNameStyle,
+                                colorHex = message.equippedNameColor,
                                 fontSize = 12.5.sp,
+                                defaultColor = if (isOwn) Color(0xFFFDA4AF) else Color.White,
                                 fontWeight = FontWeight.SemiBold,
-                                fontFamily = SfProFontFamily,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
+                                animate = message.cosmeticAnimate,
+                                timeMillisProvider = sharedTimeMillisProvider,
                                 modifier = Modifier.weight(1f, fill = false)
                             )
                             if (message.isVerified) {
@@ -575,34 +678,30 @@ fun ChatMessageRow(
                             }
                         }
 
-                        // 3. Baris Pangkat Auto-Marquee Sejajar (Tanpa Kotak Overlay/Shadow di Mini-Title & Level)
+                        // 3. Baris Pangkat FlowRow (Mini-Title + Custom Title + Level mengikuti preferensi tampilan)
                         Spacer(modifier = Modifier.height(3.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .basicMarquee(
-                                    iterations = Int.MAX_VALUE,
-                                    animationMode = MarqueeAnimationMode.Immediately,
-                                    repeatDelayMillis = 1200,
-                                    initialDelayMillis = 800,
-                                    spacing = MarqueeSpacing(24.dp),
-                                    velocity = 34.dp
-                                ),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            ChatInlineMiniTitle(
-                                rankUpper = rankUpper,
-                                level = message.level
-                            )
+                            if (message.showMiniTitle) {
+                                ChatInlineMiniTitle(
+                                    rankUpper = rankUpper,
+                                    level = message.level,
+                                    isAnimated = message.cosmeticAnimate,
+                                    timeMillisProvider = sharedTimeMillisProvider
+                                )
+                            }
 
-                            if (message.equippedTitle.isNotBlank()) {
+                            if (message.showCustomTitle && message.equippedTitle.isNotBlank()) {
                                 GeometricTitleBadge(
                                     titleName = message.equippedTitle,
                                     tierLevel = message.equippedTitleTier,
                                     styleVariant = message.equippedTitleVariant,
-                                    isAnimated = true,
-                                    compact = true
+                                    isAnimated = message.cosmeticAnimate,
+                                    compact = true,
+                                    timeMillisProvider = sharedTimeMillisProvider
                                 )
                             }
 
@@ -635,9 +734,10 @@ fun ChatMessageRow(
                             var resolvedStickerUrl by remember(message.stickerUrl) {
                                 mutableStateOf(message.stickerUrl)
                             }
-                            AsyncImage(
-                                model = ImageRequest.Builder(context)
+                            val largeStickerRequest = remember(context, resolvedStickerUrl) {
+                                ImageRequest.Builder(context)
                                     .data(resolvedStickerUrl)
+                                    .size(240, 240)
                                     .crossfade(false)
                                     .memoryCachePolicy(CachePolicy.ENABLED)
                                     .diskCachePolicy(CachePolicy.ENABLED)
@@ -652,7 +752,10 @@ fun ChatMessageRow(
                                             }
                                         }
                                     )
-                                    .build(),
+                                    .build()
+                            }
+                            AsyncImage(
+                                model = largeStickerRequest,
                                 contentDescription = "Stiker chat",
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier
@@ -954,7 +1057,9 @@ private fun ContextMenuActionItem(
 @Composable
 private fun ChatInlineMiniTitle(
     rankUpper: String,
-    level: Int
+    level: Int,
+    isAnimated: Boolean = true,
+    timeMillisProvider: (() -> Long)? = null
 ) {
     val iconRes = remember(rankUpper, level) {
         RpgSvgIconCatalog.resolveMiniTitleIcon(rankUpper, level)
@@ -982,10 +1087,10 @@ private fun ChatInlineMiniTitle(
         )
         Spacer(modifier = Modifier.width(3.5.dp))
 
-        if (level < 15) {
+        if (level < 15 || !isAnimated) {
             Text(
                 text = rankUpper,
-                color = Color(0xFFCBD5E1),
+                color = if (!isAnimated && level >= 15) iconTint else Color(0xFFCBD5E1),
                 fontSize = 8.6.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.3.sp,
@@ -994,23 +1099,6 @@ private fun ChatInlineMiniTitle(
                 softWrap = false
             )
         } else {
-            val transition = rememberInfiniteTransition(label = "chatMiniTitleShimmer")
-            val shift by transition.animateFloat(
-                initialValue = -80f,
-                targetValue = 280f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(
-                        durationMillis = when {
-                            level >= 75 -> 1900
-                            level >= 45 -> 2400
-                            else -> 2900
-                        },
-                        easing = LinearEasing
-                    ),
-                    repeatMode = RepeatMode.Restart
-                ),
-                label = "miniShimmerShift"
-            )
             val shimmerColors = remember(level) {
                 when {
                     level >= 85 -> listOf(
@@ -1041,21 +1129,54 @@ private fun ChatInlineMiniTitle(
                     )
                 }
             }
+            val periodMs = remember(level) {
+                when {
+                    level >= 75 -> 1900L
+                    level >= 45 -> 2400L
+                    else -> 2900L
+                }
+            }
+            val localClockMs = remember { mutableLongStateOf(0L) }
+            if (timeMillisProvider == null) {
+                LaunchedEffect(periodMs) {
+                    while (isActive) {
+                        withFrameMillis { frameMs ->
+                            localClockMs.longValue = frameMs
+                        }
+                    }
+                }
+            }
+            val readTimeMs: () -> Long = remember(timeMillisProvider) {
+                timeMillisProvider ?: { localClockMs.longValue }
+            }
+
+            // Gambar teks 1x lalu sapukan gradien strictly di fase Draw (0 recomposition)
             Text(
                 text = rankUpper,
+                color = Color.White,
+                fontSize = 8.8.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 0.35.sp,
+                fontFamily = SfProFontFamily,
                 maxLines = 1,
                 softWrap = false,
-                style = TextStyle(
-                    brush = Brush.linearGradient(
-                        colors = shimmerColors,
-                        start = Offset(shift - 70f, 0f),
-                        end = Offset(shift + 90f, 18f)
-                    ),
-                    fontSize = 8.8.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 0.35.sp,
-                    fontFamily = SfProFontFamily
-                )
+                modifier = Modifier
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        val nowMs = readTimeMs()
+                        val t = (nowMs % periodMs).toFloat() / periodMs.toFloat()
+                        val shift = -80f + t * 360f
+                        drawRect(
+                            brush = Brush.linearGradient(
+                                colors = shimmerColors,
+                                start = Offset(shift - 70f, 0f),
+                                end = Offset(shift + 90f, size.height),
+                                tileMode = TileMode.Mirror
+                            ),
+                            blendMode = BlendMode.SrcAtop
+                        )
+                    }
             )
         }
     }

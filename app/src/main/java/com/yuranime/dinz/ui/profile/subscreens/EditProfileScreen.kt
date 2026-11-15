@@ -31,6 +31,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
@@ -81,6 +83,7 @@ import com.yuranime.dinz.ui.components.ApngStackedEffectView
 import com.yuranime.dinz.ui.components.MultiLayerProfileEffectView
 import com.yuranime.dinz.ui.components.EmptyTitleSlotBadge
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
+import com.yuranime.dinz.ui.components.StyledUsernameText
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -95,7 +98,8 @@ import java.util.Locale
 @Composable
 fun EditProfileScreen(
     authDb: LocalAuthDatabase,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onOpenNameStyleShop: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val currentProfile by FirebaseManager.userProfile.collectAsState()
@@ -532,6 +536,79 @@ fun EditProfileScreen(
                     shape = RoundedCornerShape(12.dp),
                     colors = textFieldColors,
                     modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Tombol Navigasi Khusus ke Halaman Gaya & Animasi Nama (YuraStyle)
+            val activeNameStyleDef = remember(currentProfile?.equippedNameStyle) {
+                FirebaseManager.resolveNameStyleDefinition(currentProfile?.equippedNameStyle)
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF131620))
+                    .border(1.dp, Color(0xFF222738), RoundedCornerShape(14.dp))
+                    .clickable(onClick = onOpenNameStyleShop)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0x24FF5722)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.AutoAwesome,
+                        contentDescription = null,
+                        tint = Color(0xFFFF784E),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Gaya & Animasi Nama (Name Style)",
+                        color = Color.White,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = SfProFontFamily
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        StyledUsernameText(
+                            name = nameInput.ifBlank { currentProfile?.name ?: "Member Yuranime" },
+                            styleId = currentProfile?.equippedNameStyle,
+                            colorHex = currentProfile?.equippedNameColor,
+                            fontSize = 13.5.sp,
+                            defaultColor = Color(0xFF94A3B8),
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (activeNameStyleDef != null) {
+                                "• ${activeNameStyleDef.name}"
+                            } else {
+                                "• Ketuk untuk pilih"
+                            },
+                            color = Color(0xFF94A3B8),
+                            fontSize = 11.5.sp,
+                            fontFamily = SfProFontFamily,
+                            maxLines = 1
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = "Buka Name Style",
+                    tint = Color(0xFF94A3B8),
+                    modifier = Modifier.size(20.dp)
                 )
             }
 

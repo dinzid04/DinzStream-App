@@ -2,6 +2,7 @@ package com.yuranime.dinz.data.repository
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.runtime.Immutable
 import coil.Coil
 import coil.request.CachePolicy
 import coil.request.ImageRequest
@@ -28,11 +29,13 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
+@Immutable
 data class StickerItem(
     val url: String,
     val isAnimated: Boolean = false
 )
 
+@Immutable
 data class StickerPack(
     val id: String,
     val name: String,

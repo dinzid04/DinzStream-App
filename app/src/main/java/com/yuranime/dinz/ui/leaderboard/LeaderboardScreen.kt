@@ -71,6 +71,7 @@ import com.yuranime.dinz.data.firebase.LeaderboardUser
 import com.yuranime.dinz.data.firebase.UserProfile
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.PrimoPointIcon
+import com.yuranime.dinz.ui.components.StyledUsernameText
 import com.yuranime.dinz.ui.components.VerifiedBadgeIcon
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 
@@ -859,12 +860,13 @@ private fun EditorialPodiumSpot(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text = user.name,
-                    color = Color.White,
+                StyledUsernameText(
+                    name = user.name,
+                    styleId = user.equippedNameStyle,
+                    colorHex = user.equippedNameColor,
                     fontSize = if (rank == 1) 15.5.sp else 14.sp,
+                    defaultColor = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
@@ -1033,12 +1035,13 @@ private fun ModernLeaderboardRowItem(
             verticalArrangement = Arrangement.Center
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = user.name,
-                    color = Color.White,
+                StyledUsernameText(
+                    name = user.name,
+                    styleId = user.equippedNameStyle,
+                    colorHex = user.equippedNameColor,
                     fontSize = 14.5.sp,
+                    defaultColor = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
@@ -1142,6 +1145,12 @@ private fun CurrentUserRankBottomBar(
     val exp = currentUserProfile?.exp ?: myRankEntry?.exp ?: 0L
     val level = currentUserProfile?.level ?: myRankEntry?.level ?: 1
     val rankTitle = currentUserProfile?.rankTitle ?: FirebaseManager.computeRankTitle(level)
+    val equippedNameStyle = currentUserProfile?.equippedNameStyle
+        ?: myRankEntry?.equippedNameStyle
+        ?: ""
+    val equippedNameColor = currentUserProfile?.equippedNameColor
+        ?: myRankEntry?.equippedNameColor
+        ?: ""
     val isVerified = currentUserProfile?.isVerified ?: myRankEntry?.isVerified ?: false
     val verifiedColor = currentUserProfile?.verifiedColor?.ifBlank { null }
         ?: myRankEntry?.verifiedColor
@@ -1205,18 +1214,16 @@ private fun CurrentUserRankBottomBar(
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = displayName,
-                        color = Color.White,
+                    StyledUsernameText(
+                        name = displayName,
+                        styleId = equippedNameStyle,
+                        colorHex = equippedNameColor,
                         fontSize = 14.sp,
+                        defaultColor = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                        style = TextStyle(
-                            platformStyle = PlatformTextStyle(includeFontPadding = false)
-                        )
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                     if (isVerified) {
                         Spacer(modifier = Modifier.width(4.dp))
