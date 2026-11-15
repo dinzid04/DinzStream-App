@@ -91,9 +91,9 @@ import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.yuranime.dinz.data.firebase.ChatTextSegment
-import com.yuranime.dinz.data.firebase.DiscordCosmeticsRepository
 import com.yuranime.dinz.data.firebase.GlobalChatMessage
 import com.yuranime.dinz.data.firebase.InlineStickerCodec
+import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
 import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.theme.SfProFontFamily

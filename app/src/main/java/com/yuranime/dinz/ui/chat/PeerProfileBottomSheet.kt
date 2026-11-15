@@ -48,10 +48,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.yuranime.dinz.data.firebase.DiscordCosmeticsRepository
 import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.firebase.GlobalChatMessage
 import com.yuranime.dinz.data.firebase.UserProfile
+import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
 import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
 import com.yuranime.dinz.ui.components.ApngStackedEffectView
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
