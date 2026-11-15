@@ -135,6 +135,7 @@ fun PeerProfileBottomSheet(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                 .background(SheetSurfaceColor)
                 .navigationBarsPadding()
         ) {
@@ -280,9 +281,9 @@ fun PeerProfileBottomSheet(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // 3. Baris Status & Mini-Title (Tanpa kotak/kapsul shadow overlay)
+                    // 3. Baris Status & Mini-Title (ALL-CAPS + pembatas vertikal | rapih)
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         val isPriv = role.equals("Admin", ignoreCase = true) ||
@@ -292,50 +293,67 @@ fun PeerProfileBottomSheet(
                                 imageVector = Icons.Outlined.WorkspacePremium,
                                 contentDescription = null,
                                 tint = if (isPriv) Color(0xFFF43F5E) else Color(0xFFFF5722),
-                                modifier = Modifier.size(15.dp)
+                                modifier = Modifier.size(14.dp)
                             )
-                            Spacer(modifier = Modifier.width(5.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = role.replaceFirstChar {
-                                    if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString()
-                                },
+                                text = role.uppercase(Locale.ROOT),
                                 color = Color.White,
-                                fontSize = 12.5.sp,
+                                fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.4.sp,
                                 fontFamily = SfProFontFamily
                             )
                         }
+
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterVertically)
+                                .width(1.dp)
+                                .height(12.dp)
+                                .background(Color.White.copy(alpha = 0.24f))
+                        )
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Outlined.KeyboardDoubleArrowUp,
                                 contentDescription = null,
                                 tint = Color(0xFF38BDF8),
-                                modifier = Modifier.size(15.dp)
+                                modifier = Modifier.size(14.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
                             Text(
                                 text = "LV. $level",
                                 color = Color.White,
-                                fontSize = 12.5.sp,
+                                fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.4.sp,
                                 fontFamily = SfProFontFamily
                             )
                         }
+
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterVertically)
+                                .width(1.dp)
+                                .height(12.dp)
+                                .background(Color.White.copy(alpha = 0.24f))
+                        )
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Outlined.Diamond,
                                 contentDescription = null,
                                 tint = if (level >= 35) Color(0xFFF59E0B) else Color(0xFFE11D48),
-                                modifier = Modifier.size(15.dp)
+                                modifier = Modifier.size(14.dp)
                             )
-                            Spacer(modifier = Modifier.width(5.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = rankTitle,
+                                text = rankTitle.uppercase(Locale.ROOT),
                                 color = Color.White,
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 0.5.sp,
                                 fontFamily = SfProFontFamily
                             )
                         }
@@ -366,23 +384,26 @@ fun PeerProfileBottomSheet(
                 }
             }
 
-            // Profile Effect bergerak penuh di atas header sheet jika akun memasang effect
+            // Profile Effect terpotong rapih pada batas atas preview sheet (lebar penuh, jeda 10 detik)
             if (effectUrl.isNotBlank() && effectLayers.isNotEmpty()) {
                 Box(
                     modifier = Modifier
                         .matchParentSize()
+                        .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                         .zIndex(20f)
                 ) {
                     if (effectDef != null) {
                         MultiLayerProfileEffectView(
                             effect = effectDef,
-                            scaleType = ImageView.ScaleType.FIT_START,
+                            cropTopWidth = true,
+                            cycleCooldownMs = 10_000L,
                             modifier = Modifier.fillMaxSize()
                         )
                     } else {
                         ApngStackedEffectView(
                             layerUrls = effectLayers,
-                            scaleType = ImageView.ScaleType.FIT_START,
+                            cropTopWidth = true,
+                            cycleCooldownMs = 10_000L,
                             modifier = Modifier.fillMaxSize()
                         )
                     }

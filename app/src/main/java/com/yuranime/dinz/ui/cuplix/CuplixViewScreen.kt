@@ -104,12 +104,8 @@ fun CuplixViewScreen(
         viewModel.initialize(initialCuplix, initialCuplixId)
     }
 
-    BackHandler {
-        if (uiState.activeCommentsFypId != null) {
-            viewModel.closeComments()
-        } else {
-            onBackClick()
-        }
+    BackHandler(enabled = uiState.activeCommentsFypId != null) {
+        viewModel.closeComments()
     }
 
     if (uiState.isLoading && uiState.cuplixList.isEmpty()) {

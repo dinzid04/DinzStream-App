@@ -88,6 +88,7 @@ object StickerRepository {
     private var initialized = false
 
     private val searchMemoryCache = ConcurrentHashMap<String, List<StickerPack>>()
+    private val searchThumbnailCache = ConcurrentHashMap<String, List<StickerPack>>()
     private val packDetailMemoryCache = ConcurrentHashMap<String, StickerPack>()
 
     fun initializeAndPreload(context: Context) {
@@ -174,23 +175,31 @@ object StickerRepository {
                                 when (entry) {
                                     is String -> StickerItem(url = entry, isAnimated = guessAnimated(entry))
                                     is Map<*, *> -> {
-                                        val u = entry["url"]?.toString()?.trim().orEmpty()
-                                        if (u.isBlank()) null
-                                        else StickerItem(
-                                            url = u,
-                                            isAnimated = (entry["isAnimated"] as? Boolean) ?: guessAnimated(u)
-                                        )
+                                        val rawUrl = entry["url"]?.toString()?.trim().orEmpty()
+                                        if (rawUrl.isBlank()) null
+                                        else {
+                                            val explicitAnim = entry["isAnimated"] as? Boolean
+                                            val resolvedUrl = normalizeStaticStickerUrl(rawUrl, explicitAnim)
+                                            StickerItem(
+                                                url = resolvedUrl,
+                                                isAnimated = explicitAnim ?: guessAnimated(resolvedUrl)
+                                            )
+                                        }
                                     }
                                     else -> null
                                 }
                             }.orEmpty()
                             if (stickers.isEmpty()) return@mapNotNull null
+                            val resolvedThumb = normalizeStaticStickerUrl(
+                                thumb,
+                                isAnimated = if (stickers.none { it.isAnimated }) false else null
+                            )
 
                             StickerPack(
                                 id = doc.id,
                                 name = name,
                                 author = author,
-                                thumbnailUrl = thumb.ifBlank { stickers.first().url },
+                                thumbnailUrl = resolvedThumb.ifBlank { stickers.first().url },
                                 sourceUrl = sourceUrl,
                                 stickers = stickers,
                                 isAdminManaged = true
@@ -250,6 +259,37 @@ object StickerRepository {
             }
         }
         _packs.value = merged
+    }
+
+    /**
+     * Pencarian ringan 2-tahap: hanya mengambil metadata + thumbnail paket tanpa batch-download
+     * seluruh stiker tiap paket hasil pencarian.
+     */
+    suspend fun searchPackThumbnails(query: String): List<StickerPack> = withContext(Dispatchers.IO) {
+        val cleanQuery = query.trim()
+        if (cleanQuery.isBlank()) return@withContext _packs.value
+
+        val cacheKey = cleanQuery.lowercase(Locale.ROOT)
+        searchThumbnailCache[cacheKey]?.let { cached ->
+            if (cached.isNotEmpty()) return@withContext cached
+        }
+
+        val summaries = searchPackSummaries(cleanQuery).take(16)
+        val lightPacks = summaries.map { summary ->
+            StickerPack(
+                id = extractPackId(summary.sourceUrl),
+                name = summary.name,
+                author = summary.author,
+                thumbnailUrl = summary.thumbnailUrl,
+                sourceUrl = summary.sourceUrl,
+                stickers = emptyList(),
+                isAdminManaged = false
+            )
+        }
+        if (lightPacks.isNotEmpty()) {
+            searchThumbnailCache[cacheKey] = lightPacks
+        }
+        lightPacks
     }
 
     suspend fun searchStickerPacks(query: String): List<StickerPack> = withContext(Dispatchers.IO) {
@@ -351,8 +391,9 @@ object StickerRepository {
         if (!apiRaw.isNullOrBlank()) {
             val fromApi = parseDownloaderJson(apiRaw, cleanUrl, fallbackName, fallbackAuthor, fallbackThumb)
             if (fromApi != null && fromApi.stickers.isNotEmpty()) {
-                packDetailMemoryCache[cleanUrl] = fromApi
-                return@withContext fromApi
+                val fixed = fixStaticWebpPackIfNeeded(fromApi)
+                packDetailMemoryCache[cleanUrl] = fixed
+                return@withContext fixed
             }
         }
 
@@ -361,8 +402,9 @@ object StickerRepository {
         if (!htmlRaw.isNullOrBlank()) {
             val fromHtml = parseStickerLyHtml(htmlRaw, cleanUrl, fallbackName, fallbackAuthor, fallbackThumb)
             if (fromHtml != null && fromHtml.stickers.isNotEmpty()) {
-                packDetailMemoryCache[cleanUrl] = fromHtml
-                return@withContext fromHtml
+                val fixed = fixStaticWebpPackIfNeeded(fromHtml)
+                packDetailMemoryCache[cleanUrl] = fixed
+                return@withContext fixed
             }
         }
         null
@@ -395,16 +437,21 @@ object StickerRepository {
                         stickers.add(StickerItem(url = elem, isAnimated = guessAnimated(elem)))
                     }
                     is JSONObject -> {
-                        val u = firstNonBlank(elem, "url", "imageUrl", "image_url", "image", "src", "stickerUrl")
-                        if (u.startsWith("http")) {
-                            val animFlag = if (elem.has("isAnimated")) {
-                                elem.optBoolean("isAnimated", false)
-                            } else if (elem.has("animated")) {
-                                elem.optBoolean("animated", false)
-                            } else {
-                                guessAnimated(u)
+                        val rawUrl = firstNonBlank(elem, "url", "imageUrl", "image_url", "image", "src", "stickerUrl")
+                        if (rawUrl.startsWith("http")) {
+                            val explicitAnim = when {
+                                elem.has("isAnimated") -> elem.optBoolean("isAnimated", false)
+                                elem.has("is_animated") -> elem.optBoolean("is_animated", false)
+                                elem.has("animated") -> elem.optBoolean("animated", false)
+                                else -> null
                             }
-                            stickers.add(StickerItem(url = u, isAnimated = animFlag))
+                            val resolvedUrl = normalizeStaticStickerUrl(rawUrl, explicitAnim)
+                            stickers.add(
+                                StickerItem(
+                                    url = resolvedUrl,
+                                    isAnimated = explicitAnim ?: guessAnimated(resolvedUrl)
+                                )
+                            )
                         }
                     }
                 }
@@ -440,13 +487,39 @@ object StickerRepository {
         val listBlock = Regex("""<ul[^>]*id=["']content_images["'][^>]*>([\s\S]*?)</ul>""", RegexOption.IGNORE_CASE)
             .find(html)?.groupValues?.getOrNull(1) ?: html
 
-        val urls = Regex("""<img[^>]+src=["'](https://stickerly\.pstatic\.net/sticker_pack/[^"']+)["']""", RegexOption.IGNORE_CASE)
-            .findAll(listBlock)
-            .map { it.groupValues[1] }
-            .distinct()
-            .toList()
+        val parsedThumbRaw = Regex("""property=["']og:image["'][^>]+content=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+            .find(html)?.groupValues?.getOrNull(1)
+            ?: fallbackThumb
+        val packLooksAnimated = parsedThumbRaw.contains(".preview.", ignoreCase = true)
 
-        if (urls.isEmpty()) return null
+        val imgTagRegex = Regex("""<img\s+[^>]*>""", RegexOption.IGNORE_CASE)
+        val srcRegex = Regex("""\bsrc=["'](https://stickerly\.pstatic\.net/sticker_pack/[^"']+)["']""", RegexOption.IGNORE_CASE)
+        val onerrorRegex = Regex("""onerror\s*=\s*["']([^"']*)["']""", RegexOption.IGNORE_CASE)
+        val pngFallbackRegex = Regex("""https?://stickerly\.pstatic\.net/sticker_pack/[^"'\s)]+\.png""", RegexOption.IGNORE_CASE)
+
+        val seenUrls = HashSet<String>()
+        val stickers = ArrayList<StickerItem>()
+        for (tagMatch in imgTagRegex.findAll(listBlock)) {
+            val tag = tagMatch.value
+            val srcUrl = srcRegex.find(tag)?.groupValues?.getOrNull(1)?.trim() ?: continue
+            val onerrorExpr = onerrorRegex.find(tag)?.groupValues?.getOrNull(1).orEmpty()
+            val hasWebpFallback = onerrorExpr.contains(".webp", ignoreCase = true)
+            val pngFallback = pngFallbackRegex.find(onerrorExpr)?.value
+            val hasPngFallback = pngFallback != null || onerrorExpr.contains(".png", ignoreCase = true)
+
+            val isAnimated = srcUrl.endsWith(".gif", ignoreCase = true) ||
+                (srcUrl.endsWith(".webp", ignoreCase = true) && (hasWebpFallback || (!hasPngFallback && packLooksAnimated)))
+            val resolvedUrl = if (!isAnimated && hasPngFallback && srcUrl.contains(".webp", ignoreCase = true)) {
+                pngFallback ?: webpToPng(srcUrl)
+            } else {
+                srcUrl
+            }
+            if (seenUrls.add(resolvedUrl)) {
+                stickers.add(StickerItem(url = resolvedUrl, isAnimated = isAnimated))
+            }
+        }
+
+        if (stickers.isEmpty()) return null
 
         val parsedTitle = Regex("""property=["']og:title["'][^>]+content=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
             .find(html)?.groupValues?.getOrNull(1)
@@ -458,16 +531,17 @@ object StickerRepository {
             .find(html)?.groupValues?.getOrNull(1)?.trim()
             ?: fallbackAuthor
 
-        val parsedThumb = Regex("""property=["']og:image["'][^>]+content=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-            .find(html)?.groupValues?.getOrNull(1)
-            ?: fallbackThumb
+        val normalizedThumb = if (!packLooksAnimated && stickers.none { it.isAnimated }) {
+            webpToPng(parsedThumbRaw)
+        } else {
+            parsedThumbRaw
+        }
 
-        val stickers = urls.map { u -> StickerItem(url = u, isAnimated = guessAnimated(u)) }
         return StickerPack(
             id = extractPackId(sourceUrl),
             name = parsedTitle.ifBlank { "Sticker Pack" },
             author = parsedAuthor.ifBlank { "Sticker.ly" },
-            thumbnailUrl = parsedThumb.ifBlank { stickers.first().url },
+            thumbnailUrl = normalizedThumb.ifBlank { stickers.first().url },
             sourceUrl = sourceUrl,
             stickers = stickers,
             isAdminManaged = false
@@ -604,5 +678,62 @@ object StickerRepository {
         val lower = url.lowercase(Locale.ROOT)
         return lower.endsWith(".gif") || lower.contains(".gif?") ||
             lower.endsWith(".webp") || lower.contains(".webp?")
+    }
+
+    private fun webpToPng(url: String): String {
+        val clean = url.trim()
+        if (!clean.contains(".webp", ignoreCase = true)) return clean
+        return clean.replace(Regex("""\.webp(\?.*)?$""", RegexOption.IGNORE_CASE)) {
+            ".png${it.groupValues.getOrNull(1).orEmpty()}"
+        }
+    }
+
+    private fun normalizeStaticStickerUrl(url: String, isAnimated: Boolean?): String {
+        val clean = url.trim()
+        if (isAnimated == false && clean.contains("stickerly.pstatic.net", ignoreCase = true)) {
+            return webpToPng(clean)
+        }
+        return clean
+    }
+
+    private fun isUrlReachable(url: String): Boolean {
+        if (url.isBlank()) return false
+        return runCatching {
+            val req = Request.Builder()
+                .url(url)
+                .header(
+                    "User-Agent",
+                    "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+                )
+                .head()
+                .build()
+            httpClient.newCall(req).execute().use { it.isSuccessful }
+        }.getOrDefault(false)
+    }
+
+    private fun fixStaticWebpPackIfNeeded(pack: StickerPack): StickerPack {
+        val firstUrl = pack.stickers.firstOrNull()?.url.orEmpty()
+        if (!firstUrl.contains("stickerly.pstatic.net", ignoreCase = true) ||
+            !firstUrl.contains(".webp", ignoreCase = true)
+        ) {
+            return pack
+        }
+        if (isUrlReachable(firstUrl)) return pack
+
+        val pngCandidate = webpToPng(firstUrl)
+        if (!isUrlReachable(pngCandidate)) return pack
+
+        val fixedStickers = pack.stickers.map { item ->
+            val nextUrl = webpToPng(item.url)
+            StickerItem(
+                url = nextUrl,
+                isAnimated = nextUrl.endsWith(".gif", ignoreCase = true)
+            )
+        }
+        val fixedThumb = webpToPng(pack.thumbnailUrl).ifBlank { fixedStickers.first().url }
+        return pack.copy(
+            thumbnailUrl = fixedThumb,
+            stickers = fixedStickers
+        )
     }
 }

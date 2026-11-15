@@ -273,11 +273,46 @@ fun ApngAnimationView(
  *   dan mengulang siklus secara periodik (while(isActive)) agar karakter utama (Venom, Lord of the Dead, dll.)
  *   selalu muncul hidup dan tidak pernah hilang/mati!
  */
+private class TopWidthCropImageView(context: android.content.Context) : ImageView(context) {
+    init {
+        scaleType = ScaleType.MATRIX
+    }
+
+    override fun setImageDrawable(drawable: android.graphics.drawable.Drawable?) {
+        super.setImageDrawable(drawable)
+        applyTopWidthMatrix()
+    }
+
+    override fun setFrame(l: Int, t: Int, r: Int, b: Int): Boolean {
+        val changed = super.setFrame(l, t, r, b)
+        applyTopWidthMatrix()
+        return changed
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        applyTopWidthMatrix()
+    }
+
+    private fun applyTopWidthMatrix() {
+        val d = drawable ?: return
+        val vw = width - paddingLeft - paddingRight
+        val dw = d.intrinsicWidth
+        if (vw <= 0 || dw <= 0) return
+        val scale = vw.toFloat() / dw.toFloat()
+        val m = android.graphics.Matrix()
+        m.setScale(scale, scale)
+        imageMatrix = m
+    }
+}
+
 @Composable
 fun MultiLayerProfileEffectView(
     layers: List<ProfileEffectLayer>,
     modifier: Modifier = Modifier,
     scaleType: ImageView.ScaleType = ImageView.ScaleType.FIT_CENTER,
+    cropTopWidth: Boolean = false,
+    cycleCooldownMs: Long = 2500L,
     effectId: String = "effect",
     onLoadingChanged: (Boolean) -> Unit = {}
 ) {
@@ -422,8 +457,19 @@ fun MultiLayerProfileEffectView(
                     }
                 }
 
-                // Waktu tunggu ambient sebelum karakter utama muncul kembali
-                delay(maxDuration + 2500L)
+                if (cycleCooldownMs >= 5000L) {
+                    delay(maxDuration)
+                    imageViews.forEachIndexed { idx, view ->
+                        view.visibility = View.INVISIBLE
+                        try {
+                            drawables.getOrNull(idx)?.stop()
+                        } catch (_: Throwable) {}
+                    }
+                    delay(cycleCooldownMs)
+                } else {
+                    // Waktu tunggu ambient sebelum karakter utama muncul kembali
+                    delay(maxDuration + cycleCooldownMs)
+                }
             }
             cycleCount++
         }
@@ -444,8 +490,10 @@ fun MultiLayerProfileEffectView(
 
                     sortedLayers.forEachIndexed { index, layer ->
                         val file = cachedFiles.getOrNull(index)
-                        val iv = ImageView(ctx).apply {
-                            this.scaleType = scaleType
+                        val iv = (if (cropTopWidth) TopWidthCropImageView(ctx) else ImageView(ctx)).apply {
+                            if (!cropTopWidth) {
+                                this.scaleType = scaleType
+                            }
                             this.isClickable = false
                             this.isFocusable = false
                             this.isEnabled = false
@@ -507,6 +555,8 @@ fun MultiLayerProfileEffectView(
     effect: ProfileEffectDefinition?,
     modifier: Modifier = Modifier,
     scaleType: ImageView.ScaleType = ImageView.ScaleType.FIT_CENTER,
+    cropTopWidth: Boolean = false,
+    cycleCooldownMs: Long = 2500L,
     onLoadingChanged: (Boolean) -> Unit = {}
 ) {
     if (effect == null) {
@@ -533,6 +583,8 @@ fun MultiLayerProfileEffectView(
         layers = layers,
         modifier = modifier,
         scaleType = scaleType,
+        cropTopWidth = cropTopWidth,
+        cycleCooldownMs = cycleCooldownMs,
         effectId = effect.id,
         onLoadingChanged = onLoadingChanged
     )
@@ -547,6 +599,8 @@ fun ApngStackedEffectView(
     layerUrls: List<String>,
     modifier: Modifier = Modifier,
     scaleType: ImageView.ScaleType = ImageView.ScaleType.FIT_CENTER,
+    cropTopWidth: Boolean = false,
+    cycleCooldownMs: Long = 2500L,
     effectId: String = "stacked_effect",
     onLoadingChanged: (Boolean) -> Unit = {}
 ) {
@@ -572,6 +626,8 @@ fun ApngStackedEffectView(
         layers = layers,
         modifier = modifier,
         scaleType = scaleType,
+        cropTopWidth = cropTopWidth,
+        cycleCooldownMs = cycleCooldownMs,
         effectId = effectId,
         onLoadingChanged = onLoadingChanged
     )

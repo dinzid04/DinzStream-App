@@ -51,6 +51,58 @@ function parseMetaContent(html, property) {
   return "";
 }
 
+async function probeAndFixStaticWebp(pack) {
+  if (!pack || !Array.isArray(pack.stickers) || pack.stickers.length === 0) return pack;
+  const firstUrl = pack.stickers[0].url || "";
+  if (!/\.webp(\?.*)?$/i.test(firstUrl)) return pack;
+
+  let firstOk = false;
+  try {
+    const headRes = await fetch(firstUrl, {
+      method: "HEAD",
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(2200),
+    });
+    firstOk = headRes.ok;
+  } catch {
+    firstOk = false;
+  }
+  if (firstOk) return pack;
+
+  const pngCandidate = firstUrl.replace(/\.webp(\?.*)?$/i, ".png$1");
+  let pngOk = false;
+  try {
+    const pngRes = await fetch(pngCandidate, {
+      method: "HEAD",
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(2200),
+    });
+    pngOk = pngRes.ok;
+  } catch {
+    pngOk = false;
+  }
+  if (!pngOk) return pack;
+
+  const fixedStickers = pack.stickers.map((s) => {
+    const nextUrl = /\.webp(\?.*)?$/i.test(s.url)
+      ? s.url.replace(/\.webp(\?.*)?$/i, ".png$1")
+      : s.url;
+    return {
+      url: nextUrl,
+      isAnimated: nextUrl.endsWith(".gif"),
+    };
+  });
+  const fixedThumb = /\.webp(\?.*)?$/i.test(pack.thumbnailUrl || "")
+    ? pack.thumbnailUrl.replace(/\.webp(\?.*)?$/i, ".png$1")
+    : pack.thumbnailUrl;
+
+  return {
+    ...pack,
+    thumbnailUrl: fixedThumb || fixedStickers[0].url,
+    stickers: fixedStickers,
+  };
+}
+
 async function fetchPackFromHtml(packId) {
   const sourceUrl = `https://sticker.ly/s/${packId}`;
   const res = await fetch(sourceUrl, {
@@ -72,6 +124,7 @@ async function fetchPackFromHtml(packId) {
     decodeHtml((html.match(/<title>([^<]+)<\/title>/i) || [])[1] || "") ||
     `Pack ${packId}`;
   const ogImage = normalizeStickerUrl(parseMetaContent(html, "og:image"));
+  const packLooksAnimated = /\.preview\.(png|webp)/i.test(ogImage);
 
   const authorMatch = html.match(
     /class=["'][^"']*sticker_author[^"']*["'][^>]*>([^<]+)</i
@@ -93,20 +146,26 @@ async function fetchPackFromHtml(packId) {
     const srcMatch = tag.match(/\bsrc=["'](https:\/\/stickerly\.pstatic\.net\/sticker_pack\/[^"']+)["']/i);
     if (!srcMatch) continue;
 
-    const url = normalizeStickerUrl(srcMatch[1]);
+    let url = normalizeStickerUrl(srcMatch[1]);
     if (!url || seen.has(url)) continue;
     if (!url.includes(`/${packId}/`) && stickers.length > 0 && sectionHtml === "") {
       continue;
     }
 
-    seen.add(url);
     const onerrorExpr = tag.match(/onerror\s*=\s*["']([^"']*)["']/i)?.[1] || "";
     const hasWebpFallback = /\.webp\b/i.test(onerrorExpr);
-    const hasPngFallback = /\.png\b/i.test(onerrorExpr);
-    const packLooksAnimated = /\.preview\.(png|webp)/i.test(ogImage);
+    const pngFallbackMatch = onerrorExpr.match(/https?:\/\/stickerly\.pstatic\.net\/sticker_pack\/[^"'\s)]+\.png/i);
+    const hasPngFallback = Boolean(pngFallbackMatch) || /\.png\b/i.test(onerrorExpr);
     const isAnimated =
       url.endsWith(".gif") ||
       (url.endsWith(".webp") && (hasWebpFallback || (!hasPngFallback && packLooksAnimated)));
+
+    if (!isAnimated && hasPngFallback && /\.webp(\?.*)?$/i.test(url)) {
+      url = normalizeStickerUrl(pngFallbackMatch?.[0] || url.replace(/\.webp(\?.*)?$/i, ".png$1"));
+    }
+
+    if (seen.has(url)) continue;
+    seen.add(url);
     stickers.push({ url, isAnimated });
   }
 
@@ -114,15 +173,22 @@ async function fetchPackFromHtml(packId) {
     throw new Error("Stiker di dalam paket tidak ditemukan");
   }
 
-  const thumbnailUrl = ogImage || stickers[0].url;
-  return {
+  const normalizedThumb =
+    !packLooksAnimated &&
+    stickers.every((s) => !s.isAnimated) &&
+    /\.webp(\?.*)?$/i.test(ogImage)
+      ? ogImage.replace(/\.webp(\?.*)?$/i, ".png$1")
+      : ogImage;
+
+  const thumbnailUrl = normalizedThumb || stickers[0].url;
+  return await probeAndFixStaticWebp({
     id: packId,
     name: title,
     author,
     thumbnailUrl,
     sourceUrl,
     stickers,
-  };
+  });
 }
 
 async function fetchPackFromSnowping(packUrl, packId) {
@@ -159,14 +225,14 @@ async function fetchPackFromSnowping(packUrl, packId) {
 
   if (stickers.length === 0) throw new Error("Empty Snowping pack");
 
-  return {
+  return await probeAndFixStaticWebp({
     id: packId,
     name: root?.name || root?.title || `Pack ${packId}`,
     author: root?.author || root?.creator || "sticker.ly",
     thumbnailUrl: normalizeStickerUrl(root?.thumbnail || root?.thumbnailUrl || stickers[0].url),
     sourceUrl: packUrl,
     stickers,
-  };
+  });
 }
 
 async function fetchQuickThumb(packId) {

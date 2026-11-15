@@ -178,8 +178,13 @@ fun StreamingScreen(
         viewModel.loadStreaming(episodeId = episodeId, movieId = movieId)
     }
 
-    // Handle system back button: exits replies, gallery, or screen
-    BackHandler {
+    // Hanya cegat tombol back saat sub-sheet/dialog/fullscreen internal terbuka agar Predictive Back berjalan saat normal
+    val hasInnerModal = uiState.fullScreenPreviewUrl != null ||
+        uiState.activeCommentForReplies != null ||
+        uiState.isGallerySheetOpen ||
+        uiState.isServerPickerOpen ||
+        uiState.isFullScreen
+    BackHandler(enabled = hasInnerModal) {
         when {
             uiState.fullScreenPreviewUrl != null -> viewModel.closeFullScreenImage()
             uiState.activeCommentForReplies != null -> viewModel.closeReplies()
@@ -189,7 +194,6 @@ fun StreamingScreen(
                 viewModel.toggleFullScreen()
                 activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
-            else -> onBackClick()
         }
     }
 

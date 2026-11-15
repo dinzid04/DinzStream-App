@@ -2528,6 +2528,16 @@ object FirebaseManager {
         return sdf.format(cal.time)
     }
 
+    /** Mengubah snapshot dokumen `users` publik menjadi [UserProfile] dengan parser tunggal yang konsisten. */
+    internal fun parsePublicProfileSnapshot(snapshot: DocumentSnapshot): UserProfile {
+        return parseUserProfileFromSnapshot(
+            snapshot = snapshot,
+            fallbackUid = snapshot.id,
+            fallbackSession = null,
+            allowCurrentAuthTimestampFallback = false
+        )
+    }
+
     /** Mengambil profil publik user lain berdasarkan UID dari Firestore (untuk preview profil chat). */
     suspend fun fetchUserProfileByUid(uid: String): UserProfile? {
         if (uid.isBlank()) return null

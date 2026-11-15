@@ -112,8 +112,6 @@ fun ComicDetailScreen(
     modifier: Modifier = Modifier,
     repository: ComicRepository = remember { ComicRepository() }
 ) {
-    BackHandler { onBackClick() }
-
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 

@@ -1,5 +1,6 @@
 package com.yuranime.dinz.ui.chat
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -120,6 +122,12 @@ fun ChatStickerPanel(
     var isSearchingRemote by remember { mutableStateOf(false) }
     var searchError by remember { mutableStateOf<String?>(null) }
 
+    // Tahap 2 Pencarian: klik thumbnail paket -> buka preview detail paket & render stiker malas-malasan (lazy)
+    var selectedSearchPack by remember { mutableStateOf<StickerPack?>(null) }
+    var selectedSearchDetail by remember { mutableStateOf<StickerPack?>(null) }
+    var isLoadingPackDetail by remember { mutableStateOf(false) }
+    var packDetailError by remember { mutableStateOf<String?>(null) }
+
     val gridState = rememberLazyGridState()
     val thumbRowState = rememberLazyListState()
     var isProgrammaticScroll by remember { mutableStateOf(false) }
@@ -128,9 +136,25 @@ fun ChatStickerPanel(
         StickerRepository.initializeAndPreload(context)
     }
 
+    BackHandler(enabled = isSearchMode) {
+        if (selectedSearchPack != null) {
+            selectedSearchPack = null
+            selectedSearchDetail = null
+            packDetailError = null
+        } else {
+            isSearchMode = false
+            searchQuery = ""
+        }
+    }
+
     LaunchedEffect(searchQuery, isSearchMode) {
         if (!isSearchMode) return@LaunchedEffect
         val q = searchQuery.trim()
+        selectedSearchPack = null
+        selectedSearchDetail = null
+        isLoadingPackDetail = false
+        packDetailError = null
+
         if (q.isEmpty()) {
             searchResults = emptyList()
             isSearchingRemote = false
@@ -140,8 +164,8 @@ fun ChatStickerPanel(
         delay(350L)
         isSearchingRemote = true
         searchError = null
-        val found = runCatching { StickerRepository.searchStickerPacks(q) }.getOrElse {
-            searchError = "Gagal mencari stiker untuk \"$q\"."
+        val found = runCatching { StickerRepository.searchPackThumbnails(q) }.getOrElse {
+            searchError = "Gagal mencari paket stiker untuk \"$q\"."
             emptyList()
         }
         searchResults = found
@@ -151,11 +175,39 @@ fun ChatStickerPanel(
         isSearchingRemote = false
     }
 
+    LaunchedEffect(selectedSearchPack) {
+        val pack = selectedSearchPack ?: return@LaunchedEffect
+        isLoadingPackDetail = true
+        packDetailError = null
+        selectedSearchDetail = null
+        val loaded = runCatching {
+            StickerRepository.fetchPackDetail(
+                packUrl = pack.sourceUrl,
+                fallbackName = pack.name,
+                fallbackAuthor = pack.author,
+                fallbackThumb = pack.thumbnailUrl
+            )
+        }.getOrNull()
+        if (loaded != null && loaded.stickers.isNotEmpty()) {
+            selectedSearchDetail = loaded
+        } else {
+            packDetailError = "Isi stiker pada paket \"${pack.name}\" gagal dimuat."
+        }
+        isLoadingPackDetail = false
+    }
+
     val allPreloadedStickers = remember(packs) {
         packs.flatMap { it.stickers }.distinctBy { it.url }
     }
 
-    val gridEntries = remember(isSearchMode, searchQuery, searchResults, recentStickers, packs, allPreloadedStickers) {
+    val gridEntries = remember(
+        isSearchMode,
+        searchQuery,
+        selectedSearchDetail,
+        recentStickers,
+        packs,
+        allPreloadedStickers
+    ) {
         val list = mutableListOf<StickerGridEntry>()
         if (isSearchMode) {
             val q = searchQuery.trim()
@@ -167,18 +219,10 @@ fun ChatStickerPanel(
                     }
                 }
             } else {
-                searchResults.forEach { pack ->
-                    if (pack.stickers.isNotEmpty()) {
-                        list.add(
-                            StickerGridEntry.Header(
-                                sectionKey = "search_${pack.id}",
-                                title = pack.name,
-                                subtitle = pack.author
-                            )
-                        )
-                        pack.stickers.forEachIndexed { idx, stk ->
-                            list.add(StickerGridEntry.Cell("search_${pack.id}", stk, idx))
-                        }
+                val detail = selectedSearchDetail
+                if (detail != null && detail.stickers.isNotEmpty()) {
+                    detail.stickers.forEachIndexed { idx, stk ->
+                        list.add(StickerGridEntry.Cell("detail_${detail.id}", stk, idx))
                     }
                 }
             }
@@ -265,8 +309,105 @@ fun ChatStickerPanel(
             )
         }
 
-        // Header Panel Stiker: Mode Normal vs Mode Pencarian
-        if (isSearchMode) {
+        // Header Panel Stiker: Mode Normal vs Mode Pencarian / Preview Detail Paket
+        val activePreviewPack = selectedSearchPack
+        if (isSearchMode && activePreviewPack != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = "Kembali ke daftar paket",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {
+                                selectedSearchPack = null
+                                selectedSearchDetail = null
+                                packDetailError = null
+                            }
+                        )
+                        .padding(5.dp)
+                )
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                StickerImageWithPngFallback(
+                    url = activePreviewPack.thumbnailUrl,
+                    contentDescription = activePreviewPack.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF191C26))
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = activePreviewPack.name,
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SfProFontFamily,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    val countText = selectedSearchDetail?.stickers?.size?.let { "$it stiker" } ?: "Memuat isi..."
+                    Text(
+                        text = "@${activePreviewPack.author} • $countText",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 11.sp,
+                        fontFamily = SfProFontFamily,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Segmented Toggle tetap tersedia saat membuka detail paket agar bisa kirim besar atau sisipkan inline
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0xFF171A23))
+                        .padding(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (mode == StickerPanelMode.INLINE_EMOJI) Color(0xFF282D3C) else Color.Transparent)
+                            .clickable { mode = StickerPanelMode.INLINE_EMOJI }
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.SentimentSatisfiedAlt,
+                            contentDescription = "Inline",
+                            tint = if (mode == StickerPanelMode.INLINE_EMOJI) Color.White else Color(0xFF94A3B8),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (mode == StickerPanelMode.LARGE_STICKER) Color(0xFF282D3C) else Color.Transparent)
+                            .clickable { mode = StickerPanelMode.LARGE_STICKER }
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        FoldedStickerIcon(
+                            tint = if (mode == StickerPanelMode.LARGE_STICKER) Color.White else Color(0xFF94A3B8),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        } else if (isSearchMode) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -284,6 +425,8 @@ fun ChatStickerPanel(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             onClick = {
+                                selectedSearchPack = null
+                                selectedSearchDetail = null
                                 isSearchMode = false
                                 searchQuery = ""
                             }
@@ -438,13 +581,100 @@ fun ChatStickerPanel(
             }
         }
 
-        // Area Grid Stiker Utama
+        // Area Grid Stiker / Daftar Thumbnail Paket Pencarian
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
         ) {
+            val activePreview = selectedSearchPack
             when {
+                isSearchMode && searchQuery.isNotBlank() && activePreview != null -> {
+                    when {
+                        isLoadingPackDetail -> {
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    color = Color(0xFFFF5722),
+                                    strokeWidth = 2.5.dp,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "Memuat stiker paket \"${activePreview.name}\"...",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 12.5.sp,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        packDetailError != null && gridEntries.isEmpty() -> {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = packDetailError.orEmpty(),
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 13.sp,
+                                    fontFamily = SfProFontFamily
+                                )
+                            }
+                        }
+                        else -> {
+                            LazyVerticalGrid(
+                                state = gridState,
+                                columns = GridCells.Fixed(columnCount),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(gridSpacing),
+                                verticalArrangement = Arrangement.spacedBy(gridSpacing),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                itemsIndexed(
+                                    items = gridEntries,
+                                    key = { idx, entry ->
+                                        when (entry) {
+                                            is StickerGridEntry.Header -> "hdr_${entry.sectionKey}_$idx"
+                                            is StickerGridEntry.Cell -> "stk_${entry.sectionKey}_${entry.keySuffix}_${entry.item.url}"
+                                        }
+                                    }
+                                ) { _, entry ->
+                                    if (entry is StickerGridEntry.Cell) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(itemSize)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .clickable {
+                                                    StickerRepository.recordRecentSticker(context, entry.item)
+                                                    if (mode == StickerPanelMode.INLINE_EMOJI) {
+                                                        onInsertInlineSticker(entry.item)
+                                                    } else {
+                                                        onSendLargeSticker(entry.item)
+                                                    }
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            StickerImageWithPngFallback(
+                                                url = entry.item.url,
+                                                contentDescription = "Stiker",
+                                                contentScale = ContentScale.Fit,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 isSearchMode && isSearchingRemote -> {
                     Column(
                         modifier = Modifier.fillMaxSize(),
@@ -458,14 +688,14 @@ fun ChatStickerPanel(
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "Mencari stiker \"${searchQuery.trim()}\"...",
+                            text = "Mencari paket stiker \"${searchQuery.trim()}\"...",
                             color = Color(0xFF94A3B8),
                             fontSize = 13.sp,
                             fontFamily = SfProFontFamily
                         )
                     }
                 }
-                isSearchMode && searchError != null && gridEntries.isEmpty() -> {
+                isSearchMode && searchQuery.isNotBlank() && searchError != null && searchResults.isEmpty() -> {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -479,6 +709,77 @@ fun ChatStickerPanel(
                             fontSize = 13.5.sp,
                             fontFamily = SfProFontFamily
                         )
+                    }
+                }
+                isSearchMode && searchQuery.isNotBlank() -> {
+                    // Tampilkan kartu THUMBNAIL paket saja dulu agar ringan & tidak render semua stiker sekaligus
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        itemsIndexed(
+                            items = searchResults,
+                            key = { _, pack -> pack.id }
+                        ) { _, pack ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF161923))
+                                    .border(0.75.dp, Color(0xFF242938), RoundedCornerShape(12.dp))
+                                    .clickable { selectedSearchPack = pack }
+                                    .padding(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF101219)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (pack.thumbnailUrl.isNotBlank()) {
+                                        StickerImageWithPngFallback(
+                                            url = pack.thumbnailUrl,
+                                            contentDescription = pack.name,
+                                            contentScale = ContentScale.Fit,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(4.dp)
+                                        )
+                                    } else {
+                                        Text(
+                                            text = pack.name.take(1).uppercase(),
+                                            color = Color(0xFFFF5722),
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = SfProFontFamily
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = pack.name,
+                                    color = Color.White,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "@${pack.author}",
+                                    color = Color(0xFF64748B),
+                                    fontSize = 10.sp,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                     }
                 }
                 gridEntries.isEmpty() && isLoadingDefaults -> {
@@ -586,20 +887,15 @@ fun ChatStickerPanel(
                                                     onSendLargeSticker(entry.item)
                                                 }
                                             },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(context)
-                                                .data(entry.item.url)
-                                                .crossfade(false)
-                                                .memoryCachePolicy(CachePolicy.ENABLED)
-                                                .diskCachePolicy(CachePolicy.ENABLED)
-                                                .build(),
-                                            contentDescription = "Stiker",
-                                            contentScale = ContentScale.Fit,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    }
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            StickerImageWithPngFallback(
+                                                url = entry.item.url,
+                                                contentDescription = "Stiker",
+                                                contentScale = ContentScale.Fit,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        }
                                 }
                             }
                         }
@@ -685,13 +981,8 @@ fun ChatStickerPanel(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(pack.thumbnailUrl)
-                                    .crossfade(false)
-                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                    .build(),
+                            StickerImageWithPngFallback(
+                                url = pack.thumbnailUrl,
                                 contentDescription = pack.name,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
@@ -704,6 +995,39 @@ fun ChatStickerPanel(
             }
         }
     }
+}
+
+@Composable
+private fun StickerImageWithPngFallback(
+    url: String,
+    contentDescription: String,
+    contentScale: ContentScale,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var resolvedUrl by remember(url) { mutableStateOf(url) }
+    AsyncImage(
+        model = ImageRequest.Builder(context)
+            .data(resolvedUrl)
+            .crossfade(false)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .listener(
+                onError = { _, _ ->
+                    if (resolvedUrl.contains("stickerly.pstatic.net", ignoreCase = true) &&
+                        resolvedUrl.contains(".webp", ignoreCase = true)
+                    ) {
+                        resolvedUrl = resolvedUrl.replace(
+                            Regex("""\.webp(\?.*)?$""", RegexOption.IGNORE_CASE)
+                        ) { ".png${it.groupValues.getOrNull(1).orEmpty()}" }
+                    }
+                }
+            )
+            .build(),
+        contentDescription = contentDescription,
+        contentScale = contentScale,
+        modifier = modifier
+    )
 }
 
 @Composable

@@ -1061,13 +1061,13 @@ fun EditProfileScreen(
                 if (previewEffectDef != null) {
                     MultiLayerProfileEffectView(
                         effect = previewEffectDef,
-                        scaleType = ImageView.ScaleType.FIT_START,
+                        cropTopWidth = true,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
                     ApngStackedEffectView(
                         layerUrls = previewLayers,
-                        scaleType = ImageView.ScaleType.FIT_START,
+                        cropTopWidth = true,
                         modifier = Modifier.fillMaxSize()
                     )
                 }

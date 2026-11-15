@@ -306,8 +306,6 @@ fun ComicReaderScreen(
         }
     }
 
-    BackHandler { onBackClick() }
-
     Box(
         modifier = modifier
             .fillMaxSize()

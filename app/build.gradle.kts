@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.yuranime.dinz"
-    compileSdk = 34
+    compileSdk = 35
 
     val propVersionName = (project.findProperty("versionName") as? String)
         ?.removePrefix("v")?.removePrefix("V")
@@ -86,14 +86,15 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
-    implementation("androidx.activity:activity-compose:1.9.1")
+    implementation("androidx.activity:activity-compose:1.9.3")
 
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation("androidx.navigation:navigation-compose:2.8.4")
 
     // Image loading with Coil & Native APNG Animation Decoder (60 FPS)
     implementation("io.coil-kt:coil-compose:2.7.0")

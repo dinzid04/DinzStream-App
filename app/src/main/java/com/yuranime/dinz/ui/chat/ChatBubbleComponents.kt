@@ -21,6 +21,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -257,8 +259,26 @@ fun InlineStickerText(
                         placeholderVerticalAlign = PlaceholderVerticalAlign.Center
                     )
                 ) {
+                    val inlineCtx = LocalContext.current
+                    var resolvedInlineUrl by remember(seg.url) { mutableStateOf(seg.url) }
                     AsyncImage(
-                        model = seg.url,
+                        model = ImageRequest.Builder(inlineCtx)
+                            .data(resolvedInlineUrl)
+                            .crossfade(false)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .listener(
+                                onError = { _, _ ->
+                                    if (resolvedInlineUrl.contains("stickerly.pstatic.net", ignoreCase = true) &&
+                                        resolvedInlineUrl.contains(".webp", ignoreCase = true)
+                                    ) {
+                                        resolvedInlineUrl = resolvedInlineUrl.replace(
+                                            Regex("""\.webp(\?.*)?$""", RegexOption.IGNORE_CASE)
+                                        ) { ".png${it.groupValues.getOrNull(1).orEmpty()}" }
+                                    }
+                                }
+                            )
+                            .build(),
                         contentDescription = "Stiker inline",
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
@@ -280,7 +300,7 @@ fun InlineStickerText(
     )
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun ChatMessageRow(
     message: GlobalChatMessage,
@@ -318,12 +338,14 @@ fun ChatMessageRow(
     val bubbleShape = remember(isOwn) { ModernTailChatBubbleShape(isOwn = isOwn) }
     val roleUpper = remember(message.role) { message.role.ifBlank { "Member" }.uppercase(Locale.ROOT) }
     val isPrivilegedRole = remember(roleUpper) { roleUpper == "ADMIN" || roleUpper == "OWNER" }
+    val rankUpper = remember(message.rankTitle) { message.rankTitle.uppercase(Locale.ROOT) }
+    val edgeGuardPx = with(density) { 26.dp.toPx() }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(highlightAlpha)
-            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .padding(horizontal = 10.dp, vertical = 2.5.dp)
     ) {
         // Ikon indikator swipe reply elastis di belakang sisi kiri item
         val dragFraction = (offsetX.value / replyThresholdPx).coerceIn(0f, 1.25f)
@@ -332,7 +354,7 @@ fun ChatMessageRow(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .padding(start = 6.dp)
-                    .size(32.dp)
+                    .size(30.dp)
                     .graphicsLayer {
                         val s = (0.45f + dragFraction * 0.55f).coerceAtMost(1.1f)
                         scaleX = s
@@ -352,7 +374,7 @@ fun ChatMessageRow(
                     imageVector = Icons.AutoMirrored.Outlined.Reply,
                     contentDescription = "Balas",
                     tint = if (dragFraction >= 1f) Color(0xFFFF5722) else Color.White,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(15.dp)
                 )
             }
         }
@@ -363,9 +385,16 @@ fun ChatMessageRow(
                 .offset { IntOffset(offsetX.value.roundToInt(), 0) }
                 .pointerInput(message.id) {
                     var thresholdCrossed = false
+                    var allowDrag = false
                     detectHorizontalDragGestures(
-                        onDragStart = { thresholdCrossed = false },
+                        onDragStart = { startOffset ->
+                            // Abaikan sentuhan tepat di tepi layar agar gestur Predictive Back sistem tidak bentrok
+                            allowDrag = startOffset.x > edgeGuardPx &&
+                                startOffset.x < (size.width - edgeGuardPx)
+                            thresholdCrossed = false
+                        },
                         onHorizontalDrag = { change, dragAmount ->
+                            if (!allowDrag) return@detectHorizontalDragGestures
                             val next = (offsetX.value + dragAmount).coerceIn(0f, maxDragPx)
                             if (dragAmount != 0f) {
                                 change.consume()
@@ -377,6 +406,7 @@ fun ChatMessageRow(
                             }
                         },
                         onDragEnd = {
+                            if (!allowDrag) return@detectHorizontalDragGestures
                             if (offsetX.value >= replyThresholdPx) {
                                 onReplyTriggered(message)
                             }
@@ -391,6 +421,7 @@ fun ChatMessageRow(
                             }
                         },
                         onDragCancel = {
+                            allowDrag = false
                             scope.launch {
                                 offsetX.animateTo(
                                     targetValue = 0f,
@@ -411,16 +442,16 @@ fun ChatMessageRow(
                         avatarUrl = message.avatar,
                         name = message.name,
                         borderUrl = message.equippedBorderUrl,
-                        size = 36.dp,
+                        size = 32.dp,
                         onClick = { onAvatarOrNameClick(message) }
                     )
-                    Spacer(modifier = Modifier.width(3.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
                 }
 
                 val bubbleBgModifier = if (isOwn) {
                     Modifier.background(
                         brush = Brush.linearGradient(
-                            colors = listOf(Color(0xFF2A1219), Color(0xFF38141E)),
+                            colors = listOf(Color(0xFF281118), Color(0xFF35131C)),
                             start = Offset.Zero,
                             end = Offset(420f, 360f)
                         ),
@@ -428,14 +459,14 @@ fun ChatMessageRow(
                     )
                 } else {
                     Modifier.background(
-                        color = Color(0xFF161922),
+                        color = Color(0xFF151821),
                         shape = bubbleShape
                     )
                 }
 
                 Box(
                     modifier = Modifier
-                        .widthIn(min = 148.dp, max = 282.dp)
+                        .widthIn(min = 96.dp, max = 266.dp)
                         .clip(bubbleShape)
                         .then(bubbleBgModifier)
                         .combinedClickable(
@@ -446,126 +477,40 @@ fun ChatMessageRow(
                             }
                         )
                         .padding(
-                            start = if (isOwn) 12.dp else 19.dp,
-                            end = if (isOwn) 19.dp else 12.dp,
-                            top = 9.dp,
-                            bottom = 8.dp
+                            start = if (isOwn) 10.dp else 17.dp,
+                            end = if (isOwn) 17.dp else 10.dp,
+                            top = 7.dp,
+                            bottom = 6.dp
                         )
                 ) {
                     Column(modifier = Modifier.width(IntrinsicSize.Max)) {
-                        // 1. Baris Header Bubble: Username + #Tag di kiri, LV. X tanpa kotak di kanan
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .weight(1f, fill = false)
-                                    .clickable { onAvatarOrNameClick(message) },
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = message.name,
-                                    color = if (isOwn) Color(0xFFFDA4AF) else Color.White,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontFamily = SfProFontFamily,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.width(5.dp))
-                                Text(
-                                    text = "#${message.userTag}",
-                                    color = Color(0xFF64748B),
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    fontFamily = SfProFontFamily,
-                                    maxLines = 1
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Outlined.KeyboardDoubleArrowUp,
-                                    contentDescription = null,
-                                    tint = Color(0xFF38BDF8),
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Spacer(modifier = Modifier.width(2.dp))
-                                Text(
-                                    text = "LV. ${message.level}",
-                                    color = Color(0xFF94A3B8),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = SfProFontFamily
-                                )
-                            }
-                        }
-
-                        // 2. Baris Title Aktif: Mini-Title bersih tanpa kapsul + Custom Title kompak jika terpasang
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Diamond,
-                                    contentDescription = null,
-                                    tint = if (message.level >= 35) Color(0xFFF59E0B) else Color(0xFFE11D48),
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = message.rankTitle,
-                                    color = Color(0xFFCBD5E1),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    fontFamily = SfProFontFamily,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            if (message.equippedTitle.isNotBlank()) {
-                                GeometricTitleBadge(
-                                    titleName = message.equippedTitle,
-                                    tierLevel = message.equippedTitleTier,
-                                    styleVariant = message.equippedTitleVariant,
-                                    isAnimated = false,
-                                    compact = true
-                                )
-                            }
-                        }
-
-                        // 3. Blok Kutipan Reply di Dalam Bubble (klik untuk lompat ke pesan asli)
+                        // 1. Blok Kutipan Reply di PALING ATAS Bubble (sesuai layout Anibi)
                         if (message.replyToId.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(6.dp))
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(IntrinsicSize.Min)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color.Black.copy(alpha = 0.25f))
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.Black.copy(alpha = 0.28f))
                                     .clickable { onReplyQuoteClick(message.replyToId) }
-                                    .padding(end = 8.dp),
+                                    .padding(end = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .width(3.dp)
+                                        .width(2.5.dp)
                                         .fillMaxHeight()
                                         .background(Color(0xFFFF5722))
                                 )
                                 Column(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                                        .padding(horizontal = 7.dp, vertical = 4.dp)
                                 ) {
                                     Text(
                                         text = message.replyToName.ifBlank { "Member" },
                                         color = Color(0xFFFF784E),
-                                        fontSize = 11.5.sp,
+                                        fontSize = 10.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = SfProFontFamily,
                                         maxLines = 1,
@@ -574,7 +519,7 @@ fun ChatMessageRow(
                                     Text(
                                         text = message.replyToSnippet.ifBlank { "Pesan" },
                                         color = Color(0xFFCBD5E1),
-                                        fontSize = 11.5.sp,
+                                        fontSize = 10.5.sp,
                                         fontFamily = SfProFontFamily,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -582,14 +527,125 @@ fun ChatMessageRow(
                                 }
                                 DiagonalJumpArrow(
                                     color = Color(0xFF94A3B8),
-                                    modifier = Modifier.size(12.dp)
+                                    modifier = Modifier.size(11.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(5.dp))
+                        }
+
+                        // 2. Baris Identitas: Username + #Tag
+                        Row(
+                            modifier = Modifier.clickable { onAvatarOrNameClick(message) },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = message.name,
+                                color = if (isOwn) Color(0xFFFDA4AF) else Color.White,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = SfProFontFamily,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "#${message.userTag}",
+                                color = Color(0xFF64748B),
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                fontFamily = SfProFontFamily,
+                                maxLines = 1
+                            )
+                        }
+
+                        // 3. Baris Pangkat Kompak: Mini-Title (ALL-CAPS tegak) | Title Besar Beranimasi | Role & Level
+                        Spacer(modifier = Modifier.height(2.5.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            verticalArrangement = Arrangement.spacedBy(3.dp),
+                            itemVerticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Diamond,
+                                    contentDescription = null,
+                                    tint = if (message.level >= 35) Color(0xFFF59E0B) else Color(0xFFE11D48),
+                                    modifier = Modifier.size(10.5.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = rankUpper,
+                                    color = Color(0xFFE2E8F0),
+                                    fontSize = 9.8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.35.sp,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            if (message.equippedTitle.isNotBlank()) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(1.dp)
+                                        .height(9.dp)
+                                        .background(Color.White.copy(alpha = 0.22f))
+                                )
+                                GeometricTitleBadge(
+                                    titleName = message.equippedTitle,
+                                    tierLevel = message.equippedTitleTier,
+                                    styleVariant = message.equippedTitleVariant,
+                                    isAnimated = true,
+                                    compact = true
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height(9.dp)
+                                    .background(Color.White.copy(alpha = 0.22f))
+                            )
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = roleUpper,
+                                    color = if (isPrivilegedRole) Color(0xFFFB7185) else Color(0xFF94A3B8),
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.35.sp,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = " • ",
+                                    color = Color(0xFF475569),
+                                    fontSize = 9.5.sp
+                                )
+                                Icon(
+                                    imageVector = Icons.Outlined.KeyboardDoubleArrowUp,
+                                    contentDescription = null,
+                                    tint = Color(0xFF38BDF8),
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Spacer(modifier = Modifier.width(1.5.dp))
+                                Text(
+                                    text = "LV. ${message.level}",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.3.sp,
+                                    fontFamily = SfProFontFamily,
+                                    maxLines = 1
                                 )
                             }
                         }
 
                         // 4. Foto / Gambar CDN Telegram
                         if (message.imageUrl.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(7.dp))
+                            Spacer(modifier = Modifier.height(5.dp))
                             AsyncImage(
                                 model = ImageRequest.Builder(context)
                                     .data(message.imageUrl)
@@ -599,9 +655,9 @@ fun ChatMessageRow(
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .widthIn(min = 170.dp, max = 235.dp)
-                                    .heightIn(min = 110.dp, max = 220.dp)
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .widthIn(min = 150.dp, max = 225.dp)
+                                    .heightIn(min = 100.dp, max = 190.dp)
+                                    .clip(RoundedCornerShape(10.dp))
                                     .background(Color(0xFF0E1016))
                                     .clickable { onImageClick(message.imageUrl) }
                             )
@@ -609,60 +665,66 @@ fun ChatMessageRow(
 
                         // 5. Stiker Besar Mandiri (statis & animasi GIF/WebP bergerak)
                         if (message.stickerUrl.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            var resolvedStickerUrl by remember(message.stickerUrl) {
+                                mutableStateOf(message.stickerUrl)
+                            }
                             AsyncImage(
                                 model = ImageRequest.Builder(context)
-                                    .data(message.stickerUrl)
+                                    .data(resolvedStickerUrl)
                                     .crossfade(false)
                                     .memoryCachePolicy(CachePolicy.ENABLED)
                                     .diskCachePolicy(CachePolicy.ENABLED)
+                                    .listener(
+                                        onError = { _, _ ->
+                                            if (resolvedStickerUrl.contains("stickerly.pstatic.net", ignoreCase = true) &&
+                                                resolvedStickerUrl.contains(".webp", ignoreCase = true)
+                                            ) {
+                                                resolvedStickerUrl = resolvedStickerUrl.replace(
+                                                    Regex("""\.webp(\?.*)?$""", RegexOption.IGNORE_CASE)
+                                                ) { ".png${it.groupValues.getOrNull(1).orEmpty()}" }
+                                            }
+                                        }
+                                    )
                                     .build(),
                                 contentDescription = "Stiker chat",
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier
-                                    .size(124.dp)
+                                    .size(104.dp)
                                     .aspectRatio(1f)
                             )
                         }
 
                         // 6. Teks Pesan + Inline Emoji-Stiker
                         if (message.text.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                             InlineStickerText(
                                 rawText = message.text,
                                 textColor = Color(0xFFF8FAFC),
-                                fontSize = 14.5.sp,
-                                lineHeight = 20.sp
+                                fontSize = 13.8.sp,
+                                lineHeight = 18.5.sp
                             )
                         }
 
-                        // 7. Footer Kanan Bawah: Role + diedit + HH:mm
-                        Spacer(modifier = Modifier.height(5.dp))
+                        // 7. Timestamp Kanan Bawah Ramping
+                        Spacer(modifier = Modifier.height(3.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.End,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = roleUpper,
-                                color = if (isPrivilegedRole) Color(0xFFFB7185) else Color(0xFF94A3B8),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = SfProFontFamily
-                            )
                             if (message.isEdited) {
                                 Text(
-                                    text = "  •  diedit",
+                                    text = "diedit  •  ",
                                     color = Color(0xFF64748B),
-                                    fontSize = 10.sp,
+                                    fontSize = 9.5.sp,
                                     fontFamily = SfProFontFamily
                                 )
                             }
-                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = formattedTime,
                                 color = Color(0xFF94A3B8),
-                                fontSize = 10.sp,
+                                fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Medium,
                                 fontFamily = SfProFontFamily
                             )

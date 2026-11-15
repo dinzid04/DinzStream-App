@@ -7,10 +7,14 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
@@ -157,6 +161,10 @@ object GlobalChatRepository {
     private const val MESSAGES_LIMIT = 120L
 
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
+    private val repoScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    private val _rawMessages = MutableStateFlow<List<GlobalChatMessage>>(emptyList())
+    private val _liveUsersByUid = MutableStateFlow<Map<String, UserProfile>>(emptyMap())
 
     private val _messages = MutableStateFlow<List<GlobalChatMessage>>(emptyList())
     val messages: StateFlow<List<GlobalChatMessage>> = _messages.asStateFlow()
@@ -172,10 +180,64 @@ object GlobalChatRepository {
 
     private var messagesListener: ListenerRegistration? = null
     private var presenceListener: ListenerRegistration? = null
+    private var usersListener: ListenerRegistration? = null
+
+    init {
+        repoScope.launch {
+            combine(
+                _rawMessages,
+                _liveUsersByUid,
+                FirebaseManager.userProfile
+            ) { rawList, usersByUid, myProfile ->
+                rawList.map { msg -> mergeLiveUserOverlay(msg, usersByUid, myProfile) }
+            }.collect { merged ->
+                _messages.value = merged
+            }
+        }
+    }
+
+    private fun mergeLiveUserOverlay(
+        msg: GlobalChatMessage,
+        usersByUid: Map<String, UserProfile>,
+        myProfile: UserProfile?
+    ): GlobalChatMessage {
+        val live = when {
+            myProfile != null && myProfile.uid.isNotBlank() && myProfile.uid == msg.uid -> myProfile
+            msg.uid.isNotBlank() -> usersByUid[msg.uid]
+            else -> null
+        }
+        val replyLive = msg.replyToUid.takeIf { it.isNotBlank() }?.let { rUid ->
+            if (myProfile != null && myProfile.uid == rUid) myProfile else usersByUid[rUid]
+        }
+        val resolvedReplyName = replyLive?.name?.takeIf { it.isNotBlank() } ?: msg.replyToName
+        if (live == null) {
+            return if (resolvedReplyName != msg.replyToName) {
+                msg.copy(replyToName = resolvedReplyName)
+            } else msg
+        }
+        val resolvedLevel = live.level.coerceAtLeast(1)
+        return msg.copy(
+            name = live.name.ifBlank { msg.name },
+            userTag = live.userTag.ifBlank { msg.userTag },
+            avatar = live.avatar,
+            banner = live.banner,
+            bio = live.bio.ifBlank { msg.bio },
+            joinDate = live.joinDate.ifBlank { msg.joinDate },
+            role = live.role.ifBlank { msg.role },
+            level = resolvedLevel,
+            rankTitle = live.rankTitle.ifBlank { FirebaseManager.computeRankTitle(resolvedLevel) },
+            equippedTitle = live.equippedTitle,
+            equippedTitleTier = live.equippedTitleTier,
+            equippedTitleVariant = live.equippedTitleVariant,
+            equippedBorderUrl = live.equippedBorderUrl,
+            equippedProfileEffectUrl = live.equippedProfileEffectUrl,
+            replyToName = resolvedReplyName
+        )
+    }
 
     fun startListening() {
         if (messagesListener == null) {
-            _isLoadingMessages.value = _messages.value.isEmpty()
+            _isLoadingMessages.value = _rawMessages.value.isEmpty()
             messagesListener = firestore.collection(COLLECTION_MESSAGES)
                 .orderBy("timestamp", Query.Direction.ASCENDING)
                 .limitToLast(MESSAGES_LIMIT)
@@ -230,7 +292,29 @@ object GlobalChatRepository {
                             )
                         }.getOrNull()
                     }
-                    _messages.value = parsed
+                    _rawMessages.value = parsed
+                }
+        }
+
+        if (usersListener == null) {
+            usersListener = firestore.collection("users")
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        Log.w(TAG, "Listener live profile chat error: ${error.message}")
+                        return@addSnapshotListener
+                    }
+                    if (snapshot == null) return@addSnapshotListener
+                    val updated = HashMap<String, UserProfile>(snapshot.documents.size * 2)
+                    snapshot.documents.forEach { doc ->
+                        val profile = runCatching {
+                            FirebaseManager.parsePublicProfileSnapshot(doc)
+                        }.getOrNull() ?: return@forEach
+                        updated[doc.id] = profile
+                        if (profile.uid.isNotBlank()) {
+                            updated[profile.uid] = profile
+                        }
+                    }
+                    _liveUsersByUid.value = updated
                 }
         }
 
@@ -273,6 +357,8 @@ object GlobalChatRepository {
         messagesListener = null
         presenceListener?.remove()
         presenceListener = null
+        usersListener?.remove()
+        usersListener = null
     }
 
     suspend fun upsertPresence(profile: UserProfile?) = withContext(Dispatchers.IO) {

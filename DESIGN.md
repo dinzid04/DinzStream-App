@@ -1535,3 +1535,33 @@ Mengacu pada tata letak referensi `WA_1794546770520.jpg` (`1002213252.jpg`) deng
 ### D. Tab 3 Admin Console (`promo-web-admin`): Kelola Stiker Chat Default
 - Ditambahkan pada `/storage/emulated/0/termux/Workspace_uiApp/promo-web-admin/index.html` bersama Vercel Serverless proxy `/storage/emulated/0/termux/Workspace_uiApp/promo-web-admin/api/stickerly.js` (`GET /api/stickerly?action=search&q=...` dan `?action=pack&url=...`).
 - Mendukung tambah paket langsung via URL/ID Sticker.ly, preview paket & animasi WebP/GIF sebelum disimpan, pencarian Sticker.ly dengan shortcut kata kunci populer, sinkronisasi real-time `onSnapshot` + REST fallback ke koleksi `global_sticker_packs`, dan penghapusan paket.
+
+---
+
+## 46. SPESIFIKASI PERBAIKAN 43: Profile Effect Top-Width Crop (Jeda 10 Detik), Big Title Shimmer + Mini-Title Kapital, Live Sync Profil Histori Chat, Redesain Bubble Anibi, Pencarian Stiker 2 Tahap & Predictive Back Gesture 60/120fps
+
+### A. Profile Effect Preview & Layar Profil (`ApngAnimationView.kt`, `PeerProfileBottomSheet.kt`, `LoginProfileScreen.kt`, `EditProfileScreen.kt`, `ShopScreen.kt`)
+- Menambahkan `TopWidthCropImageView` (`ScaleType.MATRIX` fitting lebar penuh 100% dan menjangkarkan posisi Y di bagian paling atas `y = 0`) dengan parameter `cropTopWidth = true`, sekaligus membungkus overlay efek pada `PeerProfileBottomSheet` di dalam `clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))` agar efek terpotong bersih di batas preview sheet tanpa terpotong setengah lebar vertikal.
+- Menambahkan parameter `cycleCooldownMs = 10_000L` pada Profil pengguna (`LoginProfileScreen.kt`) dan Preview Profil (`PeerProfileBottomSheet.kt`): setelah satu siklus selesai (`maxDuration`), seluruh layer efek disembunyikan selama 10 detik penuh sebelum diputar ulang.
+
+### B. Custom Big Title & Mini-Title (`GeometricTitleBadge.kt`, `PeerProfileBottomSheet.kt`, `ChatBubbleComponents.kt`)
+- Memperbesar `endSafePad` pada `GeometricTitleBadge` (`22.dp` compact / `30.dp` penuh) serta mengatur `FlowRow` pada baris badge bubble chat agar title panjang seperti `"MYTHIC SOVEREIGN"` tampil utuh tanpa terpotong huruf terakhir.
+- Mengaktifkan animasi Big Title di bubble chat (`isAnimated = true`) dan memperkuat sapuan kilau metalik 60fps pada 8 tipe animasi (`LIQUID_GOLD_WAVE`, `HOLOGRAPHIC_FOIL`, `CRIMSON_EMBER_DRIFT`, `STARLIGHT_TWINKLE`, `CYBER_PULSE_GLOW`, `PLASMA_BORDER_FLOW`, `CELESTIAL_ORBIT`, `LIGHTNING_ARC_SWEEP`).
+- Penyeragaman Mini-Title (`SEPUH YURANIME` dll.) huruf kapital penuh (`uppercase(Locale.ROOT)`) tegak dengan pemisah garis vertikal `|` di Preview Profil dan Bubble Chat.
+
+### C. Sinkronisasi Real-Time Histori Chat (`GlobalChatRepository.kt`, `FirebaseManager.kt`)
+- Menambahkan listener real-time pada koleksi Firestore `users` yang digabung (`combine`) dengan `_rawMessages` dan `FirebaseManager.userProfile` via `FirebaseManager.parsePublicProfileSnapshot(...)`. Seluruh bubble histori pesan dan nama kutipan balasan otomatis ikut berubah seketika saat pengguna mengganti foto profil, nama, dekorasi avatar, bio, title, level, atau efek profil.
+
+### D. Redesain Bubble Chat Kompak + Anibi Hierarchy & Full-Width Composer (`ChatBubbleComponents.kt`, `GlobalChatScreen.kt`)
+- Memangkas padding internal bubble dan batas lebar minimum paksa (`widthIn(min = 96.dp, max = 266.dp)`) serta memadatkan stiker mandiri menjadi `104.dp` agar tidak ada ruang kosong berlebih.
+- Urutan tata letak isi bubble mengikuti referensi Anibi: (1) Blok kutipan reply di bagian paling atas, (2) Nama pengguna + `#Tag`, (3) Baris kompak Mini-Title kapital | Title Besar beranimasi | Role & `LV. X`, (4) Gambar / Stiker / Teks + timestamp ringkas di kanan bawah.
+- Menghapus overlay bar hitam di area komposer bawah `GlobalChatScreen` dan menyatukan tombol `+`, ikon stiker/keyboard, kolom ketik memanjang penuh, dan tombol kirim di dalam satu kapsul panjang (`RoundedCornerShape(26.dp)`).
+
+### E. Pencarian Stiker 2 Tahap & Resolusi Stiker Statis Web/Android (`StickerRepository.kt`, `ChatStickerPanel.kt`, `promo-web-admin`)
+- `StickerRepository.searchPackThumbnails` menampilkan grid kartu thumbnail paket terlebih dahulu; daftar stiker paket baru diunduh dan dirender secara lazy via `fetchPackDetail` ketika pengguna membuka pratinjau paket tersebut.
+- Memperbaiki scraping stiker statis Sticker.ly di `promo-web-admin/api/stickerly.js`, `promo-web-admin/index.html`, dan `StickerRepository.kt` untuk mendeteksi URL `.png` valid (mengatasi URL `.webp` 404 dari CDN statis Sticker.ly) beserta fallback otomatis pada Coil `ImageRequest` & `<img>` browser.
+
+### F. Interactive Predictive Back Gesture & Transisi Shared Axis X / Spring (`AndroidManifest.xml`, `app/build.gradle.kts`, `PredictiveBackNavigation.kt`, `MainActivity.kt`, `LoginProfileScreen.kt`)
+- Mengaktifkan `android:enableOnBackInvokedCallback="true"`, menaikkan `compileSdk = 35`, serta memperbarui `activity-compose:1.9.3`, `navigation-compose:2.8.4`, dan `androidx.compose.animation:animation`.
+- Membangun `PredictiveBackSurface`, `PredictiveBackItemOverlay`, dan `PredictiveBackVisibilityOverlay` berakselerasi GPU (`graphicsLayer`: skala dinamis `1f -> 0.90f`, sudut membulat `0.dp -> 28.dp`, translasi paralaks tepi kiri/kanan, scrim transparan real-time ke halaman di belakangnya, dan pegas snapback kritis saat gestur dibatalkan) beserta penjaga tepi layar `26.dp` pada swipe-to-reply bubble chat agar bebas konflik gestur.
+

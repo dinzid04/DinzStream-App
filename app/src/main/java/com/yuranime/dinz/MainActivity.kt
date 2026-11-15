@@ -9,12 +9,16 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +39,8 @@ import com.yuranime.dinz.ui.comic.ComicSearchScreen
 import com.yuranime.dinz.ui.comic.ComicViewAllScreen
 import com.yuranime.dinz.ui.components.ComicNavTab
 import com.yuranime.dinz.ui.components.NavTab
+import com.yuranime.dinz.ui.components.PredictiveBackItemOverlay
+import com.yuranime.dinz.ui.components.PredictiveBackVisibilityOverlay
 import com.yuranime.dinz.ui.cuplix.CuplixViewScreen
 import com.yuranime.dinz.ui.detail.AnimeDetailScreen
 import com.yuranime.dinz.ui.home.HomeScreen
@@ -109,9 +115,11 @@ class MainActivity : ComponentActivity() {
                     var activeComicGenreFilter by remember { mutableStateOf<String?>(null) }
 
                     fun openGlobalChat() {
-                        chatReturnTab = currentTab
-                        chatReturnComicMode = isComicMode
-                        chatReturnComicTab = selectedComicTab
+                        if (currentTab != NavTab.CHAT) {
+                            chatReturnTab = currentTab
+                            chatReturnComicMode = isComicMode
+                            chatReturnComicTab = selectedComicTab
+                        }
                         isComicMode = false
                         currentTab = NavTab.CHAT
                     }
@@ -140,126 +148,38 @@ class MainActivity : ComponentActivity() {
                     // agar pengguna terinstall tidak terus mendapat popup pembaruan di awal buka aplikasi.
                     // Pengecekan manual lewat Profil -> Periksa Pembaruan tetap tersedia.
 
+                    val isChatOpen = !isComicMode && currentTab == NavTab.CHAT
+                    val showComicBase = if (isChatOpen) chatReturnComicMode else isComicMode
+                    val activeBaseTab = if (isChatOpen) {
+                        if (chatReturnTab == NavTab.CHAT) NavTab.HOME else chatReturnTab
+                    } else {
+                        currentTab
+                    }
+                    val activeComicBaseTab = if (isChatOpen) chatReturnComicTab else selectedComicTab
+
+                    val topmostOverlay = when {
+                        selectedComicChapterId != null -> "COMIC_READER"
+                        selectedComicId != null -> "COMIC_DETAIL"
+                        showAllComics -> "COMIC_VIEW_ALL"
+                        selectedBirthdayItem != null -> "BIRTHDAY_DETAIL"
+                        selectedCuplixItem != null -> "CUPLIX_VIEW"
+                        selectedStreamingEpisodeId != null -> "STREAMING"
+                        selectedAnimeId != null -> "ANIME_DETAIL"
+                        isChatOpen -> "GLOBAL_CHAT"
+                        else -> null
+                    }
+
                     Box(modifier = Modifier.fillMaxSize()) {
-                        when {
-                            selectedComicChapterId != null -> {
-                                key(selectedComicChapterId) {
-                                    com.yuranime.dinz.ui.comic.ComicReaderScreen(
-                                        chapterId = selectedComicChapterId!!,
-                                        comicId = selectedComicId,
-                                        comicTitle = selectedComicTitle,
-                                        posterUrl = selectedComicPosterUrl,
-                                        onBackClick = { selectedComicChapterId = null }
-                                    )
-                                }
-                            }
-                            selectedComicId != null -> {
-                                key(selectedComicId) {
-                                    com.yuranime.dinz.ui.comic.ComicDetailScreen(
-                                        comicId = selectedComicId!!,
-                                        onBackClick = { selectedComicId = null },
-                                        onChapterClick = { chId -> selectedComicChapterId = chId },
-                                        onChapterWithTitleClick = { chId, title ->
-                                            selectedComicTitle = title
-                                            selectedComicChapterId = chId
-                                        },
-                                        onChapterWithDetailsClick = { chId, title, poster ->
-                                            selectedComicTitle = title
-                                            selectedComicPosterUrl = poster
-                                            selectedComicChapterId = chId
-                                        }
-                                    )
-                                }
-                            }
-                            showAllComics -> {
-                                com.yuranime.dinz.ui.comic.ComicViewAllScreen(
-                                    onBackClick = { showAllComics = false },
-                                    onComicClick = { cId -> selectedComicId = cId }
-                                )
-                            }
-                            selectedBirthdayItem != null -> {
-                                key(selectedBirthdayItem?.detailUrl) {
-                                    com.yuranime.dinz.ui.detail.BirthdayDetailScreen(
-                                        item = selectedBirthdayItem!!,
-                                        onBackClick = { selectedBirthdayItem = null },
-                                        onNavigateToDetailUrl = { newUrl ->
-                                            val idMatch = Regex("""/(character|people)/view/(\d+)/([^/?#\s]+)""").find(newUrl)
-                                            val kind = if (newUrl.contains("/people/view/")) "seiyuu_staff" else "character"
-                                            val id = idMatch?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
-                                            val slug = idMatch?.groupValues?.getOrNull(3).orEmpty()
-                                            selectedBirthdayItem = com.yuranime.dinz.data.api.BirthdayCharacterItem(
-                                                id = id,
-                                                slug = slug,
-                                                type = kind,
-                                                name = slug.replace("-", " "),
-                                                nameKanji = "",
-                                                nameEn = "",
-                                                imageUrl = "",
-                                                thumbnailUrl = "",
-                                                detailUrl = newUrl
-                                            )
-                                        },
-                                        onAnimeClick = { animeTitleOrId ->
-                                            selectedAnimeId = animeTitleOrId
-                                            selectedBirthdayItem = null
-                                        }
-                                    )
-                                }
-                            }
-                            selectedCuplixItem != null -> {
-                                key(selectedCuplixItem?.id) {
-                                    CuplixViewScreen(
-                                        initialCuplix = selectedCuplixItem,
-                                        onBackClick = { selectedCuplixItem = null },
-                                        onAnimeClick = { animeId ->
-                                            selectedCuplixItem = null
-                                            selectedAnimeId = animeId
-                                        },
-                                        onEpisodeClick = { epId, mId ->
-                                            selectedCuplixItem = null
-                                            selectedStreamingMovieId = mId
-                                            selectedStreamingEpisodeId = epId
-                                        }
-                                    )
-                                }
-                            }
-                            selectedStreamingEpisodeId != null -> {
-                                StreamingScreen(
-                                    episodeId = selectedStreamingEpisodeId!!,
-                                    movieId = selectedStreamingMovieId ?: selectedAnimeId ?: "",
-                                    onBackClick = {
-                                        selectedStreamingEpisodeId = null
-                                    },
-                                    onEpisodeChange = { newEpId ->
-                                        selectedStreamingEpisodeId = newEpId
-                                    }
-                                )
-                            }
-                            selectedAnimeId != null -> {
-                                BackHandler {
-                                    selectedAnimeId = null
-                                }
-                                AnimeDetailScreen(
-                                    movieId = selectedAnimeId!!,
-                                    onBackClick = {
-                                        selectedAnimeId = null
-                                    },
-                                    onAnimeClick = { newId ->
-                                        selectedAnimeId = newId
-                                    },
-                                    onEpisodeClick = { epId ->
-                                        selectedStreamingMovieId = selectedAnimeId
-                                        selectedStreamingEpisodeId = epId
-                                    },
-                                    onCuplixClick = { cuplixItem ->
-                                        selectedCuplixItem = cuplixItem
-                                    }
-                                )
-                            }
-                            isComicMode -> {
-                                when (selectedComicTab) {
+                        // LAYER 0: Halaman dasar tab utama (tetap hidup di bawah overlay untuk efek intip Predictive Back)
+                        AnimatedContent(
+                            targetState = showComicBase to if (showComicBase) activeComicBaseTab.name else activeBaseTab.name,
+                            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(140)) },
+                            label = "BaseTabCrossfade"
+                        ) { (comicActive, _) ->
+                            if (comicActive) {
+                                when (activeComicBaseTab) {
                                     ComicNavTab.HOME -> {
-                                        BackHandler {
+                                        BackHandler(enabled = topmostOverlay == null) {
                                             isComicMode = false
                                             currentTab = NavTab.HOME
                                         }
@@ -305,7 +225,7 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
                                     ComicNavTab.CARI -> {
-                                        BackHandler {
+                                        BackHandler(enabled = topmostOverlay == null) {
                                             selectedComicTab = ComicNavTab.HOME
                                         }
                                         ComicSearchScreen(
@@ -334,11 +254,11 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
                                     ComicNavTab.PROFILE -> {
-                                        BackHandler {
+                                        BackHandler(enabled = topmostOverlay == null) {
                                             selectedComicTab = ComicNavTab.HOME
                                         }
                                         LoginProfileScreen(
-                                            selectedTab = currentTab,
+                                            selectedTab = activeBaseTab,
                                             onTabSelected = { tab ->
                                                 if (tab == NavTab.CHAT) {
                                                     openGlobalChat()
@@ -379,12 +299,11 @@ class MainActivity : ComponentActivity() {
                                         currentTab = NavTab.HOME
                                     }
                                 }
-                            }
-                            else -> {
-                                when (currentTab) {
+                            } else {
+                                when (activeBaseTab) {
                                     NavTab.HOME -> {
                                         HomeScreen(
-                                            selectedTab = currentTab,
+                                            selectedTab = activeBaseTab,
                                             onTabSelected = { tab ->
                                                 if (tab == NavTab.CHAT) {
                                                     openGlobalChat()
@@ -421,11 +340,11 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
                                     NavTab.JADWAL -> {
-                                        BackHandler {
+                                        BackHandler(enabled = topmostOverlay == null) {
                                             currentTab = NavTab.HOME
                                         }
                                         JadwalScreen(
-                                            selectedTab = currentTab,
+                                            selectedTab = activeBaseTab,
                                             onTabSelected = { tab ->
                                                 if (tab == NavTab.CHAT) {
                                                     openGlobalChat()
@@ -445,11 +364,11 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
                                     NavTab.CARI -> {
-                                        BackHandler {
+                                        BackHandler(enabled = topmostOverlay == null) {
                                             currentTab = NavTab.HOME
                                         }
                                         SearchScreen(
-                                            selectedTab = currentTab,
+                                            selectedTab = activeBaseTab,
                                             onTabSelected = { tab ->
                                                 if (tab == NavTab.CHAT) {
                                                     openGlobalChat()
@@ -469,7 +388,7 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
                                     NavTab.COMIC -> {
-                                        BackHandler {
+                                        BackHandler(enabled = topmostOverlay == null) {
                                             currentTab = NavTab.HOME
                                         }
                                         ComicHomeScreen(
@@ -514,11 +433,11 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
                                     NavTab.PROFILE -> {
-                                        BackHandler {
+                                        BackHandler(enabled = topmostOverlay == null) {
                                             currentTab = NavTab.HOME
                                         }
                                         LoginProfileScreen(
-                                            selectedTab = currentTab,
+                                            selectedTab = activeBaseTab,
                                             onTabSelected = { tab ->
                                                 if (tab == NavTab.CHAT) {
                                                     openGlobalChat()
@@ -554,20 +473,159 @@ class MainActivity : ComponentActivity() {
                                             }
                                         )
                                     }
-                                    NavTab.CHAT -> {
-                                        GlobalChatScreen(
-                                            onBackClick = { closeGlobalChat() },
-                                            onOpenLoginProfile = {
-                                                isComicMode = false
-                                                currentTab = NavTab.PROFILE
-                                            }
-                                        )
-                                    }
                                     else -> {
                                         currentTab = NavTab.HOME
                                     }
                                 }
                             }
+                        }
+
+                        // LAYER 1..8: Tumpukan Overlay dengan Shared Axis X + Spring & Predictive Back Interaktif
+                        PredictiveBackVisibilityOverlay(
+                            visible = isChatOpen,
+                            isTopmost = topmostOverlay == "GLOBAL_CHAT",
+                            onBack = { closeGlobalChat() }
+                        ) {
+                            GlobalChatScreen(
+                                onBackClick = { closeGlobalChat() },
+                                onOpenLoginProfile = {
+                                    isComicMode = false
+                                    currentTab = NavTab.PROFILE
+                                }
+                            )
+                        }
+
+                        PredictiveBackItemOverlay(
+                            targetItem = selectedAnimeId,
+                            isTopmost = topmostOverlay == "ANIME_DETAIL",
+                            onBack = { selectedAnimeId = null }
+                        ) { animeId ->
+                            AnimeDetailScreen(
+                                movieId = animeId,
+                                onBackClick = { selectedAnimeId = null },
+                                onAnimeClick = { newId -> selectedAnimeId = newId },
+                                onEpisodeClick = { epId ->
+                                    selectedStreamingMovieId = animeId
+                                    selectedStreamingEpisodeId = epId
+                                },
+                                onCuplixClick = { cuplixItem ->
+                                    selectedCuplixItem = cuplixItem
+                                }
+                            )
+                        }
+
+                        PredictiveBackItemOverlay(
+                            targetItem = selectedStreamingEpisodeId,
+                            isTopmost = topmostOverlay == "STREAMING",
+                            onBack = { selectedStreamingEpisodeId = null },
+                            exitDurationMs = 190
+                        ) { episodeId ->
+                            StreamingScreen(
+                                episodeId = episodeId,
+                                movieId = selectedStreamingMovieId ?: selectedAnimeId ?: "",
+                                onBackClick = { selectedStreamingEpisodeId = null },
+                                onEpisodeChange = { newEpId ->
+                                    selectedStreamingEpisodeId = newEpId
+                                }
+                            )
+                        }
+
+                        PredictiveBackItemOverlay(
+                            targetItem = selectedCuplixItem,
+                            isTopmost = topmostOverlay == "CUPLIX_VIEW",
+                            onBack = { selectedCuplixItem = null }
+                        ) { cuplix ->
+                            CuplixViewScreen(
+                                initialCuplix = cuplix,
+                                onBackClick = { selectedCuplixItem = null },
+                                onAnimeClick = { animeId ->
+                                    selectedCuplixItem = null
+                                    selectedAnimeId = animeId
+                                },
+                                onEpisodeClick = { epId, mId ->
+                                    selectedCuplixItem = null
+                                    selectedStreamingMovieId = mId
+                                    selectedStreamingEpisodeId = epId
+                                }
+                            )
+                        }
+
+                        PredictiveBackItemOverlay(
+                            targetItem = selectedBirthdayItem,
+                            isTopmost = topmostOverlay == "BIRTHDAY_DETAIL",
+                            onBack = { selectedBirthdayItem = null }
+                        ) { bItem ->
+                            com.yuranime.dinz.ui.detail.BirthdayDetailScreen(
+                                item = bItem,
+                                onBackClick = { selectedBirthdayItem = null },
+                                onNavigateToDetailUrl = { newUrl ->
+                                    val idMatch = Regex("""/(character|people)/view/(\d+)/([^/?#\s]+)""").find(newUrl)
+                                    val kind = if (newUrl.contains("/people/view/")) "seiyuu_staff" else "character"
+                                    val id = idMatch?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
+                                    val slug = idMatch?.groupValues?.getOrNull(3).orEmpty()
+                                    selectedBirthdayItem = com.yuranime.dinz.data.api.BirthdayCharacterItem(
+                                        id = id,
+                                        slug = slug,
+                                        type = kind,
+                                        name = slug.replace("-", " "),
+                                        nameKanji = "",
+                                        nameEn = "",
+                                        imageUrl = "",
+                                        thumbnailUrl = "",
+                                        detailUrl = newUrl
+                                    )
+                                },
+                                onAnimeClick = { animeTitleOrId ->
+                                    selectedAnimeId = animeTitleOrId
+                                    selectedBirthdayItem = null
+                                }
+                            )
+                        }
+
+                        PredictiveBackVisibilityOverlay(
+                            visible = showAllComics,
+                            isTopmost = topmostOverlay == "COMIC_VIEW_ALL",
+                            onBack = { showAllComics = false }
+                        ) {
+                            com.yuranime.dinz.ui.comic.ComicViewAllScreen(
+                                onBackClick = { showAllComics = false },
+                                onComicClick = { cId -> selectedComicId = cId }
+                            )
+                        }
+
+                        PredictiveBackItemOverlay(
+                            targetItem = selectedComicId,
+                            isTopmost = topmostOverlay == "COMIC_DETAIL",
+                            onBack = { selectedComicId = null }
+                        ) { cId ->
+                            com.yuranime.dinz.ui.comic.ComicDetailScreen(
+                                comicId = cId,
+                                onBackClick = { selectedComicId = null },
+                                onChapterClick = { chId -> selectedComicChapterId = chId },
+                                onChapterWithTitleClick = { chId, title ->
+                                    selectedComicTitle = title
+                                    selectedComicChapterId = chId
+                                },
+                                onChapterWithDetailsClick = { chId, title, poster ->
+                                    selectedComicTitle = title
+                                    selectedComicPosterUrl = poster
+                                    selectedComicChapterId = chId
+                                }
+                            )
+                        }
+
+                        PredictiveBackItemOverlay(
+                            targetItem = selectedComicChapterId,
+                            isTopmost = topmostOverlay == "COMIC_READER",
+                            onBack = { selectedComicChapterId = null }
+                        ) { chapterId ->
+                            com.yuranime.dinz.ui.comic.ComicReaderScreen(
+                                chapterId = chapterId,
+                                comicId = selectedComicId,
+                                comicTitle = selectedComicTitle,
+                                posterUrl = selectedComicPosterUrl,
+                                onBackClick = { selectedComicChapterId = null }
+                            )
                         }
 
                         // Dialog Pembaruan Otomatis Bergaya iOS Frosted Glassmorphism

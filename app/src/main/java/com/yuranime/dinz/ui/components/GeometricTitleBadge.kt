@@ -145,7 +145,7 @@ fun GeometricTitleBadge(
         else -> 10.5.sp
     }
     val startTextPad: Dp = if (compact) 23.dp else 34.dp
-    val endSafePad: Dp = if (compact) 15.dp else 26.dp
+    val endSafePad: Dp = if (compact) 22.dp else 30.dp
 
     val phase = if (isAnimated) {
         val transition = rememberInfiniteTransition(label = "titleBadgeAnim")
@@ -256,79 +256,156 @@ fun GeometricTitleBadge(
 
                 // Render 8 Variasi Animasi di Latar Sayap (Terkunci Sempurna di Dalam clipPath)
                 clipPath(wingPath) {
+                    val span = (wingEndX - wingStartX).coerceAtLeast(1f)
+                    if (isAnimated) {
+                        // Kilau metalik diagonal halus agar setiap Custom Title terasa hidup 60fps
+                        val sheenX = wingStartX + (span + 44.dp.toPx()) * phase - 22.dp.toPx()
+                        drawLine(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    palette.highlightLine.copy(alpha = 0.20f),
+                                    Color.White.copy(alpha = 0.24f),
+                                    Color.Transparent
+                                ),
+                                startX = sheenX - 16.dp.toPx(),
+                                endX = sheenX + 16.dp.toPx()
+                            ),
+                            start = Offset(sheenX, wingTopY - 4.dp.toPx()),
+                            end = Offset(sheenX - 14.dp.toPx(), wingBottomY + 4.dp.toPx()),
+                            strokeWidth = 22.dp.toPx()
+                        )
+                    }
+
                     when (resolvedAnimType) {
                         TitleAnimationType.HOLOGRAPHIC_FOIL -> {
-                            val sweepX = wingStartX + (wingEndX - wingStartX + 40.dp.toPx()) * phase - 20.dp.toPx()
+                            val sweepX = wingStartX + (span + 46.dp.toPx()) * phase - 23.dp.toPx()
                             drawLine(
-                                brush = Brush.verticalGradient(
-                                    listOf(
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(
                                         Color.Transparent,
-                                        Color(0x66A5F3FC),
-                                        Color(0x66F472B6),
+                                        Color(0x88A5F3FC),
+                                        Color(0x99F472B6),
+                                        Color(0x88FDE047),
                                         Color.Transparent
-                                    )
+                                    ),
+                                    startX = sweepX - 18.dp.toPx(),
+                                    endX = sweepX + 18.dp.toPx()
                                 ),
-                                start = Offset(sweepX, wingTopY),
-                                end = Offset(sweepX - 10.dp.toPx(), wingBottomY),
-                                strokeWidth = 10.dp.toPx()
+                                start = Offset(sweepX, wingTopY - 4.dp.toPx()),
+                                end = Offset(sweepX - 14.dp.toPx(), wingBottomY + 4.dp.toPx()),
+                                strokeWidth = 24.dp.toPx()
                             )
                         }
                         TitleAnimationType.LIQUID_GOLD_WAVE -> {
-                            val waveX = wingStartX + (wingEndX - wingStartX) * phase
+                            val waveX = wingStartX + (span + 40.dp.toPx()) * phase - 20.dp.toPx()
                             drawLine(
-                                brush = Brush.verticalGradient(
-                                    listOf(
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(
                                         Color.Transparent,
-                                        palette.highlightLine.copy(alpha = 0.55f),
+                                        palette.primaryAccent.copy(alpha = 0.48f),
+                                        Color(0xCCFEF08A),
+                                        palette.primaryAccent.copy(alpha = 0.42f),
                                         Color.Transparent
-                                    )
+                                    ),
+                                    startX = waveX - 18.dp.toPx(),
+                                    endX = waveX + 18.dp.toPx()
                                 ),
-                                start = Offset(waveX, wingTopY),
-                                end = Offset(waveX - 7.dp.toPx(), wingBottomY),
-                                strokeWidth = 7.dp.toPx()
+                                start = Offset(waveX, wingTopY - 3.dp.toPx()),
+                                end = Offset(waveX - 12.dp.toPx(), wingBottomY + 3.dp.toPx()),
+                                strokeWidth = 22.dp.toPx()
+                            )
+                            val wave2Phase = (phase + 0.5f) % 1f
+                            val wave2X = wingStartX + (span + 30.dp.toPx()) * wave2Phase - 15.dp.toPx()
+                            drawLine(
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.White.copy(alpha = 0.50f),
+                                        Color.Transparent
+                                    ),
+                                    startX = wave2X - 6.dp.toPx(),
+                                    endX = wave2X + 6.dp.toPx()
+                                ),
+                                start = Offset(wave2X, wingTopY - 2.dp.toPx()),
+                                end = Offset(wave2X - 9.dp.toPx(), wingBottomY + 2.dp.toPx()),
+                                strokeWidth = 6.dp.toPx()
                             )
                         }
                         TitleAnimationType.CRIMSON_EMBER_DRIFT -> {
-                            for (i in 0..3) {
-                                val pLocal = (phase + i * 0.25f) % 1f
-                                val ex = wingStartX + (wingEndX - wingStartX - 18.dp.toPx()) * ((i * 0.27f + 0.12f) % 1f)
+                            for (i in 0..5) {
+                                val pLocal = (phase + i * 0.167f) % 1f
+                                val ex = wingStartX + (span - 16.dp.toPx()) * ((i * 0.19f + 0.10f) % 1f)
                                 val ey = wingBottomY - wingHeight * pLocal
                                 drawCircle(
-                                    color = palette.highlightLine.copy(alpha = (1f - pLocal) * 0.65f),
-                                    radius = 1.3.dp.toPx(),
+                                    color = palette.highlightLine.copy(alpha = (1f - pLocal) * 0.85f),
+                                    radius = if (i % 2 == 0) 1.6.dp.toPx() else 1.15.dp.toPx(),
                                     center = Offset(ex, ey)
                                 )
                             }
                         }
                         TitleAnimationType.STARLIGHT_TWINKLE -> {
-                            for (i in 0..3) {
-                                val alpha = (0.2f + 0.7f * sin((phase * 2 * Math.PI + i * 1.5).toFloat()).let { (it + 1f) / 2f })
-                                val sx = wingStartX + (wingEndX - wingStartX - 16.dp.toPx()) * (0.18f + i * 0.22f)
+                            for (i in 0..4) {
+                                val alpha = (0.2f + 0.78f * sin((phase * 2 * Math.PI + i * 1.35).toFloat()).let { (it + 1f) / 2f })
+                                val sx = wingStartX + (span - 16.dp.toPx()) * (0.14f + i * 0.19f)
                                 val sy = if (i % 2 == 0) wingTopY + wingHeight * 0.28f else wingBottomY - wingHeight * 0.28f
                                 drawCircle(
-                                    color = palette.highlightLine.copy(alpha = alpha * 0.75f),
-                                    radius = 1.2.dp.toPx(),
+                                    color = Color.White.copy(alpha = alpha * 0.85f),
+                                    radius = 1.4.dp.toPx(),
                                     center = Offset(sx, sy)
                                 )
                             }
                         }
-                        else -> Unit
+                        TitleAnimationType.CYBER_PULSE_GLOW -> {
+                            val pulse = sin(phase * 2 * Math.PI).toFloat().let { (it + 1f) / 2f }
+                            drawRect(
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(
+                                        palette.primaryAccent.copy(alpha = 0.08f + 0.22f * pulse),
+                                        palette.highlightLine.copy(alpha = 0.14f + 0.26f * pulse),
+                                        Color.Transparent
+                                    ),
+                                    startX = wingStartX,
+                                    endX = wingEndX
+                                ),
+                                topLeft = Offset(wingStartX, wingTopY),
+                                size = androidx.compose.ui.geometry.Size(span, wingHeight)
+                            )
+                        }
+                        TitleAnimationType.PLASMA_BORDER_FLOW -> {
+                            val px = wingStartX + (span + 32.dp.toPx()) * ((1f - phase + 0.5f) % 1f) - 16.dp.toPx()
+                            drawLine(
+                                color = palette.secondaryAccent.copy(alpha = 0.35f),
+                                start = Offset(px, wingTopY),
+                                end = Offset(px - 10.dp.toPx(), wingBottomY),
+                                strokeWidth = 10.dp.toPx()
+                            )
+                        }
+                        TitleAnimationType.CELESTIAL_ORBIT -> {
+                            val pulse = sin(phase * 2 * Math.PI).toFloat().let { (it + 1f) / 2f }
+                            drawCircle(
+                                color = palette.highlightLine.copy(alpha = 0.22f * pulse),
+                                radius = 14.dp.toPx(),
+                                center = Offset(wingStartX + span * phase, cy)
+                            )
+                        }
+                        TitleAnimationType.LIGHTNING_ARC_SWEEP -> Unit
                     }
 
-                    if (resolvedAnimType == TitleAnimationType.LIGHTNING_ARC_SWEEP && phase < 0.35f) {
-                        val lx = wingStartX + (wingEndX - wingStartX) * (phase / 0.35f)
+                    if (resolvedAnimType == TitleAnimationType.LIGHTNING_ARC_SWEEP && phase < 0.45f) {
+                        val lx = wingStartX + span * (phase / 0.45f)
                         drawLine(
-                            color = palette.highlightLine.copy(alpha = 0.85f),
+                            color = Color.White.copy(alpha = 0.92f),
                             start = Offset(lx, wingTopY),
                             end = Offset(lx - 4.dp.toPx(), cy),
-                            strokeWidth = 1.3.dp.toPx(),
+                            strokeWidth = 1.6.dp.toPx(),
                             cap = StrokeCap.Round
                         )
                         drawLine(
-                            color = palette.highlightLine.copy(alpha = 0.85f),
+                            color = palette.highlightLine.copy(alpha = 0.92f),
                             start = Offset(lx - 4.dp.toPx(), cy),
-                            end = Offset(lx + 2.dp.toPx(), wingBottomY),
-                            strokeWidth = 1.3.dp.toPx(),
+                            end = Offset(lx + 3.dp.toPx(), wingBottomY),
+                            strokeWidth = 1.6.dp.toPx(),
                             cap = StrokeCap.Round
                         )
                     }

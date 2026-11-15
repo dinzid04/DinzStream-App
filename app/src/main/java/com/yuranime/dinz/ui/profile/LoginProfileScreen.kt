@@ -137,6 +137,7 @@ import com.yuranime.dinz.ui.components.MultiLayerProfileEffectView
 import com.yuranime.dinz.ui.components.EmptyTitleSlotBadge
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.NavTab
+import com.yuranime.dinz.ui.components.PredictiveBackItemOverlay
 import com.yuranime.dinz.ui.components.PrimoPointIcon
 import com.yuranime.dinz.ui.components.StatusMicroTitleTagRow
 import com.yuranime.dinz.ui.components.liquidGlassBackdrop
@@ -277,10 +278,6 @@ fun LoginProfileScreen(
         }
     }
 
-    BackHandler(enabled = currentSubScreen != ProfileSubScreen.MAIN) {
-        currentSubScreen = ProfileSubScreen.MAIN
-    }
-
     if (showInfoDialog) {
         AppInfoModal(onDismiss = { showInfoDialog = false })
     }
@@ -296,132 +293,136 @@ fun LoginProfileScreen(
         )
     }
 
-    AnimatedContent(
-        targetState = currentSubScreen,
-        transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(200)) },
-        label = "ProfileSubScreenAnim"
-    ) { subScreen ->
-        when (subScreen) {
-            ProfileSubScreen.EDIT_PROFILE -> {
-                EditProfileScreen(
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Layar utama Profile tetap terpasang di bawah agar transisi Predictive Back bisa mengintip langsung
+        if (!isUserLoggedIn) {
+            LoginView(
+                isLoggingIn = isLoggingIn,
+                onBackToHomeClick = { onTabSelected(NavTab.HOME) },
+                onSettingsClick = { currentSubScreen = ProfileSubScreen.SETTINGS },
+                onGoogleLoginClick = {
+                    isLoggingIn = true
+                    try {
+                        googleSignInClient.signOut().addOnCompleteListener {
+                            val signInIntent = googleSignInClient.signInIntent
+                            googleSignInLauncher.launch(signInIntent)
+                        }
+                    } catch (e: Exception) {
+                        isLoggingIn = false
+                    }
+                },
+                onEmailLoginClick = {
+                    isLoggingIn = true
+                    try {
+                        googleSignInClient.signOut().addOnCompleteListener {
+                            val signInIntent = googleSignInClient.signInIntent
+                            googleSignInLauncher.launch(signInIntent)
+                        }
+                    } catch (e: Exception) {
+                        isLoggingIn = false
+                    }
+                },
+                onGuestLoginClick = {
+                    onTabSelected(NavTab.HOME)
+                }
+            )
+        } else {
+            val backdropLayer = rememberGraphicsLayer()
+            Box(
+                modifier = modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF0B0B0B))
+            ) {
+                UserProfileView(
+                    profile = userProfile,
                     authDb = authDb,
-                    onBackClick = { currentSubScreen = ProfileSubScreen.MAIN }
-                )
-            }
-            ProfileSubScreen.LEADERBOARD -> {
-                LeaderboardScreen(
-                    onBackClick = { currentSubScreen = ProfileSubScreen.MAIN }
-                )
-            }
-            ProfileSubScreen.POINTS_REWARDS -> {
-                PointsRewardsScreen(
-                    authDb = authDb,
-                    onBackClick = { currentSubScreen = ProfileSubScreen.MAIN }
-                )
-            }
-            ProfileSubScreen.SHOP -> {
-                ShopScreen(
-                    onBack = { currentSubScreen = ProfileSubScreen.MAIN },
-                    onNavigateToRewards = { currentSubScreen = ProfileSubScreen.POINTS_REWARDS }
-                )
-            }
-            ProfileSubScreen.DOWNLOADS -> {
-                DownloadsScreen(
-                    onBackClick = { currentSubScreen = ProfileSubScreen.MAIN },
-                    onReadComicOffline = { offlineComic ->
-                        onComicChapterClick?.invoke(offlineComic.chapterId)
+                    userRankNumber = userRankNumber,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .liquidGlassBackdrop(backdropLayer, enabled = isLiquidGlass),
+                    onEditProfileClick = { currentSubScreen = ProfileSubScreen.EDIT_PROFILE },
+                    onOpenLeaderboardClick = { currentSubScreen = ProfileSubScreen.LEADERBOARD },
+                    onOpenPointsRewardsClick = { currentSubScreen = ProfileSubScreen.POINTS_REWARDS },
+                    onOpenShopClick = { currentSubScreen = ProfileSubScreen.SHOP },
+                    onOpenTitleSlotClick = { showTitlePickerDialog = true },
+                    onOpenDownloadsClick = { currentSubScreen = ProfileSubScreen.DOWNLOADS },
+                    onOpenCollectionHistoryClick = { currentSubScreen = ProfileSubScreen.COLLECTION_HISTORY },
+                    onOpenSettingsClick = { currentSubScreen = ProfileSubScreen.SETTINGS },
+                    onOpenInfoClick = { showInfoDialog = true },
+                    onSignOutClick = {
+                        FirebaseManager.signOut(context)
+                        authDb.setLoggedIn(false)
+                        Toast.makeText(
+                            context,
+                            "Berhasil keluar dari akun",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 )
-            }
-            ProfileSubScreen.COLLECTION_HISTORY -> {
-                CollectionAndHistorySubScreen(
-                    authDb = authDb,
-                    onBackClick = { currentSubScreen = ProfileSubScreen.MAIN },
-                    onEpisodeClick = onEpisodeClick,
-                    onComicChapterClick = onComicChapterClick
+
+                BottomNavBar(
+                    selectedTab = selectedTab,
+                    onTabSelected = onTabSelected,
+                    backdropLayer = backdropLayer,
+                    isLiquidGlassEnabled = isLiquidGlass,
+                    modifier = Modifier.align(Alignment.BottomCenter)
                 )
             }
-            ProfileSubScreen.SETTINGS -> {
-                SettingsScreen(
-                    onBackClick = { currentSubScreen = ProfileSubScreen.MAIN },
-                    onCheckUpdateClick = onCheckUpdateClick
-                )
-            }
-            ProfileSubScreen.MAIN -> {
-                if (!isUserLoggedIn) {
-                    LoginView(
-                        isLoggingIn = isLoggingIn,
-                        onBackToHomeClick = { onTabSelected(NavTab.HOME) },
-                        onSettingsClick = { currentSubScreen = ProfileSubScreen.SETTINGS },
-                        onGoogleLoginClick = {
-                            isLoggingIn = true
-                            try {
-                                googleSignInClient.signOut().addOnCompleteListener {
-                                    val signInIntent = googleSignInClient.signInIntent
-                                    googleSignInLauncher.launch(signInIntent)
-                                }
-                            } catch (e: Exception) {
-                                isLoggingIn = false
-                            }
-                        },
-                        onEmailLoginClick = {
-                            isLoggingIn = true
-                            try {
-                                googleSignInClient.signOut().addOnCompleteListener {
-                                    val signInIntent = googleSignInClient.signInIntent
-                                    googleSignInLauncher.launch(signInIntent)
-                                }
-                            } catch (e: Exception) {
-                                isLoggingIn = false
-                            }
-                        },
-                        onGuestLoginClick = {
-                            onTabSelected(NavTab.HOME)
+        }
+
+        // Sub-halaman Profile tampil berlapis dengan Predictive Back interaktif + Shared Axis X
+        PredictiveBackItemOverlay(
+            targetItem = currentSubScreen.takeIf { it != ProfileSubScreen.MAIN },
+            isTopmost = currentSubScreen != ProfileSubScreen.MAIN,
+            onBack = { currentSubScreen = ProfileSubScreen.MAIN }
+        ) { subScreen ->
+            when (subScreen) {
+                ProfileSubScreen.EDIT_PROFILE -> {
+                    EditProfileScreen(
+                        authDb = authDb,
+                        onBackClick = { currentSubScreen = ProfileSubScreen.MAIN }
+                    )
+                }
+                ProfileSubScreen.LEADERBOARD -> {
+                    LeaderboardScreen(
+                        onBackClick = { currentSubScreen = ProfileSubScreen.MAIN }
+                    )
+                }
+                ProfileSubScreen.POINTS_REWARDS -> {
+                    PointsRewardsScreen(
+                        authDb = authDb,
+                        onBackClick = { currentSubScreen = ProfileSubScreen.MAIN }
+                    )
+                }
+                ProfileSubScreen.SHOP -> {
+                    ShopScreen(
+                        onBack = { currentSubScreen = ProfileSubScreen.MAIN },
+                        onNavigateToRewards = { currentSubScreen = ProfileSubScreen.POINTS_REWARDS }
+                    )
+                }
+                ProfileSubScreen.DOWNLOADS -> {
+                    DownloadsScreen(
+                        onBackClick = { currentSubScreen = ProfileSubScreen.MAIN },
+                        onReadComicOffline = { offlineComic ->
+                            onComicChapterClick?.invoke(offlineComic.chapterId)
                         }
                     )
-                } else {
-                    val backdropLayer = rememberGraphicsLayer()
-                    Box(
-                        modifier = modifier
-                            .fillMaxSize()
-                            .background(Color(0xFF0B0B0B))
-                    ) {
-                        UserProfileView(
-                            profile = userProfile,
-                            authDb = authDb,
-                            userRankNumber = userRankNumber,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .liquidGlassBackdrop(backdropLayer, enabled = isLiquidGlass),
-                            onEditProfileClick = { currentSubScreen = ProfileSubScreen.EDIT_PROFILE },
-                            onOpenLeaderboardClick = { currentSubScreen = ProfileSubScreen.LEADERBOARD },
-                            onOpenPointsRewardsClick = { currentSubScreen = ProfileSubScreen.POINTS_REWARDS },
-                            onOpenShopClick = { currentSubScreen = ProfileSubScreen.SHOP },
-                            onOpenTitleSlotClick = { showTitlePickerDialog = true },
-                            onOpenDownloadsClick = { currentSubScreen = ProfileSubScreen.DOWNLOADS },
-                            onOpenCollectionHistoryClick = { currentSubScreen = ProfileSubScreen.COLLECTION_HISTORY },
-                            onOpenSettingsClick = { currentSubScreen = ProfileSubScreen.SETTINGS },
-                            onOpenInfoClick = { showInfoDialog = true },
-                            onSignOutClick = {
-                                FirebaseManager.signOut(context)
-                                authDb.setLoggedIn(false)
-                                Toast.makeText(
-                                    context,
-                                    "Berhasil keluar dari akun",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        )
-
-                        BottomNavBar(
-                            selectedTab = selectedTab,
-                            onTabSelected = onTabSelected,
-                            backdropLayer = backdropLayer,
-                            isLiquidGlassEnabled = isLiquidGlass,
-                            modifier = Modifier.align(Alignment.BottomCenter)
-                        )
-                    }
                 }
+                ProfileSubScreen.COLLECTION_HISTORY -> {
+                    CollectionAndHistorySubScreen(
+                        authDb = authDb,
+                        onBackClick = { currentSubScreen = ProfileSubScreen.MAIN },
+                        onEpisodeClick = onEpisodeClick,
+                        onComicChapterClick = onComicChapterClick
+                    )
+                }
+                ProfileSubScreen.SETTINGS -> {
+                    SettingsScreen(
+                        onBackClick = { currentSubScreen = ProfileSubScreen.MAIN },
+                        onCheckUpdateClick = onCheckUpdateClick
+                    )
+                }
+                ProfileSubScreen.MAIN -> Unit
             }
         }
     }
@@ -1081,13 +1082,15 @@ private fun UserProfileView(
         if (effectDef != null) {
             MultiLayerProfileEffectView(
                 effect = effectDef,
-                scaleType = ImageView.ScaleType.FIT_START,
+                cropTopWidth = true,
+                cycleCooldownMs = 10_000L,
                 modifier = Modifier.fillMaxSize()
             )
         } else {
             ApngStackedEffectView(
                 layerUrls = effectLayers,
-                scaleType = ImageView.ScaleType.FIT_START,
+                cropTopWidth = true,
+                cycleCooldownMs = 10_000L,
                 modifier = Modifier.fillMaxSize()
             )
         }

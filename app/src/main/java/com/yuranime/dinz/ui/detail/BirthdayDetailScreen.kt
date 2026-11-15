@@ -90,8 +90,6 @@ fun BirthdayDetailScreen(
     onAnimeClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    BackHandler(onBack = onBackClick)
-
     var detailData by remember { mutableStateOf<BirthdayCharacterDetail?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }

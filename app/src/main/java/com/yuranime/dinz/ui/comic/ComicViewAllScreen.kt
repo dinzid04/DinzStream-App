@@ -61,8 +61,6 @@ fun ComicViewAllScreen(
     modifier: Modifier = Modifier,
     repository: ComicRepository = remember { ComicRepository() }
 ) {
-    BackHandler { onBackClick() }
-
     var comics by remember { mutableStateOf<List<ComicItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 

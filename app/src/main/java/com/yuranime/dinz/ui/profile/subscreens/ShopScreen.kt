@@ -629,7 +629,7 @@ fun ShopScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .zIndex(50f),
-                scaleType = ImageView.ScaleType.FIT_START,
+                cropTopWidth = true,
                 onLoadingChanged = { isEffectLoading = it }
             )
 

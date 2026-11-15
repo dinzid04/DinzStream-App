@@ -3477,20 +3477,30 @@ service cloud.firestore {
       const seen = new Set();
       const items = [];
       for (const entry of rawList) {
-        const url = safeStickerUrl(
+        let url = safeStickerUrl(
           typeof entry === "string"
             ? entry
             : entry?.url || entry?.image || entry?.src || ""
         );
-        if (!url || seen.has(url)) continue;
+        if (!url) continue;
+        const explicitAnimatedFlag =
+          typeof entry === "object" && entry !== null
+            ? (entry.isAnimated !== undefined
+                ? Boolean(entry.isAnimated)
+                : entry.is_animated !== undefined
+                  ? Boolean(entry.is_animated)
+                  : undefined)
+            : undefined;
+        if (explicitAnimatedFlag === false && /stickerly\.pstatic\.net\/.*\.webp(\?.*)?$/i.test(url)) {
+          url = url.replace(/\.webp(\?.*)?$/i, ".png$1");
+        }
+        if (seen.has(url)) continue;
         seen.add(url);
         const lower = url.toLowerCase();
         const isAnimated =
-          typeof entry === "object" && entry !== null && entry.isAnimated !== undefined
-            ? Boolean(entry.isAnimated)
-            : typeof entry === "object" && entry !== null && entry.is_animated !== undefined
-              ? Boolean(entry.is_animated)
-              : lower.endsWith(".gif") || lower.endsWith(".webp");
+          explicitAnimatedFlag !== undefined
+            ? explicitAnimatedFlag && (lower.endsWith(".gif") || lower.endsWith(".webp"))
+            : lower.endsWith(".gif") || lower.endsWith(".webp");
         items.push({ url, isAnimated });
       }
       return items;
@@ -3681,6 +3691,21 @@ service cloud.firestore {
       }
     }
 
+    window.handleStickerImgError = function(img, fallbackInitial) {
+      if (!img) return;
+      const src = String(img.getAttribute("src") || img.src || "");
+      if (!img.dataset.triedPng && /\.webp(\?.*)?$/i.test(src)) {
+        img.dataset.triedPng = "1";
+        img.src = src.replace(/\.webp(\?.*)?$/i, ".png$1");
+        return;
+      }
+      if (fallbackInitial) {
+        img.outerHTML = `<div class="sticker-pack-thumb-fallback">${escapeHtml(fallbackInitial)}</div>`;
+      } else {
+        img.style.opacity = "0.25";
+      }
+    };
+
     function buildThumbMarkup(thumbUrl, name) {
       const safeSrc = safeStickerUrl(thumbUrl);
       const rawFirst = String(name || "S").trim().charAt(0).toUpperCase();
@@ -3688,7 +3713,7 @@ service cloud.firestore {
       if (!safeSrc) {
         return `<div class="sticker-pack-thumb-fallback">${initial}</div>`;
       }
-      return `<img class="sticker-pack-thumb" src="${escapeHtml(safeSrc)}" alt="${escapeHtml(name)}" referrerpolicy="no-referrer" loading="lazy" onerror="this.outerHTML='<div class=&quot;sticker-pack-thumb-fallback&quot;>${initial}</div>'">`;
+      return `<img class="sticker-pack-thumb" src="${escapeHtml(safeSrc)}" alt="${escapeHtml(name)}" referrerpolicy="no-referrer" loading="lazy" onerror="handleStickerImgError(this, '${initial}')">`;
     }
 
     function renderGlobalStickerPacksList() {
@@ -3760,7 +3785,7 @@ service cloud.firestore {
               <div class="sticker-mini-grid">
                 ${visibleStickers.map((s) => `
                   <div class="sticker-tile">
-                    <img src="${escapeHtml(s.url)}" alt="Stiker" referrerpolicy="no-referrer" loading="lazy">
+                    <img src="${escapeHtml(s.url)}" alt="Stiker" referrerpolicy="no-referrer" loading="lazy" onerror="handleStickerImgError(this)">
                     ${s.isAnimated ? `<span class="sticker-gif-tag">GIF</span>` : ""}
                   </div>
                 `).join("")}
@@ -3864,40 +3889,45 @@ service cloud.firestore {
         throw new Error("Format link atau ID Sticker.ly tidak valid. Contoh: https://sticker.ly/s/BI9F13");
       }
       const packUrl = `https://sticker.ly/s/${packId}`;
-      const candidates = [];
 
       if (window.location.protocol.startsWith("http")) {
-        candidates.push(async () => {
+        try {
           const json = await fetchJsonWithTimeout(`/api/stickerly?action=pack&url=${encodeURIComponent(packUrl)}`, 9500);
-          if (!json?.status || !Array.isArray(json?.pack?.stickers) || json.pack.stickers.length === 0) {
-            throw new Error(json?.error || "Empty local pack response");
+          if (json?.status && Array.isArray(json?.pack?.stickers) && json.pack.stickers.length > 0) {
+            return parsePackFromFirestoreData(packId, json.pack);
           }
-          return parsePackFromFirestoreData(packId, json.pack);
-        });
+        } catch (err) {
+          console.warn("Same-origin /api/stickerly pack fallback:", err?.message || err);
+        }
       }
 
-      candidates.push(async () => {
-        const json = await fetchJsonWithTimeout(`https://api.snowping.cfd/api/downloader/stikerly?url=${encodeURIComponent(packUrl)}`, 6500);
-        const root = json?.result || json?.data || json;
-        const stickers = normalizeStickerItems(root?.stickers || root?.sticker || []);
-        if (stickers.length === 0) throw new Error("Empty snowping pack");
-        return parsePackFromFirestoreData(packId, {
-          name: root?.name || root?.title || `Pack ${packId}`,
-          author: root?.author || root?.creator || "sticker.ly",
-          thumbnailUrl: root?.thumbnail || root?.thumbnailUrl || stickers[0].url,
-          sourceUrl: packUrl,
-          stickers
-        });
-      });
-
-      candidates.push(async () => {
-        const json = await fetchJsonWithTimeout(`https://dinz-streaming-khaki.vercel.app/api/stickerly/pack?url=${encodeURIComponent(packUrl)}`, 9500);
-        const root = json?.pack || json;
-        if (!Array.isArray(root?.stickers) || root.stickers.length === 0) {
-          throw new Error("Empty fallback pack");
+      const candidates = [
+        async () => {
+          const json = await fetchJsonWithTimeout(`https://api.snowping.cfd/api/downloader/stikerly?url=${encodeURIComponent(packUrl)}`, 6500);
+          const root = json?.result || json?.data || json;
+          const stickers = normalizeStickerItems(root?.stickers || root?.sticker || []);
+          if (stickers.length === 0) throw new Error("Empty snowping pack");
+          const rawThumb = root?.thumbnail || root?.thumbnailUrl || "";
+          const fixedThumb = /\.webp(\?.*)?$/i.test(rawThumb) && stickers.every((s) => !s.isAnimated)
+            ? rawThumb.replace(/\.webp(\?.*)?$/i, ".png$1")
+            : rawThumb;
+          return parsePackFromFirestoreData(packId, {
+            name: root?.name || root?.title || `Pack ${packId}`,
+            author: root?.author || root?.creator || "sticker.ly",
+            thumbnailUrl: fixedThumb || stickers[0].url,
+            sourceUrl: packUrl,
+            stickers
+          });
+        },
+        async () => {
+          const json = await fetchJsonWithTimeout(`https://dinz-streaming-khaki.vercel.app/api/stickerly/pack?url=${encodeURIComponent(packUrl)}`, 9500);
+          const root = json?.pack || json;
+          if (!Array.isArray(root?.stickers) || root.stickers.length === 0) {
+            throw new Error("Empty fallback pack");
+          }
+          return parsePackFromFirestoreData(packId, root);
         }
-        return parsePackFromFirestoreData(packId, root);
-      });
+      ];
 
       return await Promise.any(candidates.map((fn) => fn()));
     }
@@ -3974,7 +4004,7 @@ service cloud.firestore {
         <div class="sticker-mini-grid">
           ${p.stickers.slice(0, 18).map((s) => `
             <div class="sticker-tile">
-              <img src="${escapeHtml(s.url)}" alt="Preview" referrerpolicy="no-referrer" loading="lazy">
+              <img src="${escapeHtml(s.url)}" alt="Preview" referrerpolicy="no-referrer" loading="lazy" onerror="handleStickerImgError(this)">
               ${s.isAnimated ? `<span class="sticker-gif-tag">GIF</span>` : ""}
             </div>
           `).join("")}

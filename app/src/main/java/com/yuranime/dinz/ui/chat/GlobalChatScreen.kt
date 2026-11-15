@@ -230,13 +230,16 @@ fun GlobalChatScreen(
         }
     }
 
-    BackHandler(enabled = true) {
+    val hasChatOverlayModal = previewImageUrl != null ||
+        previewPeer != null ||
+        contextMenuTarget != null ||
+        showStickerPanel
+    BackHandler(enabled = hasChatOverlayModal) {
         when {
             previewImageUrl != null -> previewImageUrl = null
             previewPeer != null -> previewPeer = null
             contextMenuTarget != null -> contextMenuTarget = null
             showStickerPanel -> showStickerPanel = false
-            else -> onBackClick()
         }
     }
 
@@ -584,8 +587,11 @@ fun GlobalChatScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF10131B))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 10.dp)
+                        .padding(top = 4.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFF131620))
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
@@ -655,22 +661,23 @@ fun GlobalChatScreen(
                 }
             }
 
-            HorizontalDivider(thickness = 0.5.dp, color = Color(0xFF181B25))
-
-            // 4. BAR INPUT BAWAH (+ | Stiker/Keyboard | Input + Inline Sticker | Kirim)
+            // 4. BAR INPUT BAWAH FULL-WIDTH DOCKED (Tanpa overlay hitam, tombol menyatu di dalam kapsul)
             if (!isLoggedIn) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF0E1016))
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Color(0xFF151822))
+                        .border(0.75.dp, Color(0xFF252938), RoundedCornerShape(24.dp))
+                        .padding(start = 16.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Masuk dengan Google untuk mengirim chat dan stiker.",
+                        text = "Masuk Google untuk mengirim chat dan stiker.",
                         color = Color(0xFF94A3B8),
-                        fontSize = 13.sp,
+                        fontSize = 12.5.sp,
                         fontFamily = SfProFontFamily,
                         modifier = Modifier.weight(1f)
                     )
@@ -679,132 +686,136 @@ fun GlobalChatScreen(
                         onClick = onOpenLoginProfile,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5722)),
                         shape = RoundedCornerShape(50),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 7.dp)
                     ) {
                         Text(
                             text = "Masuk",
                             color = Color.White,
-                            fontSize = 13.sp,
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = SfProFontFamily
                         )
                     }
                 }
             } else {
+                val canSend = composerState.hasSendableContent() && !isSendingMessage && !isUploadingImage
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF0B0B0B))
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    // Tombol "+" upload foto/GIF ke Telegram CDN (maks 10 MB)
-                    Box(
+                    Row(
                         modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF171A23))
-                            .clickable(enabled = !isUploadingImage) {
-                                if (requireLoggedInProfile()) {
-                                    imagePickerLauncher.launch(
-                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                    )
-                                }
-                            },
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(26.dp))
+                            .background(Color(0xFF161923))
+                            .border(0.85.dp, Color(0xFF272C3C), RoundedCornerShape(26.dp))
+                            .padding(horizontal = 5.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.Bottom
                     ) {
-                        if (isUploadingImage) {
-                            CircularProgressIndicator(
-                                color = Color(0xFFFF5722),
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        } else {
+                        // Tombol "+" upload foto/GIF menyatu di sisi kiri kapsul
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.06f))
+                                .clickable(enabled = !isUploadingImage) {
+                                    if (requireLoggedInProfile()) {
+                                        imagePickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isUploadingImage) {
+                                CircularProgressIndicator(
+                                    color = Color(0xFFFF5722),
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Outlined.Add,
+                                    contentDescription = "Kirim foto",
+                                    tint = Color(0xFFCBD5E1),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(3.dp))
+
+                        // Ikon Stiker / Keyboard menyatu tepat di sebelah tombol "+"
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(if (showStickerPanel) Color(0xFF262B3B) else Color.Transparent)
+                                .clickable {
+                                    if (showStickerPanel) {
+                                        showStickerPanel = false
+                                        inputFocusRequester.requestFocus()
+                                        keyboardController?.show()
+                                    } else {
+                                        keyboardController?.hide()
+                                        showStickerPanel = true
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
                             Icon(
-                                imageVector = Icons.Outlined.Add,
-                                contentDescription = "Kirim foto",
-                                tint = Color(0xFFCBD5E1),
-                                modifier = Modifier.size(21.dp)
+                                imageVector = if (showStickerPanel) {
+                                    Icons.Outlined.Keyboard
+                                } else {
+                                    Icons.Outlined.SentimentSatisfiedAlt
+                                },
+                                contentDescription = if (showStickerPanel) "Tampilkan keyboard" else "Buka stiker",
+                                tint = if (showStickerPanel) Color(0xFFFF5722) else Color(0xFFCBD5E1),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
-                    }
 
-                    Spacer(modifier = Modifier.width(6.dp))
+                        // Kolom ketik memanjang penuh mengisi ruang tengah kapsul
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 6.dp, vertical = 7.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            InlineStickerInputField(
+                                state = composerState,
+                                placeholder = if (editingMessage != null) "Edit pesan..." else "Tulis pesan...",
+                                enabled = !isSendingMessage,
+                                modifier = Modifier.focusRequester(inputFocusRequester),
+                                onFocused = { showStickerPanel = false }
+                            )
+                        }
 
-                    // Tombol Stiker <-> Keyboard
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(if (showStickerPanel) Color(0xFF232837) else Color(0xFF171A23))
-                            .clickable {
-                                if (showStickerPanel) {
-                                    showStickerPanel = false
-                                    inputFocusRequester.requestFocus()
-                                    keyboardController?.show()
-                                } else {
-                                    keyboardController?.hide()
-                                    showStickerPanel = true
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (showStickerPanel) {
-                                Icons.Outlined.Keyboard
+                        // Tombol Kirim menempel di ujung kanan kapsul panjang
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(if (canSend) Color(0xFFFF5722) else Color(0xFF232837))
+                                .clickable(enabled = canSend) { submitCurrentMessage() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSendingMessage) {
+                                CircularProgressIndicator(
+                                    color = Color.White,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(16.dp)
+                                )
                             } else {
-                                Icons.Outlined.SentimentSatisfiedAlt
-                            },
-                            contentDescription = if (showStickerPanel) "Tampilkan keyboard" else "Buka stiker",
-                            tint = if (showStickerPanel) Color.White else Color(0xFFCBD5E1),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // Kolom ketik + stiker kecil sebaris
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(22.dp))
-                            .background(Color(0xFF151821))
-                            .border(0.75.dp, Color(0xFF232736), RoundedCornerShape(22.dp))
-                            .padding(horizontal = 14.dp, vertical = 9.dp)
-                    ) {
-                        InlineStickerInputField(
-                            state = composerState,
-                            placeholder = if (editingMessage != null) "Edit pesan..." else "Tulis pesan...",
-                            enabled = !isSendingMessage,
-                            modifier = Modifier.focusRequester(inputFocusRequester),
-                            onFocused = { showStickerPanel = false }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    val canSend = composerState.hasSendableContent() && !isSendingMessage && !isUploadingImage
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(if (canSend) Color(0xFFFF5722) else Color(0xFF1B1F2A))
-                            .clickable(enabled = canSend) { submitCurrentMessage() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (isSendingMessage) {
-                            CircularProgressIndicator(
-                                color = Color.White,
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.Send,
-                                contentDescription = "Kirim pesan",
-                                tint = if (canSend) Color.White else Color(0xFF64748B),
-                                modifier = Modifier.size(18.dp)
-                            )
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.Send,
+                                    contentDescription = "Kirim pesan",
+                                    tint = if (canSend) Color.White else Color(0xFF64748B),
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
                         }
                     }
                 }
