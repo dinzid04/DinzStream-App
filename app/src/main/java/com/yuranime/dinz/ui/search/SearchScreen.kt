@@ -112,7 +112,8 @@ fun SearchScreen(
     selectedTab: NavTab = NavTab.CARI,
     onTabSelected: (NavTab) -> Unit = {},
     onAnimeClick: (id: String) -> Unit = {},
-    onCuplixClick: (CuplixItem) -> Unit = {}
+    onCuplixClick: (CuplixItem) -> Unit = {},
+    isTabActive: Boolean = true
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLiquidGlass by com.yuranime.dinz.data.local.AppPreferences.liquidGlassEnabled.collectAsState()
@@ -121,7 +122,7 @@ fun SearchScreen(
     val targetBounds = remember { mutableStateMapOf<String, Rect>() }
     val backdropLayer = rememberGraphicsLayer()
 
-    BackHandler(enabled = uiState.selectedSubPage != null || uiState.isSearchActive) {
+    BackHandler(enabled = isTabActive && (uiState.selectedSubPage != null || uiState.isSearchActive)) {
         if (uiState.selectedSubPage != null) {
             viewModel.closeSubPage()
         } else {

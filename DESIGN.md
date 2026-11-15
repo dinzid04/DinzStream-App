@@ -1565,3 +1565,24 @@ Mengacu pada tata letak referensi `WA_1794546770520.jpg` (`1002213252.jpg`) deng
 - Mengaktifkan `android:enableOnBackInvokedCallback="true"`, menaikkan `compileSdk = 35`, serta memperbarui `activity-compose:1.9.3`, `navigation-compose:2.8.4`, dan `androidx.compose.animation:animation`.
 - Membangun `PredictiveBackSurface`, `PredictiveBackItemOverlay`, dan `PredictiveBackVisibilityOverlay` berakselerasi GPU (`graphicsLayer`: skala dinamis `1f -> 0.90f`, sudut membulat `0.dp -> 28.dp`, translasi paralaks tepi kiri/kanan, scrim transparan real-time ke halaman di belakangnya, dan pegas snapback kritis saat gestur dibatalkan) beserta penjaga tepi layar `26.dp` pada swipe-to-reply bubble chat agar bebas konflik gestur.
 
+
+## 47. Penyempurnaan Profile Effect Edge-to-Edge, Bubble Chat Non-Bertumpuk, Tab Host Bebas Kedip Hitam, & Migrasi Firebase RTDB (Urutan 15)
+
+### A. Perbaikan Batas Full-Width & Top-Edge `Profile Effect` (`ApngAnimationView.kt`)
+- Mengunci `ScaleType.MATRIX` pada `TopWidthCropImageView` agar pembaruan Compose `AndroidView(update = ...)` tidak mengembalikan `scaleType` ke `FIT_CENTER` (yang sebelumnya menyisakan ruang kosong di atas efek layar Profil maupun celah tepi kiri-kanan pada sheet Preview Profil).
+- Menambahkan refresh matriks otomatis via `onSizeChanged`, `onVisibilityChanged`, transisi `View.VISIBLE`, dan fallback `.post` saat dimensi belum terukur, ditambah `.clipToBounds()`, `Alignment.TopCenter`, `key(cropTopWidth, sortedLayers, cachedFiles)`, serta `clipChildren`/`clipToPadding = true` pada kontainer multi-layer.
+
+### B. Tata Letak Metadata Bubble Chat 1 Baris & Inline Timestamp (`ChatBubbleComponents.kt`)
+- Memperlebar batas maks lebar bubble pesan teks (`max = 304.dp`) dan menyeragamkan ukuran avatar pengirim `32.dp`.
+- Memindahkan pil `ROLE` sejajar di kanan `Nama #Tag` pada baris identitas, serta menyusun `[♦ MINI-TITLE]`, `GeometricTitleBadge(compact = true, isAnimated = true)`, dan `[⇑ LV. X]` berdampingan dalam satu `Row` horizontal (`horizontalScroll`) tanpa pemisah garis vertikal `|`.
+- Menyelaraskan timestamp sebaris di kanan pesan teks 1 baris pendek sehingga tidak lagi menyisakan celah kosong di bagian bawah bubble.
+
+### C. Perpindahan Tab Navbar Bebas Kedip Hitam & Tanpa Jeda (`MainActivity.kt`, `HomeScreen.kt`, `SearchScreen.kt`, `ComicSearchScreen.kt`, `LoginProfileScreen.kt`)
+- Mengganti `AnimatedContent(fadeIn togetherWith fadeOut)` yang menimbulkan celah transparansi ke latar hitam `#050507` dan membuang state/layer AGSL setiap pergantian tab menjadi host cache `visitedBaseTabs` di `MainActivity.kt`. Halaman keluar ditahan 100% opak (`alpha = 1f`, `zIndex = 1f`) di bawah halaman masuk (`0f -> 1f`, `140ms`, `FastOutSlowInEasing`), sedangkan tab non-aktif melewati `drawWithContent`, memblokir pointer off-tab (`PointerEventPass.Initial`), menonaktifkan `BackHandler` (`isTabActive`), dan menjeda pemutaran APNG Profil saat tidak tampil.
+- Mengangkat `JadwalViewModel` dan `SearchViewModel` ke `MainActivity.kt` agar memuat data di latar belakang sejak splash, diikuti pre-staging tab utama secara bertahap setelah splash selesai.
+- Menambahkan sinkronisasi `LaunchedEffect(initialGenre)` di `ComicSearchScreen.kt` agar perpindahan genre tetap memperbarui hasil saat tab komik tetap hidup di memori.
+
+### D. Migrasi Global Chat & Presence ke Firebase RTDB + Sync Profil Berbasis UID Aktif (`google-services.json`, `app/build.gradle.kts`, `YuranimeApp.kt`, `GlobalChatRepository.kt`, `GlobalChatScreen.kt`)
+- Mengaktifkan `com.google.firebase:firebase-database-ktx`, memperbarui `app/google-services.json` (project `dinz-62119`, URL RTDB `asia-southeast1`, dukungan SHA-1 debug & release), dan menyesuaikan fallback `FirebaseOptions` di `YuranimeApp.kt`.
+- Memindahkan `global_chat_messages` (`orderByChild("timestamp").limitToLast(120)`, `ServerValue.TIMESTAMP`, `push()`) dan `chat_presence` (`.info/connected` auto-rearm + `.onDisconnect().removeValue()`, `PRESENCE_TTL_MS = 300_000L`) sepenuhnya ke Firebase Realtime Database serta menghapus loop polling 20 detik di `GlobalChatScreen.kt`.
+- Mengganti listener koleksi penuh Firestore `users` di `GlobalChatRepository.kt` dengan query `whereIn(FieldPath.documentId(), chunk)` per batch 30 UID yang benar-benar tampil di riwayat pesan & kutipan reply.

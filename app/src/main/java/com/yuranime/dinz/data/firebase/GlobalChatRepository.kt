@@ -2,11 +2,16 @@ package com.yuranime.dinz.data.firebase
 
 import android.content.Context
 import android.util.Log
-import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.Query as RtdbQuery
+import com.google.firebase.database.ServerValue
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -151,15 +156,24 @@ object InlineStickerCodec {
 }
 
 /**
- * Pengelola data real-time Chat Global (`global_chat_messages` & `chat_presence`).
+ * Pengelola data real-time Chat Global berbasis Firebase Realtime Database (RTDB):
+ * - `global_chat_messages` (`orderByChild("timestamp").limitToLast(120)`) + ServerValue.TIMESTAMP.
+ * - `chat_presence` dengan `.onDisconnect().removeValue()` otomatis tanpa heartbeat spam.
+ * - Sinkronisasi profil `users` Firestore hanya untuk UID unik yang tampil di 120 pesan aktif (anti-bengkak read).
  */
 object GlobalChatRepository {
     private const val TAG = "GlobalChatRepository"
-    private const val COLLECTION_MESSAGES = "global_chat_messages"
-    private const val COLLECTION_PRESENCE = "chat_presence"
-    private const val PRESENCE_TTL_MS = 90_000L
-    private const val MESSAGES_LIMIT = 120L
+    private const val RTDB_URL = "https://dinz-62119-default-rtdb.asia-southeast1.firebasedatabase.app"
+    private const val NODE_MESSAGES = "global_chat_messages"
+    private const val NODE_PRESENCE = "chat_presence"
+    private const val PRESENCE_TTL_MS = 300_000L
+    private const val MESSAGES_LIMIT = 120
+    private const val FIRESTORE_IN_BATCH_SIZE = 30
 
+    private val database: FirebaseDatabase by lazy { FirebaseDatabase.getInstance(RTDB_URL) }
+    private val messagesRef by lazy { database.getReference(NODE_MESSAGES) }
+    private val presenceRef by lazy { database.getReference(NODE_PRESENCE) }
+    private val connectedRef by lazy { database.getReference(".info/connected") }
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
     private val repoScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -178,9 +192,23 @@ object GlobalChatRepository {
     private val _messagesError = MutableStateFlow<String?>(null)
     val messagesError: StateFlow<String?> = _messagesError.asStateFlow()
 
-    private var messagesListener: ListenerRegistration? = null
-    private var presenceListener: ListenerRegistration? = null
-    private var usersListener: ListenerRegistration? = null
+    private var messagesQuery: RtdbQuery? = null
+    private var messagesValueListener: ValueEventListener? = null
+    private var presenceValueListener: ValueEventListener? = null
+    private var connectedValueListener: ValueEventListener? = null
+
+    private var subscribedUserUids: Set<String> = emptySet()
+    private val userChunkListeners = mutableListOf<ListenerRegistration>()
+    private val chunkUserMaps = LinkedHashMap<Int, Map<String, UserProfile>>()
+
+    @Volatile
+    private var lastPresenceUid: String? = null
+
+    @Volatile
+    private var lastPresenceName: String? = null
+
+    @Volatile
+    private var lastPresenceAvatar: String? = null
 
     init {
         repoScope.launch {
@@ -195,6 +223,15 @@ object GlobalChatRepository {
             }
         }
     }
+
+    private fun DataSnapshot.readString(key: String): String =
+        (child(key).value as? String).orEmpty()
+
+    private fun DataSnapshot.readLong(key: String, default: Long = 0L): Long =
+        (child(key).value as? Number)?.toLong() ?: default
+
+    private fun DataSnapshot.readBool(key: String, default: Boolean = false): Boolean =
+        (child(key).value as? Boolean) ?: default
 
     private fun mergeLiveUserOverlay(
         msg: GlobalChatMessage,
@@ -235,111 +272,134 @@ object GlobalChatRepository {
         )
     }
 
-    fun startListening() {
-        if (messagesListener == null) {
-            _isLoadingMessages.value = _rawMessages.value.isEmpty()
-            messagesListener = firestore.collection(COLLECTION_MESSAGES)
-                .orderBy("timestamp", Query.Direction.ASCENDING)
-                .limitToLast(MESSAGES_LIMIT)
-                .addSnapshotListener { snapshot, error ->
-                    if (error != null) {
-                        Log.e(TAG, "Listener chat global error: ${error.message}", error)
-                        _isLoadingMessages.value = false
-                        _messagesError.value = error.localizedMessage ?: "Gagal memuat chat global."
-                        return@addSnapshotListener
-                    }
-                    _messagesError.value = null
-                    _isLoadingMessages.value = false
-                    if (snapshot == null) return@addSnapshotListener
+    private fun syncActiveUserListeners(messages: List<GlobalChatMessage>) {
+        val activeUids = buildSet {
+            messages.forEach { msg ->
+                if (msg.uid.isNotBlank()) add(msg.uid)
+                if (msg.replyToUid.isNotBlank()) add(msg.replyToUid)
+            }
+        }
+        if (activeUids == subscribedUserUids) return
 
-                    val parsed = snapshot.documents.mapNotNull { doc ->
-                        runCatching {
-                            val uid = doc.getString("uid").orEmpty()
-                            val level = (doc.getLong("level") ?: 1L).toInt().coerceAtLeast(1)
-                            val rawTs = when (val tsAny = doc.get("timestamp")) {
-                                is Number -> tsAny.toLong()
-                                is Timestamp -> tsAny.toDate().time
-                                else -> 0L
-                            }
-                            GlobalChatMessage(
-                                id = doc.id,
-                                uid = uid,
-                                name = doc.getString("name")?.ifBlank { null } ?: "Member Yuranime",
-                                userTag = doc.getString("userTag")?.ifBlank { null }
-                                    ?: FirebaseManager.computeUserTag(uid),
-                                avatar = doc.getString("avatar").orEmpty(),
-                                banner = doc.getString("banner").orEmpty(),
-                                bio = doc.getString("bio").orEmpty(),
-                                joinDate = doc.getString("joinDate").orEmpty(),
-                                role = doc.getString("role")?.ifBlank { null } ?: "Member",
-                                level = level,
-                                rankTitle = doc.getString("rankTitle")?.ifBlank { null }
-                                    ?: FirebaseManager.computeRankTitle(level),
-                                equippedTitle = doc.getString("equippedTitle").orEmpty(),
-                                equippedTitleTier = (doc.getLong("equippedTitleTier") ?: level.toLong()).toInt(),
-                                equippedTitleVariant = (doc.getLong("equippedTitleVariant") ?: 0L).toInt(),
-                                equippedBorderUrl = doc.getString("equippedBorderUrl").orEmpty(),
-                                equippedProfileEffectUrl = doc.getString("equippedProfileEffectUrl").orEmpty(),
-                                text = doc.getString("text").orEmpty(),
-                                stickerUrl = doc.getString("stickerUrl").orEmpty(),
-                                imageUrl = doc.getString("imageUrl").orEmpty(),
-                                replyToId = doc.getString("replyToId").orEmpty(),
-                                replyToUid = doc.getString("replyToUid").orEmpty(),
-                                replyToName = doc.getString("replyToName").orEmpty(),
-                                replyToSnippet = doc.getString("replyToSnippet").orEmpty(),
-                                timestamp = rawTs,
-                                isEdited = doc.getBoolean("isEdited") ?: false
-                            )
-                        }.getOrNull()
-                    }
-                    _rawMessages.value = parsed
-                }
+        subscribedUserUids = activeUids
+        userChunkListeners.forEach { runCatching { it.remove() } }
+        userChunkListeners.clear()
+        chunkUserMaps.clear()
+
+        if (activeUids.isEmpty()) {
+            _liveUsersByUid.value = emptyMap()
+            return
         }
 
-        if (usersListener == null) {
-            usersListener = firestore.collection("users")
+        val sortedChunks = activeUids.toList().sorted().chunked(FIRESTORE_IN_BATCH_SIZE)
+        sortedChunks.forEachIndexed { chunkIdx, uidChunk ->
+            val reg = firestore.collection("users")
+                .whereIn(FieldPath.documentId(), uidChunk)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
-                        Log.w(TAG, "Listener live profile chat error: ${error.message}")
+                        Log.w(TAG, "Listener profil aktif chat error: ${error.message}")
                         return@addSnapshotListener
                     }
                     if (snapshot == null) return@addSnapshotListener
-                    val updated = HashMap<String, UserProfile>(snapshot.documents.size * 2)
+                    val localMap = HashMap<String, UserProfile>(snapshot.documents.size * 2)
                     snapshot.documents.forEach { doc ->
                         val profile = runCatching {
                             FirebaseManager.parsePublicProfileSnapshot(doc)
                         }.getOrNull() ?: return@forEach
-                        updated[doc.id] = profile
+                        localMap[doc.id] = profile
                         if (profile.uid.isNotBlank()) {
-                            updated[profile.uid] = profile
+                            localMap[profile.uid] = profile
                         }
                     }
-                    _liveUsersByUid.value = updated
+                    synchronized(chunkUserMaps) {
+                        chunkUserMaps[chunkIdx] = localMap
+                        val merged = HashMap<String, UserProfile>()
+                        chunkUserMaps.values.forEach { merged.putAll(it) }
+                        _liveUsersByUid.value = merged
+                    }
                 }
+            userChunkListeners.add(reg)
+        }
+    }
+
+    fun startListening() {
+        if (messagesValueListener == null) {
+            _isLoadingMessages.value = _rawMessages.value.isEmpty()
+            val query = messagesRef.orderByChild("timestamp").limitToLast(MESSAGES_LIMIT)
+            val listener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    _messagesError.value = null
+                    _isLoadingMessages.value = false
+                    val parsed = snapshot.children.mapNotNull { child ->
+                        runCatching {
+                            val id = child.key.orEmpty()
+                            if (id.isBlank()) return@mapNotNull null
+                            val uid = child.readString("uid")
+                            val level = child.readLong("level", 1L).toInt().coerceAtLeast(1)
+                            val rawTs = child.readLong("timestamp", 0L)
+                            GlobalChatMessage(
+                                id = id,
+                                uid = uid,
+                                name = child.readString("name").ifBlank { "Member Yuranime" },
+                                userTag = child.readString("userTag").ifBlank {
+                                    FirebaseManager.computeUserTag(uid)
+                                },
+                                avatar = child.readString("avatar"),
+                                banner = child.readString("banner"),
+                                bio = child.readString("bio"),
+                                joinDate = child.readString("joinDate"),
+                                role = child.readString("role").ifBlank { "Member" },
+                                level = level,
+                                rankTitle = child.readString("rankTitle").ifBlank {
+                                    FirebaseManager.computeRankTitle(level)
+                                },
+                                equippedTitle = child.readString("equippedTitle"),
+                                equippedTitleTier = child.readLong("equippedTitleTier", level.toLong()).toInt(),
+                                equippedTitleVariant = child.readLong("equippedTitleVariant", 0L).toInt(),
+                                equippedBorderUrl = child.readString("equippedBorderUrl"),
+                                equippedProfileEffectUrl = child.readString("equippedProfileEffectUrl"),
+                                text = child.readString("text"),
+                                stickerUrl = child.readString("stickerUrl"),
+                                imageUrl = child.readString("imageUrl"),
+                                replyToId = child.readString("replyToId"),
+                                replyToUid = child.readString("replyToUid"),
+                                replyToName = child.readString("replyToName"),
+                                replyToSnippet = child.readString("replyToSnippet"),
+                                timestamp = rawTs,
+                                isEdited = child.readBool("isEdited", false)
+                            )
+                        }.getOrNull()
+                    }.sortedBy { it.timestamp }
+                    _rawMessages.value = parsed
+                    syncActiveUserListeners(parsed)
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e(TAG, "Listener RTDB chat global error: ${error.message}", error.toException())
+                    _isLoadingMessages.value = false
+                    _messagesError.value = error.message.ifBlank { "Gagal memuat chat global." }
+                }
+            }
+            messagesQuery = query
+            messagesValueListener = listener
+            query.addValueEventListener(listener)
         }
 
-        if (presenceListener == null) {
-            presenceListener = firestore.collection(COLLECTION_PRESENCE)
-                .addSnapshotListener { snapshot, error ->
-                    if (error != null) {
-                        Log.w(TAG, "Listener presence chat error: ${error.message}")
-                        return@addSnapshotListener
-                    }
-                    if (snapshot == null) return@addSnapshotListener
-                    val cutoff = System.currentTimeMillis() - PRESENCE_TTL_MS
-                    val active = snapshot.documents.mapNotNull { doc ->
-                        val isOnline = doc.getBoolean("isOnline") ?: true
-                        val lastSeenMs = when (val v = doc.get("lastSeenMs")) {
-                            is Number -> v.toLong()
-                            is Timestamp -> v.toDate().time
-                            else -> 0L
-                        }
-                        if (!isOnline || lastSeenMs < cutoff) return@mapNotNull null
-                        val uid = doc.getString("uid")?.ifBlank { null } ?: doc.id
+        if (presenceValueListener == null) {
+            val pListener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val now = System.currentTimeMillis()
+                    val cutoff = now - PRESENCE_TTL_MS
+                    val active = snapshot.children.mapNotNull { child ->
+                        val isOnline = child.readBool("isOnline", false)
+                        val lastSeenMs = child.readLong("lastSeenMs", now)
+                        if (!isOnline || (lastSeenMs > 0L && lastSeenMs < cutoff)) return@mapNotNull null
+                        val uid = child.readString("uid").ifBlank { child.key.orEmpty() }
+                        if (uid.isBlank()) return@mapNotNull null
                         ChatPresenceUser(
                             uid = uid,
-                            name = doc.getString("name")?.ifBlank { null } ?: "Member",
-                            avatar = doc.getString("avatar").orEmpty(),
+                            name = child.readString("name").ifBlank { "Member" },
+                            avatar = child.readString("avatar"),
                             lastSeenMs = lastSeenMs
                         )
                     }.distinctBy { it.uid }
@@ -349,16 +409,80 @@ object GlobalChatRepository {
                         )
                     _onlineUsers.value = active
                 }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.w(TAG, "Listener RTDB presence chat error: ${error.message}")
+                }
+            }
+            presenceValueListener = pListener
+            presenceRef.addValueEventListener(pListener)
+        }
+
+        if (connectedValueListener == null) {
+            val cListener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val isConnected = snapshot.getValue(Boolean::class.java) == true
+                    val uid = lastPresenceUid?.takeIf { it.isNotBlank() } ?: return
+                    if (isConnected) {
+                        val pName = lastPresenceName ?: "Member Yuranime"
+                        val pAvatar = lastPresenceAvatar.orEmpty()
+                        repoScope.launch(Dispatchers.IO) {
+                            publishPresenceNode(uid, pName, pAvatar)
+                        }
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) = Unit
+            }
+            connectedValueListener = cListener
+            connectedRef.addValueEventListener(cListener)
         }
     }
 
     fun stopListening() {
-        messagesListener?.remove()
-        messagesListener = null
-        presenceListener?.remove()
-        presenceListener = null
-        usersListener?.remove()
-        usersListener = null
+        val mQuery = messagesQuery
+        val mListener = messagesValueListener
+        if (mQuery != null && mListener != null) {
+            runCatching { mQuery.removeEventListener(mListener) }
+        }
+        messagesQuery = null
+        messagesValueListener = null
+
+        presenceValueListener?.let { listener ->
+            runCatching { presenceRef.removeEventListener(listener) }
+        }
+        presenceValueListener = null
+
+        connectedValueListener?.let { listener ->
+            runCatching { connectedRef.removeEventListener(listener) }
+        }
+        connectedValueListener = null
+
+        userChunkListeners.forEach { runCatching { it.remove() } }
+        userChunkListeners.clear()
+        subscribedUserUids = emptySet()
+        synchronized(chunkUserMaps) {
+            chunkUserMaps.clear()
+        }
+    }
+
+    private suspend fun publishPresenceNode(uid: String, name: String, avatar: String) {
+        if (FirebaseAuth.getInstance().currentUser == null) return
+        runCatching {
+            val nodeRef = presenceRef.child(uid)
+            nodeRef.onDisconnect().removeValue().await()
+            nodeRef.setValue(
+                mapOf(
+                    "uid" to uid,
+                    "name" to name,
+                    "avatar" to avatar,
+                    "isOnline" to true,
+                    "lastSeenMs" to ServerValue.TIMESTAMP
+                )
+            ).await()
+        }.onFailure {
+            Log.w(TAG, "Gagal perbarui presence RTDB: ${it.message}")
+        }
     }
 
     suspend fun upsertPresence(profile: UserProfile?) = withContext(Dispatchers.IO) {
@@ -371,34 +495,32 @@ object GlobalChatRepository {
         val avatar = profile?.avatar?.ifBlank { null }
             ?: FirebaseManager.googleSession.value?.photoUrl
             ?: ""
-        runCatching {
-            firestore.collection(COLLECTION_PRESENCE).document(uid)
-                .set(
-                    mapOf(
-                        "uid" to uid,
-                        "name" to name,
-                        "avatar" to avatar,
-                        "isOnline" to true,
-                        "lastSeenMs" to System.currentTimeMillis()
-                    ),
-                    SetOptions.merge()
-                ).await()
-        }.onFailure {
-            Log.w(TAG, "Gagal perbarui presence chat: ${it.message}")
-        }
+        lastPresenceUid = uid
+        lastPresenceName = name
+        lastPresenceAvatar = avatar
+        publishPresenceNode(uid, name, avatar)
     }
 
     suspend fun leavePresence(uid: String?) = withContext(Dispatchers.IO) {
         val resolvedUid = uid?.takeIf { it.isNotBlank() } ?: return@withContext
+        if (lastPresenceUid == resolvedUid) {
+            lastPresenceUid = null
+            lastPresenceName = null
+            lastPresenceAvatar = null
+        }
         runCatching {
-            firestore.collection(COLLECTION_PRESENCE).document(resolvedUid)
-                .set(
-                    mapOf(
-                        "isOnline" to false,
-                        "lastSeenMs" to System.currentTimeMillis()
-                    ),
-                    SetOptions.merge()
-                ).await()
+            val nodeRef = presenceRef.child(resolvedUid)
+            nodeRef.onDisconnect().cancel().await()
+            nodeRef.removeValue().await()
+        }
+    }
+
+    private fun mapRtdbWriteError(err: Throwable): Throwable {
+        val msg = err.message.orEmpty()
+        return if (msg.contains("Permission denied", ignoreCase = true)) {
+            IllegalStateException("Sesi Firebase belum aktif. Silakan logout lalu login ulang Google untuk mengirim pesan.")
+        } else {
+            err
         }
     }
 
@@ -421,9 +543,6 @@ object GlobalChatRepository {
             "name" to sender.name.ifBlank { "Member Yuranime" },
             "userTag" to sender.userTag.ifBlank { FirebaseManager.computeUserTag(uid) },
             "avatar" to sender.avatar,
-            "banner" to sender.banner,
-            "bio" to sender.bio,
-            "joinDate" to sender.joinDate,
             "role" to sender.role.ifBlank { "Member" },
             "level" to sender.level.coerceAtLeast(1),
             "rankTitle" to sender.rankTitle.ifBlank { FirebaseManager.computeRankTitle(sender.level) },
@@ -439,15 +558,20 @@ object GlobalChatRepository {
             "replyToUid" to (replyTo?.uid ?: ""),
             "replyToName" to (replyTo?.name ?: ""),
             "replyToSnippet" to (replyTo?.let { InlineStickerCodec.buildReplySnippet(it) } ?: ""),
-            "timestamp" to System.currentTimeMillis(),
+            "timestamp" to ServerValue.TIMESTAMP,
             "isEdited" to false
         )
         runCatching {
-            firestore.collection(COLLECTION_MESSAGES).add(payload).await()
+            val pushRef = messagesRef.push()
+            pushRef.setValue(payload).await()
             Unit
-        }.onFailure {
-            Log.e(TAG, "Gagal mengirim pesan: ${it.message}", it)
-        }
+        }.fold(
+            onSuccess = { Result.success(Unit) },
+            onFailure = { err ->
+                Log.e(TAG, "Gagal mengirim pesan RTDB: ${err.message}", err)
+                Result.failure(mapRtdbWriteError(err))
+            }
+        )
     }
 
     suspend fun uploadAndSendChatImage(
@@ -483,18 +607,22 @@ object GlobalChatRepository {
             return@withContext Result.failure(IllegalArgumentException("Teks pesan tidak boleh kosong."))
         }
         runCatching {
-            firestore.collection(COLLECTION_MESSAGES).document(messageId)
-                .update(
+            messagesRef.child(messageId)
+                .updateChildren(
                     mapOf(
                         "text" to trimmed,
                         "isEdited" to true,
-                        "editedAt" to System.currentTimeMillis()
+                        "editedAt" to ServerValue.TIMESTAMP
                     )
                 ).await()
             Unit
-        }.onFailure {
-            Log.e(TAG, "Gagal edit pesan $messageId: ${it.message}", it)
-        }
+        }.fold(
+            onSuccess = { Result.success(Unit) },
+            onFailure = { err ->
+                Log.e(TAG, "Gagal edit pesan RTDB $messageId: ${err.message}", err)
+                Result.failure(mapRtdbWriteError(err))
+            }
+        )
     }
 
     suspend fun deleteMessage(messageId: String): Result<Unit> = withContext(Dispatchers.IO) {
@@ -502,10 +630,14 @@ object GlobalChatRepository {
             return@withContext Result.failure(IllegalArgumentException("ID pesan tidak valid."))
         }
         runCatching {
-            firestore.collection(COLLECTION_MESSAGES).document(messageId).delete().await()
+            messagesRef.child(messageId).removeValue().await()
             Unit
-        }.onFailure {
-            Log.e(TAG, "Gagal hapus pesan $messageId: ${it.message}", it)
-        }
+        }.fold(
+            onSuccess = { Result.success(Unit) },
+            onFailure = { err ->
+                Log.e(TAG, "Gagal hapus pesan RTDB $messageId: ${err.message}", err)
+                Result.failure(mapRtdbWriteError(err))
+            }
+        )
     }
 }

@@ -171,17 +171,14 @@ fun GlobalChatScreen(
         }
     }
 
-    // Listener pesan + presence heartbeat saat berada di GlobalChatScreen
+    // Listener pesan + presence RTDB (.onDisconnect() otomatis tanpa heartbeat 20 detik)
     LaunchedEffect(Unit) {
         GlobalChatRepository.startListening()
     }
 
     LaunchedEffect(currentProfile?.uid, currentProfile?.name, currentProfile?.avatar, isLoggedIn) {
         if (!isLoggedIn) return@LaunchedEffect
-        while (true) {
-            GlobalChatRepository.upsertPresence(currentProfile)
-            delay(20_000L)
-        }
+        GlobalChatRepository.upsertPresence(currentProfile)
     }
 
     DisposableEffect(currentUid) {

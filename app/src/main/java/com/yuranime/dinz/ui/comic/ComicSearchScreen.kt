@@ -115,9 +115,10 @@ fun ComicSearchScreen(
     selectedComicTab: ComicNavTab = ComicNavTab.CARI,
     onComicTabSelected: (ComicNavTab) -> Unit,
     modifier: Modifier = Modifier,
-    repository: ComicRepository = remember { ComicRepository() }
+    repository: ComicRepository = remember { ComicRepository() },
+    isTabActive: Boolean = true
 ) {
-    BackHandler { onBackClick() }
+    BackHandler(enabled = isTabActive) { onBackClick() }
 
     val scope = rememberCoroutineScope()
     val backdropLayer = rememberGraphicsLayer()
@@ -127,6 +128,9 @@ fun ComicSearchScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedFormatTab by remember { mutableStateOf("Semua") }
     var selectedGenre by remember { mutableStateOf(initialGenre.orEmpty()) }
+    LaunchedEffect(initialGenre) {
+        selectedGenre = initialGenre.orEmpty()
+    }
     var selectedSort by remember { mutableStateOf("Pembaruan terbaru") } // "Pembaruan terbaru" atau "Populer"
     var selectedStatus by remember { mutableStateOf("") } // "Berlanjut", "Tamat", "Hiatus"
 

@@ -10,11 +10,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -275,7 +277,15 @@ fun ApngAnimationView(
  */
 private class TopWidthCropImageView(context: android.content.Context) : ImageView(context) {
     init {
-        scaleType = ScaleType.MATRIX
+        super.setScaleType(ScaleType.MATRIX)
+    }
+
+    override fun setScaleType(scaleType: ScaleType?) {
+        // Pertahankan ScaleType.MATRIX agar efek profil selalu 100% full-width dan menempel di atas (y = 0)
+        if (this.scaleType != ScaleType.MATRIX) {
+            super.setScaleType(ScaleType.MATRIX)
+        }
+        applyTopWidthMatrix()
     }
 
     override fun setImageDrawable(drawable: android.graphics.drawable.Drawable?) {
@@ -294,15 +304,37 @@ private class TopWidthCropImageView(context: android.content.Context) : ImageVie
         applyTopWidthMatrix()
     }
 
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        applyTopWidthMatrix()
+    }
+
+    override fun onVisibilityChanged(changedView: View, visibility: Int) {
+        super.onVisibilityChanged(changedView, visibility)
+        if (visibility == View.VISIBLE) {
+            applyTopWidthMatrix()
+        }
+    }
+
+    fun refreshTopWidthMatrix() {
+        applyTopWidthMatrix()
+    }
+
     private fun applyTopWidthMatrix() {
         val d = drawable ?: return
         val vw = width - paddingLeft - paddingRight
-        val dw = d.intrinsicWidth
-        if (vw <= 0 || dw <= 0) return
+        val dw = d.intrinsicWidth.takeIf { it > 0 } ?: d.bounds.width()
+        if (vw <= 0 || dw <= 0) {
+            if (vw <= 0) {
+                post { applyTopWidthMatrix() }
+            }
+            return
+        }
         val scale = vw.toFloat() / dw.toFloat()
         val m = android.graphics.Matrix()
         m.setScale(scale, scale)
         imageMatrix = m
+        invalidate()
     }
 }
 
@@ -439,6 +471,9 @@ fun MultiLayerProfileEffectView(
                         if (!isActive) return@launch
 
                         iv.visibility = View.VISIBLE
+                        if (iv is TopWidthCropImageView) {
+                            iv.refreshTopWidthMatrix()
+                        }
                         if (d != null) {
                             try {
                                 d.setLoopLimit(if (layer.loop) 0 else 1)
@@ -476,74 +511,84 @@ fun MultiLayerProfileEffectView(
     }
 
     Box(
-        modifier = modifier,
-        contentAlignment = Alignment.Center
+        modifier = modifier.clipToBounds(),
+        contentAlignment = Alignment.TopCenter
     ) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                FrameLayout(ctx).apply {
-                    isClickable = false
-                    isFocusable = false
-                    imageViews.clear()
-                    drawables.clear()
+        key(cropTopWidth, sortedLayers, cachedFiles) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    FrameLayout(ctx).apply {
+                        isClickable = false
+                        isFocusable = false
+                        clipChildren = true
+                        clipToPadding = true
+                        imageViews.clear()
+                        drawables.clear()
 
-                    sortedLayers.forEachIndexed { index, layer ->
-                        val file = cachedFiles.getOrNull(index)
-                        val iv = (if (cropTopWidth) TopWidthCropImageView(ctx) else ImageView(ctx)).apply {
-                            if (!cropTopWidth) {
-                                this.scaleType = scaleType
-                            }
-                            this.isClickable = false
-                            this.isFocusable = false
-                            this.isEnabled = false
-                            this.visibility = View.INVISIBLE
-                        }
-                        addView(iv, FrameLayout.LayoutParams(
-                            FrameLayout.LayoutParams.MATCH_PARENT,
-                            FrameLayout.LayoutParams.MATCH_PARENT
-                        ))
-                        imageViews.add(iv)
-
-                        var d: APNGDrawable? = null
-                        if (file != null && file.exists() && file.length() >= 128L) {
-                            try {
-                                val candidate = APNGDrawable.fromFile(file.absolutePath)
-                                if (candidate.intrinsicWidth > 0 && candidate.intrinsicHeight > 0) {
-                                    candidate.setLoopLimit(if (layer.loop) 0 else 1)
-                                    iv.setImageDrawable(candidate)
-                                    d = candidate
+                        sortedLayers.forEachIndexed { index, layer ->
+                            val file = cachedFiles.getOrNull(index)
+                            val iv = (if (cropTopWidth) TopWidthCropImageView(ctx) else ImageView(ctx)).apply {
+                                if (!cropTopWidth) {
+                                    this.scaleType = scaleType
                                 }
-                            } catch (_: Throwable) {
-                                d = null
+                                this.isClickable = false
+                                this.isFocusable = false
+                                this.isEnabled = false
+                                this.visibility = View.INVISIBLE
                             }
-                            if (d == null) {
+                            addView(iv, FrameLayout.LayoutParams(
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                                FrameLayout.LayoutParams.MATCH_PARENT
+                            ))
+                            imageViews.add(iv)
+
+                            var d: APNGDrawable? = null
+                            if (file != null && file.exists() && file.length() >= 128L) {
                                 try {
-                                    BitmapFactory.decodeFile(file.absolutePath)?.let { bmp ->
-                                        iv.setImageBitmap(bmp)
+                                    val candidate = APNGDrawable.fromFile(file.absolutePath)
+                                    if (candidate.intrinsicWidth > 0 && candidate.intrinsicHeight > 0) {
+                                        candidate.setLoopLimit(if (layer.loop) 0 else 1)
+                                        iv.setImageDrawable(candidate)
+                                        d = candidate
                                     }
-                                } catch (_: Throwable) {}
+                                } catch (_: Throwable) {
+                                    d = null
+                                }
+                                if (d == null) {
+                                    try {
+                                        BitmapFactory.decodeFile(file.absolutePath)?.let { bmp ->
+                                            iv.setImageBitmap(bmp)
+                                        }
+                                    } catch (_: Throwable) {}
+                                }
                             }
+                            drawables.add(d)
                         }
-                        drawables.add(d)
+                        isViewsAttached = true
                     }
-                    isViewsAttached = true
-                }
-            },
-            update = { frameLayout ->
-                frameLayout.isClickable = false
-                frameLayout.isFocusable = false
-                // Perbarui scaleType jika ada perubahan konfigurasi
-                for (i in 0 until frameLayout.childCount) {
-                    val child = frameLayout.getChildAt(i)
-                    if (child is ImageView) {
-                        child.scaleType = scaleType
-                        child.isClickable = false
-                        child.isFocusable = false
+                },
+                update = { frameLayout ->
+                    frameLayout.isClickable = false
+                    frameLayout.isFocusable = false
+                    frameLayout.clipChildren = true
+                    frameLayout.clipToPadding = true
+                    // Pertahankan ScaleType.MATRIX pada TopWidthCropImageView agar tidak tertimpa FIT_CENTER
+                    for (i in 0 until frameLayout.childCount) {
+                        val child = frameLayout.getChildAt(i)
+                        if (child is TopWidthCropImageView) {
+                            child.refreshTopWidthMatrix()
+                            child.isClickable = false
+                            child.isFocusable = false
+                        } else if (child is ImageView) {
+                            child.scaleType = scaleType
+                            child.isClickable = false
+                            child.isFocusable = false
+                        }
                     }
                 }
-            }
-        )
+            )
+        }
     }
 }
 

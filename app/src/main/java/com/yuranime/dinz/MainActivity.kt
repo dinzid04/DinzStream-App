@@ -9,23 +9,28 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.yuranime.dinz.BuildConfig
 import com.yuranime.dinz.data.model.CuplixItem
@@ -46,8 +51,10 @@ import com.yuranime.dinz.ui.detail.AnimeDetailScreen
 import com.yuranime.dinz.ui.home.HomeScreen
 import com.yuranime.dinz.ui.home.HomeViewModel
 import com.yuranime.dinz.ui.jadwal.JadwalScreen
+import com.yuranime.dinz.ui.jadwal.JadwalViewModel
 import com.yuranime.dinz.ui.profile.LoginProfileScreen
 import com.yuranime.dinz.ui.search.SearchScreen
+import com.yuranime.dinz.ui.search.SearchViewModel
 import com.yuranime.dinz.ui.splash.YuranimeSplashScreen
 import com.yuranime.dinz.ui.streaming.StreamingScreen
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
@@ -58,6 +65,7 @@ import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.firebase.PromoPopupConfig
 import com.yuranime.dinz.data.local.AppPreferences
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -92,8 +100,10 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = ColorBackgroundPrimary
                 ) {
-                    // Preload Home data in the background while the motion splash screen runs
+                    // Preload Home, Jadwal, dan Search data in the background while the motion splash screen runs
                     val homeViewModel: HomeViewModel = viewModel()
+                    val jadwalViewModel: JadwalViewModel = viewModel()
+                    val searchViewModel: SearchViewModel = viewModel()
                     val scope = rememberCoroutineScope()
                     var showSplash by rememberSaveable { mutableStateOf(true) }
                     var selectedAnimeId by remember { mutableStateOf<String?>(null) }
@@ -169,312 +179,313 @@ class MainActivity : ComponentActivity() {
                         else -> null
                     }
 
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        // LAYER 0: Halaman dasar tab utama (tetap hidup di bawah overlay untuk efek intip Predictive Back)
-                        AnimatedContent(
-                            targetState = showComicBase to if (showComicBase) activeComicBaseTab.name else activeBaseTab.name,
-                            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(140)) },
-                            label = "BaseTabCrossfade"
-                        ) { (comicActive, _) ->
-                            if (comicActive) {
-                                when (activeComicBaseTab) {
-                                    ComicNavTab.HOME -> {
-                                        BackHandler(enabled = topmostOverlay == null) {
-                                            isComicMode = false
-                                            currentTab = NavTab.HOME
-                                        }
-                                        ComicHomeScreen(
-                                            selectedComicTab = selectedComicTab,
-                                            onComicTabSelected = { tab ->
-                                                when (tab) {
-                                                    ComicNavTab.ANIME -> {
-                                                        isComicMode = false
-                                                        currentTab = NavTab.HOME
-                                                    }
-                                                    ComicNavTab.CHAT -> {
-                                                        openGlobalChat()
-                                                    }
-                                                    ComicNavTab.CARI -> {
-                                                        activeComicGenreFilter = null
-                                                        selectedComicTab = ComicNavTab.CARI
-                                                    }
-                                                    else -> {
-                                                        selectedComicTab = tab
-                                                    }
-                                                }
-                                            },
-                                            onComicClick = { cId ->
-                                                selectedComicId = cId
-                                            },
-                                            onChapterClick = { chId ->
-                                                selectedComicChapterId = chId
-                                            },
-                                            onComicChapterWithInfoClick = { chId, cId, cTitle, cPoster ->
-                                                selectedComicChapterId = chId
-                                                if (cId != null) selectedComicId = cId
-                                                if (cTitle != null) selectedComicTitle = cTitle
-                                                if (cPoster != null) selectedComicPosterUrl = cPoster
-                                            },
-                                            onOpenAllComics = {
-                                                showAllComics = true
-                                            },
-                                            onGenreClick = { genreName ->
-                                                activeComicGenreFilter = genreName
-                                                selectedComicTab = ComicNavTab.CARI
-                                            }
-                                        )
-                                    }
-                                    ComicNavTab.CARI -> {
-                                        BackHandler(enabled = topmostOverlay == null) {
-                                            selectedComicTab = ComicNavTab.HOME
-                                        }
-                                        ComicSearchScreen(
-                                            initialGenre = activeComicGenreFilter,
-                                            onComicClick = { cId ->
-                                                selectedComicId = cId
-                                            },
-                                            onBackClick = {
-                                                selectedComicTab = ComicNavTab.HOME
-                                            },
-                                            selectedComicTab = selectedComicTab,
-                                            onComicTabSelected = { tab ->
-                                                when (tab) {
-                                                    ComicNavTab.ANIME -> {
-                                                        isComicMode = false
-                                                        currentTab = NavTab.HOME
-                                                    }
-                                                    ComicNavTab.CHAT -> {
-                                                        openGlobalChat()
-                                                    }
-                                                    else -> {
-                                                        selectedComicTab = tab
-                                                    }
-                                                }
-                                            }
-                                        )
-                                    }
-                                    ComicNavTab.PROFILE -> {
-                                        BackHandler(enabled = topmostOverlay == null) {
-                                            selectedComicTab = ComicNavTab.HOME
-                                        }
-                                        LoginProfileScreen(
-                                            selectedTab = activeBaseTab,
-                                            onTabSelected = { tab ->
-                                                if (tab == NavTab.CHAT) {
-                                                    openGlobalChat()
-                                                } else if (tab == NavTab.COMIC) {
-                                                    selectedComicTab = ComicNavTab.HOME
-                                                } else {
-                                                    isComicMode = false
-                                                    currentTab = tab
-                                                }
-                                            },
-                                            onAnimeClick = { animeId ->
-                                                selectedAnimeId = animeId
-                                            },
-                                            onEpisodeClick = { epId, mId ->
-                                                selectedStreamingMovieId = mId
-                                                selectedStreamingEpisodeId = epId
-                                            },
-                                            onComicChapterClick = { chId ->
-                                                selectedComicChapterId = chId
-                                            },
-                                            onCheckUpdateClick = {
-                                                scope.launch {
-                                                    Toast.makeText(this@MainActivity, "Memeriksa pembaruan...", Toast.LENGTH_SHORT).show()
-                                                    val info = UpdateChecker.checkUpdate(BuildConfig.VERSION_NAME, forceCheck = false)
-                                                    if (info != null && info.isUpdateAvailable) {
-                                                        pendingUpdateInfo = info
-                                                    } else if (info != null) {
-                                                        Toast.makeText(this@MainActivity, "Aplikasi sudah dalam versi terbaru (${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
-                                                    } else {
-                                                        Toast.makeText(this@MainActivity, "Gagal memeriksa pembaruan", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                            }
-                                        )
-                                    }
-                                    else -> {
-                                        isComicMode = false
-                                        currentTab = NavTab.HOME
-                                    }
-                                }
+                    val onAnimeTabSelected: (NavTab) -> Unit = { tab ->
+                        if (tab == NavTab.CHAT) {
+                            openGlobalChat()
+                        } else if (tab == NavTab.COMIC) {
+                            isComicMode = true
+                            selectedComicTab = ComicNavTab.HOME
+                        } else {
+                            currentTab = tab
+                        }
+                    }
+
+                    val onComicTabSelected: (ComicNavTab) -> Unit = { tab ->
+                        when (tab) {
+                            ComicNavTab.ANIME -> {
+                                isComicMode = false
+                                currentTab = NavTab.HOME
+                            }
+                            ComicNavTab.CHAT -> {
+                                openGlobalChat()
+                            }
+                            ComicNavTab.CARI -> {
+                                activeComicGenreFilter = null
+                                selectedComicTab = ComicNavTab.CARI
+                            }
+                            else -> {
+                                selectedComicTab = tab
+                            }
+                        }
+                    }
+
+                    val onComicProfileTabSelected: (NavTab) -> Unit = { tab ->
+                        if (tab == NavTab.CHAT) {
+                            openGlobalChat()
+                        } else if (tab == NavTab.COMIC) {
+                            selectedComicTab = ComicNavTab.HOME
+                        } else {
+                            isComicMode = false
+                            currentTab = tab
+                        }
+                    }
+
+                    val onManualUpdateCheck: () -> Unit = {
+                        scope.launch {
+                            Toast.makeText(this@MainActivity, "Memeriksa pembaruan...", Toast.LENGTH_SHORT).show()
+                            val info = UpdateChecker.checkUpdate(BuildConfig.VERSION_NAME, forceCheck = false)
+                            if (info != null && info.isUpdateAvailable) {
+                                pendingUpdateInfo = info
+                            } else if (info != null) {
+                                Toast.makeText(this@MainActivity, "Aplikasi sudah dalam versi terbaru (${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
                             } else {
-                                when (activeBaseTab) {
-                                    NavTab.HOME -> {
-                                        HomeScreen(
-                                            selectedTab = activeBaseTab,
-                                            onTabSelected = { tab ->
-                                                if (tab == NavTab.CHAT) {
-                                                    openGlobalChat()
-                                                } else if (tab == NavTab.COMIC) {
-                                                    isComicMode = true
-                                                    selectedComicTab = ComicNavTab.HOME
-                                                } else {
-                                                    currentTab = tab
+                                Toast.makeText(this@MainActivity, "Gagal memeriksa pembaruan", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+
+                    val activeBaseKey = remember(showComicBase, activeComicBaseTab, activeBaseTab) {
+                        if (showComicBase) {
+                            when (activeComicBaseTab) {
+                                ComicNavTab.HOME, ComicNavTab.CARI, ComicNavTab.PROFILE -> "COMIC_${activeComicBaseTab.name}"
+                                else -> "COMIC_HOME"
+                            }
+                        } else {
+                            when (activeBaseTab) {
+                                NavTab.HOME, NavTab.JADWAL, NavTab.CARI, NavTab.COMIC, NavTab.PROFILE -> "ANIME_${activeBaseTab.name}"
+                                else -> "ANIME_HOME"
+                            }
+                        }
+                    }
+                    val visitedBaseTabs = remember { mutableStateMapOf(activeBaseKey to true) }
+                    var settledBaseKey by remember { mutableStateOf(activeBaseKey) }
+                    var exitingBaseKey by remember { mutableStateOf<String?>(null) }
+                    val enteringBaseAlpha = remember { Animatable(1f) }
+
+                    // Pre-stage tab utama di latar belakang setelah splash selesai agar perpindahan pertama bebas jeda
+                    LaunchedEffect(showSplash) {
+                        if (!showSplash) {
+                            delay(350L)
+                            if (!visitedBaseTabs.containsKey("ANIME_JADWAL")) visitedBaseTabs["ANIME_JADWAL"] = true
+                            delay(200L)
+                            if (!visitedBaseTabs.containsKey("ANIME_CARI")) visitedBaseTabs["ANIME_CARI"] = true
+                            delay(200L)
+                            if (!visitedBaseTabs.containsKey("ANIME_PROFILE")) visitedBaseTabs["ANIME_PROFILE"] = true
+                        }
+                    }
+
+                    LaunchedEffect(activeBaseKey) {
+                        visitedBaseTabs[activeBaseKey] = true
+                        if (activeBaseKey != settledBaseKey) {
+                            exitingBaseKey = settledBaseKey
+                            settledBaseKey = activeBaseKey
+                            enteringBaseAlpha.snapTo(0f)
+                            enteringBaseAlpha.animateTo(
+                                targetValue = 1f,
+                                animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing)
+                            )
+                            exitingBaseKey = null
+                        }
+                    }
+
+                    val orderedBaseKeys = remember {
+                        listOf(
+                            "ANIME_HOME",
+                            "ANIME_JADWAL",
+                            "ANIME_CARI",
+                            "ANIME_COMIC",
+                            "ANIME_PROFILE",
+                            "COMIC_HOME",
+                            "COMIC_CARI",
+                            "COMIC_PROFILE"
+                        )
+                    }
+
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        // LAYER 0: Host tab ter-cache tanpa crossfade black-dip; halaman lama tetap 100% opak di bawah halaman baru
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            orderedBaseKeys.forEach { tabKey ->
+                                if (visitedBaseTabs[tabKey] == true) {
+                                    key(tabKey) {
+                                        val isCurrent = tabKey == settledBaseKey
+                                        val isExiting = tabKey == exitingBaseKey && !isCurrent
+                                        val isVisibleTab = isCurrent || isExiting
+                                        val isTabInteractive = isCurrent && topmostOverlay == null
+
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .zIndex(
+                                                    when {
+                                                        isCurrent -> 2f
+                                                        isExiting -> 1f
+                                                        else -> -5f
+                                                    }
+                                                )
+                                                .graphicsLayer {
+                                                    alpha = when {
+                                                        isCurrent -> enteringBaseAlpha.value
+                                                        isExiting -> 1f
+                                                        else -> 0f
+                                                    }
                                                 }
-                                            },
-                                            onAnimeClick = { animeId ->
-                                                selectedAnimeId = animeId
-                                            },
-                                            onEpisodeClick = { epId, mId ->
-                                                selectedStreamingMovieId = mId
-                                                selectedStreamingEpisodeId = epId
-                                            },
-                                            onCuplixClick = { cuplixItem ->
-                                                selectedCuplixItem = cuplixItem
-                                            },
-                                            onBirthdayClick = { bItem ->
-                                                selectedBirthdayItem = bItem
-                                            },
-                                            onComicClick = { cId ->
-                                                selectedComicId = cId
-                                            },
-                                            onComicChapterClick = { chId ->
-                                                selectedComicChapterId = chId
-                                            },
-                                            onOpenAllComics = {
-                                                showAllComics = true
-                                            },
-                                            viewModel = homeViewModel
-                                        )
-                                    }
-                                    NavTab.JADWAL -> {
-                                        BackHandler(enabled = topmostOverlay == null) {
-                                            currentTab = NavTab.HOME
-                                        }
-                                        JadwalScreen(
-                                            selectedTab = activeBaseTab,
-                                            onTabSelected = { tab ->
-                                                if (tab == NavTab.CHAT) {
-                                                    openGlobalChat()
-                                                } else if (tab == NavTab.COMIC) {
-                                                    isComicMode = true
-                                                    selectedComicTab = ComicNavTab.HOME
-                                                } else {
-                                                    currentTab = tab
+                                                .drawWithContent {
+                                                    if (isVisibleTab) {
+                                                        drawContent()
+                                                    }
                                                 }
-                                            },
-                                            onAnimeClick = { animeId ->
-                                                selectedAnimeId = animeId
-                                            },
-                                            onCuplixClick = { cuplixItem ->
-                                                selectedCuplixItem = cuplixItem
-                                            }
-                                        )
-                                    }
-                                    NavTab.CARI -> {
-                                        BackHandler(enabled = topmostOverlay == null) {
-                                            currentTab = NavTab.HOME
-                                        }
-                                        SearchScreen(
-                                            selectedTab = activeBaseTab,
-                                            onTabSelected = { tab ->
-                                                if (tab == NavTab.CHAT) {
-                                                    openGlobalChat()
-                                                } else if (tab == NavTab.COMIC) {
-                                                    isComicMode = true
-                                                    selectedComicTab = ComicNavTab.HOME
-                                                } else {
-                                                    currentTab = tab
-                                                }
-                                            },
-                                            onAnimeClick = { animeId ->
-                                                selectedAnimeId = animeId
-                                            },
-                                            onCuplixClick = { cuplixItem ->
-                                                selectedCuplixItem = cuplixItem
-                                            }
-                                        )
-                                    }
-                                    NavTab.COMIC -> {
-                                        BackHandler(enabled = topmostOverlay == null) {
-                                            currentTab = NavTab.HOME
-                                        }
-                                        ComicHomeScreen(
-                                            selectedComicTab = selectedComicTab,
-                                            onComicTabSelected = { tab ->
-                                                when (tab) {
-                                                    ComicNavTab.ANIME -> {
+                                                .then(
+                                                    if (!isTabInteractive) {
+                                                        Modifier.pointerInput(Unit) {
+                                                            awaitPointerEventScope {
+                                                                while (true) {
+                                                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                                                    event.changes.forEach { it.consume() }
+                                                                }
+                                                            }
+                                                        }
+                                                    } else {
+                                                        Modifier
+                                                    }
+                                                )
+                                        ) {
+                                            when (tabKey) {
+                                                "COMIC_HOME" -> {
+                                                    BackHandler(enabled = isTabInteractive) {
                                                         isComicMode = false
                                                         currentTab = NavTab.HOME
                                                     }
-                                                    ComicNavTab.CHAT -> {
-                                                        openGlobalChat()
-                                                    }
-                                                    ComicNavTab.CARI -> {
-                                                        activeComicGenreFilter = null
-                                                        selectedComicTab = ComicNavTab.CARI
-                                                    }
-                                                    else -> {
-                                                        selectedComicTab = tab
-                                                    }
+                                                    ComicHomeScreen(
+                                                        selectedComicTab = selectedComicTab,
+                                                        onComicTabSelected = onComicTabSelected,
+                                                        onComicClick = { cId -> selectedComicId = cId },
+                                                        onChapterClick = { chId -> selectedComicChapterId = chId },
+                                                        onComicChapterWithInfoClick = { chId, cId, cTitle, cPoster ->
+                                                            selectedComicChapterId = chId
+                                                            if (cId != null) selectedComicId = cId
+                                                            if (cTitle != null) selectedComicTitle = cTitle
+                                                            if (cPoster != null) selectedComicPosterUrl = cPoster
+                                                        },
+                                                        onOpenAllComics = { showAllComics = true },
+                                                        onGenreClick = { genreName ->
+                                                            activeComicGenreFilter = genreName
+                                                            selectedComicTab = ComicNavTab.CARI
+                                                        }
+                                                    )
                                                 }
-                                            },
-                                            onComicClick = { cId ->
-                                                selectedComicId = cId
-                                            },
-                                            onChapterClick = { chId ->
-                                                selectedComicChapterId = chId
-                                            },
-                                            onComicChapterWithInfoClick = { chId, cId, cTitle, cPoster ->
-                                                selectedComicChapterId = chId
-                                                if (cId != null) selectedComicId = cId
-                                                if (cTitle != null) selectedComicTitle = cTitle
-                                                if (cPoster != null) selectedComicPosterUrl = cPoster
-                                            },
-                                            onOpenAllComics = {
-                                                showAllComics = true
-                                            },
-                                            onGenreClick = { genreName ->
-                                                activeComicGenreFilter = genreName
-                                                selectedComicTab = ComicNavTab.CARI
+                                                "COMIC_CARI" -> {
+                                                    BackHandler(enabled = isTabInteractive) {
+                                                        selectedComicTab = ComicNavTab.HOME
+                                                    }
+                                                    ComicSearchScreen(
+                                                        initialGenre = activeComicGenreFilter,
+                                                        onComicClick = { cId -> selectedComicId = cId },
+                                                        onBackClick = { selectedComicTab = ComicNavTab.HOME },
+                                                        selectedComicTab = selectedComicTab,
+                                                        onComicTabSelected = { tab ->
+                                                            when (tab) {
+                                                                ComicNavTab.ANIME -> {
+                                                                    isComicMode = false
+                                                                    currentTab = NavTab.HOME
+                                                                }
+                                                                ComicNavTab.CHAT -> openGlobalChat()
+                                                                else -> selectedComicTab = tab
+                                                            }
+                                                        },
+                                                        isTabActive = isTabInteractive
+                                                    )
+                                                }
+                                                "COMIC_PROFILE" -> {
+                                                    BackHandler(enabled = isTabInteractive) {
+                                                        selectedComicTab = ComicNavTab.HOME
+                                                    }
+                                                    LoginProfileScreen(
+                                                        selectedTab = activeBaseTab,
+                                                        onTabSelected = onComicProfileTabSelected,
+                                                        onAnimeClick = { animeId -> selectedAnimeId = animeId },
+                                                        onEpisodeClick = { epId, mId ->
+                                                            selectedStreamingMovieId = mId
+                                                            selectedStreamingEpisodeId = epId
+                                                        },
+                                                        onComicChapterClick = { chId -> selectedComicChapterId = chId },
+                                                        onCheckUpdateClick = onManualUpdateCheck,
+                                                        isTabActive = isTabInteractive
+                                                    )
+                                                }
+                                                "ANIME_HOME" -> {
+                                                    HomeScreen(
+                                                        selectedTab = NavTab.HOME,
+                                                        onTabSelected = onAnimeTabSelected,
+                                                        onAnimeClick = { animeId -> selectedAnimeId = animeId },
+                                                        onEpisodeClick = { epId, mId ->
+                                                            selectedStreamingMovieId = mId
+                                                            selectedStreamingEpisodeId = epId
+                                                        },
+                                                        onCuplixClick = { cuplixItem -> selectedCuplixItem = cuplixItem },
+                                                        onBirthdayClick = { bItem -> selectedBirthdayItem = bItem },
+                                                        onComicClick = { cId -> selectedComicId = cId },
+                                                        onComicChapterClick = { chId -> selectedComicChapterId = chId },
+                                                        onOpenAllComics = { showAllComics = true },
+                                                        isTabActive = isTabInteractive,
+                                                        viewModel = homeViewModel
+                                                    )
+                                                }
+                                                "ANIME_JADWAL" -> {
+                                                    BackHandler(enabled = isTabInteractive) {
+                                                        currentTab = NavTab.HOME
+                                                    }
+                                                    JadwalScreen(
+                                                        selectedTab = NavTab.JADWAL,
+                                                        onTabSelected = onAnimeTabSelected,
+                                                        onAnimeClick = { animeId -> selectedAnimeId = animeId },
+                                                        onCuplixClick = { cuplixItem -> selectedCuplixItem = cuplixItem },
+                                                        viewModel = jadwalViewModel
+                                                    )
+                                                }
+                                                "ANIME_CARI" -> {
+                                                    BackHandler(enabled = isTabInteractive) {
+                                                        currentTab = NavTab.HOME
+                                                    }
+                                                    SearchScreen(
+                                                        selectedTab = NavTab.CARI,
+                                                        onTabSelected = onAnimeTabSelected,
+                                                        onAnimeClick = { animeId -> selectedAnimeId = animeId },
+                                                        onCuplixClick = { cuplixItem -> selectedCuplixItem = cuplixItem },
+                                                        isTabActive = isTabInteractive,
+                                                        viewModel = searchViewModel
+                                                    )
+                                                }
+                                                "ANIME_COMIC" -> {
+                                                    BackHandler(enabled = isTabInteractive) {
+                                                        currentTab = NavTab.HOME
+                                                    }
+                                                    ComicHomeScreen(
+                                                        selectedComicTab = selectedComicTab,
+                                                        onComicTabSelected = onComicTabSelected,
+                                                        onComicClick = { cId -> selectedComicId = cId },
+                                                        onChapterClick = { chId -> selectedComicChapterId = chId },
+                                                        onComicChapterWithInfoClick = { chId, cId, cTitle, cPoster ->
+                                                            selectedComicChapterId = chId
+                                                            if (cId != null) selectedComicId = cId
+                                                            if (cTitle != null) selectedComicTitle = cTitle
+                                                            if (cPoster != null) selectedComicPosterUrl = cPoster
+                                                        },
+                                                        onOpenAllComics = { showAllComics = true },
+                                                        onGenreClick = { genreName ->
+                                                            activeComicGenreFilter = genreName
+                                                            selectedComicTab = ComicNavTab.CARI
+                                                        }
+                                                    )
+                                                }
+                                                "ANIME_PROFILE" -> {
+                                                    BackHandler(enabled = isTabInteractive) {
+                                                        currentTab = NavTab.HOME
+                                                    }
+                                                    LoginProfileScreen(
+                                                        selectedTab = NavTab.PROFILE,
+                                                        onTabSelected = onAnimeTabSelected,
+                                                        onAnimeClick = { animeId -> selectedAnimeId = animeId },
+                                                        onEpisodeClick = { epId, mId ->
+                                                            selectedStreamingMovieId = mId
+                                                            selectedStreamingEpisodeId = epId
+                                                        },
+                                                        onComicChapterClick = { chId -> selectedComicChapterId = chId },
+                                                        onCheckUpdateClick = onManualUpdateCheck,
+                                                        isTabActive = isTabInteractive
+                                                    )
+                                                }
                                             }
-                                        )
-                                    }
-                                    NavTab.PROFILE -> {
-                                        BackHandler(enabled = topmostOverlay == null) {
-                                            currentTab = NavTab.HOME
                                         }
-                                        LoginProfileScreen(
-                                            selectedTab = activeBaseTab,
-                                            onTabSelected = { tab ->
-                                                if (tab == NavTab.CHAT) {
-                                                    openGlobalChat()
-                                                } else if (tab == NavTab.COMIC) {
-                                                    isComicMode = true
-                                                    selectedComicTab = ComicNavTab.HOME
-                                                } else {
-                                                    currentTab = tab
-                                                }
-                                            },
-                                            onAnimeClick = { animeId ->
-                                                selectedAnimeId = animeId
-                                            },
-                                            onEpisodeClick = { epId, mId ->
-                                                selectedStreamingMovieId = mId
-                                                selectedStreamingEpisodeId = epId
-                                            },
-                                            onComicChapterClick = { chId ->
-                                                selectedComicChapterId = chId
-                                            },
-                                            onCheckUpdateClick = {
-                                                scope.launch {
-                                                    Toast.makeText(this@MainActivity, "Memeriksa pembaruan...", Toast.LENGTH_SHORT).show()
-                                                    val info = UpdateChecker.checkUpdate(BuildConfig.VERSION_NAME, forceCheck = false)
-                                                    if (info != null && info.isUpdateAvailable) {
-                                                        pendingUpdateInfo = info
-                                                    } else if (info != null) {
-                                                        Toast.makeText(this@MainActivity, "Aplikasi sudah dalam versi terbaru (${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
-                                                    } else {
-                                                        Toast.makeText(this@MainActivity, "Gagal memeriksa pembaruan", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                            }
-                                        )
-                                    }
-                                    else -> {
-                                        currentTab = NavTab.HOME
                                     }
                                 }
                             }

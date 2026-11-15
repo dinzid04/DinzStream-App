@@ -102,7 +102,8 @@ fun HomeScreen(
     onBirthdayClick: (com.yuranime.dinz.data.api.BirthdayCharacterItem) -> Unit = {},
     onComicClick: (comicId: String) -> Unit = {},
     onComicChapterClick: (chapterId: String) -> Unit = {},
-    onOpenAllComics: () -> Unit = {}
+    onOpenAllComics: () -> Unit = {},
+    isTabActive: Boolean = true
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sliderMode by AppPreferences.sliderMode.collectAsState()
@@ -144,7 +145,7 @@ fun HomeScreen(
 
     // Sub-Page: Active Full Vertical List for Chevron '>'
     if (uiState.activeSectionDetail != null) {
-        BackHandler {
+        BackHandler(enabled = isTabActive) {
             viewModel.closeSectionDetail()
         }
         HomeSectionDetailSubPage(

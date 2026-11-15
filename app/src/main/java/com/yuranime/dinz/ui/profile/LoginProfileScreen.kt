@@ -183,7 +183,8 @@ fun LoginProfileScreen(
     onAnimeClick: (id: String) -> Unit = {},
     onEpisodeClick: (episodeId: String, movieId: String) -> Unit = { _, _ -> },
     onCheckUpdateClick: () -> Unit = {},
-    onComicChapterClick: ((chapterId: String) -> Unit)? = null
+    onComicChapterClick: ((chapterId: String) -> Unit)? = null,
+    isTabActive: Boolean = true
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -337,6 +338,7 @@ fun LoginProfileScreen(
                     profile = userProfile,
                     authDb = authDb,
                     userRankNumber = userRankNumber,
+                    isTabActive = isTabActive && currentSubScreen == ProfileSubScreen.MAIN,
                     modifier = Modifier
                         .fillMaxSize()
                         .liquidGlassBackdrop(backdropLayer, enabled = isLiquidGlass),
@@ -373,7 +375,7 @@ fun LoginProfileScreen(
         // Sub-halaman Profile tampil berlapis dengan Predictive Back interaktif + Shared Axis X
         PredictiveBackItemOverlay(
             targetItem = currentSubScreen.takeIf { it != ProfileSubScreen.MAIN },
-            isTopmost = currentSubScreen != ProfileSubScreen.MAIN,
+            isTopmost = isTabActive && currentSubScreen != ProfileSubScreen.MAIN,
             onBack = { currentSubScreen = ProfileSubScreen.MAIN }
         ) { subScreen ->
             when (subScreen) {
@@ -438,6 +440,7 @@ private fun UserProfileView(
     profile: UserProfile?,
     authDb: LocalAuthDatabase,
     userRankNumber: Int?,
+    isTabActive: Boolean = true,
     modifier: Modifier = Modifier,
     onEditProfileClick: () -> Unit,
     onOpenLeaderboardClick: () -> Unit,
@@ -477,9 +480,9 @@ private fun UserProfileView(
 
     // URUTAN 2 & 3: Jeda 2 detik sebelum Profile Effect muncul + Preload seluruh multi-layer
     var isEffectReadyToShow by remember { mutableStateOf(false) }
-    LaunchedEffect(equippedProfileEffectUrl) {
+    LaunchedEffect(equippedProfileEffectUrl, isTabActive) {
         isEffectReadyToShow = false
-        if (equippedProfileEffectUrl.isNotBlank()) {
+        if (isTabActive && equippedProfileEffectUrl.isNotBlank()) {
             delay(2000L)
             isEffectReadyToShow = true
         }
@@ -1072,7 +1075,7 @@ private fun UserProfileView(
 
     // 5. LAYER OVERLAY FOREGROUND: FULL-SCREEN PROFILE EFFECT (DI ATAS SEMUA ELEMEN PROFIL & BANNER)
     AnimatedVisibility(
-        visible = isEffectReadyToShow && equippedProfileEffectUrl.isNotBlank() && cosmeticAnimate,
+        visible = isTabActive && isEffectReadyToShow && equippedProfileEffectUrl.isNotBlank() && cosmeticAnimate,
         enter = fadeIn(animationSpec = tween(700)),
         exit = fadeOut(animationSpec = tween(400)),
         modifier = Modifier

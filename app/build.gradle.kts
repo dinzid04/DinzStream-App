@@ -122,6 +122,7 @@ dependencies {
     implementation(firebaseBom)
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-database-ktx")
 
     // Google Sign-In & Credential Manager
     implementation("com.google.android.gms:play-services-auth:21.2.0")

@@ -20,10 +20,11 @@ class YuranimeApp : Application(), ImageLoaderFactory {
         } catch (e: Exception) {
             try {
                 val options = com.google.firebase.FirebaseOptions.Builder()
-                    .setApplicationId("1:400464992596:web:68fde66c88d351699610c1")
-                    .setApiKey("AIzaSyAPZsUFl1RoV3bfMWWOsJ0M9yt_YPqrRSg")
-                    .setProjectId("dinz-ai-gemini-copy")
-                    .setStorageBucket("dinz-ai-gemini-copy.firebasestorage.app")
+                    .setApplicationId("1:683241181647:android:1e0e591adc20bca80a42ba")
+                    .setApiKey("AIzaSyDyxfS2r8Y6dLYu2z6Kvdf5IOvzRApQU7E")
+                    .setProjectId("dinz-62119")
+                    .setStorageBucket("dinz-62119.firebasestorage.app")
+                    .setDatabaseUrl("https://dinz-62119-default-rtdb.asia-southeast1.firebasedatabase.app")
                     .build()
                 com.google.firebase.FirebaseApp.initializeApp(this, options)
             } catch (ignored: Exception) {}

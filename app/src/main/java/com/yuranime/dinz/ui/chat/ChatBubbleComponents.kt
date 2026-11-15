@@ -17,7 +17,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -468,7 +470,7 @@ fun ChatMessageRow(
 
                 Box(
                     modifier = Modifier
-                        .widthIn(min = 96.dp, max = 266.dp)
+                        .widthIn(min = 96.dp, max = 304.dp)
                         .clip(bubbleShape)
                         .then(bubbleBgModifier)
                         .combinedClickable(
@@ -481,8 +483,8 @@ fun ChatMessageRow(
                         .padding(
                             start = if (isOwn) 10.dp else 17.dp,
                             end = if (isOwn) 17.dp else 10.dp,
-                            top = 7.dp,
-                            bottom = 6.dp
+                            top = 6.dp,
+                            bottom = 5.dp
                         )
                 ) {
                     Column(modifier = Modifier.width(IntrinsicSize.Max)) {
@@ -532,12 +534,14 @@ fun ChatMessageRow(
                                     modifier = Modifier.size(11.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(5.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                         }
 
-                        // 2. Baris Identitas: Username + #Tag
+                        // 2. Baris Identitas: Username + #Tag + Role Badge Ramping (1 baris)
                         Row(
-                            modifier = Modifier.clickable { onAvatarOrNameClick(message) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onAvatarOrNameClick(message) },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
@@ -553,100 +557,92 @@ fun ChatMessageRow(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "#${message.userTag}",
-                                color = Color(0xFF64748B),
-                                fontSize = 10.5.sp,
+                                color = Color(0xFF94A3B8),
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Medium,
                                 fontFamily = SfProFontFamily,
                                 maxLines = 1
                             )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = roleUpper,
+                                color = if (isPrivilegedRole) Color(0xFFFB7185) else Color(0xFFCBD5E1),
+                                fontSize = 8.4.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.3.sp,
+                                fontFamily = SfProFontFamily,
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(
+                                        if (isPrivilegedRole) Color(0x28FB7185) else Color(0x1894A3B8)
+                                    )
+                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
                         }
 
-                        // 3. Baris Pangkat Kompak: Mini-Title (ALL-CAPS tegak) | Title Besar Beranimasi | Role & Level
-                        Spacer(modifier = Modifier.height(2.5.dp))
-                        FlowRow(
+                        // 3. Baris Pangkat Horizontal Sejajar (1 baris rapih tanpa tumpuk ke bawah)
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(5.dp),
-                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
-                                modifier = Modifier.align(Alignment.CenterVertically),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(Color(0x14FFFFFF))
+                                    .padding(horizontal = 5.dp, vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.Diamond,
                                     contentDescription = null,
                                     tint = if (message.level >= 35) Color(0xFFF59E0B) else Color(0xFFE11D48),
-                                    modifier = Modifier.size(10.5.dp)
+                                    modifier = Modifier.size(9.5.dp)
                                 )
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(
                                     text = rankUpper,
                                     color = Color(0xFFE2E8F0),
-                                    fontSize = 9.8.sp,
+                                    fontSize = 8.2.sp,
                                     fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.35.sp,
+                                    letterSpacing = 0.25.sp,
                                     fontFamily = SfProFontFamily,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    maxLines = 1
                                 )
                             }
 
                             if (message.equippedTitle.isNotBlank()) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.CenterVertically)
-                                        .width(1.dp)
-                                        .height(9.dp)
-                                        .background(Color.White.copy(alpha = 0.22f))
-                                )
                                 GeometricTitleBadge(
                                     titleName = message.equippedTitle,
                                     tierLevel = message.equippedTitleTier,
-                                    modifier = Modifier.align(Alignment.CenterVertically),
                                     styleVariant = message.equippedTitleVariant,
                                     isAnimated = true,
                                     compact = true
                                 )
                             }
 
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.CenterVertically)
-                                    .width(1.dp)
-                                    .height(9.dp)
-                                    .background(Color.White.copy(alpha = 0.22f))
-                            )
-
                             Row(
-                                modifier = Modifier.align(Alignment.CenterVertically),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(Color(0x1C38BDF8))
+                                    .padding(horizontal = 5.dp, vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = roleUpper,
-                                    color = if (isPrivilegedRole) Color(0xFFFB7185) else Color(0xFF94A3B8),
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.35.sp,
-                                    fontFamily = SfProFontFamily,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = " • ",
-                                    color = Color(0xFF475569),
-                                    fontSize = 9.5.sp
-                                )
                                 Icon(
                                     imageVector = Icons.Outlined.KeyboardDoubleArrowUp,
                                     contentDescription = null,
                                     tint = Color(0xFF38BDF8),
-                                    modifier = Modifier.size(11.dp)
+                                    modifier = Modifier.size(9.5.dp)
                                 )
-                                Spacer(modifier = Modifier.width(1.5.dp))
+                                Spacer(modifier = Modifier.width(2.dp))
                                 Text(
                                     text = "LV. ${message.level}",
-                                    color = Color(0xFF94A3B8),
-                                    fontSize = 9.5.sp,
+                                    color = Color(0xFFE2E8F0),
+                                    fontSize = 8.2.sp,
                                     fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.3.sp,
+                                    letterSpacing = 0.25.sp,
                                     fontFamily = SfProFontFamily,
                                     maxLines = 1
                                 )
@@ -705,39 +701,82 @@ fun ChatMessageRow(
                             )
                         }
 
-                        // 6. Teks Pesan + Inline Emoji-Stiker
-                        if (message.text.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            InlineStickerText(
-                                rawText = message.text,
-                                textColor = Color(0xFFF8FAFC),
-                                fontSize = 13.8.sp,
-                                lineHeight = 18.5.sp
-                            )
-                        }
+                        val isShortInlineText = message.text.isNotBlank() &&
+                            message.imageUrl.isBlank() &&
+                            message.stickerUrl.isBlank() &&
+                            !message.text.contains('\n') &&
+                            !InlineStickerCodec.TOKEN_REGEX.containsMatchIn(message.text) &&
+                            message.text.length <= 24
 
-                        // 7. Timestamp Kanan Bawah Ramping
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (message.isEdited) {
+                        if (isShortInlineText) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Bottom
+                            ) {
                                 Text(
-                                    text = "diedit  •  ",
-                                    color = Color(0xFF64748B),
-                                    fontSize = 9.5.sp,
+                                    text = message.text,
+                                    color = Color(0xFFF8FAFC),
+                                    fontSize = 13.8.sp,
+                                    lineHeight = 18.5.sp,
+                                    fontFamily = SfProFontFamily,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (message.isEdited) {
+                                        Text(
+                                            text = "diedit  •  ",
+                                            color = Color(0xFF94A3B8),
+                                            fontSize = 9.2.sp,
+                                            fontFamily = SfProFontFamily
+                                        )
+                                    }
+                                    Text(
+                                        text = formattedTime,
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 9.2.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        fontFamily = SfProFontFamily
+                                    )
+                                }
+                            }
+                        } else {
+                            // 6. Teks Pesan + Inline Emoji-Stiker
+                            if (message.text.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                InlineStickerText(
+                                    rawText = message.text,
+                                    textColor = Color(0xFFF8FAFC),
+                                    fontSize = 13.8.sp,
+                                    lineHeight = 18.5.sp
+                                )
+                            }
+
+                            // 7. Timestamp Kanan Bawah Ramping
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (message.isEdited) {
+                                    Text(
+                                        text = "diedit  •  ",
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 9.2.sp,
+                                        fontFamily = SfProFontFamily
+                                    )
+                                }
+                                Text(
+                                    text = formattedTime,
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 9.2.sp,
+                                    fontWeight = FontWeight.Medium,
                                     fontFamily = SfProFontFamily
                                 )
                             }
-                            Text(
-                                text = formattedTime,
-                                color = Color(0xFF94A3B8),
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                fontFamily = SfProFontFamily
-                            )
                         }
                     }
                 }
@@ -748,7 +787,7 @@ fun ChatMessageRow(
                         avatarUrl = message.avatar,
                         name = message.name,
                         borderUrl = message.equippedBorderUrl,
-                        size = 36.dp,
+                        size = 32.dp,
                         onClick = { onAvatarOrNameClick(message) }
                     )
                 }
