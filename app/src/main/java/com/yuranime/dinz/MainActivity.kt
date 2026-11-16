@@ -162,9 +162,17 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Pengecekan update otomatis saat startup dinonaktifkan sementara untuk rilis bertahap ini
-                    // agar pengguna terinstall tidak terus mendapat popup pembaruan di awal buka aplikasi.
-                    // Pengecekan manual lewat Profil -> Periksa Pembaruan tetap tersedia.
+                    // Pengecekan update otomatis saat aplikasi dibuka (setelah splash selesai)
+                    var hasCheckedAutoUpdate by rememberSaveable { mutableStateOf(false) }
+                    LaunchedEffect(showSplash) {
+                        if (!showSplash && !hasCheckedAutoUpdate) {
+                            hasCheckedAutoUpdate = true
+                            val info = UpdateChecker.checkUpdate(BuildConfig.VERSION_NAME, forceCheck = false)
+                            if (info != null && info.isUpdateAvailable && pendingUpdateInfo == null) {
+                                pendingUpdateInfo = info
+                            }
+                        }
+                    }
 
                     val isChatOpen = !isComicMode && currentTab == NavTab.CHAT
                     val showComicBase = if (isChatOpen) chatReturnComicMode else isComicMode
@@ -693,7 +701,7 @@ class MainActivity : ComponentActivity() {
 
                         // Dialog Notifikasi Promosi Dinamis (Sesuai Referensi 1002208488.jpg & Apple Design)
                         val promoToShow = activePromoToShow
-                        if (!showSplash && promoToShow != null) {
+                        if (!showSplash && pendingUpdateInfo == null && promoToShow != null) {
                             PromoPopupDialog(
                                 config = promoToShow,
                                 onDismiss = {

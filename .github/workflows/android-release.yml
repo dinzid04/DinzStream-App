@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "2.9.1"
+  APP_VERSION: "2.9.2"
 
 jobs:
   build:
@@ -69,7 +69,7 @@ jobs:
 
             ### Pembaruan Utama:
             1. **Tab "SOUNDTRACK" di Detail Anime:**
-               - Menampilkan daftar lagu Opening & Ending (AnimeThemes -> Jikan v4 -> Kitsu/AniList) lengkap dengan cover art & audio preview 30 detik (Deezer -> iTunes -> MusicBrainz/Cover Art Archive) tanpa API Key.
+               - Menampilkan daftar lagu Opening & Ending (AnimeThemes -> Jikan v4 -> Kitsu/AniList + MyAnimeList publik) lengkap dengan cover art & audio preview 30 detik (Deezer -> iTunes -> MusicBrainz/Cover Art Archive) tanpa API Key secara progresif.
                - Tab disembunyikan otomatis jika anime tidak memiliki data lagu Opening maupun Ending.
             2. **Peningkatan Video Player (`StreamingScreen`):**
                - Seekbar modern ala YouTube (track tipis, aksen `#FF5722`, buffer abu-abu, thumb lingkaran responsif) dengan penanda segmen Intro/Outro kuning (`#FACC15`) di timeline.
@@ -78,8 +78,8 @@ jobs:
                - Sinkronisasi otomatis lintas perangkat ke Firestore untuk pengguna login (berkala, saat pause, selesai episode, & keluar player), termasuk penghapusan riwayat & penanda episode ditonton. Pengguna tamu tetap 100% lokal.
             4. **Perbaikan Stabilitas & Anti-Crash:**
                - Memperbaiki crash di halaman Edit Profil & Style Nama (`StyledUsernameText`, variable font API-safe, `ApngAnimationView`, async load kosmetik Discord), menghilangkan unsafe `!!`, dan menambah `GlobalCrashHandler`.
-            5. **In-App Background Update:**
-               - Pengunduhan APK lewat Foreground Service dengan progres & persentase putih murni (`#FFFFFF`), notifikasi bar persisten, opsi minimize di dalam aplikasi, serta auto-install menimpa aplikasi lama melalui `FileProvider`.
+            5. **In-App Background Update & Auto-Check:**
+               - Pengecekan pembaruan otomatis saat membuka aplikasi dan pengunduhan APK lewat Foreground Service dengan progres & persentase putih murni (`#FFFFFF`), notifikasi bar persisten, opsi minimize di dalam aplikasi, serta auto-install menimpa aplikasi lama melalui `FileProvider`.
           draft: false
           prerelease: false
           make_latest: true
