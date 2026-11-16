@@ -288,8 +288,8 @@ fun ComicReaderScreen(
     }
 
     LaunchedEffect(currentChapterId, currentReadingPage) {
-        if (effectiveComicId.isNotBlank() && chapterDetail != null) {
-            val cd = chapterDetail!!
+        val cd = chapterDetail
+        if (effectiveComicId.isNotBlank() && cd != null) {
             val coverToSave = effectivePosterUrl.ifBlank {
                 fullComicDetail?.coverPortrait.orEmpty()
             }
@@ -317,8 +317,9 @@ fun ComicReaderScreen(
             }
     ) {
         // ==================== KONTEN BACA (WEBTOON / PER HALAMAN) ====================
-        val pages = if (!offlinePageFiles.isNullOrEmpty()) {
-            offlinePageFiles!!.map { it.absolutePath }
+        val offlineSnapshot = offlinePageFiles
+        val pages = if (!offlineSnapshot.isNullOrEmpty()) {
+            offlineSnapshot.map { it.absolutePath }
         } else {
             chapterDetail?.pages ?: emptyList()
         }
@@ -434,13 +435,14 @@ fun ComicReaderScreen(
                                 fontFamily = SfProFontFamily
                             )
 
-                            if (!detail?.nextChapterId.isNullOrBlank()) {
+                            val nextChapterId = detail?.nextChapterId?.takeIf { it.isNotBlank() }
+                            if (nextChapterId != null) {
                                 Spacer(modifier = Modifier.height(14.dp))
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(20.dp))
                                         .background(ReaderAccentOrange)
-                                        .clickable { loadChapter(detail!!.nextChapterId!!) }
+                                        .clickable { loadChapter(nextChapterId) }
                                         .padding(horizontal = 22.dp, vertical = 10.dp)
                                 ) {
                                     Row(

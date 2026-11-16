@@ -284,8 +284,9 @@ object R2CdnUploader {
     }
 
     private fun openStream(context: Context, uri: Uri): InputStream? {
-        return if (uri.scheme == "file" && !uri.path.isNullOrBlank()) {
-            FileInputStream(File(uri.path!!))
+        val filePath = uri.path
+        return if (uri.scheme == "file" && !filePath.isNullOrBlank()) {
+            FileInputStream(File(filePath))
         } else {
             context.contentResolver.openInputStream(uri)
         }

@@ -89,3 +89,35 @@ data class AniListCreditsData(
     val availableVaLanguages: List<String> = emptyList(),
     val fetchedAtMs: Long = System.currentTimeMillis()
 )
+
+enum class SoundtrackCategory(val label: String) {
+    OPENING("Opening"),
+    ENDING("Ending")
+}
+
+@Immutable
+data class AnimeSoundtrackTrack(
+    val id: String,
+    val category: SoundtrackCategory,
+    val badgeLabel: String,
+    val title: String,
+    val artist: String,
+    val album: String? = null,
+    val episodeNote: String? = null,
+    val coverUrl: String? = null,
+    val previewUrl: String? = null,
+    val durationSec: Int? = null,
+    val metadataSource: String = "",
+    val enrichmentSource: String = ""
+)
+
+@Immutable
+data class AnimeSoundtrackResult(
+    val animeTitle: String = "",
+    val openings: List<AnimeSoundtrackTrack> = emptyList(),
+    val endings: List<AnimeSoundtrackTrack> = emptyList(),
+    val fetchedAtMs: Long = System.currentTimeMillis()
+) {
+    val isEmpty: Boolean
+        get() = openings.isEmpty() && endings.isEmpty()
+}

@@ -25,17 +25,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.yuranime.dinz.BuildConfig
 import com.yuranime.dinz.data.model.CuplixItem
 import com.yuranime.dinz.data.update.AppUpdateInfo
 import com.yuranime.dinz.data.update.UpdateChecker
+import com.yuranime.dinz.data.update.UpdateDownloadManager
+import com.yuranime.dinz.data.update.UpdateDownloadState
 import com.yuranime.dinz.ui.comic.ComicDetailScreen
 import com.yuranime.dinz.ui.comic.ComicHomeScreen
 import com.yuranime.dinz.ui.chat.GlobalChatScreen
@@ -59,8 +65,10 @@ import com.yuranime.dinz.ui.splash.YuranimeSplashScreen
 import com.yuranime.dinz.ui.streaming.StreamingScreen
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
 import com.yuranime.dinz.ui.theme.YuranimeTheme
+import com.yuranime.dinz.ui.update.UpdateMiniProgressBanner
 import com.yuranime.dinz.ui.update.UpdateNoticeDialog
 import com.yuranime.dinz.ui.components.PromoPopupDialog
+import androidx.compose.runtime.DisposableEffect
 import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.firebase.PromoPopupConfig
 import com.yuranime.dinz.data.local.AppPreferences
@@ -639,22 +647,59 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        // Dialog Pembaruan Otomatis Bergaya iOS Frosted Glassmorphism
-                        if (pendingUpdateInfo != null) {
+                        // Dialog Pembaruan Otomatis Bergaya iOS Frosted Glassmorphism + Background Download
+                        val lifecycleOwner = LocalLifecycleOwner.current
+                        val updateDownloadState by UpdateDownloadManager.downloadState.collectAsStateWithLifecycle()
+                        val isUpdateBannerMinimized by UpdateDownloadManager.isMinimized.collectAsStateWithLifecycle()
+
+                        DisposableEffect(lifecycleOwner) {
+                            val observer = LifecycleEventObserver { _, event ->
+                                if (event == Lifecycle.Event.ON_RESUME) {
+                                    UpdateDownloadManager.consumePendingInstallIfGranted(this@MainActivity)
+                                }
+                            }
+                            lifecycleOwner.lifecycle.addObserver(observer)
+                            onDispose {
+                                lifecycleOwner.lifecycle.removeObserver(observer)
+                            }
+                        }
+
+                        pendingUpdateInfo?.let { updateInfo ->
                             UpdateNoticeDialog(
-                                updateInfo = pendingUpdateInfo!!,
-                                onDismiss = { pendingUpdateInfo = null }
+                                updateInfo = updateInfo,
+                                onDismiss = {
+                                    if (updateDownloadState is UpdateDownloadState.Downloading) {
+                                        UpdateDownloadManager.minimizeBanner()
+                                    }
+                                    pendingUpdateInfo = null
+                                }
+                            )
+                        }
+
+                        // Mini status bar putih non-blocking ketika dialog di-minimize atau unduhan berjalan di latar
+                        if (pendingUpdateInfo == null &&
+                            (isUpdateBannerMinimized || updateDownloadState is UpdateDownloadState.Downloading || updateDownloadState is UpdateDownloadState.Completed)
+                        ) {
+                            UpdateMiniProgressBanner(
+                                downloadState = updateDownloadState,
+                                onExpandDialog = {
+                                    pendingUpdateInfo = UpdateDownloadManager.activeUpdateInfo.value
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .zIndex(90f)
                             )
                         }
 
                         // Dialog Notifikasi Promosi Dinamis (Sesuai Referensi 1002208488.jpg & Apple Design)
-                        if (!showSplash && activePromoToShow != null) {
+                        val promoToShow = activePromoToShow
+                        if (!showSplash && promoToShow != null) {
                             PromoPopupDialog(
-                                config = activePromoToShow!!,
+                                config = promoToShow,
                                 onDismiss = {
                                     AppPreferences.recordPromoPopupShown(
                                         context = this@MainActivity,
-                                        promoId = activePromoToShow!!.promoId
+                                        promoId = promoToShow.promoId
                                     )
                                     activePromoToShow = null
                                 }

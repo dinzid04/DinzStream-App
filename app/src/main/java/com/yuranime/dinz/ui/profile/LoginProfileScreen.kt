@@ -63,6 +63,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Diamond
 import androidx.compose.material.icons.outlined.DownloadForOffline
 import androidx.compose.material.icons.outlined.Edit
@@ -1688,9 +1689,15 @@ private fun CollectionAndHistorySubScreen(
     onEpisodeClick: (episodeId: String, movieId: String) -> Unit,
     onComicChapterClick: ((chapterId: String) -> Unit)?
 ) {
+    val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
-    val watchHistory = remember { authDb.getWatchHistory() }
+    val watchSyncVer by FirebaseManager.watchHistorySyncVersion.collectAsState()
+    var watchHistory by remember { mutableStateOf(authDb.getWatchHistory()) }
     val comicHistory = remember { authDb.getComicReadHistory() }
+
+    LaunchedEffect(watchSyncVer) {
+        watchHistory = authDb.getWatchHistory()
+    }
 
     Column(
         modifier = Modifier
@@ -1836,6 +1843,21 @@ private fun CollectionAndHistorySubScreen(
                                     fontFamily = SfProFontFamily,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    authDb.deleteWatchHistory(item.movieId)
+                                    watchHistory = authDb.getWatchHistory()
+                                    FirebaseManager.deleteWatchHistoryFromCloud(context, item.movieId)
+                                },
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.DeleteOutline,
+                                    contentDescription = "Hapus riwayat tontonan",
+                                    tint = Color(0xFF94A3B8),
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }

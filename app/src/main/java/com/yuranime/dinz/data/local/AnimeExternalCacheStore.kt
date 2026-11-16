@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.yuranime.dinz.data.model.AniListCreditsData
+import com.yuranime.dinz.data.model.AnimeSoundtrackResult
 import com.yuranime.dinz.data.model.EpisodeSkipData
 import com.yuranime.dinz.data.model.ExternalAnimeMapping
 import java.io.File
@@ -42,6 +43,7 @@ object AnimeExternalCacheStore {
     private val mappingsMemory = ConcurrentHashMap<String, ExternalAnimeMapping>()
     private val skipsMemory = ConcurrentHashMap<String, EpisodeSkipData>()
     private val creditsMemory = ConcurrentHashMap<Int, AniListCreditsData>()
+    private val soundtrackMemory = ConcurrentHashMap<String, AnimeSoundtrackResult>()
 
     fun init(context: Context) {
         val dir = File(context.applicationContext.filesDir, CACHE_DIR_NAME)
@@ -157,6 +159,34 @@ object AnimeExternalCacheStore {
         val dir = cacheDir ?: return
         synchronized(ioLock) {
             writeTextAtomic(File(dir, "anilist_credits_v1_${data.anilistId}.json"), gson.toJson(data))
+        }
+    }
+
+    fun getSoundtrack(cacheKey: String): AnimeSoundtrackResult? {
+        if (cacheKey.isBlank()) return null
+        val sanitizedKey = cacheKey.replace(Regex("[^a-zA-Z0-9._-]"), "_").take(80)
+        val mem = soundtrackMemory[sanitizedKey]
+        if (mem != null && (System.currentTimeMillis() - mem.fetchedAtMs) < CREDITS_TTL_MS) {
+            return mem
+        }
+        val dir = cacheDir ?: return null
+        val file = File(dir, "soundtrack_v1_$sanitizedKey.json")
+        if (!file.exists()) return null
+        val parsed = runCatching {
+            gson.fromJson(file.readText(), AnimeSoundtrackResult::class.java)
+        }.getOrNull() ?: return null
+        if ((System.currentTimeMillis() - parsed.fetchedAtMs) > CREDITS_TTL_MS) return null
+        soundtrackMemory[sanitizedKey] = parsed
+        return parsed
+    }
+
+    fun putSoundtrack(cacheKey: String, data: AnimeSoundtrackResult) {
+        if (cacheKey.isBlank() || data.isEmpty) return
+        val sanitizedKey = cacheKey.replace(Regex("[^a-zA-Z0-9._-]"), "_").take(80)
+        soundtrackMemory[sanitizedKey] = data
+        val dir = cacheDir ?: return
+        synchronized(ioLock) {
+            writeTextAtomic(File(dir, "soundtrack_v1_$sanitizedKey.json"), gson.toJson(data))
         }
     }
 

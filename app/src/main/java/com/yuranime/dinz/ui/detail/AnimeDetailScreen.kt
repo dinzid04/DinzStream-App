@@ -45,19 +45,28 @@ import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -80,15 +89,29 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.yuranime.dinz.R
+import com.yuranime.dinz.data.firebase.FirebaseManager
+import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.model.AniListCharacterEntry
 import com.yuranime.dinz.data.model.AniListCreditsData
 import com.yuranime.dinz.data.model.AniListStaffEntry
+import com.yuranime.dinz.data.model.AnimeSoundtrackResult
+import com.yuranime.dinz.data.model.AnimeSoundtrackTrack
 import com.yuranime.dinz.data.model.CommunityMediaItem
+import kotlinx.coroutines.delay
 import com.yuranime.dinz.data.model.CuplixItem
 import com.yuranime.dinz.data.model.EpisodeItem
 import com.yuranime.dinz.data.model.MovieDetail
@@ -115,9 +138,158 @@ fun AnimeDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val targetBounds = remember { mutableStateMapOf<String, Rect>() }
+    val watchSyncVer by FirebaseManager.watchHistorySyncVersion.collectAsState()
+    var watchedEpisodeIds by remember(movieId) {
+        mutableStateOf(LocalAuthDatabase(context).getWatchedEpisodeIds(movieId))
+    }
+
+    LaunchedEffect(movieId, watchSyncVer) {
+        watchedEpisodeIds = LocalAuthDatabase(context).getWatchedEpisodeIds(movieId)
+    }
+
+    // Single-instance audio preview player untuk tab SOUNDTRACK (otomatis berhenti saat pindah tab / keluar halaman)
+    var activeTrackId by remember { mutableStateOf<String?>(null) }
+    var isAudioPlaying by remember { mutableStateOf(false) }
+    var isAudioBuffering by remember { mutableStateOf(false) }
+    var audioPositionMs by remember { mutableLongStateOf(0L) }
+    var audioDurationMs by remember { mutableLongStateOf(30_000L) }
+
+    val audioPreviewPlayer = remember(context) {
+        ExoPlayer.Builder(context.applicationContext)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .build(),
+                true
+            )
+            .build()
+    }
+
+    val stopAudioPreview: () -> Unit = remember(audioPreviewPlayer) {
+        {
+            runCatching {
+                audioPreviewPlayer.pause()
+                audioPreviewPlayer.stop()
+                audioPreviewPlayer.clearMediaItems()
+            }
+            activeTrackId = null
+            isAudioPlaying = false
+            isAudioBuffering = false
+            audioPositionMs = 0L
+        }
+    }
+
+    val toggleAudioPreview: (AnimeSoundtrackTrack) -> Unit = remember(audioPreviewPlayer) {
+        { track ->
+            val previewUrl = track.previewUrl?.takeIf { it.startsWith("http") }
+            if (previewUrl != null) {
+                if (activeTrackId == track.id) {
+                    if (isAudioPlaying) {
+                        runCatching { audioPreviewPlayer.pause() }
+                        isAudioPlaying = false
+                    } else {
+                        runCatching {
+                            if (audioPreviewPlayer.playbackState == Player.STATE_ENDED) {
+                                audioPreviewPlayer.seekTo(0L)
+                            }
+                            audioPreviewPlayer.playWhenReady = true
+                            audioPreviewPlayer.play()
+                        }
+                        isAudioPlaying = true
+                    }
+                } else {
+                    runCatching {
+                        audioPreviewPlayer.stop()
+                        audioPreviewPlayer.clearMediaItems()
+                        audioPreviewPlayer.setMediaItem(MediaItem.fromUri(previewUrl))
+                        audioPreviewPlayer.prepare()
+                        audioPreviewPlayer.playWhenReady = true
+                        audioPreviewPlayer.play()
+                        activeTrackId = track.id
+                        isAudioPlaying = true
+                        isAudioBuffering = true
+                        audioPositionMs = 0L
+                        audioDurationMs = ((track.durationSec ?: 30) * 1000L).coerceAtLeast(1000L)
+                    }.onFailure {
+                        stopAudioPreview()
+                    }
+                }
+            }
+        }
+    }
+
+    DisposableEffect(audioPreviewPlayer, lifecycleOwner) {
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                when (playbackState) {
+                    Player.STATE_BUFFERING -> isAudioBuffering = true
+                    Player.STATE_READY -> {
+                        isAudioBuffering = false
+                        val dur = audioPreviewPlayer.duration
+                        if (dur > 0L) audioDurationMs = dur
+                    }
+                    Player.STATE_ENDED -> {
+                        isAudioPlaying = false
+                        isAudioBuffering = false
+                        audioPositionMs = 0L
+                        runCatching {
+                            audioPreviewPlayer.seekTo(0L)
+                            audioPreviewPlayer.pause()
+                        }
+                    }
+                    else -> isAudioBuffering = false
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                isAudioPlaying = isPlaying
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                stopAudioPreview()
+            }
+        }
+        val lifecycleObserver = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                if (activeTrackId != null) {
+                    runCatching { audioPreviewPlayer.pause() }
+                    isAudioPlaying = false
+                }
+            }
+        }
+        audioPreviewPlayer.addListener(listener)
+        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
+            audioPreviewPlayer.removeListener(listener)
+            runCatching {
+                audioPreviewPlayer.stop()
+                audioPreviewPlayer.release()
+            }
+        }
+    }
+
+    LaunchedEffect(activeTrackId, isAudioPlaying) {
+        while (activeTrackId != null && isAudioPlaying) {
+            val pos = runCatching { audioPreviewPlayer.currentPosition }.getOrDefault(0L).coerceAtLeast(0L)
+            val dur = runCatching { audioPreviewPlayer.duration }.getOrDefault(0L)
+            audioPositionMs = pos
+            if (dur > 0L) audioDurationMs = dur
+            delay(150L)
+        }
+    }
+
+    LaunchedEffect(uiState.selectedTab) {
+        if (uiState.selectedTab != DetailTab.SOUNDTRACK && activeTrackId != null) {
+            stopAudioPreview()
+        }
+    }
 
     LaunchedEffect(movieId) {
+        stopAudioPreview()
         viewModel.loadAnimeDetail(movieId)
     }
 
@@ -183,121 +355,156 @@ fun AnimeDetailScreen(
                 }
             }
 
-            uiState.movieDetail != null -> {
-                val movie = uiState.movieDetail!!
-                Column(modifier = Modifier.fillMaxSize()) {
-                    // 1. Hero Cover Header with Edge-to-Edge Status Bar Handling
-                    HeroCoverHeader(
-                        movie = movie,
-                        latestEpisode = uiState.latestEpisode,
-                        isFavorite = uiState.isFavorite,
-                        targetBounds = targetBounds,
-                        onBackClick = onBackClick,
-                        onFavoriteClick = { viewModel.toggleFavorite() },
-                        onShareClick = {
-                            val sendIntent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, "Nonton ${movie.title} di Yuranime!")
-                                type = "text/plain"
+            else -> {
+                uiState.movieDetail?.let { movie ->
+                    val visibleTabs = remember(uiState.isLoadingSoundtrack, uiState.soundtrack) {
+                        DetailTab.entries.filter { tab ->
+                            if (tab == DetailTab.SOUNDTRACK) {
+                                !uiState.isLoadingSoundtrack && !uiState.soundtrack.isEmpty
+                            } else {
+                                true
                             }
-                            context.startActivity(Intent.createChooser(sendIntent, "Bagikan anime"))
-                        },
-                        onPlayClick = {
-                            val targetEpId = uiState.latestEpisode?.id ?: uiState.episodes.firstOrNull()?.id
-                            if (targetEpId != null) {
-                                onEpisodeClick(targetEpId)
-                            }
-                        }
-                    )
-
-                    // 2. Scrollable TabBar (Clean 6 Tabs)
-                    ScrollableTabRow(
-                        selectedTabIndex = uiState.selectedTab.ordinal,
-                        containerColor = ColorBackgroundPrimary,
-                        contentColor = ColorAccentPrimary,
-                        edgePadding = 16.dp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onboardingTarget("detail_tabs", targetBounds),
-                        indicator = { tabPositions ->
-                            if (uiState.selectedTab.ordinal < tabPositions.size) {
-                                Box(
-                                    modifier = Modifier
-                                        .tabIndicatorOffset(tabPositions[uiState.selectedTab.ordinal])
-                                        .height(2.5.dp)
-                                        .background(ColorAccentPrimary)
-                                )
-                            }
-                        },
-                        divider = {}
-                    ) {
-                        DetailTab.entries.forEach { tab ->
-                            val isSelected = uiState.selectedTab == tab
-                            Tab(
-                                selected = isSelected,
-                                onClick = { viewModel.selectTab(tab) },
-                                text = {
-                                    Text(
-                                        text = tab.label,
-                                        fontSize = 13.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) ColorAccentPrimary else ColorTextSecondary
-                                    )
-                                },
-                                modifier = Modifier.height(48.dp)
-                            )
                         }
                     }
+                    val activeTabIndex = visibleTabs.indexOf(uiState.selectedTab).coerceAtLeast(0)
 
-                    // 3. Tab Content
-                    Box(modifier = Modifier.weight(1f)) {
-                        when (uiState.selectedTab) {
-                            DetailTab.INFO -> TabInfoContent(
-                                movie = movie,
-                                creditsData = uiState.creditsData,
-                                onOpenCreditsTab = { viewModel.selectTab(DetailTab.CREDITS) }
-                            )
-                            DetailTab.EPISODE -> TabEpisodeContent(
-                                episodes = uiState.filteredEpisodes,
-                                searchQuery = uiState.episodeSearchQuery,
-                                onSearchQueryChange = { viewModel.setEpisodeSearchQuery(it) },
-                                isSortAscending = uiState.isEpisodeSortAscending,
-                                onToggleSort = { viewModel.toggleEpisodeSort() },
-                                isLoadingMore = uiState.isLoadingMoreEpisodes,
-                                onLoadMore = { viewModel.loadMoreEpisodes() },
-                                onEpisodeClick = { ep ->
-                                    ep.id?.let { onEpisodeClick(it) }
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // 1. Hero Cover Header with Edge-to-Edge Status Bar Handling
+                        HeroCoverHeader(
+                            movie = movie,
+                            latestEpisode = uiState.latestEpisode,
+                            isFavorite = uiState.isFavorite,
+                            targetBounds = targetBounds,
+                            onBackClick = {
+                                stopAudioPreview()
+                                onBackClick()
+                            },
+                            onFavoriteClick = { viewModel.toggleFavorite() },
+                            onShareClick = {
+                                runCatching {
+                                    val sendIntent = Intent().apply {
+                                        action = Intent.ACTION_SEND
+                                        putExtra(Intent.EXTRA_TEXT, "Nonton ${movie.title} di Yuranime!")
+                                        type = "text/plain"
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, "Bagikan anime"))
                                 }
-                            )
-                            DetailTab.CREDITS -> TabCharactersAndStaffContent(
-                                isLoading = uiState.isLoadingCredits,
-                                errorMessage = uiState.creditsError,
-                                creditsData = uiState.creditsData,
-                                selectedSection = uiState.selectedCreditsSection,
-                                selectedVaLanguage = uiState.selectedVaLanguage,
-                                onSelectSection = { viewModel.selectCreditsSection(it) },
-                                onSelectVaLanguage = { viewModel.selectVaLanguage(it) },
-                                onRetry = { viewModel.retryLoadCredits(forceRefresh = true) },
-                                onImageClick = { viewModel.openFullScreenImage(it) }
-                            )
-                            DetailTab.SEASON -> TabSeasonContent(
-                                seasons = uiState.seasons,
-                                onSeasonClick = { seasonId ->
-                                    onAnimeClick(seasonId)
+                            },
+                            onPlayClick = {
+                                val targetEpId = uiState.latestEpisode?.id ?: uiState.episodes.firstOrNull()?.id
+                                if (targetEpId != null) {
+                                    stopAudioPreview()
+                                    onEpisodeClick(targetEpId)
                                 }
-                            )
-                            DetailTab.CUPLIX -> TabCuplixContent(
-                                cuplixList = uiState.cuplixList,
-                                onCuplixClick = onCuplixClick
-                            )
-                            DetailTab.POSTER -> TabPosterContent(
-                                posters = uiState.posters,
-                                onImageClick = { viewModel.openFullScreenImage(it) }
-                            )
-                            DetailTab.COVER -> TabCoverContent(
-                                covers = uiState.covers,
-                                onImageClick = { viewModel.openFullScreenImage(it) }
-                            )
+                            }
+                        )
+
+                        // 2. Scrollable TabBar (SOUNDTRACK disembunyikan otomatis jika lagu OP & ED kosong)
+                        ScrollableTabRow(
+                            selectedTabIndex = activeTabIndex,
+                            containerColor = ColorBackgroundPrimary,
+                            contentColor = ColorAccentPrimary,
+                            edgePadding = 16.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onboardingTarget("detail_tabs", targetBounds),
+                            indicator = { tabPositions ->
+                                if (activeTabIndex < tabPositions.size) {
+                                    Box(
+                                        modifier = Modifier
+                                            .tabIndicatorOffset(tabPositions[activeTabIndex])
+                                            .height(2.5.dp)
+                                            .background(ColorAccentPrimary)
+                                    )
+                                }
+                            },
+                            divider = {}
+                        ) {
+                            visibleTabs.forEach { tab ->
+                                val isSelected = uiState.selectedTab == tab
+                                Tab(
+                                    selected = isSelected,
+                                    onClick = { viewModel.selectTab(tab) },
+                                    text = {
+                                        Text(
+                                            text = tab.label,
+                                            fontSize = 13.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) ColorAccentPrimary else ColorTextSecondary
+                                        )
+                                    },
+                                    modifier = Modifier.height(48.dp)
+                                )
+                            }
+                        }
+
+                        // 3. Tab Content
+                        Box(modifier = Modifier.weight(1f)) {
+                            when (uiState.selectedTab) {
+                                DetailTab.INFO -> TabInfoContent(
+                                    movie = movie,
+                                    creditsData = uiState.creditsData,
+                                    onOpenCreditsTab = { viewModel.selectTab(DetailTab.CREDITS) }
+                                )
+                                DetailTab.EPISODE -> TabEpisodeContent(
+                                    episodes = uiState.filteredEpisodes,
+                                    watchedEpisodeIds = watchedEpisodeIds,
+                                    searchQuery = uiState.episodeSearchQuery,
+                                    onSearchQueryChange = { viewModel.setEpisodeSearchQuery(it) },
+                                    isSortAscending = uiState.isEpisodeSortAscending,
+                                    onToggleSort = { viewModel.toggleEpisodeSort() },
+                                    isLoadingMore = uiState.isLoadingMoreEpisodes,
+                                    onLoadMore = { viewModel.loadMoreEpisodes() },
+                                    onEpisodeClick = { ep ->
+                                        ep.id?.let {
+                                            stopAudioPreview()
+                                            onEpisodeClick(it)
+                                        }
+                                    }
+                                )
+                                DetailTab.CREDITS -> TabCharactersAndStaffContent(
+                                    isLoading = uiState.isLoadingCredits,
+                                    errorMessage = uiState.creditsError,
+                                    creditsData = uiState.creditsData,
+                                    selectedSection = uiState.selectedCreditsSection,
+                                    selectedVaLanguage = uiState.selectedVaLanguage,
+                                    onSelectSection = { viewModel.selectCreditsSection(it) },
+                                    onSelectVaLanguage = { viewModel.selectVaLanguage(it) },
+                                    onRetry = { viewModel.retryLoadCredits(forceRefresh = true) },
+                                    onImageClick = { viewModel.openFullScreenImage(it) }
+                                )
+                                DetailTab.SOUNDTRACK -> TabSoundtrackContent(
+                                    soundtrack = uiState.soundtrack,
+                                    activeTrackId = activeTrackId,
+                                    isPlaying = isAudioPlaying,
+                                    isBuffering = isAudioBuffering,
+                                    currentPosMs = audioPositionMs,
+                                    durationMs = audioDurationMs,
+                                    onTogglePlay = toggleAudioPreview
+                                )
+                                DetailTab.SEASON -> TabSeasonContent(
+                                    seasons = uiState.seasons,
+                                    onSeasonClick = { seasonId ->
+                                        stopAudioPreview()
+                                        onAnimeClick(seasonId)
+                                    }
+                                )
+                                DetailTab.CUPLIX -> TabCuplixContent(
+                                    cuplixList = uiState.cuplixList,
+                                    onCuplixClick = {
+                                        stopAudioPreview()
+                                        onCuplixClick(it)
+                                    }
+                                )
+                                DetailTab.POSTER -> TabPosterContent(
+                                    posters = uiState.posters,
+                                    onImageClick = { viewModel.openFullScreenImage(it) }
+                                )
+                                DetailTab.COVER -> TabCoverContent(
+                                    covers = uiState.covers,
+                                    onImageClick = { viewModel.openFullScreenImage(it) }
+                                )
+                            }
                         }
                     }
                 }
@@ -777,6 +984,7 @@ private fun TabInfoContent(
 @Composable
 private fun TabEpisodeContent(
     episodes: List<EpisodeItem>,
+    watchedEpisodeIds: Set<String> = emptySet(),
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     isSortAscending: Boolean,
@@ -952,6 +1160,26 @@ private fun TabEpisodeContent(
                                     color = Color.White,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // Tanda episode sudah ditonton (tersinkron lintas perangkat untuk user login)
+                        val isWatched = !ep.id.isNullOrBlank() && ep.id in watchedEpisodeIds
+                        if (isWatched) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(5.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xD90B0B0E))
+                                    .padding(2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.CheckCircle,
+                                    contentDescription = "Sudah ditonton",
+                                    tint = ColorAccentPrimary,
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
@@ -1764,6 +1992,323 @@ private fun StaffCreditCard(
             )
         }
     }
+}
+
+// ==================== TAB SOUNDTRACK (OPENING & ENDING - CLEAN FLAT UI) ====================
+
+@Composable
+private fun TabSoundtrackContent(
+    soundtrack: AnimeSoundtrackResult,
+    activeTrackId: String?,
+    isPlaying: Boolean,
+    isBuffering: Boolean,
+    currentPosMs: Long,
+    durationMs: Long,
+    onTogglePlay: (AnimeSoundtrackTrack) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ColorBackgroundPrimary),
+        contentPadding = PaddingValues(top = 12.dp, bottom = 36.dp)
+    ) {
+        if (soundtrack.openings.isNotEmpty()) {
+            item(key = "header_opening") {
+                SoundtrackSectionHeader(
+                    title = "OPENING",
+                    count = soundtrack.openings.size
+                )
+            }
+            items(
+                items = soundtrack.openings,
+                key = { it.id }
+            ) { track ->
+                val isCurrent = activeTrackId == track.id
+                SoundtrackTrackRow(
+                    track = track,
+                    isCurrent = isCurrent,
+                    isPlaying = isCurrent && isPlaying,
+                    isBuffering = isCurrent && isBuffering,
+                    currentPosMs = if (isCurrent) currentPosMs else 0L,
+                    durationMs = if (isCurrent) durationMs else 30_000L,
+                    onTogglePlay = { onTogglePlay(track) }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    thickness = 0.75.dp,
+                    color = Color(0xFF1A1D26)
+                )
+            }
+        }
+
+        if (soundtrack.openings.isNotEmpty() && soundtrack.endings.isNotEmpty()) {
+            item(key = "section_gap") {
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+        }
+
+        if (soundtrack.endings.isNotEmpty()) {
+            item(key = "header_ending") {
+                SoundtrackSectionHeader(
+                    title = "ENDING",
+                    count = soundtrack.endings.size
+                )
+            }
+            items(
+                items = soundtrack.endings,
+                key = { it.id }
+            ) { track ->
+                val isCurrent = activeTrackId == track.id
+                SoundtrackTrackRow(
+                    track = track,
+                    isCurrent = isCurrent,
+                    isPlaying = isCurrent && isPlaying,
+                    isBuffering = isCurrent && isBuffering,
+                    currentPosMs = if (isCurrent) currentPosMs else 0L,
+                    durationMs = if (isCurrent) durationMs else 30_000L,
+                    onTogglePlay = { onTogglePlay(track) }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    thickness = 0.75.dp,
+                    color = Color(0xFF1A1D26)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SoundtrackSectionHeader(
+    title: String,
+    count: Int
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = title,
+            color = ColorTextPrimary,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.9.sp
+        )
+        Text(
+            text = "$count lagu",
+            color = Color(0xFF9CA3AF),
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+private fun SoundtrackTrackRow(
+    track: AnimeSoundtrackTrack,
+    isCurrent: Boolean,
+    isPlaying: Boolean,
+    isBuffering: Boolean,
+    currentPosMs: Long,
+    durationMs: Long,
+    onTogglePlay: () -> Unit
+) {
+    val hasPreview = !track.previewUrl.isNullOrBlank()
+    val context = LocalContext.current
+    var coverFailed by remember(track.id, track.coverUrl) { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (isCurrent) Color(0xFF12141B) else ColorBackgroundPrimary)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Cover Album / Fallback Ikon Musik Minimalis
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF161922))
+                    .border(
+                        width = 1.dp,
+                        color = if (isCurrent) ColorAccentPrimary.copy(alpha = 0.55f) else Color(0xFF232736),
+                        shape = RoundedCornerShape(10.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.MusicNote,
+                    contentDescription = null,
+                    tint = if (isCurrent) ColorAccentPrimary else Color(0xFF6B7280),
+                    modifier = Modifier.size(24.dp)
+                )
+                val cover = track.coverUrl
+                if (!cover.isNullOrBlank() && !coverFailed) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(cover)
+                            .crossfade(true)
+                            .listener(
+                                onError = { _, _ -> coverFailed = true }
+                            )
+                            .build(),
+                        contentDescription = track.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            // Metadata Lagu (Badge OP/ED + Judul + Artis + Album/Episode)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(Color(0x24FF5722))
+                            .padding(horizontal = 7.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = track.badgeLabel,
+                            color = Color(0xFFFF6D3F),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.4.sp
+                        )
+                    }
+
+                    if (!track.episodeNote.isNullOrBlank()) {
+                        Text(
+                            text = track.episodeNote,
+                            color = Color(0xFF9CA3AF),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Text(
+                    text = track.title,
+                    color = if (isCurrent) Color(0xFFFF6D3F) else ColorTextPrimary,
+                    fontSize = 14.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Text(
+                    text = track.artist,
+                    color = Color(0xFFCBD5E1),
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (!track.album.isNullOrBlank()) {
+                    Text(
+                        text = track.album,
+                        color = Color(0xFF6B7280),
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            // Tombol Play/Pause Preview Audio hanya jika URL preview tersedia
+            if (hasPreview) {
+                Spacer(modifier = Modifier.width(12.dp))
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isCurrent) ColorAccentPrimary else Color(0xFF1A1D26)
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = if (isCurrent) ColorAccentPrimary else Color(0xFF2B3040),
+                            shape = CircleShape
+                        )
+                        .clickable { onTogglePlay() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    when {
+                        isBuffering -> CircularProgressIndicator(
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        isPlaying -> Icon(
+                            imageVector = Icons.Rounded.Pause,
+                            contentDescription = "Jeda Preview",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        else -> Icon(
+                            imageVector = Icons.Rounded.PlayArrow,
+                            contentDescription = "Putar Preview",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Indikator Progres Sederhana untuk Preview Aktif
+        if (isCurrent && hasPreview) {
+            Spacer(modifier = Modifier.height(10.dp))
+            val safeDuration = durationMs.coerceAtLeast(1000L)
+            val progressFraction = (currentPosMs.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                LinearProgressIndicator(
+                    progress = { progressFraction },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    color = ColorAccentPrimary,
+                    trackColor = Color(0xFF232736)
+                )
+                Text(
+                    text = "${formatAudioSec(currentPosMs)} / ${formatAudioSec(safeDuration)}",
+                    color = Color(0xFF9CA3AF),
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+private fun formatAudioSec(ms: Long): String {
+    val totalSec = (ms / 1000L).coerceAtLeast(0L)
+    val min = totalSec / 60L
+    val sec = totalSec % 60L
+    return String.format(java.util.Locale.US, "%d:%02d", min, sec)
 }
 
 // ==================== 7. FULL SCREEN IMAGE PREVIEW MODAL ====================

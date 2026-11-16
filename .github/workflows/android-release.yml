@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "2.8.2"
+  APP_VERSION: "2.9.0"
 
 jobs:
   build:
@@ -63,20 +63,26 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Chat Global Real-Time, Stiker 2 Mode & Perbaikan Profil Login Google (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Tab Soundtrack, Player Modern, Sync History & Background Auto-Update (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
             ### Pembaruan Utama:
-            1. **Perbaikan Profil Login Google:**
-               - Mencegah nama, foto profil R2/Telegram CDN, banner, bio, dan kosmetik pengguna tertimpa data bawaan Google saat logout dan login kembali.
-            2. **Fitur Chat Global (`GlobalChatScreen`) & Preload Stiker Sticker.ly:**
-               - Top header real-time dengan kehadiran `chat_presence` (maksimal 4 avatar online + `+N`), gelembung berekor modern dengan Avatar Decoration statis, Swipe-to-Reply WhatsApp, dan Context Menu Popover iOS.
-               - Panel stiker 2 mode (Inline Emoji-Sticker 8-kolom sebaris dengan teks & Stiker Besar 4-kolom), pencarian cepat Sticker.ly, bar thumbnail sinkron 2 arah, serta manajemen paket default real-time dari Web Admin.
-               - Upload foto/GIF chat langsung ke Telegram Worker CDN (maks 10 MB) dan Bottom Sheet Preview Profil teman dengan kosmetik animasi penuh.
+            1. **Tab "SOUNDTRACK" di Detail Anime:**
+               - Menampilkan daftar lagu Opening & Ending (AnimeThemes -> Jikan v4 -> Kitsu/AniList) lengkap dengan cover art & audio preview 30 detik (Deezer -> iTunes -> MusicBrainz/Cover Art Archive) tanpa API Key.
+               - Tab disembunyikan otomatis jika anime tidak memiliki data lagu Opening maupun Ending.
+            2. **Peningkatan Video Player (`StreamingScreen`):**
+               - Seekbar modern ala YouTube (track tipis, aksen `#FF5722`, buffer abu-abu, thumb lingkaran responsif) dengan penanda segmen Intro/Outro kuning (`#FACC15`) di timeline.
+               - Gestur Double-Tap kiri/kanan untuk mundur/maju cepat lengkap dengan pengaturan toggle ON/OFF dan pilihan durasi (`5`, `10`, `15`, `30` detik) di menu Gear.
+            3. **Sinkronisasi Watch History Firebase (Khusus Akun Login):**
+               - Sinkronisasi otomatis lintas perangkat ke Firestore untuk pengguna login (berkala, saat pause, selesai episode, & keluar player), termasuk penghapusan riwayat & penanda episode ditonton. Pengguna tamu tetap 100% lokal.
+            4. **Perbaikan Stabilitas & Anti-Crash:**
+               - Memperbaiki crash di halaman Edit Profil & Style Nama (`StyledUsernameText`, variable font API-safe, `ApngAnimationView`, async load kosmetik Discord), menghilangkan unsafe `!!`, dan menambah `GlobalCrashHandler`.
+            5. **In-App Background Update:**
+               - Pengunduhan APK lewat Foreground Service dengan progres & persentase putih murni (`#FFFFFF`), notifikasi bar persisten, opsi minimize di dalam aplikasi, serta auto-install menimpa aplikasi lama melalui `FileProvider`.
           draft: false
           prerelease: false
-          make_latest: false
+          make_latest: true
           files: |
             build-output/Yuranime-v${{ env.APP_VERSION }}-b${{ github.run_number }}.apk
         env:

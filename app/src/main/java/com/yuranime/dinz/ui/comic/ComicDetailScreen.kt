@@ -215,8 +215,8 @@ fun ComicDetailScreen(
                     }
                 }
             }
-        } else if (comicDetail != null) {
-            val detail = comicDetail!!
+        } else {
+            comicDetail?.let { detail ->
             val coverUrl = detail.coverLandscape?.takeIf { it.isNotBlank() } ?: detail.coverPortrait
             val posterUrl = detail.coverPortrait.ifBlank { coverUrl }
 
@@ -488,6 +488,7 @@ fun ComicDetailScreen(
                         }
                     }
                 }
+            }
             }
         }
 

@@ -45,6 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -87,7 +88,9 @@ import com.yuranime.dinz.ui.components.MultiLayerProfileEffectView
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.PrimoPointIcon
 import com.yuranime.dinz.ui.theme.SfProFontFamily
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * ShopScreen:
@@ -126,9 +129,17 @@ fun ShopScreen(
     var previewEffectItem by remember { mutableStateOf<ProfileEffectDefinition?>(null) }
     var isProcessingAction by remember { mutableStateOf(false) }
 
-    // Memuat seluruh 396+ Profile Effect & 985+ Avatar Decoration TANPA BATAS!
-    val allEffects = remember(context) { DiscordCosmeticsRepository.getAllProfileEffects(context) }
-    val allBorders = remember(context) { DiscordCosmeticsRepository.getAllBorders(context) }
+    // Memuat seluruh Profile Effect & Avatar Decoration secara asynchronous agar main thread tetap ringan
+    var allEffects by remember { mutableStateOf<List<ProfileEffectDefinition>>(emptyList()) }
+    var allBorders by remember { mutableStateOf<List<BorderDefinition>>(emptyList()) }
+    LaunchedEffect(context) {
+        allEffects = withContext(Dispatchers.IO) {
+            runCatching { DiscordCosmeticsRepository.getAllProfileEffects(context) }.getOrDefault(emptyList())
+        }
+        allBorders = withContext(Dispatchers.IO) {
+            runCatching { DiscordCosmeticsRepository.getAllBorders(context) }.getOrDefault(emptyList())
+        }
+    }
 
     // Filter daftar Profile Effect
     val filteredEffects = remember(allEffects, searchQuery) {

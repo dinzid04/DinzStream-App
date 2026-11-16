@@ -43,6 +43,8 @@ object AppPreferences {
     private const val KEY_AUTO_PLAY = "key_auto_play_enabled"
     private const val KEY_AUTO_SKIP_INTRO = "key_auto_skip_intro"
     private const val KEY_PRELOAD_NEXT_EPISODE = "key_preload_next_episode"
+    private const val KEY_DOUBLE_TAP_SEEK_ENABLED = "key_double_tap_seek_enabled"
+    private const val KEY_DOUBLE_TAP_SEEK_SECONDS = "key_double_tap_seek_seconds"
     private const val KEY_SHOW_MINI_TITLE = "key_show_mini_title"
     private const val KEY_SHOW_CUSTOM_TITLE = "key_show_custom_title"
     private const val KEY_SHOW_ROLE = "key_show_role"
@@ -100,6 +102,12 @@ object AppPreferences {
     private val _cosmeticAnimate = MutableStateFlow(true)
     val cosmeticAnimate: StateFlow<Boolean> = _cosmeticAnimate.asStateFlow()
 
+    private val _doubleTapSeekEnabled = MutableStateFlow(true)
+    val doubleTapSeekEnabled: StateFlow<Boolean> = _doubleTapSeekEnabled.asStateFlow()
+
+    private val _doubleTapSeekSeconds = MutableStateFlow(10)
+    val doubleTapSeekSeconds: StateFlow<Int> = _doubleTapSeekSeconds.asStateFlow()
+
     fun init(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val modeId = prefs.getInt(KEY_SLIDER_MODE, HomeSliderMode.DEFAULT.id)
@@ -115,6 +123,9 @@ object AppPreferences {
         _showCustomTitle.value = prefs.getBoolean(KEY_SHOW_CUSTOM_TITLE, true)
         _showRole.value = prefs.getBoolean(KEY_SHOW_ROLE, true)
         _cosmeticAnimate.value = prefs.getBoolean(KEY_COSMETIC_ANIMATE, true)
+        _doubleTapSeekEnabled.value = prefs.getBoolean(KEY_DOUBLE_TAP_SEEK_ENABLED, true)
+        val rawSkipSec = prefs.getInt(KEY_DOUBLE_TAP_SEEK_SECONDS, 10)
+        _doubleTapSeekSeconds.value = if (rawSkipSec in setOf(5, 10, 15, 30)) rawSkipSec else 10
     }
 
     fun setSliderMode(context: Context, mode: HomeSliderMode) {
@@ -180,6 +191,23 @@ object AppPreferences {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_PRELOAD_NEXT_EPISODE, enabled)
+            .apply()
+    }
+
+    fun setDoubleTapSeekEnabled(context: Context, enabled: Boolean) {
+        _doubleTapSeekEnabled.value = enabled
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_DOUBLE_TAP_SEEK_ENABLED, enabled)
+            .apply()
+    }
+
+    fun setDoubleTapSeekSeconds(context: Context, seconds: Int) {
+        val valid = if (seconds in setOf(5, 10, 15, 30)) seconds else 10
+        _doubleTapSeekSeconds.value = valid
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(KEY_DOUBLE_TAP_SEEK_SECONDS, valid)
             .apply()
     }
 

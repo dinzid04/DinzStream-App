@@ -63,6 +63,7 @@ import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.yuranime.dinz.R
+import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.local.AppPreferences
 import com.yuranime.dinz.data.local.HomeSliderMode
 import com.yuranime.dinz.data.model.AnimeItem
@@ -108,10 +109,11 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sliderMode by AppPreferences.sliderMode.collectAsState()
     val isLiquidGlass by AppPreferences.liquidGlassEnabled.collectAsState()
+    val watchHistorySyncVer by FirebaseManager.watchHistorySyncVersion.collectAsState()
     val context = LocalContext.current
 
-    // Refresh watch history from local database
-    LaunchedEffect(Unit) {
+    // Refresh watch history dari database lokal & setelah sinkronisasi Firebase
+    LaunchedEffect(watchHistorySyncVer) {
         viewModel.refreshWatchHistory(context)
     }
 
@@ -144,12 +146,12 @@ fun HomeScreen(
     }
 
     // Sub-Page: Active Full Vertical List for Chevron '>'
-    if (uiState.activeSectionDetail != null) {
+    uiState.activeSectionDetail?.let { activeDetail ->
         BackHandler(enabled = isTabActive) {
             viewModel.closeSectionDetail()
         }
         HomeSectionDetailSubPage(
-            detailState = uiState.activeSectionDetail!!,
+            detailState = activeDetail,
             onBackClick = { viewModel.closeSectionDetail() },
             onAnimeClick = onAnimeClick,
             onLoadMore = { viewModel.loadMoreSectionDetail() }

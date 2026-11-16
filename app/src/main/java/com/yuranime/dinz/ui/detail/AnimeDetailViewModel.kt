@@ -2,9 +2,12 @@ package com.yuranime.dinz.ui.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.yuranime.dinz.data.model.AnimeSoundtrackResult
 import com.yuranime.dinz.data.model.MovieDetail
 import com.yuranime.dinz.data.repository.AniListCharacterRepository
 import com.yuranime.dinz.data.repository.AnimeRepository
+import com.yuranime.dinz.data.repository.AnimeSoundtrackRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +25,7 @@ class AnimeDetailViewModel(
 
     private var currentMovieId: String? = null
     private var creditsJob: Job? = null
+    private var soundtrackJob: Job? = null
 
     fun loadAnimeDetail(movieId: String) {
         if (currentMovieId == movieId && !_uiState.value.isLoading && _uiState.value.movieDetail != null) {
@@ -29,16 +33,20 @@ class AnimeDetailViewModel(
         }
         currentMovieId = movieId
         creditsJob?.cancel()
+        soundtrackJob?.cancel()
         _uiState.update {
             it.copy(
                 isLoading = true,
                 errorMessage = null,
+                selectedTab = DetailTab.INFO,
                 currentEpisodePage = 0,
                 hasMoreEpisodes = true,
                 episodes = emptyList(),
                 isLoadingCredits = false,
                 creditsError = null,
-                creditsData = null
+                creditsData = null,
+                isLoadingSoundtrack = false,
+                soundtrack = AnimeSoundtrackResult()
             )
         }
 
@@ -72,6 +80,7 @@ class AnimeDetailViewModel(
 
             if (movie != null) {
                 launchCreditsFetch(movie = movie, forceRefresh = false)
+                launchSoundtrackFetch(movie = movie, forceRefresh = false)
             }
 
             // Fetch secondary tabs concurrently
@@ -219,6 +228,51 @@ class AnimeDetailViewModel(
                     }
                 }
             )
+        }
+    }
+
+    private fun launchSoundtrackFetch(movie: MovieDetail, forceRefresh: Boolean) {
+        val title = movie.title?.trim().takeIf { !it.isNullOrBlank() } ?: return
+        val expectedId = currentMovieId
+
+        soundtrackJob?.cancel()
+        _uiState.update {
+            it.copy(
+                isLoadingSoundtrack = true,
+                soundtrack = AnimeSoundtrackResult()
+            )
+        }
+
+        soundtrackJob = viewModelScope.launch {
+            val result = try {
+                AnimeSoundtrackRepository.getSoundtracksForAnime(
+                    title = title,
+                    synonymsRaw = movie.synonyms,
+                    yearHint = movie.year,
+                    airedStartHint = movie.airedStart,
+                    formatHint = movie.type,
+                    movieId = movie.id ?: expectedId,
+                    forceRefresh = forceRefresh
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                AnimeSoundtrackResult()
+            }
+
+            if (currentMovieId != expectedId) return@launch
+            _uiState.update { state ->
+                val safeSelectedTab = if (state.selectedTab == DetailTab.SOUNDTRACK && result.isEmpty) {
+                    DetailTab.INFO
+                } else {
+                    state.selectedTab
+                }
+                state.copy(
+                    isLoadingSoundtrack = false,
+                    soundtrack = result,
+                    selectedTab = safeSelectedTab
+                )
+            }
         }
     }
 }

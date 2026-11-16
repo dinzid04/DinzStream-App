@@ -10,12 +10,19 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,11 +34,13 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -79,8 +88,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
@@ -92,6 +99,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -101,11 +109,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -129,6 +142,7 @@ import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import coil.request.ImageRequest
 import com.yuranime.dinz.R
+import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.local.AppPreferences
 import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.model.CommunityMediaItem
@@ -167,15 +181,27 @@ fun StreamingScreen(
     val prefAutoPlay by AppPreferences.autoPlayEnabled.collectAsState()
     val prefAutoSkipIntro by AppPreferences.autoSkipIntro.collectAsState()
     val prefPreloadNext by AppPreferences.preloadNextEpisode.collectAsState()
+    val prefDoubleTapEnabled by AppPreferences.doubleTapSeekEnabled.collectAsState()
+    val prefDoubleTapSeconds by AppPreferences.doubleTapSeekSeconds.collectAsState()
     val context = LocalContext.current
 
-    LaunchedEffect(prefQuality, prefSpeed, prefAutoPlay, prefAutoSkipIntro, prefPreloadNext) {
+    LaunchedEffect(
+        prefQuality,
+        prefSpeed,
+        prefAutoPlay,
+        prefAutoSkipIntro,
+        prefPreloadNext,
+        prefDoubleTapEnabled,
+        prefDoubleTapSeconds
+    ) {
         viewModel.syncPlaybackPreferences(
             preferredQuality = prefQuality,
             playbackSpeed = prefSpeed,
             autoPlayEnabled = prefAutoPlay,
             autoSkipIntro = prefAutoSkipIntro,
-            preloadNextEpisode = prefPreloadNext
+            preloadNextEpisode = prefPreloadNext,
+            doubleTapSeekEnabled = prefDoubleTapEnabled,
+            doubleTapSeekSeconds = prefDoubleTapSeconds
         )
     }
     val activity = context as? ComponentActivity
@@ -245,48 +271,83 @@ fun StreamingScreen(
 
     val localDb = remember { LocalAuthDatabase(context) }
 
-    // Periodic watch progress recording (simpan Cover Horizontal agar tampilan Lanjut Nonton di Home horizontal)
-    LaunchedEffect(uiState.isPlaying, uiState.currentPositionMs) {
-        if (uiState.isPlaying && uiState.currentPositionMs > 5000L) {
-            val mId = uiState.movieId.ifBlank { uiState.episode?.idMovie ?: "" }
-            if (mId.isNotBlank()) {
-                val horizontalCoverUrl = uiState.movieDetail?.movie?.getEffectiveCover()?.takeIf { it.isNotBlank() }
-                    ?: uiState.episode?.getEffectiveImage()?.takeIf { it.isNotBlank() }
-                    ?: uiState.movieDetail?.movie?.getEffectivePoster()
-                    ?: ""
-                localDb.saveWatchProgress(
-                    movieId = mId,
-                    animeTitle = uiState.movieDetail?.movie?.title ?: uiState.episode?.title?.substringBefore(" Episode") ?: "Anime",
-                    episodeId = uiState.episodeId,
-                    episodeTitle = "Episode ${uiState.episode?.index ?: "1"}",
-                    posterUrl = horizontalCoverUrl,
-                    positionMs = uiState.currentPositionMs,
-                    durationMs = uiState.durationMs
-                )
-            }
-        }
-    }
-
-    // Save watch progress on exit
-    DisposableEffect(uiState.episodeId, uiState.movieId) {
-        onDispose {
-            val state = viewModel.uiState.value
+    val persistWatchProgress: (StreamingUiState, Boolean, Boolean) -> Unit = remember(localDb, context) {
+        { state, markCompleted, pushCloud ->
             val mId = state.movieId.ifBlank { state.episode?.idMovie ?: "" }
-            if (mId.isNotBlank() && state.currentPositionMs > 3000L) {
+            val epId = state.episodeId
+            if (mId.isNotBlank() && epId.isNotBlank() && (state.currentPositionMs > 3000L || markCompleted)) {
                 val horizontalCoverUrl = state.movieDetail?.movie?.getEffectiveCover()?.takeIf { it.isNotBlank() }
                     ?: state.episode?.getEffectiveImage()?.takeIf { it.isNotBlank() }
                     ?: state.movieDetail?.movie?.getEffectivePoster()
                     ?: ""
-                localDb.saveWatchProgress(
+                val epNum = state.episode?.index?.ifBlank { "1" } ?: "1"
+                val savedItem = localDb.saveWatchProgress(
                     movieId = mId,
                     animeTitle = state.movieDetail?.movie?.title ?: state.episode?.title?.substringBefore(" Episode") ?: "Anime",
-                    episodeId = state.episodeId,
-                    episodeTitle = "Episode ${state.episode?.index ?: "1"}",
+                    episodeId = epId,
+                    episodeTitle = "Episode $epNum",
                     posterUrl = horizontalCoverUrl,
                     positionMs = state.currentPositionMs,
-                    durationMs = state.durationMs
+                    durationMs = state.durationMs,
+                    episodeNumber = epNum,
+                    isCompleted = markCompleted
                 )
+                if (savedItem != null) {
+                    FirebaseManager.notifyWatchHistoryChanged()
+                    if (pushCloud) {
+                        FirebaseManager.syncWatchHistoryItem(context, savedItem)
+                    }
+                }
             }
+        }
+    }
+
+    // Sinkronisasi berkala setiap 12 detik saat video sedang diputar (lokal selalu, Firebase khusus pengguna login)
+    LaunchedEffect(uiState.isPlaying, uiState.episodeId) {
+        if (uiState.isPlaying) {
+            while (true) {
+                delay(12_000L)
+                val snapshot = viewModel.uiState.value
+                if (snapshot.isPlaying && snapshot.currentPositionMs > 3000L) {
+                    persistWatchProgress(snapshot, false, true)
+                }
+            }
+        }
+    }
+
+    // Sinkronisasi segera saat video dijeda (Pause)
+    var wasPlayingBefore by remember { mutableStateOf(false) }
+    LaunchedEffect(uiState.isPlaying) {
+        if (wasPlayingBefore && !uiState.isPlaying) {
+            val snapshot = viewModel.uiState.value
+            if (snapshot.currentPositionMs > 3000L) {
+                persistWatchProgress(snapshot, false, true)
+            }
+        }
+        wasPlayingBefore = uiState.isPlaying
+    }
+
+    // Sinkronisasi saat episode mencapai akhir (>= 85% atau sisa <= 30 dtk)
+    var completedSyncedEpId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(uiState.episodeId, uiState.currentPositionMs, uiState.durationMs) {
+        val dur = uiState.durationMs
+        val pos = uiState.currentPositionMs
+        val epId = uiState.episodeId
+        if (epId.isNotBlank() &&
+            epId != completedSyncedEpId &&
+            dur > 30_000L &&
+            (pos.toFloat() / dur.toFloat() >= 0.85f || (dur - pos) <= 30_000L)
+        ) {
+            completedSyncedEpId = epId
+            persistWatchProgress(viewModel.uiState.value, true, true)
+        }
+    }
+
+    // Sinkronisasi saat keluar dari halaman player
+    DisposableEffect(uiState.episodeId, uiState.movieId) {
+        onDispose {
+            val snapshot = viewModel.uiState.value
+            persistWatchProgress(snapshot, false, true)
         }
     }
 
@@ -355,23 +416,25 @@ fun StreamingScreen(
                     Box(modifier = Modifier.weight(1f)) {
                         when {
                             uiState.activeCommentForReplies != null -> {
-                                // Sub-View: Balasan Komentar
-                                CommentRepliesView(
-                                    parentComment = uiState.activeCommentForReplies!!,
-                                    replies = uiState.repliesList,
-                                    isLoading = uiState.isLoadingReplies,
-                                    onBackClick = { viewModel.closeReplies() },
-                                    onRequireLogin = { viewModel.triggerLoginPrompt() },
-                                    onSendReply = { text ->
-                                        val localDb = LocalAuthDatabase(context)
-                                        val item = localDb.addLocalComment(
-                                            episodeId = uiState.episodeId,
-                                            text = text,
-                                            parentId = uiState.activeCommentForReplies?.id
-                                        )
-                                        viewModel.addLocalReply(item)
-                                    }
-                                )
+                                uiState.activeCommentForReplies?.let { parentComment ->
+                                    // Sub-View: Balasan Komentar
+                                    CommentRepliesView(
+                                        parentComment = parentComment,
+                                        replies = uiState.repliesList,
+                                        isLoading = uiState.isLoadingReplies,
+                                        onBackClick = { viewModel.closeReplies() },
+                                        onRequireLogin = { viewModel.triggerLoginPrompt() },
+                                        onSendReply = { text ->
+                                            val localDb = LocalAuthDatabase(context)
+                                            val item = localDb.addLocalComment(
+                                                episodeId = uiState.episodeId,
+                                                text = text,
+                                                parentId = uiState.activeCommentForReplies?.id
+                                            )
+                                            viewModel.addLocalReply(item)
+                                        }
+                                    )
+                                }
                             }
                             uiState.isGallerySheetOpen -> {
                                 // Full Gallery Sheet
@@ -1263,8 +1326,20 @@ private fun CustomExoPlayerView(
     var isSeeking by remember { mutableStateOf(false) }
     var sliderPosition by remember { mutableLongStateOf(0L) }
     var autoSkippedIntroForEp by remember { mutableStateOf<String?>(null) }
+    var playerBoxWidthPx by remember { mutableIntStateOf(0) }
+    var doubleTapSide by remember { mutableIntStateOf(0) } // -1 = kiri (mundur), 1 = kanan (maju)
+    var doubleTapCumulativeSec by remember { mutableIntStateOf(0) }
+    var doubleTapEventToken by remember { mutableIntStateOf(0) }
     val latestUiState by rememberUpdatedState(uiState)
     val latestOnEpisodeChange by rememberUpdatedState(onEpisodeChange)
+
+    LaunchedEffect(doubleTapEventToken) {
+        if (doubleTapEventToken > 0) {
+            delay(850L)
+            doubleTapSide = 0
+            doubleTapCumulativeSec = 0
+        }
+    }
 
     // Initialize ExoPlayer
     val exoPlayer = remember {
@@ -1285,20 +1360,46 @@ private fun CustomExoPlayerView(
                 if (playbackState == Player.STATE_READY) {
                     val duration = exoPlayer.duration
                     val pos = exoPlayer.currentPosition
-                    viewModel.updatePosition(pos, duration)
-                } else if (playbackState == Player.STATE_ENDED && activeState.autoNextEpisode) {
-                    val nextEp = activeState.episodeNext ?: run {
-                        val currentIdx = activeState.episode?.index?.toIntOrNull()
-                        if (currentIdx != null) {
-                            activeState.episodes.firstOrNull { it.index == (currentIdx + 1).toString() }
-                        } else null
+                    viewModel.updatePosition(pos, duration, exoPlayer.bufferedPosition)
+                } else if (playbackState == Player.STATE_ENDED) {
+                    val mIdEnded = activeState.movieId.ifBlank { activeState.episode?.idMovie ?: "" }
+                    if (mIdEnded.isNotBlank() && activeState.episodeId.isNotBlank()) {
+                        val endDur = exoPlayer.duration.takeIf { it > 0L } ?: activeState.durationMs
+                        val epNum = activeState.episode?.index?.ifBlank { "1" } ?: "1"
+                        val horizontalCoverUrl = activeState.movieDetail?.movie?.getEffectiveCover()?.takeIf { it.isNotBlank() }
+                            ?: activeState.episode?.getEffectiveImage()?.takeIf { it.isNotBlank() }
+                            ?: activeState.movieDetail?.movie?.getEffectivePoster()
+                            ?: ""
+                        val savedEnd = LocalAuthDatabase(context).saveWatchProgress(
+                            movieId = mIdEnded,
+                            animeTitle = activeState.movieDetail?.movie?.title ?: activeState.episode?.title?.substringBefore(" Episode") ?: "Anime",
+                            episodeId = activeState.episodeId,
+                            episodeTitle = "Episode $epNum",
+                            posterUrl = horizontalCoverUrl,
+                            positionMs = endDur,
+                            durationMs = endDur,
+                            episodeNumber = epNum,
+                            isCompleted = true
+                        )
+                        if (savedEnd != null) {
+                            FirebaseManager.notifyWatchHistoryChanged()
+                            FirebaseManager.syncWatchHistoryItem(context, savedEnd)
+                        }
                     }
-                    val nextId = nextEp?.id
-                    if (!nextId.isNullOrBlank()) {
-                        exoPlayer.stop()
-                        exoPlayer.clearMediaItems()
-                        viewModel.selectEpisode(nextId, nextEp.index)
-                        latestOnEpisodeChange?.invoke(nextId)
+                    if (activeState.autoNextEpisode) {
+                        val nextEp = activeState.episodeNext ?: run {
+                            val currentIdx = activeState.episode?.index?.toIntOrNull()
+                            if (currentIdx != null) {
+                                activeState.episodes.firstOrNull { it.index == (currentIdx + 1).toString() }
+                            } else null
+                        }
+                        val nextId = nextEp?.id
+                        if (!nextId.isNullOrBlank()) {
+                            exoPlayer.stop()
+                            exoPlayer.clearMediaItems()
+                            viewModel.selectEpisode(nextId, nextEp.index)
+                            latestOnEpisodeChange?.invoke(nextId)
+                        }
                     }
                 }
             }
@@ -1318,13 +1419,22 @@ private fun CustomExoPlayerView(
     LaunchedEffect(currentEpisodeId, currentStreamUrl) {
         if (currentStreamUrl.isNotBlank()) {
             val isResolutionChangeOnly = (lastLoadedEpisodeId != null && lastLoadedEpisodeId == currentEpisodeId)
-            val savedPosition = if (isResolutionChangeOnly) exoPlayer.currentPosition else 0L
+            val savedPosition = if (isResolutionChangeOnly) {
+                exoPlayer.currentPosition
+            } else {
+                val mIdForResume = uiState.movieId.ifBlank { uiState.episode?.idMovie ?: "" }
+                if (mIdForResume.isNotBlank() && currentEpisodeId.isNotBlank()) {
+                    LocalAuthDatabase(context).getEpisodeResumePositionMs(mIdForResume, currentEpisodeId)
+                } else {
+                    0L
+                }
+            }
 
             exoPlayer.stop()
             exoPlayer.clearMediaItems()
             exoPlayer.setMediaItem(MediaItem.fromUri(currentStreamUrl))
             exoPlayer.prepare()
-            exoPlayer.seekTo(if (isResolutionChangeOnly) savedPosition else 0L)
+            exoPlayer.seekTo(savedPosition.coerceAtLeast(0L))
             exoPlayer.playWhenReady = if (isResolutionChangeOnly) exoPlayer.playWhenReady else uiState.autoPlayEnabled
 
             lastLoadedEpisodeId = currentEpisodeId
@@ -1342,11 +1452,15 @@ private fun CustomExoPlayerView(
         exoPlayer.playbackParameters = PlaybackParameters(uiState.playbackSpeed)
     }
 
-    // Periodic time tracking (real-time 250ms untuk tombol Skip Intro / Skip Outro akurat)
+    // Periodic time tracking (real-time 250ms untuk seekbar, buffer, & tombol Skip Intro / Skip Outro akurat)
     LaunchedEffect(uiState.isPlaying) {
         while (true) {
-            if (exoPlayer.isPlaying && !isSeeking) {
-                viewModel.updatePosition(exoPlayer.currentPosition, exoPlayer.duration)
+            if (!isSeeking) {
+                viewModel.updatePosition(
+                    positionMs = exoPlayer.currentPosition,
+                    durationMs = exoPlayer.duration,
+                    bufferedMs = exoPlayer.bufferedPosition
+                )
             }
             delay(250)
         }
@@ -1398,13 +1512,47 @@ private fun CustomExoPlayerView(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
+            .onSizeChanged { playerBoxWidthPx = it.width }
+            .pointerInput(
+                uiState.isLocked,
+                uiState.doubleTapSeekEnabled,
+                uiState.doubleTapSeekSeconds,
+                uiState.durationMs,
+                playerBoxWidthPx
             ) {
-                if (!uiState.isLocked) {
-                    showControls = !showControls
-                }
+                detectTapGestures(
+                    onTap = {
+                        if (!uiState.isLocked) {
+                            showControls = !showControls
+                            if (!showControls && uiState.isSettingsOpen) {
+                                viewModel.toggleSettings()
+                            }
+                        }
+                    },
+                    onDoubleTap = { offset ->
+                        if (!uiState.isLocked && uiState.doubleTapSeekEnabled && playerBoxWidthPx > 0) {
+                            val stepSec = uiState.doubleTapSeekSeconds.coerceIn(5, 30)
+                            val isLeft = offset.x < (playerBoxWidthPx * 0.5f)
+                            val deltaMs = if (isLeft) -(stepSec * 1000L) else (stepSec * 1000L)
+                            val rawDur = exoPlayer.duration.takeIf { it > 0L } ?: uiState.durationMs
+                            val maxPos = if (rawDur > 0L) rawDur else Long.MAX_VALUE
+                            val newPos = (exoPlayer.currentPosition + deltaMs).coerceIn(0L, maxPos)
+                            exoPlayer.seekTo(newPos)
+                            viewModel.updatePosition(newPos, exoPlayer.duration, exoPlayer.bufferedPosition)
+
+                            val targetSide = if (isLeft) -1 else 1
+                            doubleTapCumulativeSec = if (doubleTapSide == targetSide) {
+                                doubleTapCumulativeSec + stepSec
+                            } else {
+                                stepSec
+                            }
+                            doubleTapSide = targetSide
+                            doubleTapEventToken++
+                        } else if (!uiState.isLocked) {
+                            showControls = !showControls
+                        }
+                    }
+                )
             }
     ) {
         // Player Surface
@@ -1420,6 +1568,24 @@ private fun CustomExoPlayerView(
                 }
             },
             modifier = Modifier.fillMaxSize()
+        )
+
+        // Overlay Animasi Indikator Double-Tap Kiri (Mundur) & Kanan (Maju)
+        DoubleTapSeekOverlay(
+            side = -1,
+            visible = doubleTapSide == -1,
+            seconds = doubleTapCumulativeSec,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 26.dp)
+        )
+        DoubleTapSeekOverlay(
+            side = 1,
+            visible = doubleTapSide == 1,
+            seconds = doubleTapCumulativeSec,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 26.dp)
         )
 
         // Lock button floating when screen is locked in fullscreen
@@ -1606,27 +1772,30 @@ private fun CustomExoPlayerView(
 
                         Spacer(modifier = Modifier.width(6.dp))
 
-                        // Custom Progress Slider in Pure White
+                        // Seekbar Modern (YouTube-style): track tipis, progres oranye/koral, buffer abu-abu, segmen Intro/Outro kuning, thumb lingkaran
                         val totalDuration = if (uiState.durationMs > 0) uiState.durationMs else 1L
                         val currentPos = if (isSeeking) sliderPosition else uiState.currentPositionMs
                         val sliderFraction = (currentPos.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
+                        val bufferedFraction = (uiState.bufferedPositionMs.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
 
-                        Slider(
-                            value = sliderFraction,
-                            onValueChange = { frac ->
+                        ModernPlayerSeekbar(
+                            progressFraction = sliderFraction,
+                            bufferedFraction = bufferedFraction,
+                            totalDurationMs = totalDuration,
+                            introSegment = uiState.introSegment,
+                            outroSegment = uiState.outroSegment,
+                            isDragging = isSeeking,
+                            onSeekChange = { frac ->
                                 isSeeking = true
                                 sliderPosition = (frac * totalDuration).toLong()
                             },
-                            onValueChangeFinished = {
-                                exoPlayer.seekTo(sliderPosition)
-                                viewModel.updatePosition(sliderPosition, exoPlayer.duration)
+                            onSeekCommit = { frac ->
+                                val targetMs = (frac * totalDuration).toLong()
+                                sliderPosition = targetMs
+                                exoPlayer.seekTo(targetMs)
+                                viewModel.updatePosition(targetMs, exoPlayer.duration, exoPlayer.bufferedPosition)
                                 isSeeking = false
                             },
-                            colors = SliderDefaults.colors(
-                                thumbColor = Color.White,
-                                activeTrackColor = Color.White,
-                                inactiveTrackColor = Color(0x55FFFFFF)
-                            ),
                             modifier = Modifier.weight(1f)
                         )
 
@@ -2001,14 +2170,201 @@ private fun LoveItRatingDialog(
 // ==================== 5. FLOATING SETTINGS MENU (PIUPIU STYLE) ====================
 
 @Composable
+private fun DoubleTapSeekOverlay(
+    side: Int,
+    visible: Boolean,
+    seconds: Int,
+    modifier: Modifier = Modifier
+) {
+    AnimatedVisibility(
+        visible = visible && seconds > 0,
+        enter = fadeIn(tween(120)),
+        exit = fadeOut(tween(240)),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0x990B0B0E))
+                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(24.dp))
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Icon(
+                imageVector = if (side < 0) Icons.Default.FastRewind else Icons.Default.FastForward,
+                contentDescription = if (side < 0) "Mundur $seconds detik" else "Maju $seconds detik",
+                tint = Color.White,
+                modifier = Modifier.size(26.dp)
+            )
+            Text(
+                text = if (side < 0) "-$seconds dtk" else "+$seconds dtk",
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun ModernPlayerSeekbar(
+    progressFraction: Float,
+    bufferedFraction: Float,
+    totalDurationMs: Long,
+    introSegment: SkipSegment?,
+    outroSegment: SkipSegment?,
+    isDragging: Boolean,
+    onSeekChange: (Float) -> Unit,
+    onSeekCommit: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val trackHeight by animateDpAsState(
+        targetValue = if (isDragging) 5.dp else 3.dp,
+        animationSpec = tween(140),
+        label = "seekbarTrackHeight"
+    )
+    val thumbRadius by animateDpAsState(
+        targetValue = if (isDragging) 8.5.dp else 5.5.dp,
+        animationSpec = tween(140),
+        label = "seekbarThumbRadius"
+    )
+    var barWidthPx by remember { mutableIntStateOf(1) }
+    var lastDragFrac by remember { mutableStateOf(progressFraction) }
+    val latestOnSeekChange by rememberUpdatedState(onSeekChange)
+    val latestOnSeekCommit by rememberUpdatedState(onSeekCommit)
+
+    Box(
+        modifier = modifier
+            .height(30.dp)
+            .onSizeChanged { barWidthPx = it.width.coerceAtLeast(1) }
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    val frac = (offset.x / barWidthPx.toFloat()).coerceIn(0f, 1f)
+                    latestOnSeekChange(frac)
+                    latestOnSeekCommit(frac)
+                }
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { offset ->
+                        val frac = (offset.x / barWidthPx.toFloat()).coerceIn(0f, 1f)
+                        lastDragFrac = frac
+                        latestOnSeekChange(frac)
+                    },
+                    onHorizontalDrag = { change, _ ->
+                        change.consume()
+                        val frac = (change.position.x / barWidthPx.toFloat()).coerceIn(0f, 1f)
+                        lastDragFrac = frac
+                        latestOnSeekChange(frac)
+                    },
+                    onDragEnd = {
+                        latestOnSeekCommit(lastDragFrac)
+                    },
+                    onDragCancel = {
+                        latestOnSeekCommit(lastDragFrac)
+                    }
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            if (w <= 0f || h <= 0f) return@Canvas
+
+            val th = trackHeight.toPx()
+            val topY = (h - th) * 0.5f
+            val corner = CornerRadius(th * 0.5f, th * 0.5f)
+
+            // 1. Track dasar transparan
+            drawRoundRect(
+                color = Color(0x45FFFFFF),
+                topLeft = Offset(0f, topY),
+                size = Size(w, th),
+                cornerRadius = corner
+            )
+
+            // 2. Buffer progress abu-abu transparan
+            val bufW = (w * bufferedFraction.coerceIn(0f, 1f))
+            if (bufW > 0f) {
+                drawRoundRect(
+                    color = Color(0x78CBD5E1),
+                    topLeft = Offset(0f, topY),
+                    size = Size(bufW, th),
+                    cornerRadius = corner
+                )
+            }
+
+            // 3. Progres yang sudah berjalan (Aksen Oranye/Koral)
+            val progW = (w * progressFraction.coerceIn(0f, 1f))
+            if (progW > 0f) {
+                drawRoundRect(
+                    color = ColorAccentPrimary,
+                    topLeft = Offset(0f, topY),
+                    size = Size(progW, th),
+                    cornerRadius = corner
+                )
+            }
+
+            // 4. Penanda warna kuning/amber kontras untuk segmen Intro & Outro (langsung tampil dari awal)
+            if (totalDurationMs > 1000L) {
+                val markerColor = Color(0xFFFACC15)
+                val minSegPx = 4.dp.toPx()
+                listOfNotNull(introSegment, outroSegment).forEach { seg ->
+                    if (seg.endMs > seg.startMs) {
+                        val startFrac = (seg.startMs.toFloat() / totalDurationMs.toFloat()).coerceIn(0f, 1f)
+                        val endFrac = (seg.endMs.toFloat() / totalDurationMs.toFloat()).coerceIn(startFrac, 1f)
+                        val startX = startFrac * w
+                        val segW = maxOf((endFrac - startFrac) * w, minSegPx).coerceAtMost((w - startX).coerceAtLeast(0f))
+                        if (segW > 0.5f) {
+                            drawRoundRect(
+                                color = markerColor,
+                                topLeft = Offset(startX, topY - 0.5.dp.toPx()),
+                                size = Size(segW, th + 1.dp.toPx()),
+                                cornerRadius = corner
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 5. Thumb lingkaran kecil presisi yang membesar halus saat disentuh/digeser
+            val r = thumbRadius.toPx()
+            val cx = progW.coerceIn(r, (w - r).coerceAtLeast(r))
+            val cy = h * 0.5f
+            if (isDragging) {
+                drawCircle(
+                    color = Color(0x45FF5722),
+                    radius = r * 1.75f,
+                    center = Offset(cx, cy)
+                )
+            }
+            drawCircle(
+                color = Color.White,
+                radius = r,
+                center = Offset(cx, cy)
+            )
+            drawCircle(
+                color = ColorAccentPrimary,
+                radius = (r - 1.5.dp.toPx()).coerceAtLeast(2f),
+                center = Offset(cx, cy)
+            )
+        }
+    }
+}
+
+@Composable
 private fun FloatingSettingsMenu(
     uiState: StreamingUiState,
     viewModel: StreamingViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Box(
         modifier = modifier
-            .width(215.dp)
+            .widthIn(min = 225.dp, max = 248.dp)
+            .heightIn(max = 275.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(Color(0xE6141414))
             .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
@@ -2020,7 +2376,11 @@ private fun FloatingSettingsMenu(
     ) {
         when (uiState.settingsSubMenu) {
             SettingsSubMenu.MAIN -> {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
                     // Quality / Server
                     Row(
                         modifier = Modifier
@@ -2100,6 +2460,70 @@ private fun FloatingSettingsMenu(
                                 tint = Color(0xFF9CA3AF),
                                 modifier = Modifier.size(14.dp)
                             )
+                        }
+                    }
+
+                    HorizontalDivider(color = Color(0x1FFFFFFF), thickness = 0.5.dp)
+
+                    // Double-Tap Skip Toggle (ON / OFF)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Double-Tap Skip",
+                            color = Color.White,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Switch(
+                            checked = uiState.doubleTapSeekEnabled,
+                            onCheckedChange = { enabled ->
+                                viewModel.setDoubleTapSeekEnabled(context, enabled)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = ColorAccentPrimary,
+                                uncheckedThumbColor = Color(0xFF9CA3AF),
+                                uncheckedTrackColor = Color(0xFF2A2A2A)
+                            )
+                        )
+                    }
+
+                    // Durasi Skip Kustom (5, 10, 15, 30 detik)
+                    if (uiState.doubleTapSeekEnabled) {
+                        HorizontalDivider(color = Color(0x1FFFFFFF), thickness = 0.5.dp)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.setSettingsSubMenu(SettingsSubMenu.DOUBLE_TAP_DURATION) }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Durasi Skip",
+                                color = Color.White,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "${uiState.doubleTapSeekSeconds} dtk",
+                                    color = Color(0xFF9CA3AF),
+                                    fontSize = 11.5.sp
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = "Pilih Durasi Skip",
+                                    tint = Color(0xFF9CA3AF),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
                     }
 
@@ -2263,6 +2687,65 @@ private fun FloatingSettingsMenu(
                         ) {
                             Text(
                                 text = speedLabel,
+                                color = if (isSelected) ColorAccentPrimary else Color(0xFFE5E7EB),
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                            if (isSelected) {
+                                Text(
+                                    text = "✓",
+                                    color = ColorAccentPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            SettingsSubMenu.DOUBLE_TAP_DURATION -> {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.setSettingsSubMenu(SettingsSubMenu.MAIN) }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Kembali ke Menu Utama",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Durasi Double-Tap Skip",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    HorizontalDivider(color = Color(0x1FFFFFFF), thickness = 0.5.dp)
+
+                    val skipOptions = listOf(5, 10, 15, 30)
+                    skipOptions.forEach { sec ->
+                        val isSelected = uiState.doubleTapSeekSeconds == sec
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setDoubleTapSeekSeconds(context, sec)
+                                    viewModel.setSettingsSubMenu(SettingsSubMenu.MAIN)
+                                }
+                                .padding(vertical = 7.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "$sec detik",
                                 color = if (isSelected) ColorAccentPrimary else Color(0xFFE5E7EB),
                                 fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal

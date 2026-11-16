@@ -85,7 +85,9 @@ import com.yuranime.dinz.ui.components.EmptyTitleSlotBadge
 import com.yuranime.dinz.ui.components.GeometricTitleBadge
 import com.yuranime.dinz.ui.components.StyledUsernameText
 import com.yuranime.dinz.ui.theme.SfProFontFamily
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /**
@@ -137,21 +139,30 @@ fun EditProfileScreen(
     ) { uri: Uri? ->
         if (uri != null) {
             scope.launch {
-                if (VideoToGifConverter.isVideoUri(context, uri)) {
+                try {
                     isPreparingAvatar = true
-                    val res = R2CdnUploader.prepareMediaForPreview(context, uri, isBanner = false)
-                    isPreparingAvatar = false
-                    res.onSuccess { gifUri ->
-                        selectedAvatarUrl = gifUri.toString()
-                    }.onFailure { err ->
-                        Toast.makeText(
-                            context,
-                            err.message ?: "Gagal mengonversi video ke GIF",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                    if (VideoToGifConverter.isVideoUri(context, uri)) {
+                        val res = R2CdnUploader.prepareMediaForPreview(context, uri, isBanner = false)
+                        res.onSuccess { gifUri ->
+                            selectedAvatarUrl = gifUri.toString()
+                        }.onFailure { err ->
+                            Toast.makeText(
+                                context,
+                                err.message ?: "Gagal mengonversi video ke GIF",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    } else {
+                        selectedAvatarUrl = uri.toString()
                     }
-                } else {
-                    selectedAvatarUrl = uri.toString()
+                } catch (t: Throwable) {
+                    Toast.makeText(
+                        context,
+                        t.message ?: "Gagal membaca file gambar",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } finally {
+                    isPreparingAvatar = false
                 }
             }
         }
@@ -162,21 +173,30 @@ fun EditProfileScreen(
     ) { uri: Uri? ->
         if (uri != null) {
             scope.launch {
-                if (VideoToGifConverter.isVideoUri(context, uri)) {
+                try {
                     isPreparingBanner = true
-                    val res = R2CdnUploader.prepareMediaForPreview(context, uri, isBanner = true)
-                    isPreparingBanner = false
-                    res.onSuccess { gifUri ->
-                        selectedBannerUrl = gifUri.toString()
-                    }.onFailure { err ->
-                        Toast.makeText(
-                            context,
-                            err.message ?: "Gagal mengonversi video ke GIF",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                    if (VideoToGifConverter.isVideoUri(context, uri)) {
+                        val res = R2CdnUploader.prepareMediaForPreview(context, uri, isBanner = true)
+                        res.onSuccess { gifUri ->
+                            selectedBannerUrl = gifUri.toString()
+                        }.onFailure { err ->
+                            Toast.makeText(
+                                context,
+                                err.message ?: "Gagal mengonversi video ke GIF",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    } else {
+                        selectedBannerUrl = uri.toString()
                     }
-                } else {
-                    selectedBannerUrl = uri.toString()
+                } catch (t: Throwable) {
+                    Toast.makeText(
+                        context,
+                        t.message ?: "Gagal membaca file banner",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } finally {
+                    isPreparingBanner = false
                 }
             }
         }
@@ -200,10 +220,19 @@ fun EditProfileScreen(
         }
     }
 
-    // Seluruh Border Avatar Asli Discord (Filter hanya yang dimiliki user di Edit Profil)
-    val allBorders = remember(context) { DiscordCosmeticsRepository.getAllBorders(context) }
-    // Seluruh Profile Effects Asli Discord (Filter hanya yang dimiliki user di Edit Profil)
-    val allProfileEffects = remember(context) { DiscordCosmeticsRepository.getAllProfileEffects(context) }
+    // Muat katalog Border Avatar & Profile Effects Discord di latar belakang agar UI thread tidak freeze/crash
+    var allBorders by remember { mutableStateOf<List<BorderDefinition>>(emptyList()) }
+    var allProfileEffects by remember { mutableStateOf<List<ProfileEffectDefinition>>(emptyList()) }
+    LaunchedEffect(context) {
+        val loadedBorders = withContext(Dispatchers.IO) {
+            runCatching { DiscordCosmeticsRepository.getAllBorders(context) }.getOrDefault(emptyList())
+        }
+        val loadedEffects = withContext(Dispatchers.IO) {
+            runCatching { DiscordCosmeticsRepository.getAllProfileEffects(context) }.getOrDefault(emptyList())
+        }
+        allBorders = loadedBorders
+        allProfileEffects = loadedEffects
+    }
 
     // HANYA tampilkan border avatar yang SUDAH dimiliki pengguna
     val ownedBorders = remember(allBorders, unlockedBorders, selectedBorderUrl, searchQuery) {

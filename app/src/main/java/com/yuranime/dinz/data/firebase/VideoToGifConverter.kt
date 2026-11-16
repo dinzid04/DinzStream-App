@@ -255,9 +255,12 @@ object VideoToGifConverter {
         }.getOrNull()
     }
 
-    private fun openInputStream(context: Context, uri: Uri) = when {
-        uri.scheme == "file" && !uri.path.isNullOrBlank() -> FileInputStream(File(uri.path!!))
-        else -> context.contentResolver.openInputStream(uri)
+    private fun openInputStream(context: Context, uri: Uri): InputStream? {
+        val path = uri.path
+        return when {
+            uri.scheme == "file" && !path.isNullOrBlank() -> FileInputStream(File(path))
+            else -> context.contentResolver.openInputStream(uri)
+        }
     }
 
     /**

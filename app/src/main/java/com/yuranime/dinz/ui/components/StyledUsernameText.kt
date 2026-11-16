@@ -271,22 +271,30 @@ fun StyledUsernameText(
     val textMeasurer = rememberTextMeasurer()
 
     // Khusus efek Wave: siapkan range cluster huruf & TextLayoutResult per huruf sekali saat nama berubah
-    val graphemeRanges = remember(safeName, styleDef.id) {
-        if (styleDef.id == "wave") extractGraphemeRanges(safeName) else emptyList()
-    }
-    val waveClusterLayouts = remember(safeName, styleDef.id, resolvedTextStyle) {
-        if (styleDef.id == "wave" && graphemeRanges.size <= 42) {
-            graphemeRanges.map { range ->
-                val slice = safeName.substring(range.first, range.last + 1)
-                textMeasurer.measure(
-                    text = AnnotatedString(slice),
-                    style = resolvedTextStyle,
-                    maxLines = 1,
-                    softWrap = false
-                )
-            }
+    val (graphemeRanges, waveClusterLayouts) = remember(safeName, styleDef.id, resolvedTextStyle) {
+        if (styleDef.id == "wave") {
+            runCatching {
+                val ranges = extractGraphemeRanges(safeName)
+                val layouts = if (ranges.size <= 42) {
+                    ranges.mapNotNull { range ->
+                        if (range.first < 0 || range.last >= safeName.length || range.first > range.last) {
+                            return@mapNotNull null
+                        }
+                        val slice = safeName.substring(range.first, range.last + 1)
+                        textMeasurer.measure(
+                            text = AnnotatedString(slice),
+                            style = resolvedTextStyle,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                } else {
+                    emptyList()
+                }
+                if (layouts.size == ranges.size) ranges to layouts else ranges to emptyList()
+            }.getOrDefault(emptyList<IntRange>() to emptyList())
         } else {
-            emptyList()
+            emptyList<IntRange>() to emptyList()
         }
     }
 
@@ -308,31 +316,37 @@ fun StyledUsernameText(
 
             onDrawWithContent {
                 val layout = measuredLayout
-                if (layout == null || size.width <= 1f || size.height <= 1f) {
+                if (layout == null || layout.lineCount <= 0 || size.width <= 1f || size.height <= 1f) {
                     drawContent()
                     return@onDrawWithContent
                 }
                 val nowMs = readTimeMs() + (phaseSeed * 2500f).toLong()
 
-                when (styleDef.id) {
-                    "ruby" -> drawRubyStyle(layout, palette, nowMs, size)
-                    "wave" -> drawWaveStyle(
-                        layout = layout,
-                        ranges = graphemeRanges,
-                        clusterLayouts = waveClusterLayouts,
-                        palette = palette,
-                        fontSizePx = fontSizePx,
-                        timeMs = nowMs,
-                        maxAmpPx = 4.2.dp.toPx(),
-                        canvasSize = size
-                    )
-                    "star" -> drawStarStyle(layout, palette, nowMs, size, starPathSmall, starPathLarge)
-                    "twilight" -> drawTwilightStyle(layout, palette, nowMs, size)
-                    "slash" -> drawSlashStyle(layout, palette, nowMs, size)
-                    "glitch" -> drawGlitchStyle(layout, palette, nowMs, size)
-                    "magma" -> drawMagmaStyle(layout, palette, nowMs, size)
-                    "sonar" -> drawSonarStyle(layout, palette, nowMs, size)
-                    else -> drawText(textLayoutResult = layout, color = palette.accent, alpha = 1f)
+                try {
+                    when (styleDef.id) {
+                        "ruby" -> drawRubyStyle(layout, palette, nowMs, size)
+                        "wave" -> drawWaveStyle(
+                            layout = layout,
+                            ranges = graphemeRanges,
+                            clusterLayouts = waveClusterLayouts,
+                            palette = palette,
+                            fontSizePx = fontSizePx,
+                            timeMs = nowMs,
+                            maxAmpPx = 4.2.dp.toPx(),
+                            canvasSize = size
+                        )
+                        "star" -> drawStarStyle(layout, palette, nowMs, size, starPathSmall, starPathLarge)
+                        "twilight" -> drawTwilightStyle(layout, palette, nowMs, size)
+                        "slash" -> drawSlashStyle(layout, palette, nowMs, size)
+                        "glitch" -> drawGlitchStyle(layout, palette, nowMs, size)
+                        "magma" -> drawMagmaStyle(layout, palette, nowMs, size)
+                        "sonar" -> drawSonarStyle(layout, palette, nowMs, size)
+                        else -> drawText(textLayoutResult = layout, color = palette.accent, alpha = 1f)
+                    }
+                } catch (_: Throwable) {
+                    runCatching {
+                        drawText(textLayoutResult = layout, color = palette.accent, alpha = 1f)
+                    }
                 }
             }
         }
@@ -401,8 +415,8 @@ private fun DrawScope.drawWaveStyle(
 
     val canPerGlyph = ranges.isNotEmpty() &&
         clusterLayouts.size == ranges.size &&
-        !layout.isLineEllipsized(0) &&
-        layout.lineCount == 1
+        layout.lineCount == 1 &&
+        runCatching { !layout.isLineEllipsized(0) }.getOrDefault(false)
 
     if (canPerGlyph) {
         val textLen = layout.layoutInput.text.length
@@ -516,21 +530,22 @@ private fun DrawScope.drawStarStyle(
         val cx = rawX.coerceIn(-4.dp.toPx(), canvasSize.width - 1f)
         val cy = (canvasSize.height * anchor.yRatio + driftY).coerceIn(1f, canvasSize.height - 1f)
 
+        val safeAlpha = alpha.coerceIn(0f, 1f)
         val starPath = if (idx == 0) largeStar else smallStar
-        val glowRadius = (if (idx == 0) 6.5.dp.toPx() else 3.8.dp.toPx()) * scaleFactor
+        val glowRadius = ((if (idx == 0) 6.5.dp.toPx() else 3.8.dp.toPx()) * scaleFactor).coerceAtLeast(1f)
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(palette.specular.copy(alpha = 0.50f * alpha), Color.Transparent),
+                colors = listOf(palette.specular.copy(alpha = (0.50f * safeAlpha).coerceIn(0f, 1f)), Color.Transparent),
                 center = Offset(cx, cy),
-                radius = glowRadius.coerceAtLeast(1f)
+                radius = glowRadius
             ),
-            radius = glowRadius.coerceAtLeast(1f),
+            radius = glowRadius,
             center = Offset(cx, cy)
         )
         rotate(degrees = angleDeg, pivot = Offset(cx, cy)) {
             scale(scale = scaleFactor.coerceIn(0.25f, 1.35f), pivot = Offset(cx, cy)) {
                 translate(left = cx, top = cy) {
-                    drawPath(path = starPath, color = Color.White.copy(alpha = alpha * 0.96f))
+                    drawPath(path = starPath, color = Color.White.copy(alpha = (safeAlpha * 0.96f).coerceIn(0f, 1f)))
                 }
             }
         }
@@ -576,19 +591,20 @@ private fun DrawScope.drawTwilightStyle(
         val bandY = if (i % 2 == 0) 0.14f + u2 * 0.20f else 0.72f + u2 * 0.22f
         val y = canvasSize.height * ((bandY + cos(cycle01(u1, 4300, timeMs) * 2f * PI.toFloat()) * 0.08f).coerceIn(0.06f, 0.94f))
         val orbColor = if (i % 3 == 0) Color(0xFFFDE68A) else palette.specular
-        val r = (1.3f + u3 * 1.1f).dp.toPx()
+        val r = (1.3f + u3 * 1.1f).dp.toPx().coerceAtLeast(1f)
+        val safePulse = pulse.coerceIn(0f, 1f)
 
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(orbColor.copy(alpha = 0.72f * pulse), Color.Transparent),
+                colors = listOf(orbColor.copy(alpha = (0.72f * safePulse).coerceIn(0f, 1f)), Color.Transparent),
                 center = Offset(x, y),
-                radius = r * 2.4f
+                radius = (r * 2.4f).coerceAtLeast(1f)
             ),
             radius = r * 2.4f,
             center = Offset(x, y)
         )
         drawCircle(
-            color = orbColor.copy(alpha = pulse * 0.95f),
+            color = orbColor.copy(alpha = (safePulse * 0.95f).coerceIn(0f, 1f)),
             radius = r * 0.42f,
             center = Offset(x, y)
         )
@@ -804,17 +820,17 @@ private fun DrawScope.drawMagmaStyle(
         val h1 = hashUnit(i, 411)
         val h2 = hashUnit(i, 523)
         val life = cycle01(h1, 1800 + i * 190, timeMs)
-        val alpha = if (life < 0.25f) life / 0.25f else (1f - life) / 0.75f
+        val alpha = (if (life < 0.25f) life / 0.25f else (1f - life) / 0.75f).coerceIn(0f, 1f)
         val x = textLeft + textWidth * (0.04f + h2 * 0.92f) +
             sin(life * 4f * PI.toFloat() + h1 * 6f) * 2.2.dp.toPx()
         val y = canvasSize.height * (0.94f - life * 1.12f)
-        val radius = ((1.1f + h1 * 1.2f) * (1f - life * 0.5f)).dp.toPx().coerceAtLeast(0.75f)
+        val radius = ((1.1f + h1 * 1.2f) * (1f - life * 0.5f).coerceAtLeast(0.1f)).dp.toPx().coerceAtLeast(0.75f)
 
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(emberHot.copy(alpha = 0.65f * alpha), Color.Transparent),
+                colors = listOf(emberHot.copy(alpha = (0.65f * alpha).coerceIn(0f, 1f)), Color.Transparent),
                 center = Offset(x, y),
-                radius = radius * 2.3f
+                radius = (radius * 2.3f).coerceAtLeast(1f)
             ),
             radius = radius * 2.3f,
             center = Offset(x, y)
@@ -842,8 +858,8 @@ private fun DrawScope.drawSonarStyle(
     val primaryPhase = cycle01(0f, 3400, timeMs)
     val waveRadius = (maxRadius * (0.14f + primaryPhase * 0.94f)).coerceAtLeast(6f)
     val innerStop = ((waveRadius - maxRadius * 0.24f) / waveRadius).coerceIn(0.02f, 0.72f)
-    val crestStop = (innerStop + 0.14f).coerceIn(innerStop + 0.02f, 0.88f)
-    val trailStop = (crestStop + 0.08f).coerceIn(crestStop + 0.02f, 0.98f)
+    val crestStop = (innerStop + 0.14f).coerceIn((innerStop + 0.02f).coerceAtMost(0.87f), 0.88f)
+    val trailStop = (crestStop + 0.08f).coerceIn((crestStop + 0.02f).coerceAtMost(0.97f), 0.98f)
     val baseMuted = lerp(palette.deep, palette.accent, 0.62f)
 
     val radialTextBrush = Brush.radialGradient(
@@ -861,14 +877,14 @@ private fun DrawScope.drawSonarStyle(
     val ringOffsets = floatArrayOf(0f, 0.33f, 0.66f)
     for (offset in ringOffsets) {
         val p = cycle01(offset, 3400, timeMs)
-        val fade = (1f - p) * (1f - p * 0.35f)
+        val fade = ((1f - p) * (1f - p * 0.35f)).coerceIn(0f, 1f)
         if (fade <= 0.02f) continue
-        val r = 4.dp.toPx() + p * maxRadius
+        val r = (4.dp.toPx() + p * maxRadius).coerceAtLeast(2f)
 
         drawCircle(
             brush = Brush.radialGradient(
                 0.72f to Color.Transparent,
-                0.96f to palette.accent.copy(alpha = fade * 0.14f),
+                0.96f to palette.accent.copy(alpha = (fade * 0.14f).coerceIn(0f, 1f)),
                 1.0f to Color.Transparent,
                 center = center,
                 radius = r
@@ -877,7 +893,7 @@ private fun DrawScope.drawSonarStyle(
             center = center
         )
         drawCircle(
-            color = lerp(palette.accent, palette.specular, (1f - p) * 0.65f).copy(alpha = fade * 0.72f),
+            color = lerp(palette.accent, palette.specular, (1f - p) * 0.65f).copy(alpha = (fade * 0.72f).coerceIn(0f, 1f)),
             radius = r,
             center = center,
             style = Stroke(width = 1.2.dp.toPx()),

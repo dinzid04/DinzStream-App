@@ -1,6 +1,7 @@
 package com.yuranime.dinz.ui.detail
 
 import com.yuranime.dinz.data.model.AniListCreditsData
+import com.yuranime.dinz.data.model.AnimeSoundtrackResult
 import com.yuranime.dinz.data.model.CommunityMediaItem
 import com.yuranime.dinz.data.model.CuplixItem
 import com.yuranime.dinz.data.model.EpisodeItem
@@ -11,6 +12,7 @@ enum class DetailTab(val label: String) {
     INFO("INFO"),
     EPISODE("EPISODE"),
     CREDITS("KARAKTER & STAFF"),
+    SOUNDTRACK("SOUNDTRACK"),
     SEASON("SEASON"),
     CUPLIX("CUPLIX"),
     POSTER("POSTER"),
@@ -40,6 +42,9 @@ data class AnimeDetailUiState(
     val creditsData: AniListCreditsData? = null,
     val selectedCreditsSection: CreditsSectionTab = CreditsSectionTab.CHARACTERS,
     val selectedVaLanguage: String = "Japanese",
+    // Soundtrack (Opening & Ending multi-provider)
+    val isLoadingSoundtrack: Boolean = false,
+    val soundtrack: AnimeSoundtrackResult = AnimeSoundtrackResult(),
     // Pagination & Search
     val episodeSearchQuery: String = "",
     val isEpisodeSortAscending: Boolean = false, // false = newest first, true = oldest first

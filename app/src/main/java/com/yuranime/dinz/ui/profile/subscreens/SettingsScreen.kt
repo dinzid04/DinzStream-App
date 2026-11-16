@@ -527,8 +527,8 @@ fun SettingsScreen(
                     val pingColor = when {
                         isMeasuringPing -> SettingsMutedText
                         serverPingMs == null -> Color(0xFFF43F5E)
-                        serverPingMs!! < 300L -> Color(0xFF22C55E)
-                        serverPingMs!! <= 800L -> Color(0xFFFACC15)
+                        (serverPingMs ?: 9999L) < 300L -> Color(0xFF22C55E)
+                        (serverPingMs ?: 9999L) <= 800L -> Color(0xFFFACC15)
                         else -> Color(0xFFF43F5E)
                     }
 

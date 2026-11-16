@@ -38,62 +38,73 @@ val ManropeFontFamily = FontFamily(
 )
 
 @OptIn(ExperimentalTextApi::class)
-val TourneyItalicFontFamily = FontFamily(
-    Font(
-        resId = R.font.tourney_italic_variable,
-        weight = FontWeight.Normal,
-        style = FontStyle.Italic,
-        variationSettings = FontVariation.Settings(
-            FontVariation.weight(400),
-            FontVariation.width(100f)
-        )
-    ),
-    Font(
-        resId = R.font.tourney_italic_variable,
-        weight = FontWeight.Medium,
-        style = FontStyle.Italic,
-        variationSettings = FontVariation.Settings(
-            FontVariation.weight(500),
-            FontVariation.width(100f)
-        )
-    ),
-    Font(
-        resId = R.font.tourney_italic_variable,
-        weight = FontWeight.SemiBold,
-        style = FontStyle.Italic,
-        variationSettings = FontVariation.Settings(
-            FontVariation.weight(600),
-            FontVariation.width(100f)
-        )
-    ),
-    Font(
-        resId = R.font.tourney_italic_variable,
-        weight = FontWeight.Bold,
-        style = FontStyle.Italic,
-        variationSettings = FontVariation.Settings(
-            FontVariation.weight(700),
-            FontVariation.width(100f)
-        )
-    ),
-    Font(
-        resId = R.font.tourney_italic_variable,
-        weight = FontWeight.ExtraBold,
-        style = FontStyle.Italic,
-        variationSettings = FontVariation.Settings(
-            FontVariation.weight(800),
-            FontVariation.width(100f)
-        )
-    ),
-    Font(
-        resId = R.font.tourney_italic_variable,
-        weight = FontWeight.Black,
-        style = FontStyle.Italic,
-        variationSettings = FontVariation.Settings(
-            FontVariation.weight(900),
-            FontVariation.width(100f)
+val TourneyItalicFontFamily = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+    FontFamily(
+        Font(
+            resId = R.font.tourney_italic_variable,
+            weight = FontWeight.Normal,
+            style = FontStyle.Italic,
+            variationSettings = FontVariation.Settings(
+                FontVariation.weight(400),
+                FontVariation.width(100f)
+            )
+        ),
+        Font(
+            resId = R.font.tourney_italic_variable,
+            weight = FontWeight.Medium,
+            style = FontStyle.Italic,
+            variationSettings = FontVariation.Settings(
+                FontVariation.weight(500),
+                FontVariation.width(100f)
+            )
+        ),
+        Font(
+            resId = R.font.tourney_italic_variable,
+            weight = FontWeight.SemiBold,
+            style = FontStyle.Italic,
+            variationSettings = FontVariation.Settings(
+                FontVariation.weight(600),
+                FontVariation.width(100f)
+            )
+        ),
+        Font(
+            resId = R.font.tourney_italic_variable,
+            weight = FontWeight.Bold,
+            style = FontStyle.Italic,
+            variationSettings = FontVariation.Settings(
+                FontVariation.weight(700),
+                FontVariation.width(100f)
+            )
+        ),
+        Font(
+            resId = R.font.tourney_italic_variable,
+            weight = FontWeight.ExtraBold,
+            style = FontStyle.Italic,
+            variationSettings = FontVariation.Settings(
+                FontVariation.weight(800),
+                FontVariation.width(100f)
+            )
+        ),
+        Font(
+            resId = R.font.tourney_italic_variable,
+            weight = FontWeight.Black,
+            style = FontStyle.Italic,
+            variationSettings = FontVariation.Settings(
+                FontVariation.weight(900),
+                FontVariation.width(100f)
+            )
         )
     )
-)
+} else {
+    FontFamily(
+        Font(R.font.tourney_italic_variable, FontWeight.Normal, FontStyle.Italic),
+        Font(R.font.tourney_italic_variable, FontWeight.Medium, FontStyle.Italic),
+        Font(R.font.tourney_italic_variable, FontWeight.SemiBold, FontStyle.Italic),
+        Font(R.font.tourney_italic_variable, FontWeight.Bold, FontStyle.Italic),
+        Font(R.font.tourney_italic_variable, FontWeight.ExtraBold, FontStyle.Italic),
+        Font(R.font.tourney_italic_variable, FontWeight.Black, FontStyle.Italic)
+    )
+}
 
 val PiedraFontFamily = FontFamily(
     Font(R.font.piedra_regular, FontWeight.Normal),

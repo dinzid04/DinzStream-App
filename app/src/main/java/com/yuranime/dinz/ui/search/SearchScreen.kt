@@ -142,10 +142,11 @@ fun SearchScreen(
                 .background(ColorBackgroundPrimary)
                 .statusBarsPadding()
         ) {
-            if (uiState.selectedSubPage != null) {
+            val selectedSubPage = uiState.selectedSubPage
+            if (selectedSubPage != null) {
                 // Sub-Page Full List for KATEGORI, TAHUN, KARAKTER
                 ExploreSubPageContent(
-                    subPage = uiState.selectedSubPage!!,
+                    subPage = selectedSubPage,
                     uiState = uiState,
                     onClose = { viewModel.closeSubPage() },
                     onGenreClick = { id, name ->

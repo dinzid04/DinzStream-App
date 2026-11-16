@@ -29,6 +29,8 @@ class StreamingViewModel(
             autoPlayEnabled = AppPreferences.autoPlayEnabled.value,
             autoSkipIntro = AppPreferences.autoSkipIntro.value,
             preloadNextEpisode = AppPreferences.preloadNextEpisode.value,
+            doubleTapSeekEnabled = AppPreferences.doubleTapSeekEnabled.value,
+            doubleTapSeekSeconds = AppPreferences.doubleTapSeekSeconds.value,
             autoNextEpisode = AppPreferences.autoNext.value
         )
     )
@@ -47,7 +49,9 @@ class StreamingViewModel(
         playbackSpeed: Float,
         autoPlayEnabled: Boolean,
         autoSkipIntro: Boolean,
-        preloadNextEpisode: Boolean
+        preloadNextEpisode: Boolean,
+        doubleTapSeekEnabled: Boolean = _uiState.value.doubleTapSeekEnabled,
+        doubleTapSeekSeconds: Int = _uiState.value.doubleTapSeekSeconds
     ) {
         _uiState.update { state ->
             val updatedServer = if (!manualServerSelected && state.servers.isNotEmpty()) {
@@ -61,6 +65,8 @@ class StreamingViewModel(
                 autoPlayEnabled = autoPlayEnabled,
                 autoSkipIntro = autoSkipIntro,
                 preloadNextEpisode = preloadNextEpisode,
+                doubleTapSeekEnabled = doubleTapSeekEnabled,
+                doubleTapSeekSeconds = doubleTapSeekSeconds,
                 selectedServer = updatedServer
             )
         }
@@ -431,16 +437,28 @@ class StreamingViewModel(
         }
     }
 
-    fun updatePosition(positionMs: Long, durationMs: Long) {
+    fun updatePosition(positionMs: Long, durationMs: Long, bufferedMs: Long = _uiState.value.bufferedPositionMs) {
         if (_uiState.value.isLoading || _uiState.value.selectedServer == null) {
             return
         }
         _uiState.update {
             it.copy(
                 currentPositionMs = positionMs,
+                bufferedPositionMs = bufferedMs.coerceAtLeast(positionMs),
                 durationMs = if (durationMs > 0) durationMs else it.durationMs
             )
         }
+    }
+
+    fun setDoubleTapSeekEnabled(context: android.content.Context, enabled: Boolean) {
+        AppPreferences.setDoubleTapSeekEnabled(context, enabled)
+        _uiState.update { it.copy(doubleTapSeekEnabled = enabled) }
+    }
+
+    fun setDoubleTapSeekSeconds(context: android.content.Context, seconds: Int) {
+        AppPreferences.setDoubleTapSeekSeconds(context, seconds)
+        val valid = if (seconds in setOf(5, 10, 15, 30)) seconds else 10
+        _uiState.update { it.copy(doubleTapSeekSeconds = valid) }
     }
 
     fun setPlaying(playing: Boolean) {

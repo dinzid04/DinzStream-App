@@ -224,24 +224,32 @@ fun ApngAnimationView(
                     imageView.isFocusable = false
                     imageView.isEnabled = false
                     currentImageView = imageView
+                    val targetPath = file.absolutePath
+                    if (imageView.tag == targetPath && currentDrawable != null) {
+                        return@AndroidView
+                    }
                     try {
                         if (file.exists() && file.length() >= 128L) {
-                            val drawable = APNGDrawable.fromFile(file.absolutePath)
+                            runCatching { currentDrawable?.stop() }
+                            val drawable = APNGDrawable.fromFile(targetPath)
                             drawable.setLoopLimit(0) // 0 = Infinite loop
+                            imageView.tag = targetPath
                             imageView.setImageDrawable(drawable)
                             drawable.start()
                             currentDrawable = drawable
                         } else {
-                            useApng = false
+                            imageView.tag = null
                             imageView.setImageDrawable(null)
+                            imageView.post { useApng = false }
                         }
                     } catch (t: Throwable) {
                         t.printStackTrace()
-                        // Fallback ke Coil jika terjadi OOM atau error decode
-                        useApng = false
+                        imageView.tag = null
                         try {
                             imageView.setImageDrawable(null)
                         } catch (_: Throwable) {}
+                        // Fallback ke Coil di frame berikutnya agar tidak mutasi state saat update
+                        imageView.post { useApng = false }
                     }
                 }
             )

@@ -24,9 +24,13 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import com.yuranime.dinz.data.local.AppPreferences
 import com.yuranime.dinz.data.local.LocalAuthDatabase
+import com.yuranime.dinz.data.local.RemoteWatchHistoryBundle
 import com.yuranime.dinz.data.local.SavedGoogleUserSession
+import com.yuranime.dinz.data.local.WatchHistoryItem
+import com.yuranime.dinz.data.local.WatchedEpisodeRecord
 import com.yuranime.dinz.ui.components.TitleVfxTier
 import com.yuranime.dinz.ui.components.VERIFIED_BADGE_DEFAULT_HEX
+import com.yuranime.dinz.util.GlobalCrashHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -908,7 +912,7 @@ object FirebaseManager {
     val SHOP_BORDERS: List<BorderDefinition> = emptyList()
     val SHOP_PROFILE_EFFECTS: List<ProfileEffectDefinition> = emptyList()
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + GlobalCrashHandler.coroutineExceptionHandler)
 
     val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
     val firestore: FirebaseFirestore by lazy {
@@ -937,6 +941,12 @@ object FirebaseManager {
 
     private val _userProfile = MutableStateFlow<UserProfile?>(null)
     val userProfile: StateFlow<UserProfile?> = _userProfile.asStateFlow()
+
+    private val _watchHistorySyncVersion = MutableStateFlow(0L)
+    val watchHistorySyncVersion: StateFlow<Long> = _watchHistorySyncVersion.asStateFlow()
+
+    @Volatile
+    private var lastSyncedWatchHistoryUid: String? = null
 
     private val _leaderboard = MutableStateFlow<List<LeaderboardUser>>(emptyList())
     val leaderboard: StateFlow<List<LeaderboardUser>> = _leaderboard.asStateFlow()
@@ -1827,6 +1837,11 @@ object FirebaseManager {
         val uid = getActiveUid() ?: return
         userDocListener?.remove()
 
+        if (context != null && isUserLoggedIn() && lastSyncedWatchHistoryUid != uid) {
+            lastSyncedWatchHistoryUid = uid
+            syncWatchHistoryFromCloud(context)
+        }
+
         userDocListener = firestore.collection("users").document(uid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
@@ -2219,12 +2234,12 @@ object FirebaseManager {
                     val deduplicatedUsers = rawEntries
                         .groupBy { it.identityKey }
                         .values
-                        .map { group ->
+                        .mapNotNull { group ->
                             val primary = group.maxWithOrNull(
                                 compareBy<RawEntry> { it.priorityScore }
                                     .thenBy { it.user.equippedBorderUrl.isNotBlank() || it.user.equippedTitle.isNotBlank() }
                                     .thenBy { it.user.exp }
-                            )!!.user
+                            )?.user ?: return@mapNotNull null
                             val maxExp = group.maxOf { it.user.exp }
                             val maxPoints = group.maxOf { it.user.points }
                             val bestLevel = computeLevelFromExp(maxExp)
@@ -2338,128 +2353,135 @@ object FirebaseManager {
         }
 
         scope.launch {
-            var finalAvatarUrl = avatarUrl.trim()
-            var finalBannerUrl = bannerUrl.trim()
+            try {
+                var finalAvatarUrl = avatarUrl.trim()
+                var finalBannerUrl = bannerUrl.trim()
 
-            if (context != null) {
-                if (finalAvatarUrl.isNotEmpty() && !finalAvatarUrl.startsWith("http")) {
-                    val uploadRes = R2CdnUploader.compressAndUploadImage(
-                        context = context,
-                        uriString = finalAvatarUrl,
-                        uid = uid,
-                        isBanner = false
-                    )
-                    uploadRes.onSuccess { cdnUrl ->
-                        finalAvatarUrl = cdnUrl
-                    }.onFailure { err ->
-                        CoroutineScope(Dispatchers.Main).launch {
-                            onComplete(false, "Gagal mengunggah foto profil ke CDN: ${err.message}")
+                if (context != null) {
+                    if (finalAvatarUrl.isNotEmpty() && !finalAvatarUrl.startsWith("http")) {
+                        val uploadRes = R2CdnUploader.compressAndUploadImage(
+                            context = context,
+                            uriString = finalAvatarUrl,
+                            uid = uid,
+                            isBanner = false
+                        )
+                        uploadRes.onSuccess { cdnUrl ->
+                            finalAvatarUrl = cdnUrl
+                        }.onFailure { err ->
+                            CoroutineScope(Dispatchers.Main).launch {
+                                onComplete(false, "Gagal mengunggah foto profil ke CDN: ${err.message}")
+                            }
+                            return@launch
                         }
-                        return@launch
+                    }
+
+                    if (finalBannerUrl.isNotEmpty() && !finalBannerUrl.startsWith("http")) {
+                        val uploadRes = R2CdnUploader.compressAndUploadImage(
+                            context = context,
+                            uriString = finalBannerUrl,
+                            uid = uid,
+                            isBanner = true
+                        )
+                        uploadRes.onSuccess { cdnUrl ->
+                            finalBannerUrl = cdnUrl
+                        }.onFailure { err ->
+                            CoroutineScope(Dispatchers.Main).launch {
+                                onComplete(false, "Gagal mengunggah cover banner ke CDN: ${err.message}")
+                            }
+                            return@launch
+                        }
                     }
                 }
 
-                if (finalBannerUrl.isNotEmpty() && !finalBannerUrl.startsWith("http")) {
-                    val uploadRes = R2CdnUploader.compressAndUploadImage(
+                val current = _userProfile.value ?: UserProfile(uid = uid)
+                val cleanName = name.trim().ifBlank { current.name }
+                val cleanUsername = username.trim().lowercase(Locale.ROOT).replace(" ", "")
+                    .removePrefix("@")
+                    .ifBlank { current.username.removePrefix("@") }
+                val cleanBio = bio.trim().ifBlank { "Penikmat anime & komik di Yuranime." }
+                val finalTitle = equippedTitle?.trim() ?: current.equippedTitle
+                val titleDef = resolveTitleDefinition(finalTitle, current.level)
+                val finalTitleTier = titleDef?.tierLevel ?: current.level
+                val finalTitleVariant = titleDef?.styleVariant ?: 0
+                val finalBorder = equippedBorderUrl?.trim() ?: current.equippedBorderUrl
+                val finalEffect = equippedProfileEffectUrl?.trim() ?: current.equippedProfileEffectUrl
+
+                val updated = current.copy(
+                    name = cleanName,
+                    username = cleanUsername,
+                    bio = cleanBio,
+                    avatar = finalAvatarUrl,
+                    banner = finalBannerUrl,
+                    equippedTitle = finalTitle,
+                    equippedTitleTier = finalTitleTier,
+                    equippedTitleVariant = finalTitleVariant,
+                    equippedBorderUrl = finalBorder,
+                    equippedProfileEffectUrl = finalEffect
+                )
+                _userProfile.value = updated
+                if (context != null) {
+                    saveProfileToPrefs(context, updated)
+                    AppPreferences.saveGoogleSession(
                         context = context,
-                        uriString = finalBannerUrl,
-                        uid = uid,
-                        isBanner = true
+                        id = uid,
+                        name = updated.name,
+                        email = updated.email,
+                        photoUrl = updated.avatar
                     )
-                    uploadRes.onSuccess { cdnUrl ->
-                        finalBannerUrl = cdnUrl
-                    }.onFailure { err ->
-                        CoroutineScope(Dispatchers.Main).launch {
-                            onComplete(false, "Gagal mengunggah cover banner ke CDN: ${err.message}")
-                        }
-                        return@launch
+                }
+                refreshLeaderboardWithCurrentUser(updated)
+
+                try {
+                    auth.currentUser?.updateProfile(
+                        UserProfileChangeRequest.Builder()
+                            .setDisplayName(updated.name)
+                            .build()
+                    )
+                } catch (_: Exception) {}
+
+                val effectiveEmail = updated.email.ifBlank {
+                    auth.currentUser?.email ?: _googleSession.value?.email ?: ""
+                }
+                val updates = mapOf(
+                    "uid" to uid,
+                    "email" to effectiveEmail,
+                    "name" to updated.name,
+                    "displayName" to updated.name,
+                    "username" to updated.username,
+                    "userTag" to updated.userTag,
+                    "bio" to updated.bio,
+                    "avatar" to updated.avatar,
+                    "photoUrl" to updated.avatar,
+                    "banner" to updated.banner,
+                    "bannerUrl" to updated.banner,
+                    "equippedTitle" to updated.equippedTitle,
+                    "equippedTitleTier" to updated.equippedTitleTier,
+                    "equippedTitleVariant" to updated.equippedTitleVariant,
+                    "equippedNameStyle" to updated.equippedNameStyle,
+                    "equippedNameColor" to updated.equippedNameColor,
+                    "unlockedNameStyles" to updated.unlockedNameStyles,
+                    "equippedBorderUrl" to updated.equippedBorderUrl,
+                    "equippedAvatarDecoration" to updated.equippedBorderUrl,
+                    "equippedProfileEffectUrl" to updated.equippedProfileEffectUrl,
+                    "equippedProfileEffect" to updated.equippedProfileEffectUrl
+                )
+
+                try {
+                    firestore.collection("users").document(uid).set(updates, SetOptions.merge()).await()
+                    deduplicateUserAccounts(context)
+                    CoroutineScope(Dispatchers.Main).launch {
+                        onComplete(true, "Profil berhasil disimpan & disinkronkan ke server!")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Update profil tersimpan lokal, menunggu koneksi Firestore: ${e.message}")
+                    CoroutineScope(Dispatchers.Main).launch {
+                        onComplete(true, "Profil berhasil diperbarui!")
                     }
                 }
-            }
-
-            val current = _userProfile.value ?: UserProfile(uid = uid)
-            val cleanName = name.trim().ifBlank { current.name }
-            val cleanUsername = username.trim().lowercase(Locale.ROOT).replace(" ", "")
-                .removePrefix("@")
-                .ifBlank { current.username.removePrefix("@") }
-            val cleanBio = bio.trim().ifBlank { "Penikmat anime & komik di Yuranime." }
-            val finalTitle = equippedTitle?.trim() ?: current.equippedTitle
-            val titleDef = resolveTitleDefinition(finalTitle, current.level)
-            val finalTitleTier = titleDef?.tierLevel ?: current.level
-            val finalTitleVariant = titleDef?.styleVariant ?: 0
-            val finalBorder = equippedBorderUrl?.trim() ?: current.equippedBorderUrl
-            val finalEffect = equippedProfileEffectUrl?.trim() ?: current.equippedProfileEffectUrl
-
-            val updated = current.copy(
-                name = cleanName,
-                username = cleanUsername,
-                bio = cleanBio,
-                avatar = finalAvatarUrl,
-                banner = finalBannerUrl,
-                equippedTitle = finalTitle,
-                equippedTitleTier = finalTitleTier,
-                equippedTitleVariant = finalTitleVariant,
-                equippedBorderUrl = finalBorder,
-                equippedProfileEffectUrl = finalEffect
-            )
-            _userProfile.value = updated
-            if (context != null) {
-                saveProfileToPrefs(context, updated)
-                AppPreferences.saveGoogleSession(
-                    context = context,
-                    id = uid,
-                    name = updated.name,
-                    email = updated.email,
-                    photoUrl = updated.avatar
-                )
-            }
-            refreshLeaderboardWithCurrentUser(updated)
-
-            try {
-                auth.currentUser?.updateProfile(
-                    UserProfileChangeRequest.Builder()
-                        .setDisplayName(updated.name)
-                        .build()
-                )
-            } catch (_: Exception) {}
-
-            val effectiveEmail = updated.email.ifBlank {
-                auth.currentUser?.email ?: _googleSession.value?.email ?: ""
-            }
-            val updates = mapOf(
-                "uid" to uid,
-                "email" to effectiveEmail,
-                "name" to updated.name,
-                "displayName" to updated.name,
-                "username" to updated.username,
-                "userTag" to updated.userTag,
-                "bio" to updated.bio,
-                "avatar" to updated.avatar,
-                "photoUrl" to updated.avatar,
-                "banner" to updated.banner,
-                "bannerUrl" to updated.banner,
-                "equippedTitle" to updated.equippedTitle,
-                "equippedTitleTier" to updated.equippedTitleTier,
-                "equippedTitleVariant" to updated.equippedTitleVariant,
-                "equippedNameStyle" to updated.equippedNameStyle,
-                "equippedNameColor" to updated.equippedNameColor,
-                "unlockedNameStyles" to updated.unlockedNameStyles,
-                "equippedBorderUrl" to updated.equippedBorderUrl,
-                "equippedAvatarDecoration" to updated.equippedBorderUrl,
-                "equippedProfileEffectUrl" to updated.equippedProfileEffectUrl,
-                "equippedProfileEffect" to updated.equippedProfileEffectUrl
-            )
-
-            try {
-                firestore.collection("users").document(uid).set(updates, SetOptions.merge()).await()
-                deduplicateUserAccounts(context)
+            } catch (t: Throwable) {
+                Log.e(TAG, "Error tak terduga saat updateProfile: ${t.message}", t)
                 CoroutineScope(Dispatchers.Main).launch {
-                    onComplete(true, "Profil berhasil disimpan & disinkronkan ke server!")
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Update profil tersimpan lokal, menunggu koneksi Firestore: ${e.message}")
-                CoroutineScope(Dispatchers.Main).launch {
-                    onComplete(true, "Profil berhasil diperbarui!")
+                    onComplete(false, t.message ?: "Terjadi kesalahan saat menyimpan profil")
                 }
             }
         }
@@ -2475,7 +2497,10 @@ object FirebaseManager {
             onComplete(false, "Silakan login terlebih dahulu")
             return
         }
-        val current = _userProfile.value ?: return
+        val current = _userProfile.value ?: run {
+            onComplete(false, "Profil pengguna belum dimuat, silakan coba lagi")
+            return
+        }
         val newTitleName = titleDefinition?.titleName.orEmpty()
         val newTier = titleDefinition?.tierLevel ?: current.level
         val newVariant = titleDefinition?.styleVariant ?: 0
@@ -2525,7 +2550,10 @@ object FirebaseManager {
             onComplete(false, "Silakan login terlebih dahulu")
             return
         }
-        val current = _userProfile.value ?: return
+        val current = _userProfile.value ?: run {
+            onComplete(false, "Profil pengguna belum dimuat, silakan coba lagi")
+            return
+        }
 
         if (current.unlockedTitles.any { it.equals(titleDefinition.titleName, ignoreCase = true) }) {
             equipTitle(context, titleDefinition, onComplete)
@@ -2607,7 +2635,10 @@ object FirebaseManager {
             onComplete(false, "Silakan login terlebih dahulu")
             return
         }
-        val current = _userProfile.value ?: return
+        val current = _userProfile.value ?: run {
+            onComplete(false, "Profil pengguna belum dimuat, silakan coba lagi")
+            return
+        }
         val cleanId = styleId.trim().lowercase(Locale.ROOT)
         val cleanColor = colorHex.trim().ifBlank { "#FFFFFF" }
 
@@ -2670,7 +2701,10 @@ object FirebaseManager {
             onComplete(false, "Silakan login terlebih dahulu")
             return
         }
-        val current = _userProfile.value ?: return
+        val current = _userProfile.value ?: run {
+            onComplete(false, "Profil pengguna belum dimuat, silakan coba lagi")
+            return
+        }
         val cleanColor = colorHex.trim().ifBlank { styleDefinition.defaultColorHex }
 
         if (current.unlockedNameStyles.any { it.equals(styleDefinition.id, ignoreCase = true) }) {
@@ -2727,7 +2761,10 @@ object FirebaseManager {
             onComplete(false, "Silakan login terlebih dahulu")
             return
         }
-        val current = _userProfile.value ?: return
+        val current = _userProfile.value ?: run {
+            onComplete(false, "Profil pengguna belum dimuat, silakan coba lagi")
+            return
+        }
 
         if (border == null) {
             val updated = current.copy(equippedBorderUrl = "")
@@ -2804,7 +2841,10 @@ object FirebaseManager {
             onComplete(false, "Silakan login terlebih dahulu")
             return
         }
-        val current = _userProfile.value ?: return
+        val current = _userProfile.value ?: run {
+            onComplete(false, "Profil pengguna belum dimuat, silakan coba lagi")
+            return
+        }
 
         if (effect == null) {
             val updated = current.copy(equippedProfileEffectUrl = "")
@@ -2966,7 +3006,10 @@ object FirebaseManager {
             onComplete(false, "Silakan login terlebih dahulu")
             return
         }
-        val current = _userProfile.value ?: return
+        val current = _userProfile.value ?: run {
+            onComplete(false, "Profil pengguna belum dimuat, silakan coba lagi")
+            return
+        }
         val cleanCode = codeInput.trim().uppercase(Locale.ROOT)
         if (cleanCode.isBlank()) {
             onComplete(false, "Masukkan kode redeem yang valid")
@@ -3466,6 +3509,8 @@ object FirebaseManager {
         _currentUser.value = null
         _googleSession.value = null
         _userProfile.value = null
+        lastSyncedWatchHistoryUid = null
+        _watchHistorySyncVersion.value += 1L
     }
 
     fun getTodayDateString(): String {
@@ -3483,6 +3528,185 @@ object FirebaseManager {
         cal.add(Calendar.DAY_OF_YEAR, -1)
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         return sdf.format(cal.time)
+    }
+
+    fun notifyWatchHistoryChanged() {
+        _watchHistorySyncVersion.value += 1L
+    }
+
+    /**
+     * Sinkronkan satu item histori tontonan & daftar episode ditonton ke Firestore (khusus pengguna login).
+     * Untuk tamu (guest), fungsi ini langsung berhenti tanpa membaca/menulis Firebase sama sekali.
+     */
+    fun syncWatchHistoryItem(context: Context, item: WatchHistoryItem) {
+        if (!isUserLoggedIn() || item.movieId.isBlank()) return
+        val uid = getActiveUid() ?: return
+
+        scope.launch {
+            try {
+                val localDb = LocalAuthDatabase(context.applicationContext)
+                val watchedEps = localDb.getWatchedEpisodesForAnime(item.movieId)
+                val watchedEpsMap = HashMap<String, Map<String, Any>>()
+                watchedEps.forEach { ep ->
+                    if (ep.episodeId.isNotBlank()) {
+                        watchedEpsMap[ep.episodeId] = mapOf(
+                            "episodeId" to ep.episodeId,
+                            "episodeNumber" to ep.episodeNumber,
+                            "positionMs" to ep.positionMs,
+                            "durationMs" to ep.durationMs,
+                            "isCompleted" to ep.isCompleted,
+                            "updatedAt" to ep.updatedAt
+                        )
+                    }
+                }
+
+                val payload = mapOf(
+                    "animeId" to item.movieId,
+                    "animeTitle" to item.animeTitle,
+                    "posterUrl" to item.posterUrl,
+                    "episodeId" to item.episodeId,
+                    "episodeNumber" to item.episodeNumber,
+                    "episodeTitle" to item.episodeTitle,
+                    "lastPosition" to (item.positionMs / 1000L).coerceAtLeast(0L),
+                    "lastPositionMs" to item.positionMs.coerceAtLeast(0L),
+                    "totalDuration" to (item.durationMs / 1000L).coerceAtLeast(0L),
+                    "totalDurationMs" to item.durationMs.coerceAtLeast(0L),
+                    "isCompleted" to item.isCompleted,
+                    "updatedAt" to item.updatedAt,
+                    "watchedEpisodes" to watchedEpsMap
+                )
+
+                firestore.collection("users")
+                    .document(uid)
+                    .collection("watch_history")
+                    .document(item.movieId)
+                    .set(payload, SetOptions.merge())
+                    .await()
+            } catch (e: Exception) {
+                Log.w(TAG, "Gagal sinkronisasi watch_history ${item.movieId}: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Tarik & gabungkan histori tontonan dari Firebase ke database lokal (prioritas updatedAt terbaru).
+     * Otomatis dilewati bila pengguna belum login (guest).
+     */
+    fun syncWatchHistoryFromCloud(context: Context) {
+        if (!isUserLoggedIn()) return
+        val uid = getActiveUid() ?: return
+
+        scope.launch {
+            try {
+                val snap = firestore.collection("users")
+                    .document(uid)
+                    .collection("watch_history")
+                    .get()
+                    .await()
+
+                val bundles = mutableListOf<RemoteWatchHistoryBundle>()
+                for (doc in snap.documents) {
+                    val animeId = doc.getString("animeId")?.takeIf { it.isNotBlank() } ?: doc.id
+                    if (animeId.isBlank()) continue
+
+                    val animeTitle = doc.getString("animeTitle").orEmpty()
+                    val posterUrl = doc.getString("posterUrl").orEmpty()
+                    val episodeId = doc.getString("episodeId").orEmpty()
+                    val episodeNumber = doc.getString("episodeNumber").orEmpty()
+                    val episodeTitle = doc.getString("episodeTitle").orEmpty()
+
+                    val lastPosMs = doc.getLong("lastPositionMs")
+                        ?: ((doc.getLong("lastPosition") ?: 0L) * 1000L)
+                    val totalDurMs = doc.getLong("totalDurationMs")
+                        ?: ((doc.getLong("totalDuration") ?: 0L) * 1000L)
+                    val isCompleted = doc.getBoolean("isCompleted") ?: false
+                    val updatedAt = doc.getLong("updatedAt") ?: 0L
+
+                    val watchedList = mutableListOf<WatchedEpisodeRecord>()
+                    val rawWatched = doc.get("watchedEpisodes") as? Map<*, *>
+                    rawWatched?.forEach { (k, v) ->
+                        val epKey = k?.toString()?.takeIf { it.isNotBlank() } ?: return@forEach
+                        val map = v as? Map<*, *> ?: return@forEach
+                        val epNum = map["episodeNumber"]?.toString().orEmpty()
+                        val posMs = (map["positionMs"] as? Number)?.toLong() ?: 0L
+                        val durMs = (map["durationMs"] as? Number)?.toLong() ?: 0L
+                        val done = (map["isCompleted"] as? Boolean) ?: false
+                        val epUpdated = (map["updatedAt"] as? Number)?.toLong() ?: updatedAt
+                        watchedList.add(
+                            WatchedEpisodeRecord(
+                                movieId = animeId,
+                                episodeId = epKey,
+                                episodeNumber = epNum,
+                                positionMs = posMs,
+                                durationMs = durMs,
+                                isCompleted = done,
+                                updatedAt = epUpdated
+                            )
+                        )
+                    }
+                    if (episodeId.isNotBlank() && watchedList.none { it.episodeId == episodeId }) {
+                        watchedList.add(
+                            WatchedEpisodeRecord(
+                                movieId = animeId,
+                                episodeId = episodeId,
+                                episodeNumber = episodeNumber,
+                                positionMs = lastPosMs,
+                                durationMs = totalDurMs,
+                                isCompleted = isCompleted,
+                                updatedAt = updatedAt
+                            )
+                        )
+                    }
+
+                    bundles.add(
+                        RemoteWatchHistoryBundle(
+                            item = WatchHistoryItem(
+                                movieId = animeId,
+                                animeTitle = animeTitle,
+                                episodeId = episodeId,
+                                episodeTitle = episodeTitle.ifBlank { "Episode ${episodeNumber.ifBlank { "1" }}" },
+                                posterUrl = posterUrl,
+                                positionMs = lastPosMs,
+                                durationMs = totalDurMs,
+                                updatedAt = updatedAt,
+                                episodeNumber = episodeNumber,
+                                isCompleted = isCompleted
+                            ),
+                            watchedEpisodes = watchedList
+                        )
+                    )
+                }
+
+                if (bundles.isNotEmpty()) {
+                    LocalAuthDatabase(context.applicationContext).mergeRemoteWatchHistory(bundles)
+                    _watchHistorySyncVersion.value += 1L
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Gagal menarik watch_history dari Firebase: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Menghapus satu item histori tontonan di Firebase saat pengguna login menghapus riwayat lokalnya.
+     */
+    fun deleteWatchHistoryFromCloud(context: Context, animeId: String) {
+        _watchHistorySyncVersion.value += 1L
+        if (!isUserLoggedIn() || animeId.isBlank()) return
+        val uid = getActiveUid() ?: return
+
+        scope.launch {
+            try {
+                firestore.collection("users")
+                    .document(uid)
+                    .collection("watch_history")
+                    .document(animeId)
+                    .delete()
+                    .await()
+            } catch (e: Exception) {
+                Log.w(TAG, "Gagal menghapus watch_history $animeId di Firebase: ${e.message}")
+            }
+        }
     }
 
     /** Mengubah snapshot dokumen `users` publik menjadi [UserProfile] dengan parser tunggal yang konsisten. */

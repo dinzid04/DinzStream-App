@@ -156,8 +156,9 @@ fun BirthdayDetailScreen(
         ?: "Izumi Kyouka, gadis yatim piatu yang menyukai kelinci dan tofu. Benci dengan anjing dan petir. Semenjak bergabung dengan Port Mafia dia telah membunuh 35 orang dalam 6 bulan. Memiliki kemampuan \"Iblis Salju\" yang dapat mencabik-cabik lawannya dengan tebasan pedang yang dibawanya."
 
     val voiceActorsList = remember(effectiveDetail) {
-        if (!effectiveDetail?.voiceActors.isNullOrEmpty()) {
-            effectiveDetail!!.voiceActors
+        val loadedVAs = effectiveDetail?.voiceActors
+        if (!loadedVAs.isNullOrEmpty()) {
+            loadedVAs
         } else {
             listOf(
                 BirthdayVoiceActorItem(
@@ -171,8 +172,9 @@ fun BirthdayDetailScreen(
     }
 
     val animeList = remember(effectiveDetail) {
-        if (!effectiveDetail?.animeList.isNullOrEmpty()) {
-            effectiveDetail!!.animeList
+        val loadedAnime = effectiveDetail?.animeList
+        if (!loadedAnime.isNullOrEmpty()) {
+            loadedAnime
         } else {
             listOf(
                 BirthdayAnimeAppearanceItem(

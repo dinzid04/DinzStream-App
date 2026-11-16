@@ -10,7 +10,8 @@ import com.yuranime.dinz.data.model.SkipSegment
 enum class SettingsSubMenu {
     MAIN,
     RESOLUTION,
-    SPEED
+    SPEED,
+    DOUBLE_TAP_DURATION
 }
 
 enum class EpisodeViewMode {
@@ -41,12 +42,15 @@ data class StreamingUiState(
     // Player controls
     val isPlaying: Boolean = false,
     val currentPositionMs: Long = 0L,
+    val bufferedPositionMs: Long = 0L,
     val durationMs: Long = 0L,
     val preferredQuality: String = "Auto",
     val playbackSpeed: Float = 1.0f,
     val autoPlayEnabled: Boolean = true,
     val autoSkipIntro: Boolean = false,
     val preloadNextEpisode: Boolean = true,
+    val doubleTapSeekEnabled: Boolean = true,
+    val doubleTapSeekSeconds: Int = 10,
     val isFullScreen: Boolean = false,
     val isLocked: Boolean = false,
     val autoNextEpisode: Boolean = true,

@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit
 class YuranimeApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
+        com.yuranime.dinz.util.GlobalCrashHandler.install(this)
         try {
             com.google.firebase.FirebaseApp.initializeApp(this)
         } catch (e: Exception) {

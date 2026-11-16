@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.yuranime.dinz.data.model.EpisodeCommentItem
 
-class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_local.db", null, 4) {
+class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_local.db", null, 5) {
 
     private val prefs = context.getSharedPreferences("animein_auth_prefs", Context.MODE_PRIVATE)
 
@@ -39,11 +39,28 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
                 movie_id TEXT PRIMARY KEY,
                 anime_title TEXT,
                 episode_id TEXT,
+                episode_number TEXT DEFAULT '',
                 episode_title TEXT,
                 poster_url TEXT,
                 position_ms INTEGER,
                 duration_ms INTEGER,
+                is_completed INTEGER DEFAULT 0,
                 updated_at INTEGER
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS watched_episodes (
+                movie_id TEXT NOT NULL,
+                episode_id TEXT NOT NULL,
+                episode_number TEXT DEFAULT '',
+                position_ms INTEGER DEFAULT 0,
+                duration_ms INTEGER DEFAULT 0,
+                is_completed INTEGER DEFAULT 0,
+                exp_awarded INTEGER DEFAULT 0,
+                updated_at INTEGER DEFAULT 0,
+                PRIMARY KEY (movie_id, episode_id)
             )
             """.trimIndent()
         )
@@ -135,6 +152,29 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
             try {
                 db.execSQL("ALTER TABLE comic_read_history ADD COLUMN scroll_offset INTEGER DEFAULT 0")
             } catch (_: Exception) {}
+        }
+        if (oldVersion < 5) {
+            try {
+                db.execSQL("ALTER TABLE watch_history ADD COLUMN episode_number TEXT DEFAULT ''")
+            } catch (_: Exception) {}
+            try {
+                db.execSQL("ALTER TABLE watch_history ADD COLUMN is_completed INTEGER DEFAULT 0")
+            } catch (_: Exception) {}
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS watched_episodes (
+                    movie_id TEXT NOT NULL,
+                    episode_id TEXT NOT NULL,
+                    episode_number TEXT DEFAULT '',
+                    position_ms INTEGER DEFAULT 0,
+                    duration_ms INTEGER DEFAULT 0,
+                    is_completed INTEGER DEFAULT 0,
+                    exp_awarded INTEGER DEFAULT 0,
+                    updated_at INTEGER DEFAULT 0,
+                    PRIMARY KEY (movie_id, episode_id)
+                )
+                """.trimIndent()
+            )
         }
     }
 
@@ -302,29 +342,93 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
         episodeTitle: String,
         posterUrl: String,
         positionMs: Long,
-        durationMs: Long
-    ) {
-        if (movieId.isBlank()) return
+        durationMs: Long,
+        episodeNumber: String = "",
+        isCompleted: Boolean = false
+    ): WatchHistoryItem? {
+        if (movieId.isBlank()) return null
+        val now = System.currentTimeMillis()
+        val safePos = positionMs.coerceAtLeast(0L)
+        val safeDur = durationMs.coerceAtLeast(0L)
+        val resolvedEpNum = episodeNumber.ifBlank {
+            Regex("\\d+").find(episodeTitle)?.value.orEmpty()
+        }
+        val computedCompleted = isCompleted || (
+            safeDur > 0L &&
+                (safePos.toFloat() / safeDur.toFloat() >= 0.85f || (safeDur - safePos) <= 30_000L)
+            )
+
         val db = writableDatabase
+        var expAlreadyAwarded = false
+        var previousCompleted = false
+
+        if (episodeId.isNotBlank()) {
+            runCatching {
+                db.rawQuery(
+                    "SELECT is_completed, exp_awarded FROM watched_episodes WHERE movie_id = ? AND episode_id = ?",
+                    arrayOf(movieId, episodeId)
+                ).use { c ->
+                    if (c.moveToFirst()) {
+                        previousCompleted = c.getInt(0) == 1
+                        expAlreadyAwarded = c.getInt(1) == 1
+                    }
+                }
+            }
+        }
+
+        val finalCompleted = computedCompleted || previousCompleted
         val cv = ContentValues().apply {
             put("movie_id", movieId)
             put("anime_title", animeTitle)
             put("episode_id", episodeId)
+            put("episode_number", resolvedEpNum)
             put("episode_title", episodeTitle)
             put("poster_url", posterUrl)
-            put("position_ms", positionMs)
-            put("duration_ms", durationMs)
-            put("updated_at", System.currentTimeMillis())
+            put("position_ms", safePos)
+            put("duration_ms", safeDur)
+            put("is_completed", if (finalCompleted) 1 else 0)
+            put("updated_at", now)
         }
         db.insertWithOnConflict("watch_history", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
-        com.yuranime.dinz.data.firebase.FirebaseManager.addExpAndPoints(20L, 10L)
+
+        val shouldAwardExp = safePos > 5_000L && !expAlreadyAwarded && episodeId.isNotBlank()
+        if (episodeId.isNotBlank()) {
+            val epCv = ContentValues().apply {
+                put("movie_id", movieId)
+                put("episode_id", episodeId)
+                put("episode_number", resolvedEpNum)
+                put("position_ms", safePos)
+                put("duration_ms", safeDur)
+                put("is_completed", if (finalCompleted) 1 else 0)
+                put("exp_awarded", if (shouldAwardExp || expAlreadyAwarded) 1 else 0)
+                put("updated_at", now)
+            }
+            db.insertWithOnConflict("watched_episodes", null, epCv, SQLiteDatabase.CONFLICT_REPLACE)
+        }
+
+        if (shouldAwardExp) {
+            com.yuranime.dinz.data.firebase.FirebaseManager.addExpAndPoints(20L, 10L)
+        }
+
+        return WatchHistoryItem(
+            movieId = movieId,
+            animeTitle = animeTitle,
+            episodeId = episodeId,
+            episodeNumber = resolvedEpNum,
+            episodeTitle = episodeTitle,
+            posterUrl = posterUrl,
+            positionMs = safePos,
+            durationMs = safeDur,
+            isCompleted = finalCompleted,
+            updatedAt = now
+        )
     }
 
     fun getWatchHistory(): List<WatchHistoryItem> {
         val db = readableDatabase
         val list = mutableListOf<WatchHistoryItem>()
         val cursor = db.rawQuery(
-            "SELECT movie_id, anime_title, episode_id, episode_title, poster_url, position_ms, duration_ms, updated_at FROM watch_history ORDER BY updated_at DESC",
+            "SELECT movie_id, anime_title, episode_id, episode_number, episode_title, poster_url, position_ms, duration_ms, is_completed, updated_at FROM watch_history ORDER BY updated_at DESC",
             null
         )
         cursor.use {
@@ -334,11 +438,13 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
                         movieId = it.getString(0) ?: "",
                         animeTitle = it.getString(1) ?: "",
                         episodeId = it.getString(2) ?: "",
-                        episodeTitle = it.getString(3) ?: "",
-                        posterUrl = it.getString(4) ?: "",
-                        positionMs = it.getLong(5),
-                        durationMs = it.getLong(6),
-                        updatedAt = it.getLong(7)
+                        episodeNumber = it.getString(3) ?: "",
+                        episodeTitle = it.getString(4) ?: "",
+                        posterUrl = it.getString(5) ?: "",
+                        positionMs = it.getLong(6),
+                        durationMs = it.getLong(7),
+                        isCompleted = it.getInt(8) == 1,
+                        updatedAt = it.getLong(9)
                     )
                 )
             }
@@ -346,14 +452,150 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
         return list
     }
 
+    fun getWatchedEpisodeIds(movieId: String): Set<String> {
+        if (movieId.isBlank()) return emptySet()
+        val db = readableDatabase
+        val set = HashSet<String>()
+        runCatching {
+            db.rawQuery(
+                "SELECT episode_id FROM watched_episodes WHERE movie_id = ?",
+                arrayOf(movieId)
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    val id = cursor.getString(0)
+                    if (!id.isNullOrBlank()) set.add(id)
+                }
+            }
+        }
+        return set
+    }
+
+    fun getEpisodeResumePositionMs(movieId: String, episodeId: String): Long {
+        if (movieId.isBlank() || episodeId.isBlank()) return 0L
+        val db = readableDatabase
+        var resumePos = 0L
+        runCatching {
+            db.rawQuery(
+                "SELECT position_ms, duration_ms, is_completed FROM watched_episodes WHERE movie_id = ? AND episode_id = ?",
+                arrayOf(movieId, episodeId)
+            ).use { c ->
+                if (c.moveToFirst()) {
+                    val pos = c.getLong(0)
+                    val dur = c.getLong(1)
+                    val completed = c.getInt(2) == 1
+                    if (!completed && pos > 5_000L && (dur <= 0L || pos.toFloat() / dur.toFloat() < 0.92f)) {
+                        resumePos = pos
+                    }
+                }
+            }
+        }
+        return resumePos
+    }
+
+    fun getWatchedEpisodesForAnime(movieId: String): List<WatchedEpisodeRecord> {
+        if (movieId.isBlank()) return emptyList()
+        val db = readableDatabase
+        val out = mutableListOf<WatchedEpisodeRecord>()
+        runCatching {
+            db.rawQuery(
+                "SELECT episode_id, episode_number, position_ms, duration_ms, is_completed, updated_at FROM watched_episodes WHERE movie_id = ?",
+                arrayOf(movieId)
+            ).use { c ->
+                while (c.moveToNext()) {
+                    out.add(
+                        WatchedEpisodeRecord(
+                            movieId = movieId,
+                            episodeId = c.getString(0) ?: "",
+                            episodeNumber = c.getString(1) ?: "",
+                            positionMs = c.getLong(2),
+                            durationMs = c.getLong(3),
+                            isCompleted = c.getInt(4) == 1,
+                            updatedAt = c.getLong(5)
+                        )
+                    )
+                }
+            }
+        }
+        return out
+    }
+
+    fun mergeRemoteWatchHistory(remoteRecords: List<RemoteWatchHistoryBundle>) {
+        if (remoteRecords.isEmpty()) return
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            remoteRecords.forEach { bundle ->
+                val item = bundle.item
+                if (item.movieId.isBlank()) return@forEach
+
+                var localUpdatedAt = -1L
+                db.rawQuery(
+                    "SELECT updated_at FROM watch_history WHERE movie_id = ?",
+                    arrayOf(item.movieId)
+                ).use { c ->
+                    if (c.moveToFirst()) localUpdatedAt = c.getLong(0)
+                }
+
+                if (item.updatedAt >= localUpdatedAt) {
+                    val cv = ContentValues().apply {
+                        put("movie_id", item.movieId)
+                        put("anime_title", item.animeTitle)
+                        put("episode_id", item.episodeId)
+                        put("episode_number", item.episodeNumber)
+                        put("episode_title", item.episodeTitle)
+                        put("poster_url", item.posterUrl)
+                        put("position_ms", item.positionMs)
+                        put("duration_ms", item.durationMs)
+                        put("is_completed", if (item.isCompleted) 1 else 0)
+                        put("updated_at", item.updatedAt)
+                    }
+                    db.insertWithOnConflict("watch_history", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+                }
+
+                bundle.watchedEpisodes.forEach { ep ->
+                    if (ep.episodeId.isBlank()) return@forEach
+                    var localEpUpdated = -1L
+                    var localExpAwarded = 0
+                    db.rawQuery(
+                        "SELECT updated_at, exp_awarded FROM watched_episodes WHERE movie_id = ? AND episode_id = ?",
+                        arrayOf(item.movieId, ep.episodeId)
+                    ).use { c ->
+                        if (c.moveToFirst()) {
+                            localEpUpdated = c.getLong(0)
+                            localExpAwarded = c.getInt(1)
+                        }
+                    }
+                    if (ep.updatedAt >= localEpUpdated) {
+                        val epCv = ContentValues().apply {
+                            put("movie_id", item.movieId)
+                            put("episode_id", ep.episodeId)
+                            put("episode_number", ep.episodeNumber)
+                            put("position_ms", ep.positionMs)
+                            put("duration_ms", ep.durationMs)
+                            put("is_completed", if (ep.isCompleted) 1 else 0)
+                            put("exp_awarded", maxOf(localExpAwarded, 1))
+                            put("updated_at", ep.updatedAt)
+                        }
+                        db.insertWithOnConflict("watched_episodes", null, epCv, SQLiteDatabase.CONFLICT_REPLACE)
+                    }
+                }
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     fun deleteWatchHistory(movieId: String) {
         val db = writableDatabase
         db.delete("watch_history", "movie_id = ?", arrayOf(movieId))
+        db.delete("watched_episodes", "movie_id = ?", arrayOf(movieId))
     }
 
     fun clearWatchHistory() {
         val db = writableDatabase
         db.delete("watch_history", null, null)
+        db.delete("watched_episodes", null, null)
     }
 
     fun saveComicReadHistory(
@@ -530,5 +772,22 @@ data class WatchHistoryItem(
     val posterUrl: String,
     val positionMs: Long,
     val durationMs: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val episodeNumber: String = "",
+    val isCompleted: Boolean = false
+)
+
+data class WatchedEpisodeRecord(
+    val movieId: String,
+    val episodeId: String,
+    val episodeNumber: String = "",
+    val positionMs: Long = 0L,
+    val durationMs: Long = 0L,
+    val isCompleted: Boolean = false,
+    val updatedAt: Long = 0L
+)
+
+data class RemoteWatchHistoryBundle(
+    val item: WatchHistoryItem,
+    val watchedEpisodes: List<WatchedEpisodeRecord>
 )

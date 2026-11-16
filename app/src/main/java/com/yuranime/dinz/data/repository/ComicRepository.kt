@@ -18,15 +18,20 @@ class ComicRepository(
     private val api: ComicApiService = ComicApiService.create(),
     private val komikStationScraper: KomikStationScraper = KomikStationScraper()
 ) {
+    @Volatile
     private var cachedBanners: List<com.yuranime.dinz.data.model.ComicBannerItem>? = null
+    @Volatile
     private var cachedTrendingComics: List<ComicItem>? = null
+    @Volatile
     private var cachedPopularComics: List<ComicItem>? = null
+    @Volatile
     private var cachedLatestComics: List<ComicItem>? = null
-    private val cachedDetails = mutableMapOf<String, ComicDetail>()
+    private val cachedDetails = java.util.Collections.synchronizedMap(mutableMapOf<String, ComicDetail>())
 
     suspend fun getBanners(forceRefresh: Boolean = false): Result<List<com.yuranime.dinz.data.model.ComicBannerItem>> = withContext(Dispatchers.IO) {
-        if (!forceRefresh && cachedBanners != null && cachedBanners!!.isNotEmpty()) {
-            return@withContext Result.success(cachedBanners!!)
+        val snapshot = cachedBanners
+        if (!forceRefresh && !snapshot.isNullOrEmpty()) {
+            return@withContext Result.success(snapshot)
         }
         try {
             val response = api.getBanners()
@@ -86,8 +91,9 @@ class ComicRepository(
                 Result.success(getFallbackBanners())
             }
         } catch (_: Exception) {
-            if (cachedBanners != null && cachedBanners!!.isNotEmpty()) {
-                Result.success(cachedBanners!!)
+            val fallbackSnapshot = cachedBanners
+            if (!fallbackSnapshot.isNullOrEmpty()) {
+                Result.success(fallbackSnapshot)
             } else {
                 Result.success(getFallbackBanners())
             }
@@ -99,8 +105,9 @@ class ComicRepository(
         pageSize: Int = 12,
         forceRefresh: Boolean = false
     ): Result<List<ComicItem>> = withContext(Dispatchers.IO) {
-        if (!forceRefresh && page == 1 && cachedTrendingComics != null && cachedTrendingComics!!.isNotEmpty()) {
-            return@withContext Result.success(cachedTrendingComics!!)
+        val snapshot = cachedTrendingComics
+        if (!forceRefresh && page == 1 && !snapshot.isNullOrEmpty()) {
+            return@withContext Result.success(snapshot)
         }
         try {
             val response = api.getTrendingManga(page = page, pageSize = pageSize)
@@ -113,8 +120,9 @@ class ComicRepository(
             }
             Result.success(items)
         } catch (_: Exception) {
-            if (cachedTrendingComics != null && cachedTrendingComics!!.isNotEmpty()) {
-                Result.success(cachedTrendingComics!!)
+            val fallbackSnapshot = cachedTrendingComics
+            if (!fallbackSnapshot.isNullOrEmpty()) {
+                Result.success(fallbackSnapshot)
             } else {
                 Result.success(getFallbackComics())
             }
@@ -126,8 +134,9 @@ class ComicRepository(
         pageSize: Int = 12,
         forceRefresh: Boolean = false
     ): Result<List<ComicItem>> = withContext(Dispatchers.IO) {
-        if (!forceRefresh && page == 1 && cachedPopularComics != null && cachedPopularComics!!.isNotEmpty()) {
-            return@withContext Result.success(cachedPopularComics!!)
+        val snapshot = cachedPopularComics
+        if (!forceRefresh && page == 1 && !snapshot.isNullOrEmpty()) {
+            return@withContext Result.success(snapshot)
         }
         try {
             val response = api.getPopularManga(page = page, pageSize = pageSize)
@@ -140,8 +149,9 @@ class ComicRepository(
             }
             Result.success(items)
         } catch (_: Exception) {
-            if (cachedPopularComics != null && cachedPopularComics!!.isNotEmpty()) {
-                Result.success(cachedPopularComics!!)
+            val fallbackSnapshot = cachedPopularComics
+            if (!fallbackSnapshot.isNullOrEmpty()) {
+                Result.success(fallbackSnapshot)
             } else {
                 Result.success(getFallbackComics())
             }
@@ -170,8 +180,9 @@ class ComicRepository(
         pageSize: Int = 12,
         forceRefresh: Boolean = false
     ): Result<List<ComicItem>> = withContext(Dispatchers.IO) {
-        if (!forceRefresh && page == 1 && cachedLatestComics != null) {
-            return@withContext Result.success(cachedLatestComics!!)
+        val snapshot = cachedLatestComics
+        if (!forceRefresh && page == 1 && !snapshot.isNullOrEmpty()) {
+            return@withContext Result.success(snapshot)
         }
 
         try {
@@ -232,8 +243,9 @@ class ComicRepository(
 
             Result.success(comicsWithChapters)
         } catch (e: Exception) {
-            if (cachedLatestComics != null && cachedLatestComics!!.isNotEmpty()) {
-                return@withContext Result.success(cachedLatestComics!!)
+            val fallbackLatest = cachedLatestComics
+            if (!fallbackLatest.isNullOrEmpty()) {
+                return@withContext Result.success(fallbackLatest)
             }
             Result.success(getFallbackComics())
         }
@@ -735,8 +747,9 @@ class ComicRepository(
 
             Result.success(combined)
         } catch (e: Exception) {
-            if (cachedLatestComics != null && cachedLatestComics!!.isNotEmpty()) {
-                Result.success(cachedLatestComics!!)
+            val fallbackCombined = cachedLatestComics
+            if (!fallbackCombined.isNullOrEmpty()) {
+                Result.success(fallbackCombined)
             } else {
                 Result.failure(e)
             }
