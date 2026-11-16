@@ -96,7 +96,7 @@ object AnimeSoundtrackRepository {
 
         var malId = mapping?.malId
         val anilistId = mapping?.anilistId
-        var kitsuId = mapping?.kitsuId
+        var kitsuId: String? = mapping?.kitsuId?.takeIf { it > 0 }?.toString()
 
         // 1A. Utama: AnimeThemes API (by MAL -> AniList -> Name search)
         var rawTracks = fetchFromAnimeThemes(
