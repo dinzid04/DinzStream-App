@@ -66,6 +66,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -400,41 +401,43 @@ fun AnimeDetailScreen(
                         )
 
                         // 2. Scrollable TabBar (SOUNDTRACK disembunyikan otomatis jika lagu OP & ED kosong)
-                        ScrollableTabRow(
-                            selectedTabIndex = activeTabIndex,
-                            containerColor = ColorBackgroundPrimary,
-                            contentColor = ColorAccentPrimary,
-                            edgePadding = 16.dp,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .onboardingTarget("detail_tabs", targetBounds),
-                            indicator = { tabPositions ->
-                                if (activeTabIndex < tabPositions.size) {
-                                    Box(
-                                        modifier = Modifier
-                                            .tabIndicatorOffset(tabPositions[activeTabIndex])
-                                            .height(2.5.dp)
-                                            .background(ColorAccentPrimary)
+                        key(visibleTabs.size) {
+                            ScrollableTabRow(
+                                selectedTabIndex = activeTabIndex,
+                                containerColor = ColorBackgroundPrimary,
+                                contentColor = ColorAccentPrimary,
+                                edgePadding = 16.dp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onboardingTarget("detail_tabs", targetBounds),
+                                indicator = { tabPositions ->
+                                    if (activeTabIndex < tabPositions.size) {
+                                        Box(
+                                            modifier = Modifier
+                                                .tabIndicatorOffset(tabPositions[activeTabIndex])
+                                                .height(2.5.dp)
+                                                .background(ColorAccentPrimary)
+                                        )
+                                    }
+                                },
+                                divider = {}
+                            ) {
+                                visibleTabs.forEach { tab ->
+                                    val isSelected = uiState.selectedTab == tab
+                                    Tab(
+                                        selected = isSelected,
+                                        onClick = { viewModel.selectTab(tab) },
+                                        text = {
+                                            Text(
+                                                text = tab.label,
+                                                fontSize = 13.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSelected) ColorAccentPrimary else ColorTextSecondary
+                                            )
+                                        },
+                                        modifier = Modifier.height(48.dp)
                                     )
                                 }
-                            },
-                            divider = {}
-                        ) {
-                            visibleTabs.forEach { tab ->
-                                val isSelected = uiState.selectedTab == tab
-                                Tab(
-                                    selected = isSelected,
-                                    onClick = { viewModel.selectTab(tab) },
-                                    text = {
-                                        Text(
-                                            text = tab.label,
-                                            fontSize = 13.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) ColorAccentPrimary else ColorTextSecondary
-                                        )
-                                    },
-                                    modifier = Modifier.height(48.dp)
-                                )
                             }
                         }
 

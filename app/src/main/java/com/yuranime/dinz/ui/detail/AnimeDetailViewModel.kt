@@ -244,8 +244,8 @@ class AnimeDetailViewModel(
         }
 
         soundtrackJob = viewModelScope.launch {
-            val result = try {
-                AnimeSoundtrackRepository.getSoundtracksForAnime(
+            try {
+                AnimeSoundtrackRepository.streamSoundtracksForAnime(
                     title = title,
                     synonymsRaw = movie.synonyms,
                     yearHint = movie.year,
@@ -253,25 +253,34 @@ class AnimeDetailViewModel(
                     formatHint = movie.type,
                     movieId = movie.id ?: expectedId,
                     forceRefresh = forceRefresh
-                )
+                ).collect { result ->
+                    if (currentMovieId != expectedId) return@collect
+                    _uiState.update { state ->
+                        val safeSelectedTab = if (state.selectedTab == DetailTab.SOUNDTRACK && result.isEmpty) {
+                            DetailTab.INFO
+                        } else {
+                            state.selectedTab
+                        }
+                        state.copy(
+                            isLoadingSoundtrack = false,
+                            soundtrack = result,
+                            selectedTab = safeSelectedTab
+                        )
+                    }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                AnimeSoundtrackResult()
-            }
-
-            if (currentMovieId != expectedId) return@launch
-            _uiState.update { state ->
-                val safeSelectedTab = if (state.selectedTab == DetailTab.SOUNDTRACK && result.isEmpty) {
-                    DetailTab.INFO
-                } else {
-                    state.selectedTab
+                if (currentMovieId == expectedId) {
+                    _uiState.update { state ->
+                        val safeTab = if (state.selectedTab == DetailTab.SOUNDTRACK) DetailTab.INFO else state.selectedTab
+                        state.copy(
+                            isLoadingSoundtrack = false,
+                            soundtrack = AnimeSoundtrackResult(),
+                            selectedTab = safeTab
+                        )
+                    }
                 }
-                state.copy(
-                    isLoadingSoundtrack = false,
-                    soundtrack = result,
-                    selectedTab = safeSelectedTab
-                )
             }
         }
     }

@@ -35,11 +35,12 @@ object AnimeIdentityResolver {
 
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
     private val gson = Gson()
+    @Volatile private var jikanSearchCooldownUntilMs: Long = 0L
 
     val externalHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(12, TimeUnit.SECONDS)
-            .readTimeout(18, TimeUnit.SECONDS)
+            .connectTimeout(7, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build()
     }
@@ -261,7 +262,7 @@ object AnimeIdentityResolver {
     }
 
     private fun searchJikan(query: String): List<CandidateAnime> {
-        if (query.isBlank()) return emptyList()
+        if (query.isBlank() || System.currentTimeMillis() < jikanSearchCooldownUntilMs) return emptyList()
         val encoded = URLEncoder.encode(query, "UTF-8")
         val url = "$JIKAN_SEARCH_ENDPOINT?q=$encoded&limit=8"
         val req = Request.Builder()
@@ -270,13 +271,18 @@ object AnimeIdentityResolver {
             .header("Accept", "application/json")
             .build()
 
-        return runCatching {
+        return try {
             externalHttpClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return@use emptyList()
+                if (!resp.isSuccessful) {
+                    if (resp.code >= 500 || resp.code == 429) {
+                        jikanSearchCooldownUntilMs = System.currentTimeMillis() + 5L * 60L * 1000L
+                    }
+                    return emptyList()
+                }
                 val text = resp.body?.string().orEmpty()
-                if (text.isBlank()) return@use emptyList()
+                if (text.isBlank()) return emptyList()
                 val root = JsonParser.parseString(text).asJsonObject
-                val dataArr = root.getAsJsonArray("data") ?: return@use emptyList()
+                val dataArr = root.getAsJsonArray("data") ?: return emptyList()
 
                 dataArr.mapNotNull { elem ->
                     val obj = elem.asJsonObject
@@ -308,7 +314,10 @@ object AnimeIdentityResolver {
                     )
                 }
             }
-        }.getOrDefault(emptyList())
+        } catch (_: Exception) {
+            jikanSearchCooldownUntilMs = System.currentTimeMillis() + 5L * 60L * 1000L
+            emptyList()
+        }
     }
 
     private fun enrichCrossIds(initial: ExternalAnimeMapping): ExternalAnimeMapping {

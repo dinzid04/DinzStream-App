@@ -13,33 +13,54 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.jsoup.Jsoup
 import java.net.URLEncoder
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
  * Repository Soundtrack Anime (Opening & Ending) 100% gratis, publik, dan tanpa autentikasi/API Key.
  *
  * Alur fallback berurutan:
  * 1. Metadata OP/ED:
- *    - Utama: AnimeThemes API (api.animethemes.moe)
+ *    - Utama: AnimeThemes API (api.animethemes.moe) dengan cooldown otomatis jika Cloudflare 503 aktif
  *    - Fallback 1: Jikan API v4 (api.jikan.moe/v4/anime/{mal_id}/themes)
- *    - Fallback 2: Kitsu API (kitsu.io/api/edge) / AniList Public GraphQL API (graphql.anilist.co) untuk resolusi ID & judul alternatif lalu query ulang metadata lagu.
- * 2. Detail Cover & Audio Preview (per lagu yang belum lengkap):
+ *    - Fallback 2: AniList Public GraphQL / Kitsu API + Ekstraktor Tema Publik MyAnimeList
+ * 2. Detail Cover & Audio Preview (progresif per batch agar tab SOUNDTRACK tampil instan):
  *    - Utama: Deezer Public Search API (api.deezer.com) -> .mp3 preview 30 dtk, cover XL, album
  *    - Fallback 1: iTunes Search API (itunes.apple.com) -> .m4a previewUrl, artwork 600px, album
- *    - Fallback 2: MusicBrainz + Cover Art Archive API -> cover art & info rilis
+ *    - Fallback 2: MusicBrainz & Cover Art Archive API -> cover art & info rilis
  */
 object AnimeSoundtrackRepository {
 
     private const val TAG = "AnimeSoundtrackRepo"
+    private const val DESKTOP_UA =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+    private const val HOST_COOLDOWN_MS = 5L * 60L * 1000L
+
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
-    private val httpClient get() = AnimeIdentityResolver.externalHttpClient
+
+    private val fastHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(8, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .retryOnConnectionFailure(true)
+            .build()
+    }
+
+    @Volatile private var animeThemesCooldownUntilMs: Long = 0L
+    @Volatile private var jikanCooldownUntilMs: Long = 0L
+    @Volatile private var musicBrainzCooldownUntilMs: Long = 0L
 
     private data class TrackSeed(
         val id: String,
@@ -52,7 +73,20 @@ object AnimeSoundtrackRepository {
         val coverUrl: String? = null,
         val previewUrl: String? = null,
         val metadataSource: String
-    )
+    ) {
+        fun toInitialTrack(): AnimeSoundtrackTrack = AnimeSoundtrackTrack(
+            id = id,
+            category = category,
+            badgeLabel = badgeLabel,
+            title = title,
+            artist = artist,
+            album = album,
+            episodeNote = episodeNote,
+            coverUrl = coverUrl,
+            previewUrl = previewUrl,
+            metadataSource = metadataSource
+        )
+    }
 
     private data class EnrichmentInfo(
         val coverUrl: String? = null,
@@ -62,7 +96,14 @@ object AnimeSoundtrackRepository {
         val source: String = ""
     )
 
-    suspend fun getSoundtracksForAnime(
+    private data class AltAnimeResolution(
+        val anilistId: Int?,
+        val malId: Int?,
+        val kitsuId: String?,
+        val altTitles: List<String>
+    )
+
+    fun streamSoundtracksForAnime(
         title: String,
         synonymsRaw: String? = null,
         yearHint: String? = null,
@@ -70,17 +111,25 @@ object AnimeSoundtrackRepository {
         formatHint: String? = null,
         movieId: String? = null,
         forceRefresh: Boolean = false
-    ): AnimeSoundtrackResult = withContext(Dispatchers.IO) {
+    ): Flow<AnimeSoundtrackResult> = flow {
         val cleanedTitle = AnimeIdentityResolver.cleanAnimeTitle(title)
-        if (cleanedTitle.isBlank()) return@withContext AnimeSoundtrackResult()
+        if (cleanedTitle.isBlank()) {
+            emit(AnimeSoundtrackResult())
+            return@flow
+        }
 
         val cacheKey = "${movieId ?: "no_id"}_${cleanedTitle.lowercase(Locale.ROOT)}"
         if (!forceRefresh) {
             AnimeExternalCacheStore.getSoundtrack(cacheKey)?.let { cached ->
-                if (!cached.isEmpty) return@withContext cached
+                if (!cached.isEmpty) {
+                    emit(cached)
+                    return@flow
+                }
             }
         }
 
+        // Tahap 0: Resolusi ID akurat (utamakan AnimeIdentityResolver yang memakai cache & season/year scoring,
+        // fallback ke query cepat AniList jika masih kosong)
         val mapping = runCatching {
             AnimeIdentityResolver.resolveMapping(
                 title = cleanedTitle,
@@ -94,18 +143,28 @@ object AnimeSoundtrackRepository {
             )
         }.getOrNull()
 
-        var malId = mapping?.malId
-        val anilistId = mapping?.anilistId
+        var malId: Int? = mapping?.malId
+        var anilistId: Int? = mapping?.anilistId
         var kitsuId: String? = mapping?.kitsuId?.takeIf { it > 0 }?.toString()
+        val altTitles = mutableListOf(cleanedTitle)
+        mapping?.matchedTitle?.takeIf { it.isNotBlank() }?.let { altTitles.add(it) }
 
-        // 1A. Utama: AnimeThemes API (by MAL -> AniList -> Name search)
+        if (malId == null || malId <= 0) {
+            val quickAniList = resolveQuickViaAniList(cleanedTitle)
+            if (quickAniList != null) {
+                anilistId = anilistId ?: quickAniList.anilistId
+                malId = quickAniList.malId ?: malId
+                altTitles.addAll(quickAniList.altTitles)
+            }
+        }
+
+        // Tahap 1: Metadata OP/ED Multi-Provider berurutan (tanpa Auth / API Key)
         var rawTracks = fetchFromAnimeThemes(
             malId = malId,
             anilistId = anilistId,
             searchTitle = cleanedTitle
         )
 
-        // 1B. Fallback 1: Jikan API v4 (api.jikan.moe/v4/anime/{mal_id}/themes)
         if (rawTracks.isEmpty()) {
             if (malId == null || malId <= 0) {
                 malId = resolveMalIdViaJikanSearch(cleanedTitle)
@@ -115,59 +174,172 @@ object AnimeSoundtrackRepository {
             }
         }
 
-        // 1C. Fallback 2: Kitsu API + AniList Public GraphQL API untuk menemukan relasi/judul alternatif & MAL/Kitsu ID
+        // Fallback 2: Kitsu API + AniList GraphQL + Ekstraktor Tema Publik MyAnimeList
         if (rawTracks.isEmpty()) {
             val altResolution = resolveViaAniListAndKitsu(cleanedTitle, anilistId, kitsuId)
             if (altResolution != null) {
                 val resolvedMal = altResolution.malId ?: malId
-                val altTitles = altResolution.altTitles
+                if (resolvedMal != null && resolvedMal > 0) malId = resolvedMal
+                anilistId = altResolution.anilistId ?: anilistId
                 kitsuId = kitsuId ?: altResolution.kitsuId
+                altTitles.addAll(altResolution.altTitles)
 
-                // Retry AnimeThemes menggunakan AniList/MAL ID atau judul romaji/native baru
                 for (candidateTitle in altTitles.distinct().take(2)) {
                     rawTracks = fetchFromAnimeThemes(
-                        malId = resolvedMal,
-                        anilistId = altResolution.anilistId ?: anilistId,
+                        malId = malId,
+                        anilistId = anilistId,
                         searchTitle = candidateTitle
                     )
                     if (rawTracks.isNotEmpty()) break
                 }
-
-                // Retry Jikan jika akhirnya malId ditemukan dari AniList/Kitsu
-                if (rawTracks.isEmpty() && resolvedMal != null && resolvedMal > 0 && resolvedMal != malId) {
-                    rawTracks = fetchFromJikanThemes(resolvedMal)
+                if (rawTracks.isEmpty() && malId != null && malId > 0) {
+                    rawTracks = fetchFromJikanThemes(malId)
                 }
             }
         }
 
+        // Fallback 2B: Ekstrak Opening & Ending langsung dari halaman publik MyAnimeList jika Jikan/AnimeThemes gagal
+        if (rawTracks.isEmpty() && malId != null && malId > 0) {
+            rawTracks = fetchFromMyAnimeListPage(malId)
+        }
+
         if (rawTracks.isEmpty()) {
-            return@withContext AnimeSoundtrackResult(animeTitle = cleanedTitle)
+            emit(AnimeSoundtrackResult(animeTitle = cleanedTitle))
+            return@flow
         }
 
-        // 2. Perkaya Cover Thumbnail, Album, & Audio Preview secara berurutan (Deezer -> iTunes -> MusicBrainz/CoverArtArchive)
-        val enrichSemaphore = Semaphore(3)
-        val enrichedTracks = coroutineScope {
-            rawTracks.map { seed ->
-                async {
-                    enrichSemaphore.withPermit {
-                        enrichTrackMedia(seed)
+        // Emit Stage 1 segera setelah daftar lagu OP/ED didapat (< 2 detik) agar tab SOUNDTRACK langsung muncul!
+        val currentList = rawTracks.map { it.toInitialTrack() }.toMutableList()
+        emit(buildSoundtrackResult(cleanedTitle, currentList))
+
+        // Emit Stage 2 secara progresif per batch (Deezer -> iTunes -> MusicBrainz/CoverArtArchive)
+        val batchSize = 4
+        val indicesToEnrich = currentList.indices.toList()
+        for (chunk in indicesToEnrich.chunked(batchSize)) {
+            val updatedPairs = coroutineScope {
+                chunk.map { idx ->
+                    async {
+                        idx to enrichTrackMedia(rawTracks[idx])
                     }
-                }
-            }.awaitAll()
+                }.awaitAll()
+            }
+            updatedPairs.forEach { (idx, enriched) ->
+                currentList[idx] = enriched
+            }
+            emit(buildSoundtrackResult(cleanedTitle, currentList))
         }
 
-        val openings = enrichedTracks.filter { it.category == SoundtrackCategory.OPENING }
-        val endings = enrichedTracks.filter { it.category == SoundtrackCategory.ENDING }
+        val finalResult = buildSoundtrackResult(cleanedTitle, currentList)
+        if (!finalResult.isEmpty) {
+            AnimeExternalCacheStore.putSoundtrack(cacheKey, finalResult)
+        }
+    }.flowOn(Dispatchers.IO)
 
-        val result = AnimeSoundtrackResult(
-            animeTitle = cleanedTitle,
-            openings = openings,
-            endings = endings
+    suspend fun getSoundtracksForAnime(
+        title: String,
+        synonymsRaw: String? = null,
+        yearHint: String? = null,
+        airedStartHint: String? = null,
+        formatHint: String? = null,
+        movieId: String? = null,
+        forceRefresh: Boolean = false
+    ): AnimeSoundtrackResult = withContext(Dispatchers.IO) {
+        var latest = AnimeSoundtrackResult()
+        streamSoundtracksForAnime(
+            title = title,
+            synonymsRaw = synonymsRaw,
+            yearHint = yearHint,
+            airedStartHint = airedStartHint,
+            formatHint = formatHint,
+            movieId = movieId,
+            forceRefresh = forceRefresh
+        ).collect { latest = it }
+        latest
+    }
+
+    private fun buildSoundtrackResult(
+        animeTitle: String,
+        tracks: List<AnimeSoundtrackTrack>
+    ): AnimeSoundtrackResult {
+        return AnimeSoundtrackResult(
+            animeTitle = animeTitle,
+            openings = tracks.filter { it.category == SoundtrackCategory.OPENING },
+            endings = tracks.filter { it.category == SoundtrackCategory.ENDING }
         )
-        if (!result.isEmpty) {
-            AnimeExternalCacheStore.putSoundtrack(cacheKey, result)
+    }
+
+    // =========================================================================
+    // RESOLUSI CEPAT ANILIST
+    // =========================================================================
+
+    private fun resolveQuickViaAniList(title: String): AltAnimeResolution? {
+        return try {
+            val query = """
+                query(${'$'}search:String){
+                  Page(page:1,perPage:5){
+                    media(search:${'$'}search,type:ANIME,sort:SEARCH_MATCH){
+                      id idMal title{romaji english native} synonyms
+                    }
+                  }
+                }
+            """.trimIndent()
+            val payload = JsonObject().apply {
+                addProperty("query", query)
+                add("variables", JsonObject().apply { addProperty("search", title) })
+            }
+            val mediaArr = postGraphQl("https://graphql.anilist.co", payload.toString())
+                ?.objOrNull("data")
+                ?.objOrNull("Page")
+                ?.arrOrNull("media")
+                ?: return null
+
+            val normTarget = normalizeForCompare(title)
+            var bestObj: JsonObject? = null
+            var bestScore = -1f
+
+            for (elem in mediaArr) {
+                val obj = elem.takeIf { it.isJsonObject }?.asJsonObject ?: continue
+                val tObj = obj.objOrNull("title")
+                val names = listOfNotNull(
+                    tObj?.strOrNull("romaji"),
+                    tObj?.strOrNull("english"),
+                    tObj?.strOrNull("native")
+                )
+                val maxTitleScore = names.maxOfOrNull { n ->
+                    val nn = normalizeForCompare(n)
+                    when {
+                        nn == normTarget -> 1.0f
+                        nn.contains(normTarget) || normTarget.contains(nn) -> 0.85f
+                        else -> tokenOverlap(nn, normTarget)
+                    }
+                } ?: 0f
+                val malBonus = if ((obj.intOrNull("idMal") ?: 0) > 0) 0.05f else 0f
+                val total = maxTitleScore + malBonus
+                if (total > bestScore) {
+                    bestScore = total
+                    bestObj = obj
+                }
+            }
+
+            val chosen = bestObj?.takeIf { bestScore >= 0.48f } ?: return null
+            val tObj = chosen.objOrNull("title")
+            val altList = listOfNotNull(
+                tObj?.strOrNull("romaji"),
+                tObj?.strOrNull("english"),
+                tObj?.strOrNull("native")
+            ).filter { it.isNotBlank() }
+
+            AltAnimeResolution(
+                anilistId = chosen.intOrNull("id"),
+                malId = chosen.intOrNull("idMal")?.takeIf { it > 0 },
+                kitsuId = null,
+                altTitles = altList
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
         }
-        result
     }
 
     // =========================================================================
@@ -179,18 +351,20 @@ object AnimeSoundtrackRepository {
         anilistId: Int?,
         searchTitle: String
     ): List<TrackSeed> {
+        if (System.currentTimeMillis() < animeThemesCooldownUntilMs) {
+            return emptyList()
+        }
+
         val candidateUrls = buildList {
             if (malId != null && malId > 0) {
                 add(
                     "https://api.animethemes.moe/anime?filter[has]=resources&filter[site]=MyAnimeList&filter[external_id]=$malId&include=animethemes.song.artists,animethemes.animethemeentries"
                 )
-            }
-            if (anilistId != null && anilistId > 0) {
+            } else if (anilistId != null && anilistId > 0) {
                 add(
                     "https://api.animethemes.moe/anime?filter[has]=resources&filter[site]=AniList&filter[external_id]=$anilistId&include=animethemes.song.artists,animethemes.animethemeentries"
                 )
-            }
-            if (searchTitle.isNotBlank()) {
+            } else if (searchTitle.isNotBlank()) {
                 val encoded = encodeQuery(searchTitle)
                 add(
                     "https://api.animethemes.moe/anime?filter[name]=$encoded&page[size]=5&include=animethemes.song.artists,animethemes.animethemeentries"
@@ -198,12 +372,18 @@ object AnimeSoundtrackRepository {
             }
         }
 
-        for ((idx, url) in candidateUrls.withIndex()) {
-            val root = getJsonObject(url) ?: continue
+        for (url in candidateUrls) {
+            val res = executeJsonGet(url)
+            if (res.statusCode in setOf(403, 503, 429) || res.networkFailed) {
+                // Hentikan segera jika terblokir Cloudflare/503 agar tidak membuang waktu ke request berikutnya
+                animeThemesCooldownUntilMs = System.currentTimeMillis() + HOST_COOLDOWN_MS
+                return emptyList()
+            }
+            val root = res.json ?: continue
             val animeArray = root.arrOrNull("anime") ?: continue
             if (animeArray.size() == 0) continue
 
-            val matchedAnime = if (idx < candidateUrls.lastIndex || (malId != null && idx == 0) || (anilistId != null && idx <= 1)) {
+            val matchedAnime = if (malId != null || anilistId != null) {
                 animeArray.firstOrNull()?.takeIf { it.isJsonObject }?.asJsonObject
             } else {
                 pickBestAnimeThemesMatch(animeArray, searchTitle)
@@ -297,7 +477,6 @@ object AnimeSoundtrackRepository {
             )
         }
 
-        // Urutkan OP dulu lalu ED sesuai urutan nomor tema
         return seeds
             .distinctBy { "${it.category.name}|${normalizeForCompare(it.title)}|${it.badgeLabel}" }
             .sortedWith(compareBy<TrackSeed> { it.category.ordinal }.thenBy { extractBadgeNumber(it.badgeLabel) })
@@ -308,9 +487,14 @@ object AnimeSoundtrackRepository {
     // =========================================================================
 
     private fun resolveMalIdViaJikanSearch(title: String): Int? {
+        if (System.currentTimeMillis() < jikanCooldownUntilMs) return null
         val url = "https://api.jikan.moe/v4/anime?q=${encodeQuery(title)}&limit=3"
-        val root = getJsonObject(url) ?: return null
-        val data = root.arrOrNull("data") ?: return null
+        val res = executeJsonGet(url)
+        if (res.networkFailed || res.statusCode >= 500) {
+            jikanCooldownUntilMs = System.currentTimeMillis() + HOST_COOLDOWN_MS
+            return null
+        }
+        val data = res.json?.arrOrNull("data") ?: return null
         val normTarget = normalizeForCompare(title)
         var fallbackId: Int? = null
 
@@ -330,19 +514,25 @@ object AnimeSoundtrackRepository {
     }
 
     private fun fetchFromJikanThemes(malId: Int): List<TrackSeed> {
+        if (System.currentTimeMillis() < jikanCooldownUntilMs) return emptyList()
         val url = "https://api.jikan.moe/v4/anime/$malId/themes"
-        val root = getJsonObject(url) ?: return emptyList()
-        val data = root.objOrNull("data") ?: return emptyList()
+        val res = executeJsonGet(url)
+        if (res.networkFailed || res.statusCode >= 500) {
+            jikanCooldownUntilMs = System.currentTimeMillis() + HOST_COOLDOWN_MS
+            return emptyList()
+        }
+        val data = res.json?.objOrNull("data") ?: return emptyList()
 
         val seeds = mutableListOf<TrackSeed>()
-        parseJikanThemeArray(data.arrOrNull("openings"), SoundtrackCategory.OPENING, seeds)
-        parseJikanThemeArray(data.arrOrNull("endings"), SoundtrackCategory.ENDING, seeds)
+        parseJikanThemeArray(data.arrOrNull("openings"), SoundtrackCategory.OPENING, "Jikan", seeds)
+        parseJikanThemeArray(data.arrOrNull("endings"), SoundtrackCategory.ENDING, "Jikan", seeds)
         return seeds
     }
 
     private fun parseJikanThemeArray(
         arr: JsonArray?,
         category: SoundtrackCategory,
+        sourceName: String,
         out: MutableList<TrackSeed>
     ) {
         if (arr == null) return
@@ -354,13 +544,13 @@ object AnimeSoundtrackRepository {
             val badge = "$prefix ${parsed.index}"
             out.add(
                 TrackSeed(
-                    id = "jk_${category.name}_${parsed.index}_${parsed.title.hashCode()}",
+                    id = "${sourceName.lowercase(Locale.ROOT)}_${category.name}_${parsed.index}_${parsed.title.hashCode()}",
                     category = category,
                     badgeLabel = badge,
                     title = parsed.title,
                     artist = parsed.artist,
                     episodeNote = parsed.episodes,
-                    metadataSource = "Jikan"
+                    metadataSource = sourceName
                 )
             )
         }
@@ -375,16 +565,17 @@ object AnimeSoundtrackRepository {
 
     private fun parseJikanThemeString(raw: String, fallbackIndex: Int): ParsedJikanLine? {
         var remaining = raw.trim()
+        if (remaining.isBlank()) return null
         var index = fallbackIndex
 
-        // Opsional awalan "1: " atau "#1: "
-        val indexMatch = Regex("^#?(\\d{1,3})\\s*[:.]\\s*(.+)$").find(remaining)
+        // Awalan opsional seperti "1: ", "#1: ", atau "S1: "
+        val indexMatch = Regex("^(?:#|S)?(\\d{1,3})\\s*[:.]\\s*(.+)$", RegexOption.IGNORE_CASE).find(remaining)
         if (indexMatch != null) {
             index = indexMatch.groupValues[1].toIntOrNull() ?: fallbackIndex
             remaining = indexMatch.groupValues[2].trim()
         }
 
-        // Opsional catatan episode di belakang "(eps 1-12)" atau "(ep 5)"
+        // Catatan episode di belakang "(eps 1-12)" atau "(ep 5)"
         var episodes: String? = null
         val epRegex = Regex("\\(eps?\\.?\\s*([^)]+)\\)", RegexOption.IGNORE_CASE)
         val epMatch = epRegex.find(remaining)
@@ -392,10 +583,8 @@ object AnimeSoundtrackRepository {
             episodes = "Ep ${epMatch.groupValues[1].trim()}"
             remaining = remaining.removeRange(epMatch.range).trim()
         }
-        // Hapus tag bracket seperti "[TV Broadcast]" atau "(TV Broadcast)" jika bukan judul
         remaining = remaining.replace(Regex("\\[[^\\]]*]"), "").trim()
 
-        // Pola baku Jikan: "\"Song Title\" by Artist Name"
         val quotedMatch = Regex("^\"([^\"]+)\"\\s+(?:by\\s+)?(.*)$", RegexOption.IGNORE_CASE).find(remaining)
         val songTitle: String
         val artistName: String
@@ -411,7 +600,7 @@ object AnimeSoundtrackRepository {
             artistName = bySplit.getOrNull(1)?.trim().orEmpty().ifBlank { "Artis Tidak Diketahui" }
         }
 
-        if (songTitle.isBlank()) return null
+        if (songTitle.isBlank() || songTitle.equals("None", ignoreCase = true)) return null
         return ParsedJikanLine(
             index = index,
             title = songTitle,
@@ -421,15 +610,8 @@ object AnimeSoundtrackRepository {
     }
 
     // =========================================================================
-    // 1C. KITSU + ANILIST FALLBACK 2
+    // 1C. KITSU + ANILIST + EKSTRAKTOR PUBLIK MYANIMELIST (FALLBACK 2)
     // =========================================================================
-
-    private data class AltAnimeResolution(
-        val anilistId: Int?,
-        val malId: Int?,
-        val kitsuId: String?,
-        val altTitles: List<String>
-    )
 
     private fun resolveViaAniListAndKitsu(
         title: String,
@@ -441,7 +623,6 @@ object AnimeSoundtrackRepository {
         var foundMalId: Int? = null
         var foundKitsuId = existingKitsuId
 
-        // Query AniList Public GraphQL API
         try {
             val query = if (existingAniListId != null && existingAniListId > 0) {
                 """query(${'$'}id:Int){Media(id:${'$'}id,type:ANIME){id idMal title{romaji english native} synonyms}}"""
@@ -474,7 +655,6 @@ object AnimeSoundtrackRepository {
             throw e
         } catch (_: Exception) {}
 
-        // Query Kitsu API (kitsu.io/api/edge) sebagai cadangan mapping & judul
         try {
             val kitsuSearchUrl = if (!foundKitsuId.isNullOrBlank()) {
                 "https://kitsu.io/api/edge/anime/$foundKitsuId?include=mappings"
@@ -533,15 +713,95 @@ object AnimeSoundtrackRepository {
         }
     }
 
+    /**
+     * Ekstraktor halaman publik MyAnimeList tanpa API Key sebagai cadangan andal
+     * ketika API AnimeThemes & Jikan sedang mengalami gangguan/timeout jaringan.
+     */
+    private fun fetchFromMyAnimeListPage(malId: Int): List<TrackSeed> {
+        return try {
+            val req = Request.Builder()
+                .url("https://myanimelist.net/anime/$malId")
+                .header("User-Agent", DESKTOP_UA)
+                .header("Accept", "text/html,application/xhtml+xml")
+                .header("Accept-Language", "en-US,en;q=0.9")
+                .build()
+
+            val html = fastHttpClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return emptyList()
+                resp.body?.string().orEmpty()
+            }
+            if (html.isBlank()) return emptyList()
+
+            val doc = Jsoup.parse(html)
+            val seeds = mutableListOf<TrackSeed>()
+
+            // Opening: MAL memakai class typo legendaris "opnening" & "ending"
+            val opCells = doc.select("div.theme-songs.js-theme-songs.opnening td[width=84%]")
+            opCells.forEachIndexed { idx, cell ->
+                val cleanCell = cell.clone()
+                cleanCell.select("input, script, style").remove()
+                val text = cleanCell.text().trim()
+                val parsed = parseJikanThemeString(text, fallbackIndex = idx + 1)
+                if (parsed != null) {
+                    seeds.add(
+                        TrackSeed(
+                            id = "mal_OPENING_${parsed.index}_${parsed.title.hashCode()}",
+                            category = SoundtrackCategory.OPENING,
+                            badgeLabel = "OP ${parsed.index}",
+                            title = parsed.title,
+                            artist = parsed.artist,
+                            episodeNote = parsed.episodes,
+                            metadataSource = "MyAnimeList"
+                        )
+                    )
+                }
+            }
+
+            val edCells = doc.select("div.theme-songs.js-theme-songs.ending td[width=84%]")
+            edCells.forEachIndexed { idx, cell ->
+                val cleanCell = cell.clone()
+                cleanCell.select("input, script, style").remove()
+                val text = cleanCell.text().trim()
+                val parsed = parseJikanThemeString(text, fallbackIndex = idx + 1)
+                if (parsed != null) {
+                    seeds.add(
+                        TrackSeed(
+                            id = "mal_ENDING_${parsed.index}_${parsed.title.hashCode()}",
+                            category = SoundtrackCategory.ENDING,
+                            badgeLabel = "ED ${parsed.index}",
+                            title = parsed.title,
+                            artist = parsed.artist,
+                            episodeNote = parsed.episodes,
+                            metadataSource = "MyAnimeList"
+                        )
+                    )
+                }
+            }
+
+            seeds.distinctBy { "${it.category.name}|${normalizeForCompare(it.title)}|${it.badgeLabel}" }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.d(TAG, "Gagal ekstrak halaman MAL $malId: ${e.message}")
+            emptyList()
+        }
+    }
+
     // =========================================================================
     // 2. ENRICHMENT: DEEZER -> ITUNES -> MUSICBRAINZ & COVER ART ARCHIVE
     // =========================================================================
 
     private fun enrichTrackMedia(seed: TrackSeed): AnimeSoundtrackTrack {
         val cleanTitle = cleanSongTitleForSearch(seed.title)
+        val altTitleInParens = extractParentheticalText(seed.title)
         val cleanArtist = cleanArtistForSearch(seed.artist)
-        val queryWithArtist = listOf(cleanTitle, cleanArtist).filter { it.isNotBlank() }.joinToString(" ")
-        val queriesToTry = listOf(queryWithArtist, cleanTitle).filter { it.isNotBlank() }.distinct()
+        val altArtistInParens = extractParentheticalText(seed.artist)
+
+        val candidateQueries = buildList {
+            if (cleanArtist.isNotBlank()) add("$cleanTitle $cleanArtist")
+            if (!altTitleInParens.isNullOrBlank() && cleanArtist.isNotBlank()) add("$altTitleInParens $cleanArtist")
+            if (cleanTitle.isNotBlank()) add(cleanTitle)
+        }.distinct()
 
         var coverUrl = seed.coverUrl
         var previewUrl = seed.previewUrl
@@ -549,38 +809,55 @@ object AnimeSoundtrackRepository {
         var durationSec: Int? = null
         val sources = mutableListOf<String>()
 
-        // 2A. Deezer Public Search API (Preview .mp3 30s + Cover High-Res + Album)
+        // 2A. Deezer Public Search API (.mp3 30 detik, cover high-res, album)
         if (previewUrl.isNullOrBlank() || coverUrl.isNullOrBlank() || album.isNullOrBlank()) {
-            for (q in queriesToTry) {
-                val dz = searchDeezer(q, cleanTitle, cleanArtist)
+            for ((idx, q) in candidateQueries.withIndex()) {
+                val queryIncludedArtist = cleanArtist.isNotBlank() && q.contains(cleanArtist)
+                val dz = searchDeezer(
+                    query = q,
+                    targetTitle = cleanTitle,
+                    altTargetTitle = altTitleInParens,
+                    targetArtist = cleanArtist,
+                    altTargetArtist = altArtistInParens,
+                    queryIncludedArtist = queryIncludedArtist
+                )
                 if (dz != null) {
                     if (previewUrl.isNullOrBlank() && !dz.previewUrl.isNullOrBlank()) previewUrl = dz.previewUrl
                     if (coverUrl.isNullOrBlank() && !dz.coverUrl.isNullOrBlank()) coverUrl = dz.coverUrl
                     if (album.isNullOrBlank() && !dz.album.isNullOrBlank()) album = dz.album
                     if (durationSec == null) durationSec = dz.durationSec
                     sources.add("Deezer")
-                    break
+                    if (!previewUrl.isNullOrBlank() && !coverUrl.isNullOrBlank()) break
                 }
+                if (idx >= 1 && !previewUrl.isNullOrBlank()) break
             }
         }
 
-        // 2B. iTunes Search API (Preview .m4a + Artwork 600px + Album jika Deezer belum lengkap)
+        // 2B. iTunes Search API (.m4a preview, artwork 600px, album) jika belum lengkap
         if (previewUrl.isNullOrBlank() || coverUrl.isNullOrBlank() || album.isNullOrBlank()) {
-            for (q in queriesToTry) {
-                val itunes = searchItunes(q, cleanTitle, cleanArtist)
+            for (q in candidateQueries.take(2)) {
+                val queryIncludedArtist = cleanArtist.isNotBlank() && q.contains(cleanArtist)
+                val itunes = searchItunes(
+                    query = q,
+                    targetTitle = cleanTitle,
+                    altTargetTitle = altTitleInParens,
+                    targetArtist = cleanArtist,
+                    altTargetArtist = altArtistInParens,
+                    queryIncludedArtist = queryIncludedArtist
+                )
                 if (itunes != null) {
                     if (previewUrl.isNullOrBlank() && !itunes.previewUrl.isNullOrBlank()) previewUrl = itunes.previewUrl
                     if (coverUrl.isNullOrBlank() && !itunes.coverUrl.isNullOrBlank()) coverUrl = itunes.coverUrl
                     if (album.isNullOrBlank() && !itunes.album.isNullOrBlank()) album = itunes.album
                     if (durationSec == null) durationSec = itunes.durationSec
                     sources.add("iTunes")
-                    break
+                    if (!previewUrl.isNullOrBlank() && !coverUrl.isNullOrBlank()) break
                 }
             }
         }
 
-        // 2C. MusicBrainz & Cover Art Archive API (Khusus cadangan Cover Art & Rilis Album)
-        if (coverUrl.isNullOrBlank()) {
+        // 2C. MusicBrainz & Cover Art Archive API jika cover masih belum tersedia
+        if (coverUrl.isNullOrBlank() && System.currentTimeMillis() >= musicBrainzCooldownUntilMs) {
             val mb = searchMusicBrainzAndCoverArt(cleanTitle, cleanArtist)
             if (mb != null) {
                 if (!mb.coverUrl.isNullOrBlank()) coverUrl = mb.coverUrl
@@ -605,7 +882,14 @@ object AnimeSoundtrackRepository {
         )
     }
 
-    private fun searchDeezer(query: String, targetTitle: String, targetArtist: String): EnrichmentInfo? {
+    private fun searchDeezer(
+        query: String,
+        targetTitle: String,
+        altTargetTitle: String?,
+        targetArtist: String,
+        altTargetArtist: String?,
+        queryIncludedArtist: Boolean
+    ): EnrichmentInfo? {
         val url = "https://api.deezer.com/search?q=${encodeQuery(query)}&limit=5"
         val root = getJsonObject(url) ?: return null
         val data = root.arrOrNull("data") ?: return null
@@ -623,8 +907,11 @@ object AnimeSoundtrackRepository {
                 candTitle = itemTitle,
                 candArtist = itemArtist,
                 targetTitle = targetTitle,
+                altTargetTitle = altTargetTitle,
                 targetArtist = targetArtist,
-                hasPreview = preview.startsWith("http")
+                altTargetArtist = altTargetArtist,
+                hasPreview = preview.startsWith("http"),
+                queryIncludedArtist = queryIncludedArtist
             )
             if (score > bestScore) {
                 bestScore = score
@@ -652,7 +939,14 @@ object AnimeSoundtrackRepository {
         )
     }
 
-    private fun searchItunes(query: String, targetTitle: String, targetArtist: String): EnrichmentInfo? {
+    private fun searchItunes(
+        query: String,
+        targetTitle: String,
+        altTargetTitle: String?,
+        targetArtist: String,
+        altTargetArtist: String?,
+        queryIncludedArtist: Boolean
+    ): EnrichmentInfo? {
         val url = "https://itunes.apple.com/search?term=${encodeQuery(query)}&media=music&entity=song&limit=5"
         val root = getJsonObject(url) ?: return null
         val results = root.arrOrNull("results") ?: return null
@@ -670,8 +964,11 @@ object AnimeSoundtrackRepository {
                 candTitle = itemTitle,
                 candArtist = itemArtist,
                 targetTitle = targetTitle,
+                altTargetTitle = altTargetTitle,
                 targetArtist = targetArtist,
-                hasPreview = preview.startsWith("http")
+                altTargetArtist = altTargetArtist,
+                hasPreview = preview.startsWith("http"),
+                queryIncludedArtist = queryIncludedArtist
             )
             if (score > bestScore) {
                 bestScore = score
@@ -699,6 +996,7 @@ object AnimeSoundtrackRepository {
     }
 
     private fun searchMusicBrainzAndCoverArt(title: String, artist: String): EnrichmentInfo? {
+        if (System.currentTimeMillis() < musicBrainzCooldownUntilMs) return null
         val mbQuery = buildString {
             append("recording:\"")
             append(title.replace("\"", ""))
@@ -710,14 +1008,19 @@ object AnimeSoundtrackRepository {
             }
         }
         val mbUrl = "https://musicbrainz.org/ws/2/recording/?query=${encodeQuery(mbQuery)}&fmt=json&limit=3"
-        val mbRoot = getJsonObject(
+        val res = executeJsonGet(
             url = mbUrl,
             headers = mapOf(
-                "User-Agent" to "YuranimeApp/2.8 (https://github.com/dinzid04/DinzStream-App)",
+                "User-Agent" to "YuranimeApp/2.9 (https://github.com/dinzid04/DinzStream-App)",
                 "Accept" to "application/json"
             )
-        ) ?: return null
+        )
+        if (res.statusCode in setOf(429, 503) || res.networkFailed) {
+            musicBrainzCooldownUntilMs = System.currentTimeMillis() + HOST_COOLDOWN_MS
+            return null
+        }
 
+        val mbRoot = res.json ?: return null
         val recordings = mbRoot.arrOrNull("recordings") ?: return null
         val candidateReleaseIds = mutableListOf<Pair<String, String?>>()
 
@@ -729,9 +1032,9 @@ object AnimeSoundtrackRepository {
                 val relId = relObj.strOrNull("id")?.takeIf { it.isNotBlank() } ?: continue
                 val relTitle = relObj.strOrNull("title")?.trim()
                 candidateReleaseIds.add(relId to relTitle)
-                if (candidateReleaseIds.size >= 3) break
+                if (candidateReleaseIds.size >= 2) break
             }
-            if (candidateReleaseIds.size >= 3) break
+            if (candidateReleaseIds.size >= 2) break
         }
 
         for ((releaseId, releaseTitle) in candidateReleaseIds) {
@@ -770,42 +1073,71 @@ object AnimeSoundtrackRepository {
         candTitle: String,
         candArtist: String,
         targetTitle: String,
+        altTargetTitle: String?,
         targetArtist: String,
-        hasPreview: Boolean
+        altTargetArtist: String?,
+        hasPreview: Boolean,
+        queryIncludedArtist: Boolean
     ): Float {
         val normCandTitle = normalizeForCompare(candTitle)
-        val normTargetTitle = normalizeForCompare(targetTitle)
-        if (normCandTitle.isBlank() || normTargetTitle.isBlank()) return 0f
+        if (normCandTitle.isBlank()) return 0f
 
-        var titleScore = when {
-            normCandTitle == normTargetTitle -> 1.0f
-            normCandTitle.contains(normTargetTitle) || normTargetTitle.contains(normCandTitle) -> 0.82f
-            else -> tokenOverlap(normCandTitle, normTargetTitle)
-        }
-        if (titleScore < 0.35f) return 0f
+        val targetTitles = listOfNotNull(targetTitle, altTargetTitle)
+            .map { normalizeForCompare(it) }
+            .filter { it.isNotBlank() }
+        if (targetTitles.isEmpty()) return 0f
 
-        val normCandArtist = normalizeForCompare(candArtist)
-        val normTargetArtist = normalizeForCompare(targetArtist)
-        val artistScore = if (normTargetArtist.isBlank() || normTargetArtist.contains("tidak diketahui")) {
-            0.5f
-        } else {
+        var bestTitleScore = targetTitles.maxOf { normTarget ->
             when {
-                normCandArtist == normTargetArtist -> 1.0f
-                normCandArtist.contains(normTargetArtist) || normTargetArtist.contains(normCandArtist) -> 0.85f
-                else -> tokenOverlap(normCandArtist, normTargetArtist)
+                normCandTitle == normTarget -> 1.0f
+                normCandTitle.contains(normTarget) || normTarget.contains(normCandTitle) -> 0.85f
+                else -> tokenOverlap(normCandTitle, normTarget)
             }
         }
 
-        // Penalti ringan untuk remix/instrumental/nightcore jika judul target bukan versi tersebut
+        val normCandArtist = normalizeForCompare(candArtist)
+        val targetArtists = listOfNotNull(targetArtist, altTargetArtist)
+            .map { normalizeForCompare(it) }
+            .filter { it.isNotBlank() && !it.contains("tidak diketahui") }
+
+        val artistScore = if (targetArtists.isEmpty()) {
+            0.5f
+        } else {
+            targetArtists.maxOf { normTargetArt ->
+                when {
+                    normCandArtist == normTargetArt -> 1.0f
+                    normCandArtist.contains(normTargetArt) || normTargetArt.contains(normCandArtist) -> 0.88f
+                    else -> tokenOverlap(normCandArtist, normTargetArt)
+                }
+            }
+        }
+
+        // Tangani lagu Jepang yang di Deezer/iTunes memakai judul terjemahan Inggris / Kanji saat artis cocok persis
+        if (bestTitleScore < 0.35f) {
+            if (queryIncludedArtist && artistScore >= 0.68f) {
+                bestTitleScore = 0.56f
+            } else {
+                return 0f
+            }
+        }
+
         val lowerCand = candTitle.lowercase(Locale.ROOT)
         val lowerTarget = targetTitle.lowercase(Locale.ROOT)
         if ((lowerCand.contains("karaoke") || lowerCand.contains("instrumental") || lowerCand.contains("off vocal")) &&
             !(lowerTarget.contains("karaoke") || lowerTarget.contains("instrumental"))
         ) {
-            titleScore -= 0.45f
+            bestTitleScore -= 0.45f
         }
 
-        return (titleScore * 0.65f) + (artistScore * 0.25f) + (if (hasPreview) 0.10f else 0f)
+        return (bestTitleScore * 0.65f) + (artistScore * 0.25f) + (if (hasPreview) 0.10f else 0f)
+    }
+
+    private fun extractParentheticalText(raw: String): String? {
+        val matches = Regex("\\(([^)]+)\\)").findAll(raw)
+            .map { it.groupValues[1].trim() }
+            .filter { it.isNotBlank() && !it.startsWith("ep", ignoreCase = true) }
+            .toList()
+        return matches.firstOrNull()
     }
 
     private fun cleanSongTitleForSearch(raw: String): String {
@@ -832,29 +1164,48 @@ object AnimeSoundtrackRepository {
         return Regex("\\d+").find(badge)?.value?.toIntOrNull() ?: 999
     }
 
-    private fun getJsonObject(
+    private data class JsonCallResult(
+        val statusCode: Int,
+        val json: JsonObject?,
+        val networkFailed: Boolean = false
+    )
+
+    private fun executeJsonGet(
         url: String,
         headers: Map<String, String> = emptyMap()
-    ): JsonObject? {
+    ): JsonCallResult {
         return try {
             val builder = Request.Builder()
                 .url(url)
                 .header("Accept", "application/json")
+                .header("User-Agent", "YuranimeApp/2.9")
             headers.forEach { (k, v) -> builder.header(k, v) }
-            httpClient.newCall(builder.build()).execute().use { resp ->
-                if (!resp.isSuccessful) return null
+            fastHttpClient.newCall(builder.build()).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    return JsonCallResult(statusCode = resp.code, json = null)
+                }
                 val body = resp.body?.string().orEmpty()
-                if (body.isBlank()) return null
-                val parsed = JsonParser.parseString(body)
-                if (parsed.isJsonObject) parsed.asJsonObject else null
+                if (body.isBlank()) {
+                    return JsonCallResult(statusCode = resp.code, json = null)
+                }
+                val parsed = runCatching { JsonParser.parseString(body) }.getOrNull()
+                JsonCallResult(
+                    statusCode = resp.code,
+                    json = if (parsed != null && parsed.isJsonObject) parsed.asJsonObject else null
+                )
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.d(TAG, "GET $url gagal: ${e.message}")
-            null
+            JsonCallResult(statusCode = 0, json = null, networkFailed = true)
         }
     }
+
+    private fun getJsonObject(
+        url: String,
+        headers: Map<String, String> = emptyMap()
+    ): JsonObject? = executeJsonGet(url, headers).json
 
     private fun postGraphQl(url: String, jsonBody: String): JsonObject? {
         return try {
@@ -862,14 +1213,15 @@ object AnimeSoundtrackRepository {
                 .url(url)
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
+                .header("User-Agent", "YuranimeApp/2.9")
                 .post(jsonBody.toRequestBody(jsonMediaType))
                 .build()
-            httpClient.newCall(req).execute().use { resp ->
+            fastHttpClient.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return null
                 val body = resp.body?.string().orEmpty()
                 if (body.isBlank()) return null
-                val parsed = JsonParser.parseString(body)
-                if (parsed.isJsonObject) parsed.asJsonObject else null
+                val parsed = runCatching { JsonParser.parseString(body) }.getOrNull()
+                if (parsed != null && parsed.isJsonObject) parsed.asJsonObject else null
             }
         } catch (e: CancellationException) {
             throw e
@@ -886,7 +1238,7 @@ object AnimeSoundtrackRepository {
     private fun normalizeForCompare(input: String): String {
         return input.lowercase(Locale.ROOT)
             .replace("&", " and ")
-            .replace(Regex("[^a-z0-9\\s]"), " ")
+            .replace(Regex("[^\\p{L}\\p{N}\\s]"), " ")
             .replace(Regex("\\s+"), " ")
             .trim()
     }
