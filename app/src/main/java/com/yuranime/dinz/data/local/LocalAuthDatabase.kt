@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.yuranime.dinz.data.model.EpisodeCommentItem
 
-class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_local.db", null, 6) {
+class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_local.db", null, 7) {
 
     private val prefs = context.getSharedPreferences("animein_auth_prefs", Context.MODE_PRIVATE)
 
@@ -28,6 +28,7 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
                 user_name TEXT,
                 user_pokemon TEXT,
                 avatar_url TEXT DEFAULT '',
+                border_url TEXT DEFAULT '',
                 text TEXT,
                 time TEXT,
                 parent_id TEXT
@@ -182,6 +183,11 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
                 db.execSQL("ALTER TABLE local_comments ADD COLUMN avatar_url TEXT DEFAULT ''")
             } catch (_: Exception) {}
         }
+        if (oldVersion < 7) {
+            try {
+                db.execSQL("ALTER TABLE local_comments ADD COLUMN border_url TEXT DEFAULT ''")
+            } catch (_: Exception) {}
+        }
     }
 
     fun isLoggedIn(): Boolean {
@@ -272,7 +278,8 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
         text: String,
         parentId: String? = null,
         customUserName: String? = null,
-        customAvatarUrl: String? = null
+        customAvatarUrl: String? = null,
+        customBorderUrl: String? = null
     ): EpisodeCommentItem {
         val db = writableDatabase
         val newId = "local_" + System.currentTimeMillis()
@@ -283,12 +290,16 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
         val avatar = customAvatarUrl?.takeIf { it.isNotBlank() }
             ?: firebaseProfile?.avatar?.takeIf { it.isNotBlank() }
             ?: getAvatarUrl()
+        val border = customBorderUrl?.takeIf { it.isNotBlank() }
+            ?: firebaseProfile?.equippedBorderUrl?.takeIf { it.isNotBlank() }
+            ?: ""
         val cv = ContentValues().apply {
             put("id", newId)
             put("episode_id", episodeId)
             put("user_name", username)
             put("user_pokemon", "025")
             put("avatar_url", avatar)
+            put("border_url", border)
             put("text", text)
             put("time", "Baru saja")
             put("parent_id", parentId)
@@ -301,6 +312,7 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
             userName = username,
             userPokemon = "025",
             avatarUrl = avatar,
+            borderUrl = border,
             text = text,
             time = "Baru saja",
             like = "0",
@@ -314,7 +326,7 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
         val db = readableDatabase
         val list = mutableListOf<EpisodeCommentItem>()
         val cursor = db.rawQuery(
-            "SELECT id, user_name, user_pokemon, avatar_url, text, time FROM local_comments WHERE episode_id = ? AND parent_id IS NULL ORDER BY id DESC",
+            "SELECT id, user_name, user_pokemon, avatar_url, border_url, text, time FROM local_comments WHERE episode_id = ? AND parent_id IS NULL ORDER BY id DESC",
             arrayOf(episodeId)
         )
         cursor.use {
@@ -325,8 +337,9 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
                         userName = it.getString(1),
                         userPokemon = it.getString(2),
                         avatarUrl = it.getString(3),
-                        text = it.getString(4),
-                        time = it.getString(5),
+                        borderUrl = it.getString(4),
+                        text = it.getString(5),
+                        time = it.getString(6),
                         like = "0",
                         dislike = "0",
                         replay = "0",
@@ -342,7 +355,7 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
         val db = readableDatabase
         val list = mutableListOf<EpisodeCommentItem>()
         val cursor = db.rawQuery(
-            "SELECT id, user_name, user_pokemon, avatar_url, text, time FROM local_comments WHERE parent_id = ? ORDER BY id DESC",
+            "SELECT id, user_name, user_pokemon, avatar_url, border_url, text, time FROM local_comments WHERE parent_id = ? ORDER BY id DESC",
             arrayOf(commentId)
         )
         cursor.use {
@@ -353,8 +366,9 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
                         userName = it.getString(1),
                         userPokemon = it.getString(2),
                         avatarUrl = it.getString(3),
-                        text = it.getString(4),
-                        time = it.getString(5),
+                        borderUrl = it.getString(4),
+                        text = it.getString(5),
+                        time = it.getString(6),
                         like = "0",
                         dislike = "0",
                         replay = "0",

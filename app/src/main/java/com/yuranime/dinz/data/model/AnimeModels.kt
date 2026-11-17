@@ -376,6 +376,7 @@ data class EpisodeCommentItem(
     @SerializedName(value = "user_name", alternate = ["username", "userName", "name"]) val userName: String? = null,
     @SerializedName(value = "user_pokemon", alternate = ["pokemon", "userPokemon"]) val userPokemon: String? = null,
     @SerializedName("avatar_url") val avatarUrl: String? = null,
+    @SerializedName("border_url") val borderUrl: String? = null,
     @SerializedName("text") val text: String? = null,
     @SerializedName(value = "time", alternate = ["key_time", "time_ago", "time_created"]) val time: String? = null,
     @SerializedName("like") val like: String? = null,

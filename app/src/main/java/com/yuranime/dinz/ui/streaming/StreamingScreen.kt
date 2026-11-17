@@ -157,6 +157,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -187,10 +188,12 @@ import com.yuranime.dinz.data.model.EpisodeCommentItem
 import com.yuranime.dinz.data.model.ServerItem
 import com.yuranime.dinz.data.model.SkipSegment
 import com.yuranime.dinz.data.model.SkipSegmentType
+import com.yuranime.dinz.data.repository.DiscordCosmeticsRepository
 import com.yuranime.dinz.ui.chat.ChatStickerPanel
 import com.yuranime.dinz.ui.chat.InlineStickerComposerState
 import com.yuranime.dinz.ui.chat.InlineStickerInputField
 import com.yuranime.dinz.ui.chat.InlineStickerText
+import com.yuranime.dinz.ui.components.AnimatedCosmeticImage
 import com.yuranime.dinz.ui.components.CoachmarkStep
 import com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay
 import com.yuranime.dinz.ui.components.onboardingTarget
@@ -407,6 +410,7 @@ fun StreamingScreen(
     val isUserSignedIn = localDb.isLoggedIn() || FirebaseManager.isUserLoggedIn()
     val currentUserName = firebaseProfile?.name?.takeIf { it.isNotBlank() } ?: localDb.getUsername()
     val currentUserAvatar = firebaseProfile?.avatar?.takeIf { it.isNotBlank() } ?: localDb.getAvatarUrl()
+    val currentUserBorderUrl = firebaseProfile?.equippedBorderUrl.orEmpty()
 
     Box(
         modifier = modifier
@@ -488,7 +492,8 @@ fun StreamingScreen(
                                                 text = text,
                                                 parentId = uiState.activeCommentForReplies?.id,
                                                 customUserName = currentUserName,
-                                                customAvatarUrl = currentUserAvatar
+                                                customAvatarUrl = currentUserAvatar,
+                                                customBorderUrl = currentUserBorderUrl
                                             )
                                             viewModel.addLocalReply(item)
                                         }
@@ -1308,42 +1313,15 @@ fun StreamingScreen(
                                     .padding(horizontal = 14.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // User Avatar di kiri (statis tanpa dekorasi bergerak)
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF1A1C22)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (currentUserAvatar.isNotBlank()) {
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(context)
-                                                .data(currentUserAvatar)
-                                                .crossfade(true)
-                                                .build(),
-                                            contentDescription = "Avatar pengguna",
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .clip(CircleShape)
-                                        )
-                                    } else if (isUserSignedIn && currentUserName.isNotBlank()) {
-                                        Text(
-                                            text = currentUserName.take(1).uppercase(Locale.ROOT),
-                                            color = Color.White,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Default.Person,
-                                            contentDescription = "Avatar",
-                                            tint = Color(0xFF9CA3AF),
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
+                                // User Avatar + Avatar Decoration statis di kiri (foto profil tetap mendukung animasi)
+                                StaticCommentAvatarWithBorder(
+                                    avatarUrl = currentUserAvatar,
+                                    userName = currentUserName,
+                                    borderUrl = if (isUserSignedIn) currentUserBorderUrl else "",
+                                    isCustomPhoto = currentUserAvatar.isNotBlank(),
+                                    size = 34.dp,
+                                    showPersonPlaceholder = !isUserSignedIn && currentUserAvatar.isBlank()
+                                )
 
                                 Spacer(modifier = Modifier.width(10.dp))
 
@@ -1417,7 +1395,8 @@ fun StreamingScreen(
                                                         episodeId = uiState.episodeId,
                                                         text = encoded,
                                                         customUserName = currentUserName,
-                                                        customAvatarUrl = currentUserAvatar
+                                                        customAvatarUrl = currentUserAvatar,
+                                                        customBorderUrl = currentUserBorderUrl
                                                     )
                                                     viewModel.addLocalComment(newComment)
                                                     commentComposerState.clear()
@@ -1454,7 +1433,8 @@ fun StreamingScreen(
                                                 episodeId = uiState.episodeId,
                                                 text = "[sticker:${sticker.url}]",
                                                 customUserName = currentUserName,
-                                                customAvatarUrl = currentUserAvatar
+                                                customAvatarUrl = currentUserAvatar,
+                                                customBorderUrl = currentUserBorderUrl
                                             )
                                             viewModel.addLocalComment(newComment)
                                             showCommentStickerPanel = false
@@ -3361,6 +3341,81 @@ private fun CommentTextOrStickerBody(rawText: String) {
 }
 
 @Composable
+private fun StaticCommentAvatarWithBorder(
+    avatarUrl: String,
+    userName: String,
+    borderUrl: String,
+    isCustomPhoto: Boolean,
+    size: Dp = 34.dp,
+    showPersonPlaceholder: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val frameSize = size * 1.24f
+    val staticBorderUrl = remember(borderUrl) {
+        if (borderUrl.isNotBlank()) {
+            DiscordCosmeticsRepository.getOptimizedUrl(borderUrl, size = 128, animated = false)
+        } else {
+            ""
+        }
+    }
+
+    Box(
+        modifier = modifier.size(frameSize),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(Color(0xFF1A1C22)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (avatarUrl.isNotBlank()) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(avatarUrl)
+                        .decoderFactory(
+                            if (Build.VERSION.SDK_INT >= 28) ImageDecoderDecoder.Factory()
+                            else GifDecoder.Factory()
+                        )
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Avatar ${userName.ifBlank { "Pengguna" }}",
+                    contentScale = if (isCustomPhoto) ContentScale.Crop else ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                )
+            } else if (!showPersonPlaceholder && userName.isNotBlank()) {
+                Text(
+                    text = userName.take(1).uppercase(Locale.ROOT),
+                    color = Color.White,
+                    fontSize = (size.value * 0.38f).sp,
+                    fontWeight = FontWeight.Bold
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Avatar",
+                    tint = Color(0xFF9CA3AF),
+                    modifier = Modifier.size(size * 0.52f)
+                )
+            }
+        }
+
+        if (staticBorderUrl.isNotBlank()) {
+            AnimatedCosmeticImage(
+                url = staticBorderUrl,
+                isAnimated = false,
+                contentDescription = null,
+                modifier = Modifier.size(frameSize)
+            )
+        }
+    }
+}
+
+@Composable
 private fun CommentItemRow(
     comment: EpisodeCommentItem,
     onReplyClick: () -> Unit,
@@ -3370,6 +3425,7 @@ private fun CommentItemRow(
 ) {
     val context = LocalContext.current
     val localDb = remember { LocalAuthDatabase(context) }
+    val activeProfile by FirebaseManager.userProfile.collectAsState()
     val isUserSignedIn = localDb.isLoggedIn() || FirebaseManager.isUserLoggedIn()
     var isLiked by remember(comment.id) { mutableStateOf(localDb.getReaction(comment.id ?: "") == "like") }
     var isDisliked by remember(comment.id) { mutableStateOf(localDb.getReaction(comment.id ?: "") == "dislike") }
@@ -3377,6 +3433,8 @@ private fun CommentItemRow(
 
     val effectiveAvatar = comment.getEffectiveAvatarUrl()
     val hasCustomPhotoAvatar = !comment.avatarUrl.isNullOrBlank()
+    val effectiveBorderUrl = comment.borderUrl?.takeIf { it.isNotBlank() }
+        ?: if (comment.isLocal) activeProfile?.equippedBorderUrl.orEmpty() else ""
 
     Row(
         modifier = Modifier
@@ -3384,22 +3442,13 @@ private fun CommentItemRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top
     ) {
-        // Avatar bulat di kiri
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(effectiveAvatar)
-                .decoderFactory(
-                    if (Build.VERSION.SDK_INT >= 28) ImageDecoderDecoder.Factory()
-                    else GifDecoder.Factory()
-                )
-                .crossfade(true)
-                .build(),
-            contentDescription = "Avatar ${comment.userName ?: "Pengguna"}",
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF1A1C22)),
-            contentScale = if (hasCustomPhotoAvatar) ContentScale.Crop else ContentScale.Fit
+        // Avatar bulat di kiri + Avatar Decoration statis (jika terpasang)
+        StaticCommentAvatarWithBorder(
+            avatarUrl = effectiveAvatar,
+            userName = comment.userName ?: "Pengguna",
+            borderUrl = effectiveBorderUrl,
+            isCustomPhoto = hasCustomPhotoAvatar,
+            size = 34.dp
         )
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -3810,11 +3859,14 @@ private fun CommentReplyItemRow(
 ) {
     val context = LocalContext.current
     val localDb = remember { LocalAuthDatabase(context) }
+    val activeProfile by FirebaseManager.userProfile.collectAsState()
     val isUserSignedIn = localDb.isLoggedIn() || FirebaseManager.isUserLoggedIn()
     var isLiked by remember(reply.id) { mutableStateOf(localDb.getReaction(reply.id ?: "") == "like") }
     var isDisliked by remember(reply.id) { mutableStateOf(localDb.getReaction(reply.id ?: "") == "dislike") }
     val effectiveAvatar = reply.getEffectiveAvatarUrl()
     val hasCustomPhotoAvatar = !reply.avatarUrl.isNullOrBlank()
+    val effectiveBorderUrl = reply.borderUrl?.takeIf { it.isNotBlank() }
+        ?: if (reply.isLocal) activeProfile?.equippedBorderUrl.orEmpty() else ""
 
     Row(
         modifier = Modifier
@@ -3822,21 +3874,12 @@ private fun CommentReplyItemRow(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.Top
     ) {
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(effectiveAvatar)
-                .decoderFactory(
-                    if (Build.VERSION.SDK_INT >= 28) ImageDecoderDecoder.Factory()
-                    else GifDecoder.Factory()
-                )
-                .crossfade(true)
-                .build(),
-            contentDescription = "Avatar",
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF1A1C22)),
-            contentScale = if (hasCustomPhotoAvatar) ContentScale.Crop else ContentScale.Fit
+        StaticCommentAvatarWithBorder(
+            avatarUrl = effectiveAvatar,
+            userName = reply.userName ?: "Pengguna",
+            borderUrl = effectiveBorderUrl,
+            isCustomPhoto = hasCustomPhotoAvatar,
+            size = 32.dp
         )
 
         Spacer(modifier = Modifier.width(10.dp))

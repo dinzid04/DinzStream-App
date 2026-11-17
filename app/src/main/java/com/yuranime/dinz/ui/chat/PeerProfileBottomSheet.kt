@@ -91,11 +91,13 @@ fun PeerProfileBottomSheet(
 
     LaunchedEffect(peerMessage.uid) {
         withContext(Dispatchers.IO) {
-            DiscordCosmeticsRepository.getAllBorders(context)
-            DiscordCosmeticsRepository.getAllProfileEffects(context)
+            runCatching { DiscordCosmeticsRepository.getAllBorders(context) }
+            runCatching { DiscordCosmeticsRepository.getAllProfileEffects(context) }
         }
         cosmeticsLoaded = true
-        latestProfile = FirebaseManager.fetchUserProfileByUid(peerMessage.uid)
+        latestProfile = runCatching {
+            FirebaseManager.fetchUserProfileByUid(peerMessage.uid)
+        }.getOrNull()
     }
 
     val displayName = latestProfile?.name?.ifBlank { null } ?: peerMessage.name
@@ -107,7 +109,7 @@ fun PeerProfileBottomSheet(
     val joinDate = latestProfile?.joinDate?.ifBlank { null }
         ?: peerMessage.joinDate.ifBlank { "Baru bergabung" }
     val role = latestProfile?.role?.ifBlank { null } ?: peerMessage.role.ifBlank { "Member" }
-    val level = latestProfile?.level ?: peerMessage.level
+    val level = (latestProfile?.level ?: peerMessage.level).coerceAtLeast(1)
     val rankTitle = latestProfile?.rankTitle?.ifBlank { null }
         ?: peerMessage.rankTitle.ifBlank { FirebaseManager.computeRankTitle(level) }
     val equippedTitle = latestProfile?.equippedTitle ?: peerMessage.equippedTitle
@@ -126,12 +128,16 @@ fun PeerProfileBottomSheet(
 
     val animatedBorderUrl = remember(borderUrl, cosmeticAnimate) {
         if (borderUrl.isNotBlank()) {
-            DiscordCosmeticsRepository.getOptimizedUrl(borderUrl, size = 240, animated = cosmeticAnimate)
+            runCatching {
+                DiscordCosmeticsRepository.getOptimizedUrl(borderUrl, size = 240, animated = cosmeticAnimate)
+            }.getOrDefault(borderUrl)
         } else ""
     }
     val effectDef = remember(effectUrl, cosmeticsLoaded) {
         if (effectUrl.isNotBlank()) {
-            DiscordCosmeticsRepository.findEffect(context, effectUrl)
+            runCatching {
+                DiscordCosmeticsRepository.findEffect(context, effectUrl)
+            }.getOrNull()
         } else null
     }
     val effectLayers = remember(effectDef, effectUrl) {
@@ -313,7 +319,8 @@ fun PeerProfileBottomSheet(
                     // 3. Baris Status & Mini-Title (ALL-CAPS + pembatas vertikal | rapih)
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically
                     ) {
                         if (showRole) {
                             val roleSpec = remember(role) { RpgSvgIconCatalog.resolveRoleSpec(role) }
@@ -338,7 +345,6 @@ fun PeerProfileBottomSheet(
 
                             Box(
                                 modifier = Modifier
-                                    .align(Alignment.CenterVertically)
                                     .width(1.dp)
                                     .height(12.dp)
                                     .background(Color.White.copy(alpha = 0.24f))
@@ -367,7 +373,6 @@ fun PeerProfileBottomSheet(
                         if (showMiniTitle) {
                             Box(
                                 modifier = Modifier
-                                    .align(Alignment.CenterVertically)
                                     .width(1.dp)
                                     .height(12.dp)
                                     .background(Color.White.copy(alpha = 0.24f))

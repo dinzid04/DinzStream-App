@@ -1689,8 +1689,11 @@ object FirebaseManager {
         allowCurrentAuthTimestampFallback: Boolean = true
     ): UserProfile {
         val uid = snapshot.getString("uid")?.takeIf { it.isNotBlank() } ?: snapshot.id.ifBlank { fallbackUid }
-        val exp = maxOf(snapshot.getLong("exp") ?: 0L, snapshot.getLong("xp") ?: 0L)
-        val points = snapshot.getLong("points") ?: 100L
+        val exp = maxOf(
+            readSnapshotLong(snapshot, "exp") ?: 0L,
+            readSnapshotLong(snapshot, "xp") ?: 0L
+        )
+        val points = readSnapshotLong(snapshot, "points") ?: 100L
         val computedLevel = computeLevelFromExp(exp)
         val nextTarget = computeNextLevelTargetExp(computedLevel)
         val expProgress = computeExpProgress(exp, nextTarget)
@@ -1729,10 +1732,10 @@ object FirebaseManager {
 
         val equippedTitle = snapshot.getString("equippedTitle")?.trim().orEmpty()
         val titleDef = resolveTitleDefinition(equippedTitle, computedLevel)
-        val equippedTitleTier = (snapshot.getLong("equippedTitleTier")?.toInt())
+        val equippedTitleTier = readSnapshotLong(snapshot, "equippedTitleTier")?.toInt()
             ?: titleDef?.tierLevel
             ?: computedLevel
-        val equippedTitleVariant = (snapshot.getLong("equippedTitleVariant")?.toInt())
+        val equippedTitleVariant = readSnapshotLong(snapshot, "equippedTitleVariant")?.toInt()
             ?: titleDef?.styleVariant
             ?: 0
         val equippedNameStyle = snapshot.getString("equippedNameStyle")?.trim()?.lowercase(Locale.ROOT).orEmpty()
@@ -1825,7 +1828,7 @@ object FirebaseManager {
             claimedRedeemCodes = claimedRedeemCodes,
             claimedMissions = rawClaimedMissions,
             lastCheckInDate = snapshot.getString("lastCheckInDate") ?: "",
-            checkInStreak = (snapshot.getLong("checkInStreak") ?: 0L).toInt(),
+            checkInStreak = (readSnapshotLong(snapshot, "checkInStreak") ?: 0L).toInt(),
             nextLevelTargetExp = nextTarget,
             expProgress = expProgress,
             isVerified = verifiedBool,
@@ -3719,6 +3722,18 @@ object FirebaseManager {
         )
     }
 
+    private fun readSnapshotLong(snapshot: DocumentSnapshot, field: String): Long? {
+        return try {
+            when (val raw = snapshot.get(field)) {
+                is Number -> raw.toLong()
+                is String -> raw.trim().toLongOrNull()
+                else -> null
+            }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
     /** Mengambil profil publik user lain berdasarkan UID dari Firestore (untuk preview profil chat). */
     suspend fun fetchUserProfileByUid(uid: String): UserProfile? {
         if (uid.isBlank()) return null
@@ -3747,8 +3762,8 @@ object FirebaseManager {
                     )
                 } else null
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Gagal mengambil profil peer $uid: ${e.message}")
+        } catch (t: Throwable) {
+            Log.w(TAG, "Gagal mengambil profil peer $uid: ${t.message}")
             null
         }
     }

@@ -118,18 +118,48 @@ fun ApngAnimationView(
         return
     }
 
-    val context = LocalContext.current
-    var apngFile by remember(url) { mutableStateOf<File?>(null) }
-    var useApng by remember(url) { mutableStateOf(true) }
-    var currentDrawable by remember { mutableStateOf<APNGDrawable?>(null) }
-    var currentImageView by remember { mutableStateOf<ImageView?>(null) }
+    val sanitizedUrl = remember(url) {
+        val t = url.trim()
+        if (t.startsWith("http://", ignoreCase = true)) {
+            "https://" + t.removePrefix("http://")
+        } else {
+            t
+        }
+    }
+    if (!sanitizedUrl.startsWith("https://", ignoreCase = true)) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(url)
+                .crossfade(true)
+                .build(),
+            contentDescription = null,
+            contentScale = when (scaleType) {
+                ImageView.ScaleType.CENTER_CROP -> ContentScale.Crop
+                ImageView.ScaleType.FIT_START -> ContentScale.FillWidth
+                ImageView.ScaleType.FIT_XY -> ContentScale.FillBounds
+                else -> ContentScale.Fit
+            },
+            modifier = modifier
+        )
+        return
+    }
 
-    LaunchedEffect(url) {
+    val context = LocalContext.current
+    var apngFile by remember(sanitizedUrl) { mutableStateOf<File?>(null) }
+    var useApng by remember(sanitizedUrl) { mutableStateOf(true) }
+    val viewRef = remember(sanitizedUrl) {
+        object {
+            var drawable: APNGDrawable? = null
+            var imageView: ImageView? = null
+        }
+    }
+
+    LaunchedEffect(sanitizedUrl) {
         onLoadingChanged(true)
         val file = withContext(Dispatchers.IO) {
             try {
                 val cacheDir = File(context.cacheDir, "apng_cache").apply { if (!exists()) mkdirs() }
-                val safeHash = url.hashCode().toString().replace("-", "n")
+                val safeHash = sanitizedUrl.hashCode().toString().replace("-", "n")
                 val targetFile = File(cacheDir, "apng_$safeHash.png")
 
                 if (targetFile.exists() && targetFile.length() >= 128L) {
@@ -138,7 +168,7 @@ fun ApngAnimationView(
 
                 val tempFile = File(cacheDir, "apng_${safeHash}_${System.currentTimeMillis()}_tmp.png")
                 val request = Request.Builder()
-                    .url(url)
+                    .url(sanitizedUrl)
                     .header("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko)")
                     .build()
 
@@ -188,16 +218,16 @@ fun ApngAnimationView(
         onLoadingChanged(false)
     }
 
-    DisposableEffect(url) {
+    DisposableEffect(sanitizedUrl) {
         onDispose {
             try {
-                currentDrawable?.stop()
-                currentImageView?.setImageDrawable(null)
+                viewRef.drawable?.stop()
+                viewRef.imageView?.setImageDrawable(null)
             } catch (t: Throwable) {
                 t.printStackTrace()
             }
-            currentDrawable = null
-            currentImageView = null
+            viewRef.drawable = null
+            viewRef.imageView = null
         }
     }
 
@@ -215,7 +245,7 @@ fun ApngAnimationView(
                         this.isClickable = false
                         this.isFocusable = false
                         this.isEnabled = false
-                        currentImageView = this
+                        viewRef.imageView = this
                     }
                 },
                 update = { imageView ->
@@ -223,20 +253,20 @@ fun ApngAnimationView(
                     imageView.isClickable = false
                     imageView.isFocusable = false
                     imageView.isEnabled = false
-                    currentImageView = imageView
+                    viewRef.imageView = imageView
                     val targetPath = file.absolutePath
-                    if (imageView.tag == targetPath && currentDrawable != null) {
+                    if (imageView.tag == targetPath && viewRef.drawable != null) {
                         return@AndroidView
                     }
                     try {
                         if (file.exists() && file.length() >= 128L) {
-                            runCatching { currentDrawable?.stop() }
+                            runCatching { viewRef.drawable?.stop() }
                             val drawable = APNGDrawable.fromFile(targetPath)
                             drawable.setLoopLimit(0) // 0 = Infinite loop
                             imageView.tag = targetPath
                             imageView.setImageDrawable(drawable)
                             drawable.start()
-                            currentDrawable = drawable
+                            viewRef.drawable = drawable
                         } else {
                             imageView.tag = null
                             imageView.setImageDrawable(null)
@@ -263,7 +293,7 @@ fun ApngAnimationView(
             }
             AsyncImage(
                 model = ImageRequest.Builder(context)
-                    .data(url)
+                    .data(sanitizedUrl)
                     .crossfade(true)
                     .build(),
                 contentDescription = null,
@@ -284,6 +314,9 @@ fun ApngAnimationView(
  *   selalu muncul hidup dan tidak pernah hilang/mati!
  */
 private class TopWidthCropImageView(context: android.content.Context) : ImageView(context) {
+    private var lastScaledVw = -1
+    private var lastScaledDw = -1
+
     init {
         super.setScaleType(ScaleType.MATRIX)
     }
@@ -297,6 +330,7 @@ private class TopWidthCropImageView(context: android.content.Context) : ImageVie
     }
 
     override fun setImageDrawable(drawable: android.graphics.drawable.Drawable?) {
+        lastScaledDw = -1
         super.setImageDrawable(drawable)
         applyTopWidthMatrix()
     }
@@ -325,24 +359,26 @@ private class TopWidthCropImageView(context: android.content.Context) : ImageVie
     }
 
     fun refreshTopWidthMatrix() {
+        lastScaledVw = -1
         applyTopWidthMatrix()
     }
 
     private fun applyTopWidthMatrix() {
-        val d = drawable ?: return
-        val vw = width - paddingLeft - paddingRight
-        val dw = d.intrinsicWidth.takeIf { it > 0 } ?: d.bounds.width()
-        if (vw <= 0 || dw <= 0) {
-            if (vw <= 0) {
-                post { applyTopWidthMatrix() }
+        runCatching {
+            val d = drawable ?: return
+            val vw = width - paddingLeft - paddingRight
+            val dw = d.intrinsicWidth.takeIf { it > 0 } ?: d.bounds.width()
+            if (vw <= 0 || dw <= 0) {
+                return
             }
-            return
+            if (vw == lastScaledVw && dw == lastScaledDw) return
+            lastScaledVw = vw
+            lastScaledDw = dw
+            val scale = vw.toFloat() / dw.toFloat()
+            val m = android.graphics.Matrix()
+            m.setScale(scale, scale)
+            imageMatrix = m
         }
-        val scale = vw.toFloat() / dw.toFloat()
-        val m = android.graphics.Matrix()
-        m.setScale(scale, scale)
-        imageMatrix = m
-        invalidate()
     }
 }
 
@@ -377,8 +413,14 @@ fun MultiLayerProfileEffectView(
 
             sortedLayers.mapIndexed { layerIndex, layer ->
                 try {
-                    if (layer.src.isBlank()) return@mapIndexed null
-                    val safeHash = layer.src.hashCode().toString().replace("-", "n")
+                    val rawSrc = layer.src.trim()
+                    val safeSrc = if (rawSrc.startsWith("http://", ignoreCase = true)) {
+                        "https://" + rawSrc.removePrefix("http://")
+                    } else {
+                        rawSrc
+                    }
+                    if (!safeSrc.startsWith("https://", ignoreCase = true)) return@mapIndexed null
+                    val safeHash = safeSrc.hashCode().toString().replace("-", "n")
                     val targetFile = File(cacheDir, "effect_${safeEffectId}_layer_${layerIndex}_$safeHash.png")
 
                     if (targetFile.exists() && targetFile.length() >= 128L && isValidPngSignature(targetFile)) {
@@ -390,7 +432,7 @@ fun MultiLayerProfileEffectView(
 
                     val tempFile = File(cacheDir, "effect_${safeEffectId}_layer_${layerIndex}_${safeHash}_tmp.png")
                     val request = Request.Builder()
-                        .url(layer.src)
+                        .url(safeSrc)
                         .header("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
                         .build()
 
@@ -573,7 +615,7 @@ fun MultiLayerProfileEffectView(
                             }
                             drawables.add(d)
                         }
-                        isViewsAttached = true
+                        post { isViewsAttached = true }
                     }
                 },
                 update = { frameLayout ->

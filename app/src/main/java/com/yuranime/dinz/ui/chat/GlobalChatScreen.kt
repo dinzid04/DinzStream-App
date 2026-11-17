@@ -62,6 +62,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -960,10 +961,14 @@ fun GlobalChatScreen(
         )
 
         // 7. BOTTOM SHEET PREVIEW PROFIL TEMAN (Kosmetik animasi penuh, avatar di kanan)
-        PeerProfileBottomSheet(
-            peerMessage = previewPeer,
-            onDismiss = { previewPeer = null }
-        )
+        previewPeer?.let { activePeer ->
+            key(activePeer.uid.ifBlank { activePeer.id }) {
+                PeerProfileBottomSheet(
+                    peerMessage = activePeer,
+                    onDismiss = { previewPeer = null }
+                )
+            }
+        }
 
         // 8. DIALOG PRATINJAU FOTO CHAT FULLSCREEN
         if (previewImageUrl != null) {
