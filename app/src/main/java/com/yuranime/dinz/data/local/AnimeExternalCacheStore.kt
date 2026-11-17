@@ -170,7 +170,7 @@ object AnimeExternalCacheStore {
             return mem
         }
         val dir = cacheDir ?: return null
-        val file = File(dir, "soundtrack_v2_$sanitizedKey.json")
+        val file = File(dir, "soundtrack_v3_$sanitizedKey.json")
         if (!file.exists()) return null
         val parsed = runCatching {
             gson.fromJson(file.readText(), AnimeSoundtrackResult::class.java)
@@ -186,7 +186,7 @@ object AnimeExternalCacheStore {
         soundtrackMemory[sanitizedKey] = data
         val dir = cacheDir ?: return
         synchronized(ioLock) {
-            writeTextAtomic(File(dir, "soundtrack_v2_$sanitizedKey.json"), gson.toJson(data))
+            writeTextAtomic(File(dir, "soundtrack_v3_$sanitizedKey.json"), gson.toJson(data))
         }
     }
 

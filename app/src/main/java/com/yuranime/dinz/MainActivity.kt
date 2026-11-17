@@ -166,10 +166,16 @@ class MainActivity : ComponentActivity() {
                     var hasCheckedAutoUpdate by rememberSaveable { mutableStateOf(false) }
                     LaunchedEffect(showSplash) {
                         if (!showSplash && !hasCheckedAutoUpdate) {
-                            hasCheckedAutoUpdate = true
-                            val info = UpdateChecker.checkUpdate(BuildConfig.VERSION_NAME, forceCheck = false)
-                            if (info != null && info.isUpdateAvailable && pendingUpdateInfo == null) {
-                                pendingUpdateInfo = info
+                            var info = UpdateChecker.checkUpdate(BuildConfig.VERSION_NAME, forceCheck = false)
+                            if (info == null) {
+                                delay(3000L)
+                                info = UpdateChecker.checkUpdate(BuildConfig.VERSION_NAME, forceCheck = false)
+                            }
+                            if (info != null) {
+                                hasCheckedAutoUpdate = true
+                                if (info.isUpdateAvailable && pendingUpdateInfo == null) {
+                                    pendingUpdateInfo = info
+                                }
                             }
                         }
                     }

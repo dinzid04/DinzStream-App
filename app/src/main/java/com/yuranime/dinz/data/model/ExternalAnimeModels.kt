@@ -106,10 +106,15 @@ data class AnimeSoundtrackTrack(
     val episodeNote: String? = null,
     val coverUrl: String? = null,
     val previewUrl: String? = null,
+    val ytVideoId: String? = null,
+    val durationText: String? = null,
     val durationSec: Int? = null,
     val metadataSource: String = "",
     val enrichmentSource: String = ""
-)
+) {
+    val isPlayable: Boolean
+        get() = !ytVideoId.isNullOrBlank() || !previewUrl.isNullOrBlank()
+}
 
 @Immutable
 data class AnimeSoundtrackResult(

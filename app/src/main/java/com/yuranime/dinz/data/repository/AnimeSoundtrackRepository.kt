@@ -788,10 +788,10 @@ object AnimeSoundtrackRepository {
     }
 
     // =========================================================================
-    // 2. ENRICHMENT: DEEZER -> ITUNES -> MUSICBRAINZ & COVER ART ARCHIVE
+    // 2. ENRICHMENT: YT MUSIC (FULL AUDIO) -> DEEZER -> ITUNES -> MUSICBRAINZ
     // =========================================================================
 
-    private fun enrichTrackMedia(seed: TrackSeed): AnimeSoundtrackTrack {
+    private suspend fun enrichTrackMedia(seed: TrackSeed): AnimeSoundtrackTrack {
         val cleanTitle = cleanSongTitleForSearch(seed.title)
         val altTitleInParens = extractParentheticalText(seed.title)
         val cleanArtist = cleanArtistForSearch(seed.artist)
@@ -805,13 +805,73 @@ object AnimeSoundtrackRepository {
 
         var coverUrl = seed.coverUrl
         var previewUrl = seed.previewUrl
+        var ytVideoId: String? = null
         var album = seed.album
+        var durationText: String? = null
         var durationSec: Int? = null
         val sources = mutableListOf<String>()
 
-        // 2A. Deezer Public Search API (.mp3 30 detik, cover high-res, album)
+        // 2A. YouTube Music Innertube Search (lagu full-length, cover art, durasi penuh, album)
+        for ((idx, q) in candidateQueries.take(2).withIndex()) {
+            val queryIncludedArtist = cleanArtist.isNotBlank() && q.contains(cleanArtist)
+            val ytSongs = runCatching {
+                YtMusicRepository.searchTracks(query = q, songsOnly = true)
+            }.getOrDefault(emptyList())
+
+            val ytCandidates = if (ytSongs.isNotEmpty() || idx > 0) {
+                ytSongs
+            } else {
+                runCatching {
+                    YtMusicRepository.searchTracks(query = q, songsOnly = false)
+                }.getOrDefault(emptyList())
+            }
+
+            if (ytCandidates.isNotEmpty()) {
+                var bestYt: YtMusicRepository.YtMusicSearchItem? = null
+                var bestYtScore = -1f
+                for (cand in ytCandidates) {
+                    val baseScore = scoreAudioMatch(
+                        candTitle = cand.title,
+                        candArtist = cand.artistText,
+                        targetTitle = cleanTitle,
+                        altTargetTitle = altTitleInParens,
+                        targetArtist = cleanArtist,
+                        altTargetArtist = altArtistInParens,
+                        hasPreview = true,
+                        queryIncludedArtist = queryIncludedArtist
+                    )
+                    val adjusted = if (cand.isSong && baseScore > 0f) baseScore + 0.08f else baseScore
+                    if (adjusted > bestYtScore) {
+                        bestYtScore = adjusted
+                        bestYt = cand
+                    }
+                }
+                val minThreshold = if (queryIncludedArtist) 0.42f else 0.50f
+                val chosenYt = bestYt?.takeIf { bestYtScore >= minThreshold }
+                if (chosenYt != null) {
+                    ytVideoId = chosenYt.videoId
+                    if (coverUrl.isNullOrBlank() && !chosenYt.thumbnailUrl.isNullOrBlank()) {
+                        coverUrl = chosenYt.thumbnailUrl
+                    }
+                    if (album.isNullOrBlank() && !chosenYt.albumTitle.isNullOrBlank()) {
+                        album = chosenYt.albumTitle
+                    }
+                    if (durationText.isNullOrBlank() && !chosenYt.durationText.isNullOrBlank()) {
+                        durationText = chosenYt.durationText
+                    }
+                    if (durationSec == null && chosenYt.durationSec != null && chosenYt.durationSec > 0) {
+                        durationSec = chosenYt.durationSec
+                    }
+                    sources.add("YTMusic")
+                    break
+                }
+            }
+        }
+
+        // 2B. Deezer Public Search API (.mp3 30 detik cadangan, cover album resolusi tinggi)
+        val deezerQueries = if (ytVideoId != null) candidateQueries.take(1) else candidateQueries
         if (previewUrl.isNullOrBlank() || coverUrl.isNullOrBlank() || album.isNullOrBlank()) {
-            for ((idx, q) in candidateQueries.withIndex()) {
+            for ((idx, q) in deezerQueries.withIndex()) {
                 val queryIncludedArtist = cleanArtist.isNotBlank() && q.contains(cleanArtist)
                 val dz = searchDeezer(
                     query = q,
@@ -833,9 +893,9 @@ object AnimeSoundtrackRepository {
             }
         }
 
-        // 2B. iTunes Search API (.m4a preview, artwork 600px, album) jika belum lengkap
-        if (previewUrl.isNullOrBlank() || coverUrl.isNullOrBlank() || album.isNullOrBlank()) {
-            for (q in candidateQueries.take(2)) {
+        // 2C. iTunes Search API (.m4a preview cadangan, artwork 600px, album) jika belum lengkap
+        if ((ytVideoId == null && previewUrl.isNullOrBlank()) || coverUrl.isNullOrBlank() || album.isNullOrBlank()) {
+            for (q in candidateQueries.take(if (ytVideoId != null) 1 else 2)) {
                 val queryIncludedArtist = cleanArtist.isNotBlank() && q.contains(cleanArtist)
                 val itunes = searchItunes(
                     query = q,
@@ -856,7 +916,7 @@ object AnimeSoundtrackRepository {
             }
         }
 
-        // 2C. MusicBrainz & Cover Art Archive API jika cover masih belum tersedia
+        // 2D. MusicBrainz & Cover Art Archive API jika cover masih belum tersedia
         if (coverUrl.isNullOrBlank() && System.currentTimeMillis() >= musicBrainzCooldownUntilMs) {
             val mb = searchMusicBrainzAndCoverArt(cleanTitle, cleanArtist)
             if (mb != null) {
@@ -876,6 +936,8 @@ object AnimeSoundtrackRepository {
             episodeNote = seed.episodeNote?.takeIf { it.isNotBlank() },
             coverUrl = coverUrl?.takeIf { it.startsWith("http") },
             previewUrl = previewUrl?.takeIf { it.startsWith("http") },
+            ytVideoId = ytVideoId?.takeIf { it.isNotBlank() },
+            durationText = durationText?.takeIf { it.isNotBlank() },
             durationSec = durationSec,
             metadataSource = seed.metadataSource,
             enrichmentSource = sources.distinct().joinToString("+")

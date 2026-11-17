@@ -231,6 +231,11 @@ class AnimeDetailViewModel(
         }
     }
 
+    fun retrySoundtrack(forceRefresh: Boolean = true) {
+        val movie = _uiState.value.movieDetail ?: return
+        launchSoundtrackFetch(movie = movie, forceRefresh = forceRefresh)
+    }
+
     private fun launchSoundtrackFetch(movie: MovieDetail, forceRefresh: Boolean) {
         val title = movie.title?.trim().takeIf { !it.isNullOrBlank() } ?: return
         val expectedId = currentMovieId
@@ -256,15 +261,9 @@ class AnimeDetailViewModel(
                 ).collect { result ->
                     if (currentMovieId != expectedId) return@collect
                     _uiState.update { state ->
-                        val safeSelectedTab = if (state.selectedTab == DetailTab.SOUNDTRACK && result.isEmpty) {
-                            DetailTab.INFO
-                        } else {
-                            state.selectedTab
-                        }
                         state.copy(
                             isLoadingSoundtrack = false,
-                            soundtrack = result,
-                            selectedTab = safeSelectedTab
+                            soundtrack = result
                         )
                     }
                 }
@@ -273,11 +272,9 @@ class AnimeDetailViewModel(
             } catch (_: Exception) {
                 if (currentMovieId == expectedId) {
                     _uiState.update { state ->
-                        val safeTab = if (state.selectedTab == DetailTab.SOUNDTRACK) DetailTab.INFO else state.selectedTab
                         state.copy(
                             isLoadingSoundtrack = false,
-                            soundtrack = AnimeSoundtrackResult(),
-                            selectedTab = safeTab
+                            soundtrack = AnimeSoundtrackResult()
                         )
                     }
                 }
