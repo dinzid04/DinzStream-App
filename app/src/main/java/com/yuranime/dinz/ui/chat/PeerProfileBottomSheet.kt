@@ -319,8 +319,7 @@ fun PeerProfileBottomSheet(
                     // 3. Baris Status & Mini-Title (ALL-CAPS + pembatas vertikal | rapih)
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                        itemVerticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         if (showRole) {
                             val roleSpec = remember(role) { RpgSvgIconCatalog.resolveRoleSpec(role) }
@@ -345,6 +344,7 @@ fun PeerProfileBottomSheet(
 
                             Box(
                                 modifier = Modifier
+                                    .align(Alignment.CenterVertically)
                                     .width(1.dp)
                                     .height(12.dp)
                                     .background(Color.White.copy(alpha = 0.24f))
@@ -373,6 +373,7 @@ fun PeerProfileBottomSheet(
                         if (showMiniTitle) {
                             Box(
                                 modifier = Modifier
+                                    .align(Alignment.CenterVertically)
                                     .width(1.dp)
                                     .height(12.dp)
                                     .background(Color.White.copy(alpha = 0.24f))
