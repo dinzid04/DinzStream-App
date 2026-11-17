@@ -124,9 +124,9 @@ fun PeerProfileBottomSheet(
     val isVerified = latestProfile?.isVerified ?: peerMessage.isVerified
     val verifiedColor = latestProfile?.verifiedColor?.ifBlank { null } ?: peerMessage.verifiedColor
 
-    val animatedBorderUrl = remember(borderUrl) {
+    val animatedBorderUrl = remember(borderUrl, cosmeticAnimate) {
         if (borderUrl.isNotBlank()) {
-            DiscordCosmeticsRepository.getOptimizedUrl(borderUrl, size = 240, animated = false)
+            DiscordCosmeticsRepository.getOptimizedUrl(borderUrl, size = 240, animated = cosmeticAnimate)
         } else ""
     }
     val effectDef = remember(effectUrl, cosmeticsLoaded) {
@@ -257,7 +257,7 @@ fun PeerProfileBottomSheet(
                         if (animatedBorderUrl.isNotBlank()) {
                             AnimatedCosmeticImage(
                                 url = animatedBorderUrl,
-                                isAnimated = false,
+                                isAnimated = cosmeticAnimate,
                                 contentDescription = "Avatar Decoration",
                                 modifier = Modifier.size(96.dp)
                             )

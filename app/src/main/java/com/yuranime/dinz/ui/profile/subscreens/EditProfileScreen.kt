@@ -488,11 +488,11 @@ fun EditProfileScreen(
                     }
                 }
 
-                // Layer Live Preview Border Avatar (discord_assets): 100.dp tepat konsentris
+                // Layer Live Preview Border Avatar: 100.dp tepat konsentris
                 if (selectedBorderUrl.isNotBlank()) {
                     AnimatedCosmeticImage(
-                        url = DiscordCosmeticsRepository.getOptimizedUrl(selectedBorderUrl, size = 240, animated = false),
-                        isAnimated = false,
+                        url = DiscordCosmeticsRepository.getOptimizedUrl(selectedBorderUrl, size = 240, animated = true),
+                        isAnimated = true,
                         contentDescription = "Live Preview Border Avatar",
                         modifier = Modifier.size(100.dp)
                     )
@@ -1252,8 +1252,8 @@ private fun EditCosmeticCard(
                     }
                 }
                 AnimatedCosmeticImage(
-                    url = DiscordCosmeticsRepository.getOptimizedUrl(imageUrl, size = 160, animated = false),
-                    isAnimated = false,
+                    url = DiscordCosmeticsRepository.getOptimizedUrl(imageUrl, size = 160, animated = true),
+                    isAnimated = true,
                     contentDescription = name,
                     modifier = Modifier.size(72.dp)
                 )

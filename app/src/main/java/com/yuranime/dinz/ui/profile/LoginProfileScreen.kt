@@ -597,8 +597,16 @@ private fun UserProfileView(
             ?: if (equippedProfileEffectUrl.isNotBlank()) listOf(equippedProfileEffectUrl) else emptyList()
     }
 
-    val resolvedBorderUrl = remember(equippedBorderUrl) {
-        DiscordCosmeticsRepository.getOptimizedUrl(equippedBorderUrl, size = 240, animated = false)
+    val resolvedBorderUrl = remember(equippedBorderUrl, cosmeticAnimate, catalogRev) {
+        if (equippedBorderUrl.isNotBlank()) {
+            DiscordCosmeticsRepository.getOptimizedUrl(
+                url = equippedBorderUrl,
+                size = 240,
+                animated = cosmeticAnimate
+            )
+        } else {
+            ""
+        }
     }
 
     val animatedExpProgress by animateFloatAsState(
@@ -717,11 +725,11 @@ private fun UserProfileView(
                     }
                 }
 
-                // Layer Border Avatar Asli (discord_assets): 102.dp tepat konsentris di Alignment.Center
+                // Layer Border Avatar Asli: 102.dp tepat konsentris di Alignment.Center
                 if (resolvedBorderUrl.isNotBlank()) {
                     AnimatedCosmeticImage(
-                        url = DiscordCosmeticsRepository.getOptimizedUrl(resolvedBorderUrl, size = 240, animated = false),
-                        isAnimated = false,
+                        url = resolvedBorderUrl,
+                        isAnimated = cosmeticAnimate,
                         contentDescription = "Avatar Border",
                         modifier = Modifier.size(102.dp)
                     )
