@@ -1,5 +1,10 @@
 package com.yuranime.dinz.ui.jadwal
 
+import android.Manifest
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,11 +26,14 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
@@ -33,6 +41,7 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -54,6 +63,7 @@ import com.yuranime.dinz.R
 import com.yuranime.dinz.data.local.AppPreferences
 import com.yuranime.dinz.data.model.AnimeItem
 import com.yuranime.dinz.data.model.CuplixItem
+import com.yuranime.dinz.data.notification.AnimeReleaseScheduler
 import com.yuranime.dinz.ui.components.BottomNavBar
 import com.yuranime.dinz.ui.components.CuplixAvatarItem
 import com.yuranime.dinz.ui.components.NavTab
@@ -77,7 +87,32 @@ fun JadwalScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLiquidGlass by AppPreferences.liquidGlassEnabled.collectAsState()
+    val releaseNotifEnabled by AppPreferences.releaseNotificationsEnabled.collectAsState()
+    val context = LocalContext.current
     val backdropLayer = rememberGraphicsLayer()
+
+    val notifPermLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            AppPreferences.setReleaseNotificationsEnabled(context, true)
+            AnimeReleaseScheduler.syncFullWeekScheduleInBackground(context, force = true)
+            Toast.makeText(context, "Notifikasi jadwal rilis diaktifkan", Toast.LENGTH_SHORT).show()
+        } else {
+            AppPreferences.setReleaseNotificationsEnabled(context, false)
+            Toast.makeText(context, "Izin notifikasi ditolak sistem", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    LaunchedEffect(uiState.scheduledAnimeList, uiState.selectedDay, releaseNotifEnabled) {
+        if (releaseNotifEnabled && uiState.scheduledAnimeList.isNotEmpty() && AnimeReleaseScheduler.hasNotificationPermission(context)) {
+            AnimeReleaseScheduler.scheduleFromScheduleItems(
+                context = context,
+                dayApiName = uiState.selectedDay.apiDay,
+                items = uiState.scheduledAnimeList
+            )
+        }
+    }
 
     Box(
         modifier = modifier
@@ -91,40 +126,76 @@ fun JadwalScreen(
                 .background(ColorBackgroundPrimary)
                 .statusBarsPadding()
         ) {
-            // Days Tab Row (SEN, SEL, RAB, KAM, JUM, SAB, MIN)
+            // Days Tab Row (SEN, SEL, RAB, KAM, JUM, SAB, MIN) + Toggle Notifikasi Rilis
             val days = ScheduleDay.entries
             val selectedIndex = days.indexOf(uiState.selectedDay).coerceAtLeast(0)
 
-            ScrollableTabRow(
-                selectedTabIndex = selectedIndex,
-                containerColor = ColorBackgroundPrimary,
-                contentColor = ColorAccentPrimary,
-                edgePadding = 16.dp,
-                indicator = { tabPositions ->
-                    if (selectedIndex < tabPositions.size) {
-                        Box(
-                            modifier = Modifier
-                                .tabIndicatorOffset(tabPositions[selectedIndex])
-                                .height(2.5.dp)
-                                .background(ColorAccentPrimary)
-                        )
-                    }
-                },
-                divider = {}
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                days.forEachIndexed { index, day ->
-                    val isSelected = index == selectedIndex
-                    Tab(
-                        selected = isSelected,
-                        onClick = { viewModel.selectDay(day) },
-                        text = {
-                            Text(
-                                text = day.label,
-                                color = if (isSelected) ColorAccentPrimary else ColorTextSecondary,
-                                fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                ScrollableTabRow(
+                    selectedTabIndex = selectedIndex,
+                    containerColor = ColorBackgroundPrimary,
+                    contentColor = ColorAccentPrimary,
+                    edgePadding = 16.dp,
+                    modifier = Modifier.weight(1f),
+                    indicator = { tabPositions ->
+                        if (selectedIndex < tabPositions.size) {
+                            Box(
+                                modifier = Modifier
+                                    .tabIndicatorOffset(tabPositions[selectedIndex])
+                                    .height(2.5.dp)
+                                    .background(ColorAccentPrimary)
                             )
                         }
+                    },
+                    divider = {}
+                ) {
+                    days.forEachIndexed { index, day ->
+                        val isSelected = index == selectedIndex
+                        Tab(
+                            selected = isSelected,
+                            onClick = { viewModel.selectDay(day) },
+                            text = {
+                                Text(
+                                    text = day.label,
+                                    color = if (isSelected) ColorAccentPrimary else ColorTextSecondary,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = {
+                        if (releaseNotifEnabled) {
+                            AppPreferences.setReleaseNotificationsEnabled(context, false)
+                            AnimeReleaseScheduler.cancelAllScheduledAlarms(context)
+                            Toast.makeText(context, "Notifikasi jadwal rilis dinonaktifkan", Toast.LENGTH_SHORT).show()
+                        } else {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                !AnimeReleaseScheduler.hasNotificationPermission(context)
+                            ) {
+                                notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                AppPreferences.setReleaseNotificationsEnabled(context, true)
+                                AnimeReleaseScheduler.syncFullWeekScheduleInBackground(context, force = true)
+                                Toast.makeText(context, "Notifikasi jadwal rilis diaktifkan", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .padding(end = 6.dp)
+                        .size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = if (releaseNotifEnabled) Icons.Default.NotificationsActive else Icons.Default.NotificationsOff,
+                        contentDescription = if (releaseNotifEnabled) "Matikan notifikasi rilis" else "Aktifkan notifikasi rilis",
+                        tint = if (releaseNotifEnabled) ColorAccentPrimary else ColorTextSecondary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

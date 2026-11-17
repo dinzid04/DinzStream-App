@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.yuranime.dinz.data.model.EpisodeCommentItem
 
-class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_local.db", null, 5) {
+class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_local.db", null, 6) {
 
     private val prefs = context.getSharedPreferences("animein_auth_prefs", Context.MODE_PRIVATE)
 
@@ -27,6 +27,7 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
                 episode_id TEXT,
                 user_name TEXT,
                 user_pokemon TEXT,
+                avatar_url TEXT DEFAULT '',
                 text TEXT,
                 time TEXT,
                 parent_id TEXT
@@ -176,6 +177,11 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
                 """.trimIndent()
             )
         }
+        if (oldVersion < 6) {
+            try {
+                db.execSQL("ALTER TABLE local_comments ADD COLUMN avatar_url TEXT DEFAULT ''")
+            } catch (_: Exception) {}
+        }
     }
 
     fun isLoggedIn(): Boolean {
@@ -261,15 +267,28 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
         }
     }
 
-    fun addLocalComment(episodeId: String, text: String, parentId: String? = null): EpisodeCommentItem {
+    fun addLocalComment(
+        episodeId: String,
+        text: String,
+        parentId: String? = null,
+        customUserName: String? = null,
+        customAvatarUrl: String? = null
+    ): EpisodeCommentItem {
         val db = writableDatabase
         val newId = "local_" + System.currentTimeMillis()
-        val username = getUsername()
+        val firebaseProfile = com.yuranime.dinz.data.firebase.FirebaseManager.userProfile.value
+        val username = customUserName?.takeIf { it.isNotBlank() }
+            ?: firebaseProfile?.name?.takeIf { it.isNotBlank() }
+            ?: getUsername()
+        val avatar = customAvatarUrl?.takeIf { it.isNotBlank() }
+            ?: firebaseProfile?.avatar?.takeIf { it.isNotBlank() }
+            ?: getAvatarUrl()
         val cv = ContentValues().apply {
             put("id", newId)
             put("episode_id", episodeId)
             put("user_name", username)
-            put("user_pokemon", "025") // Pikachu avatar
+            put("user_pokemon", "025")
+            put("avatar_url", avatar)
             put("text", text)
             put("time", "Baru saja")
             put("parent_id", parentId)
@@ -281,18 +300,23 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
             id = newId,
             userName = username,
             userPokemon = "025",
+            avatarUrl = avatar,
             text = text,
             time = "Baru saja",
             like = "0",
             dislike = "0",
-            replay = "0"
+            replay = "0",
+            isLocal = true
         )
     }
 
     fun getLocalComments(episodeId: String): List<EpisodeCommentItem> {
         val db = readableDatabase
         val list = mutableListOf<EpisodeCommentItem>()
-        val cursor = db.rawQuery("SELECT id, user_name, user_pokemon, text, time FROM local_comments WHERE episode_id = ? AND parent_id IS NULL ORDER BY id DESC", arrayOf(episodeId))
+        val cursor = db.rawQuery(
+            "SELECT id, user_name, user_pokemon, avatar_url, text, time FROM local_comments WHERE episode_id = ? AND parent_id IS NULL ORDER BY id DESC",
+            arrayOf(episodeId)
+        )
         cursor.use {
             while (it.moveToNext()) {
                 list.add(
@@ -300,11 +324,13 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
                         id = it.getString(0),
                         userName = it.getString(1),
                         userPokemon = it.getString(2),
-                        text = it.getString(3),
-                        time = it.getString(4),
+                        avatarUrl = it.getString(3),
+                        text = it.getString(4),
+                        time = it.getString(5),
                         like = "0",
                         dislike = "0",
-                        replay = "0"
+                        replay = "0",
+                        isLocal = true
                     )
                 )
             }
@@ -315,7 +341,10 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
     fun getLocalReplies(commentId: String): List<EpisodeCommentItem> {
         val db = readableDatabase
         val list = mutableListOf<EpisodeCommentItem>()
-        val cursor = db.rawQuery("SELECT id, user_name, user_pokemon, text, time FROM local_comments WHERE parent_id = ? ORDER BY id DESC", arrayOf(commentId))
+        val cursor = db.rawQuery(
+            "SELECT id, user_name, user_pokemon, avatar_url, text, time FROM local_comments WHERE parent_id = ? ORDER BY id DESC",
+            arrayOf(commentId)
+        )
         cursor.use {
             while (it.moveToNext()) {
                 list.add(
@@ -323,16 +352,24 @@ class LocalAuthDatabase(context: Context) : SQLiteOpenHelper(context, "animein_l
                         id = it.getString(0),
                         userName = it.getString(1),
                         userPokemon = it.getString(2),
-                        text = it.getString(3),
-                        time = it.getString(4),
+                        avatarUrl = it.getString(3),
+                        text = it.getString(4),
+                        time = it.getString(5),
                         like = "0",
                         dislike = "0",
-                        replay = "0"
+                        replay = "0",
+                        isLocal = true
                     )
                 )
             }
         }
         return list
+    }
+
+    fun deleteLocalComment(commentId: String) {
+        if (commentId.isBlank()) return
+        val db = writableDatabase
+        db.delete("local_comments", "id = ? OR parent_id = ?", arrayOf(commentId, commentId))
     }
 
     fun saveWatchProgress(

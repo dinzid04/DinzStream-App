@@ -375,6 +375,7 @@ data class EpisodeCommentItem(
     @SerializedName(value = "user_id", alternate = ["id_user", "userId"]) val userId: String? = null,
     @SerializedName(value = "user_name", alternate = ["username", "userName", "name"]) val userName: String? = null,
     @SerializedName(value = "user_pokemon", alternate = ["pokemon", "userPokemon"]) val userPokemon: String? = null,
+    @SerializedName("avatar_url") val avatarUrl: String? = null,
     @SerializedName("text") val text: String? = null,
     @SerializedName(value = "time", alternate = ["key_time", "time_ago", "time_created"]) val time: String? = null,
     @SerializedName("like") val like: String? = null,
@@ -382,11 +383,16 @@ data class EpisodeCommentItem(
     @SerializedName("score") val score: String? = null,
     @SerializedName("replay") val replay: String? = null,
     @SerializedName("pro") val pro: String? = null,
-    @SerializedName("rank") val rank: String? = null
+    @SerializedName("rank") val rank: String? = null,
+    val isLocal: Boolean = false
 ) {
     fun getPokemonAvatarUrl(): String {
         val p = userPokemon?.toIntOrNull() ?: 1
         return "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/$p.gif"
+    }
+
+    fun getEffectiveAvatarUrl(): String {
+        return avatarUrl?.takeIf { it.isNotBlank() } ?: getPokemonAvatarUrl()
     }
 }
 

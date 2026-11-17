@@ -2,6 +2,7 @@ package com.yuranime.dinz.ui.profile.subscreens
 
 import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -52,10 +53,12 @@ import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FileDownload
+import androidx.compose.material.icons.rounded.Gavel
 import androidx.compose.material.icons.rounded.Hd
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Policy
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
@@ -124,7 +127,9 @@ fun SettingsScreen(
     onBackClick: () -> Unit,
     onNavigateToDownloads: () -> Unit = {},
     onSignOutClick: () -> Unit = {},
-    onCheckUpdateClick: () -> Unit = {}
+    onCheckUpdateClick: () -> Unit = {},
+    onOpenTermsClick: (() -> Unit)? = null,
+    onOpenPrivacyPolicyClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -201,6 +206,11 @@ fun SettingsScreen(
     var showQualitySheet by remember { mutableStateOf(false) }
     var showSpeedSheet by remember { mutableStateOf(false) }
     var showPrivacyFaqDialog by remember { mutableStateOf(false) }
+    var inlineLegalDoc by remember { mutableStateOf<LegalDocumentType?>(null) }
+
+    BackHandler(enabled = inlineLegalDoc != null) {
+        inlineLegalDoc = null
+    }
 
     val showCompactHeaderTitle by remember {
         derivedStateOf {
@@ -589,6 +599,36 @@ fun SettingsScreen(
                             showChevron = true,
                             onClick = { showPrivacyFaqDialog = true }
                         )
+                        SettingsGroupDivider()
+                        SettingsValueRow(
+                            icon = Icons.Rounded.Gavel,
+                            iconTint = Color(0xFFBED62C),
+                            title = "Terms of Service",
+                            value = "Buka",
+                            showChevron = true,
+                            onClick = {
+                                if (onOpenTermsClick != null) {
+                                    onOpenTermsClick()
+                                } else {
+                                    inlineLegalDoc = LegalDocumentType.TERMS_OF_SERVICE
+                                }
+                            }
+                        )
+                        SettingsGroupDivider()
+                        SettingsValueRow(
+                            icon = Icons.Rounded.Policy,
+                            iconTint = Color(0xFF38BDF8),
+                            title = "Privacy Policy",
+                            value = "Buka",
+                            showChevron = true,
+                            onClick = {
+                                if (onOpenPrivacyPolicyClick != null) {
+                                    onOpenPrivacyPolicyClick()
+                                } else {
+                                    inlineLegalDoc = LegalDocumentType.PRIVACY_POLICY
+                                }
+                            }
+                        )
                     }
                 }
 
@@ -860,6 +900,13 @@ fun SettingsScreen(
                 showPrivacyFaqDialog = false
                 onCheckUpdateClick()
             }
+        )
+    }
+
+    inlineLegalDoc?.let { docType ->
+        LegalDocumentScreen(
+            documentType = docType,
+            onBackClick = { inlineLegalDoc = null }
         )
     }
 }

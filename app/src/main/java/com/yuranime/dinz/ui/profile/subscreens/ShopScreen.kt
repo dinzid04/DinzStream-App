@@ -647,8 +647,8 @@ fun ShopScreen(
 
                 if (equippedBorderUrl.isNotBlank()) {
                     AnimatedCosmeticImage(
-                        url = DiscordCosmeticsRepository.getOptimizedUrl(equippedBorderUrl, size = 160, animated = true),
-                        isAnimated = true,
+                        url = DiscordCosmeticsRepository.getOptimizedUrl(equippedBorderUrl, size = 160, animated = false),
+                        isAnimated = false,
                         modifier = Modifier.size(76.dp)
                     )
                 }
@@ -960,12 +960,24 @@ fun ShopScreen(
                         }
                     }
 
-                    // Border Avatar Discord 60 FPS 134.dp
-                    ApngAnimationView(
-                        url = border.imageUrl,
-                        modifier = Modifier.size(134.dp),
-                        scaleType = ImageView.ScaleType.FIT_CENTER,
-                        onLoadingChanged = { isBorderLoading = it }
+                    // Border Avatar Statis 134.dp (Hemat daya, foto profil tetap mendukung animasi)
+                    val staticPreviewUrl = remember(border.id, border.staticImageUrl, border.imageUrl) {
+                        DiscordCosmeticsRepository.getOptimizedUrl(
+                            url = border.staticImageUrl.ifBlank { border.imageUrl },
+                            size = 240,
+                            animated = false
+                        )
+                    }
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(staticPreviewUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = border.name,
+                        contentScale = ContentScale.Fit,
+                        onSuccess = { isBorderLoading = false },
+                        onError = { isBorderLoading = false },
+                        modifier = Modifier.size(134.dp)
                     )
 
                     AnimatedVisibility(

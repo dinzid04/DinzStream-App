@@ -2,6 +2,7 @@ package com.yuranime.dinz.ui.streaming
 
 import android.content.pm.ActivityInfo
 import android.os.Build
+import android.os.SystemClock
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.Toast
@@ -10,16 +11,25 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -35,7 +45,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -56,8 +68,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.FastForward
@@ -84,7 +97,15 @@ import androidx.compose.material.icons.filled.StarOutline
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.SentimentSatisfied
+import androidx.compose.material.icons.outlined.ThumbDown
+import androidx.compose.material.icons.outlined.ThumbUp
+import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -99,33 +120,47 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -140,9 +175,11 @@ import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
+import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.yuranime.dinz.R
 import com.yuranime.dinz.data.firebase.FirebaseManager
+import com.yuranime.dinz.data.firebase.InlineStickerCodec
 import com.yuranime.dinz.data.local.AppPreferences
 import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.model.CommunityMediaItem
@@ -150,20 +187,24 @@ import com.yuranime.dinz.data.model.EpisodeCommentItem
 import com.yuranime.dinz.data.model.ServerItem
 import com.yuranime.dinz.data.model.SkipSegment
 import com.yuranime.dinz.data.model.SkipSegmentType
+import com.yuranime.dinz.ui.chat.ChatStickerPanel
+import com.yuranime.dinz.ui.chat.InlineStickerComposerState
+import com.yuranime.dinz.ui.chat.InlineStickerInputField
+import com.yuranime.dinz.ui.chat.InlineStickerText
 import com.yuranime.dinz.ui.components.CoachmarkStep
 import com.yuranime.dinz.ui.components.SpotlightCoachmarkOverlay
 import com.yuranime.dinz.ui.components.onboardingTarget
 import java.util.Locale
-import com.yuranime.dinz.ui.theme.ColorAccentPrimary
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
 import com.yuranime.dinz.ui.theme.ColorMetricFavorites
-import com.yuranime.dinz.ui.theme.ColorMetricViews
 import com.yuranime.dinz.ui.theme.ColorTextPrimary
 import com.yuranime.dinz.ui.theme.ColorTextSecondary
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-private val ColorTosca = Color(0xFF26A69A)
-private val ColorEmerald = Color(0xFF00C853)
+private val ColorStreamAccent = Color.White
+private val LARGE_COMMENT_STICKER_REGEX = Regex("^\\[sticker:(https?://[^\\]\\s]+)]$")
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -207,6 +248,15 @@ fun StreamingScreen(
     val activity = context as? ComponentActivity
     val episodeRowState = rememberLazyListState()
     val targetBounds = remember { mutableStateMapOf<String, Rect>() }
+    val commentComposerState = remember { InlineStickerComposerState() }
+    val commentInputFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val clipboardManager = LocalClipboardManager.current
+    var showCommentStickerPanel by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.attachContext(context)
+    }
 
     val prefs = remember { context.getSharedPreferences("yuranime_ui_prefs", android.content.Context.MODE_PRIVATE) }
     LaunchedEffect(Unit) {
@@ -224,8 +274,9 @@ fun StreamingScreen(
         viewModel.loadStreaming(episodeId = episodeId, movieId = movieId)
     }
 
-    // Hanya cegat tombol back saat sub-sheet/dialog/fullscreen internal terbuka agar Predictive Back berjalan saat normal
+    // Hanya cegat tombol back saat sub-sheet/dialog/fullscreen/panel stiker terbuka agar Predictive Back berjalan saat normal
     val hasInnerModal = uiState.fullScreenPreviewUrl != null ||
+        showCommentStickerPanel ||
         uiState.activeCommentForReplies != null ||
         uiState.isGallerySheetOpen ||
         uiState.isServerPickerOpen ||
@@ -233,6 +284,7 @@ fun StreamingScreen(
     BackHandler(enabled = hasInnerModal) {
         when {
             uiState.fullScreenPreviewUrl != null -> viewModel.closeFullScreenImage()
+            showCommentStickerPanel -> showCommentStickerPanel = false
             uiState.activeCommentForReplies != null -> viewModel.closeReplies()
             uiState.isGallerySheetOpen -> viewModel.toggleGallerySheet()
             uiState.isServerPickerOpen -> viewModel.toggleServerPicker()
@@ -351,6 +403,11 @@ fun StreamingScreen(
         }
     }
 
+    val firebaseProfile by FirebaseManager.userProfile.collectAsState()
+    val isUserSignedIn = localDb.isLoggedIn() || FirebaseManager.isUserLoggedIn()
+    val currentUserName = firebaseProfile?.name?.takeIf { it.isNotBlank() } ?: localDb.getUsername()
+    val currentUserAvatar = firebaseProfile?.avatar?.takeIf { it.isNotBlank() } ?: localDb.getAvatarUrl()
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -361,7 +418,7 @@ fun StreamingScreen(
 
         if (isInitialLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = ColorAccentPrimary, modifier = Modifier.size(40.dp))
+                CircularProgressIndicator(color = ColorStreamAccent, modifier = Modifier.size(40.dp))
             }
         } else if (isInitialError) {
             Column(
@@ -424,12 +481,14 @@ fun StreamingScreen(
                                         isLoading = uiState.isLoadingReplies,
                                         onBackClick = { viewModel.closeReplies() },
                                         onRequireLogin = { viewModel.triggerLoginPrompt() },
+                                        onDeleteLocalReply = { replyId -> viewModel.deleteLocalComment(replyId) },
                                         onSendReply = { text ->
-                                            val localDb = LocalAuthDatabase(context)
                                             val item = localDb.addLocalComment(
                                                 episodeId = uiState.episodeId,
                                                 text = text,
-                                                parentId = uiState.activeCommentForReplies?.id
+                                                parentId = uiState.activeCommentForReplies?.id,
+                                                customUserName = currentUserName,
+                                                customAvatarUrl = currentUserAvatar
                                             )
                                             viewModel.addLocalReply(item)
                                         }
@@ -451,9 +510,9 @@ fun StreamingScreen(
                                 // Main Content Column
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(bottom = 72.dp)
+                                    contentPadding = PaddingValues(bottom = 16.dp)
                                 ) {
-                                    // Anime Info Surface Card (#12151C) directly below Player and above COVER & POSTER
+                                    // Anime Info langsung menyatu dengan latar hitam pekat (tanpa kotak/card abu-abu gelap)
                                     item(key = "episode_header") {
                                         var isSynopsisExpanded by remember(uiState.episodeId, uiState.movieId) {
                                             mutableStateOf(false)
@@ -477,11 +536,8 @@ fun StreamingScreen(
                                         Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(horizontal = 8.dp, vertical = 8.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(Color(0xFF12151C))
                                                 .animateContentSize()
-                                                .padding(horizontal = 14.dp, vertical = 14.dp)
+                                                .padding(horizontal = 16.dp, vertical = 14.dp)
                                         ) {
                                             // Top Row: Vertical Poster on Left + Title & Metadata on Right
                                             Row(
@@ -497,10 +553,10 @@ fun StreamingScreen(
                                                         .build(),
                                                     contentDescription = realTitle,
                                                     modifier = Modifier
-                                                        .width(80.dp)
+                                                        .width(74.dp)
                                                         .aspectRatio(2f / 3f)
                                                         .clip(RoundedCornerShape(8.dp))
-                                                        .background(Color(0xFF181A22)),
+                                                        .background(Color(0xFF14161D)),
                                                     contentScale = ContentScale.Crop
                                                 )
 
@@ -526,34 +582,50 @@ fun StreamingScreen(
                                                     ) {
                                                         Text(
                                                             text = "Episode $episodeNumber",
-                                                            color = Color(0xFFCBD5E1),
-                                                            fontSize = 13.sp,
+                                                            color = Color(0xFFB8BEC9),
+                                                            fontSize = 12.5.sp,
                                                             fontWeight = FontWeight.Medium
                                                         )
 
-                                                        Spacer(modifier = Modifier.width(10.dp))
+                                                        Text(
+                                                            text = "  •  ",
+                                                            color = Color(0xFF6B7280),
+                                                            fontSize = 12.5.sp
+                                                        )
 
                                                         Icon(
                                                             imageVector = Icons.Default.Visibility,
                                                             contentDescription = "Views",
-                                                            tint = Color(0xFFCBD5E1),
-                                                            modifier = Modifier.size(14.dp)
+                                                            tint = Color(0xFFB8BEC9),
+                                                            modifier = Modifier.size(13.5.dp)
                                                         )
 
                                                         Spacer(modifier = Modifier.width(4.dp))
 
                                                         Text(
                                                             text = shortViews,
-                                                            color = Color(0xFFCBD5E1),
-                                                            fontSize = 13.sp,
+                                                            color = Color(0xFFB8BEC9),
+                                                            fontSize = 12.5.sp,
                                                             fontWeight = FontWeight.Medium
                                                         )
 
                                                         if (formattedAiredStart != null) {
                                                             Text(
-                                                                text = "  •  $formattedAiredStart",
-                                                                color = Color(0xFFCBD5E1),
-                                                                fontSize = 13.sp,
+                                                                text = "  •  ",
+                                                                color = Color(0xFF6B7280),
+                                                                fontSize = 12.5.sp
+                                                            )
+                                                            Icon(
+                                                                imageVector = Icons.Outlined.DateRange,
+                                                                contentDescription = "Tanggal Rilis",
+                                                                tint = Color(0xFFB8BEC9),
+                                                                modifier = Modifier.size(13.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.width(4.dp))
+                                                            Text(
+                                                                text = formattedAiredStart,
+                                                                color = Color(0xFFB8BEC9),
+                                                                fontSize = 12.5.sp,
                                                                 fontWeight = FontWeight.Medium,
                                                                 maxLines = 1,
                                                                 overflow = TextOverflow.Ellipsis
@@ -565,17 +637,17 @@ fun StreamingScreen(
 
                                             Spacer(modifier = Modifier.height(12.dp))
 
-                                            // Bottom Section: Synopsis + Expand/Collapse "Selengkapnya >"
+                                            // Bottom Section: Synopsis + Expand/Collapse "Selengkapnya >" (Putih Bersih)
                                             Text(
                                                 text = realSynopsis,
-                                                color = Color(0xFF94A3B8),
-                                                fontSize = 13.sp,
+                                                color = Color(0xFFD1D5DB),
+                                                fontSize = 13.5.sp,
                                                 lineHeight = 19.sp,
                                                 maxLines = if (isSynopsisExpanded) Int.MAX_VALUE else 3,
                                                 overflow = TextOverflow.Ellipsis
                                             )
 
-                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Spacer(modifier = Modifier.height(8.dp))
 
                                             Row(
                                                 modifier = Modifier
@@ -586,11 +658,11 @@ fun StreamingScreen(
                                             ) {
                                                 Text(
                                                     text = if (isSynopsisExpanded) "Sembunyikan" else "Selengkapnya",
-                                                    color = Color(0xFF3B82F6),
+                                                    color = Color.White,
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.SemiBold
                                                 )
-                                                Spacer(modifier = Modifier.width(2.dp))
+                                                Spacer(modifier = Modifier.width(3.dp))
                                                 Icon(
                                                     imageVector = if (isSynopsisExpanded) {
                                                         Icons.Default.KeyboardArrowUp
@@ -602,14 +674,19 @@ fun StreamingScreen(
                                                     } else {
                                                         "Selengkapnya sinopsis"
                                                     },
-                                                    tint = Color(0xFF3B82F6),
+                                                    tint = Color.White,
                                                     modifier = Modifier.size(16.dp)
                                                 )
                                             }
                                         }
+                                        HorizontalDivider(
+                                            thickness = 0.5.dp,
+                                            color = Color(0x14FFFFFF),
+                                            modifier = Modifier.padding(horizontal = 16.dp)
+                                        )
                                     }
 
-                                    // Section: EPISODE SELECTOR & SEARCH INLINE (Between Anime Info Card & COVER & POSTER)
+                                    // Section: EPISODE SELECTOR & SEARCH INLINE
                                     item(key = "episode_selector_section") {
                                         val displayedEpisodes = remember(uiState.episodes, uiState.episodeSearchQuery) {
                                             val q = uiState.episodeSearchQuery.trim()
@@ -626,7 +703,6 @@ fun StreamingScreen(
                                         val activeEpIndex = uiState.episode?.index
                                         val currentViewMode = uiState.episodeViewMode
 
-                                        // Auto-scroll LazyRow ke episode aktif (berfungsi mulus di kedua mode)
                                         LaunchedEffect(activeEpId, activeEpIndex, displayedEpisodes.size, currentViewMode) {
                                             val activeIndex = displayedEpisodes.indexOfFirst {
                                                 it.id == activeEpId || (it.index != null && it.index == activeEpIndex)
@@ -636,7 +712,6 @@ fun StreamingScreen(
                                             }
                                         }
 
-                                        // Auto-scroll saat query search cocok dengan nomor episode
                                         LaunchedEffect(uiState.episodeSearchQuery, displayedEpisodes.size) {
                                             val q = uiState.episodeSearchQuery.trim()
                                             if (q.isNotEmpty()) {
@@ -651,9 +726,9 @@ fun StreamingScreen(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .onboardingTarget("stream_episodes", targetBounds)
-                                                .padding(top = 4.dp, bottom = 4.dp)
+                                                .padding(top = 10.dp, bottom = 4.dp)
                                         ) {
-                                            // Header Bar: EPISODE • Total + Inline Search Pill + Toggle View Mode (1 Baris Rapi)
+                                            // Header Bar: EPISODE • Total + Inline Search Pill + Toggle View Mode
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
@@ -661,66 +736,63 @@ fun StreamingScreen(
                                                 horizontalArrangement = Arrangement.SpaceBetween,
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                // Sisi Kiri: Judul EPISODE + Total
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                                     Text(
                                                         text = "EPISODE",
                                                         color = ColorTextPrimary,
                                                         fontSize = 14.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        letterSpacing = 0.5.sp
+                                                        letterSpacing = 0.4.sp
                                                     )
                                                     val epCount = if (uiState.totalEpisodesCount > 0) uiState.totalEpisodesCount else uiState.episodes.size
                                                     if (epCount > 0) {
                                                         Spacer(modifier = Modifier.width(6.dp))
                                                         Text(
                                                             text = "• $epCount Ep",
-                                                            color = Color(0xFF64748B),
+                                                            color = Color(0xFF9CA3AF),
                                                             fontSize = 13.sp,
                                                             fontWeight = FontWeight.Normal
                                                         )
                                                     }
                                                 }
 
-                                                // Sisi Kanan: Inline Search Pill + Toggle View Mode Button
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                 ) {
-                                                    // Kolom Pencarian Ringkas (Tinggi 30dp, Latar #14171F tanpa border kaku)
                                                     Row(
                                                         modifier = Modifier
                                                             .height(30.dp)
                                                             .width(115.dp)
                                                             .clip(RoundedCornerShape(15.dp))
-                                                            .background(Color(0xFF14171F))
-                                                            .padding(horizontal = 8.dp),
+                                                            .background(Color(0xFF1A1C22))
+                                                            .padding(horizontal = 10.dp),
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
                                                         Icon(
                                                             imageVector = Icons.Default.Search,
                                                             contentDescription = "Cari episode",
-                                                            tint = Color(0xFF64748B),
+                                                            tint = Color(0xFF8E929B),
                                                             modifier = Modifier.size(13.dp)
                                                         )
-                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Spacer(modifier = Modifier.width(5.dp))
                                                         BasicTextField(
                                                             value = uiState.episodeSearchQuery,
                                                             onValueChange = { viewModel.setEpisodeSearchQuery(it) },
                                                             modifier = Modifier.weight(1f),
                                                             textStyle = TextStyle(
                                                                 color = Color.White,
-                                                                fontSize = 11.sp,
+                                                                fontSize = 11.5.sp,
                                                                 fontWeight = FontWeight.Medium
                                                             ),
                                                             singleLine = true,
-                                                            cursorBrush = SolidColor(Color(0xFFFF5722)),
+                                                            cursorBrush = SolidColor(ColorStreamAccent),
                                                             decorationBox = { innerTextField ->
                                                                 if (uiState.episodeSearchQuery.isEmpty()) {
                                                                     Text(
-                                                                        text = "Cari ep..",
-                                                                        color = Color(0xFF64748B),
-                                                                        fontSize = 11.sp
+                                                                        text = "Cari ep.",
+                                                                        color = Color(0xFF8E929B),
+                                                                        fontSize = 11.5.sp
                                                                     )
                                                                 }
                                                                 innerTextField()
@@ -730,7 +802,7 @@ fun StreamingScreen(
                                                             Icon(
                                                                 imageVector = Icons.Default.Close,
                                                                 contentDescription = "Hapus pencarian",
-                                                                tint = Color(0xFF94A3B8),
+                                                                tint = Color(0xFF9CA3AF),
                                                                 modifier = Modifier
                                                                     .size(12.dp)
                                                                     .clickable { viewModel.setEpisodeSearchQuery("") }
@@ -738,12 +810,10 @@ fun StreamingScreen(
                                                         }
                                                     }
 
-                                                    // Tombol Ikon Bersih: Toggle View Mode (Thumbnail Card vs Number Pill)
                                                     Box(
                                                         modifier = Modifier
-                                                            .size(30.dp)
+                                                            .size(32.dp)
                                                             .clip(RoundedCornerShape(8.dp))
-                                                            .background(Color(0xFF14171F))
                                                             .clickable {
                                                                 val newMode = if (currentViewMode == EpisodeViewMode.THUMBNAIL) {
                                                                     EpisodeViewMode.COMPACT
@@ -760,7 +830,7 @@ fun StreamingScreen(
                                                     ) {
                                                         Icon(
                                                             imageVector = if (currentViewMode == EpisodeViewMode.THUMBNAIL) {
-                                                                Icons.Default.FormatListNumbered
+                                                                Icons.AutoMirrored.Filled.FormatListBulleted
                                                             } else {
                                                                 Icons.Default.Image
                                                             },
@@ -769,8 +839,8 @@ fun StreamingScreen(
                                                             } else {
                                                                 "Beralih ke Mode Gambar"
                                                             },
-                                                            tint = if (currentViewMode == EpisodeViewMode.THUMBNAIL) Color(0xFFCBD5E1) else Color(0xFFFF5722),
-                                                            modifier = Modifier.size(16.dp)
+                                                            tint = Color.White,
+                                                            modifier = Modifier.size(20.dp)
                                                         )
                                                     }
                                                 }
@@ -804,7 +874,12 @@ fun StreamingScreen(
                                                             modifier = Modifier
                                                                 .height(26.dp)
                                                                 .clip(RoundedCornerShape(6.dp))
-                                                                .background(if (isSelected) Color(0xFF242836) else Color(0xFF12151C))
+                                                                .background(if (isSelected) Color(0xFF262932) else Color(0xFF14161D))
+                                                                .then(
+                                                                    if (isSelected) {
+                                                                        Modifier.border(1.dp, Color.White, RoundedCornerShape(6.dp))
+                                                                    } else Modifier
+                                                                )
                                                                 .clickable {
                                                                     viewModel.selectEpisodeRange(chunk.first, chunk.second)
                                                                 }
@@ -813,7 +888,7 @@ fun StreamingScreen(
                                                         ) {
                                                             Text(
                                                                 text = "${chunk.first} - ${chunk.second}",
-                                                                color = if (isSelected) Color.White else Color(0xFF64748B),
+                                                                color = if (isSelected) Color.White else Color(0xFF9CA3AF),
                                                                 fontSize = 11.sp,
                                                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                                             )
@@ -822,7 +897,7 @@ fun StreamingScreen(
                                                 }
                                             }
 
-                                            // Daftar Episode Horizontal LazyRow (Anti-Slop Design - Dual Mode)
+                                            // Daftar Episode Horizontal LazyRow
                                             if (uiState.isLoadingEpisodes && displayedEpisodes.isEmpty()) {
                                                 Row(
                                                     modifier = Modifier
@@ -835,7 +910,7 @@ fun StreamingScreen(
                                                     CircularProgressIndicator(
                                                         modifier = Modifier.size(20.dp),
                                                         strokeWidth = 2.dp,
-                                                        color = Color(0xFFFF5722)
+                                                        color = ColorStreamAccent
                                                     )
                                                 }
                                             } else if (displayedEpisodes.isEmpty()) {
@@ -849,17 +924,17 @@ fun StreamingScreen(
                                                 ) {
                                                     Text(
                                                         text = if (uiState.episodeSearchQuery.isNotEmpty()) "Episode tidak ditemukan" else "Memuat episode...",
-                                                        color = Color(0xFF64748B),
+                                                        color = Color(0xFF9CA3AF),
                                                         fontSize = 12.sp
                                                     )
                                                 }
                                             } else if (currentViewMode == EpisodeViewMode.THUMBNAIL) {
-                                                // Mode 1: Versi Dengan Gambar (Thumbnail Card Row — Clean & Anti-Slop)
+                                                // Mode 1: Thumbnail Card Row dengan border tipis PUTIH (#FFFFFF) untuk episode aktif
                                                 LazyRow(
                                                     state = episodeRowState,
                                                     modifier = Modifier
                                                         .fillMaxWidth()
-                                                        .padding(vertical = 6.dp),
+                                                        .padding(vertical = 8.dp),
                                                     contentPadding = PaddingValues(horizontal = 16.dp),
                                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                                 ) {
@@ -876,7 +951,7 @@ fun StreamingScreen(
 
                                                         Box(
                                                             modifier = Modifier
-                                                                .width(146.dp)
+                                                                .width(138.dp)
                                                                 .aspectRatio(16f / 9f)
                                                                 .clip(RoundedCornerShape(10.dp))
                                                                 .background(Color(0xFF14171F))
@@ -884,7 +959,7 @@ fun StreamingScreen(
                                                                     if (isActive) {
                                                                         Modifier.border(
                                                                             width = 1.5.dp,
-                                                                            color = Color(0xFFFF5722),
+                                                                            color = Color.White,
                                                                             shape = RoundedCornerShape(10.dp)
                                                                         )
                                                                     } else Modifier
@@ -898,7 +973,6 @@ fun StreamingScreen(
                                                                     }
                                                                 }
                                                         ) {
-                                                            // Gambar Thumbnail Episode
                                                             AsyncImage(
                                                                 model = ImageRequest.Builder(LocalContext.current)
                                                                     .data(thumbnailModel)
@@ -911,18 +985,17 @@ fun StreamingScreen(
                                                                 contentScale = ContentScale.Crop
                                                             )
 
-                                                            // Gradasi Gelap Tipis di Bawah Gambar untuk Teks Ep [Nomor]
                                                             Box(
                                                                 modifier = Modifier
                                                                     .fillMaxWidth()
-                                                                    .height(38.dp)
+                                                                    .height(36.dp)
                                                                     .align(Alignment.BottomCenter)
                                                                     .background(
                                                                         Brush.verticalGradient(
                                                                             colors = listOf(
                                                                                 Color.Transparent,
-                                                                                Color(0xB3000000),
-                                                                                Color(0xE6000000)
+                                                                                Color(0x99000000),
+                                                                                Color(0xDE000000)
                                                                             )
                                                                         )
                                                                     )
@@ -938,47 +1011,16 @@ fun StreamingScreen(
                                                                     overflow = TextOverflow.Ellipsis
                                                                 )
                                                             }
-
-                                                            // Indikator Episode Aktif: Badge PLAYING di Pojok Atas
-                                                            if (isActive) {
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .align(Alignment.TopStart)
-                                                                        .padding(6.dp)
-                                                                        .clip(RoundedCornerShape(4.dp))
-                                                                        .background(Color(0xEEFF5722))
-                                                                        .padding(horizontal = 5.dp, vertical = 2.dp)
-                                                                ) {
-                                                                    Row(
-                                                                        verticalAlignment = Alignment.CenterVertically,
-                                                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                                                    ) {
-                                                                        Icon(
-                                                                            imageVector = Icons.Default.PlayArrow,
-                                                                            contentDescription = "Playing",
-                                                                            tint = Color.White,
-                                                                            modifier = Modifier.size(10.dp)
-                                                                        )
-                                                                        Text(
-                                                                            text = "PLAYING",
-                                                                            color = Color.White,
-                                                                            fontSize = 9.sp,
-                                                                            fontWeight = FontWeight.Bold,
-                                                                            letterSpacing = 0.5.sp
-                                                                        )
-                                                                    }
-                                                                }
-                                                            }
                                                         }
                                                     }
                                                 }
                                             } else {
-                                                // Mode 2: Versi Tanpa Gambar (Compact Number Pill Row — Clean & Anti-Slop)
+                                                // Mode 2: Compact Number Pill Row dengan border PUTIH (#FFFFFF) untuk episode aktif
                                                 LazyRow(
                                                     state = episodeRowState,
                                                     modifier = Modifier
                                                         .fillMaxWidth()
-                                                        .padding(vertical = 6.dp),
+                                                        .padding(vertical = 8.dp),
                                                     contentPadding = PaddingValues(horizontal = 16.dp),
                                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                 ) {
@@ -995,8 +1037,17 @@ fun StreamingScreen(
                                                                 .defaultMinSize(minWidth = 48.dp)
                                                                 .clip(RoundedCornerShape(8.dp))
                                                                 .background(
-                                                                    if (isActive) Color(0xFFFF5722)
-                                                                    else Color(0xFF14171F)
+                                                                    if (isActive) Color(0xFF22252E)
+                                                                    else Color(0xFF14161D)
+                                                                )
+                                                                .then(
+                                                                    if (isActive) {
+                                                                        Modifier.border(
+                                                                            width = 1.5.dp,
+                                                                            color = Color.White,
+                                                                            shape = RoundedCornerShape(8.dp)
+                                                                        )
+                                                                    } else Modifier
                                                                 )
                                                                 .clickable {
                                                                     if (!isActive) {
@@ -1009,26 +1060,12 @@ fun StreamingScreen(
                                                                 .padding(horizontal = 12.dp),
                                                             contentAlignment = Alignment.Center
                                                         ) {
-                                                            Row(
-                                                                verticalAlignment = Alignment.CenterVertically,
-                                                                horizontalArrangement = Arrangement.Center
-                                                            ) {
-                                                                if (isActive) {
-                                                                    Icon(
-                                                                        imageVector = Icons.Default.PlayArrow,
-                                                                        contentDescription = "Playing",
-                                                                        tint = Color.White,
-                                                                        modifier = Modifier.size(12.dp)
-                                                                    )
-                                                                    Spacer(modifier = Modifier.width(3.dp))
-                                                                }
-                                                                Text(
-                                                                    text = epItem.index ?: "•",
-                                                                    color = if (isActive) Color.White else Color(0xFFCBD5E1),
-                                                                    fontSize = 13.sp,
-                                                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold
-                                                                )
-                                                            }
+                                                            Text(
+                                                                text = epItem.index ?: "•",
+                                                                color = if (isActive) Color.White else Color(0xFFCBD5E1),
+                                                                fontSize = 13.sp,
+                                                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold
+                                                            )
                                                         }
                                                     }
                                                 }
@@ -1036,10 +1073,10 @@ fun StreamingScreen(
                                         }
                                     }
 
-                                    // Section: COVER & POSTER (Equal Height 195dp, Interleaved, Horizontal Scroll)
+                                    // Section: COVER & POSTER >
                                     item(key = "cover_poster_section") {
                                         val interleavedMedia = remember(uiState.posters, uiState.covers) {
-                                            val list = mutableListOf<Pair<CommunityMediaItem, Boolean>>() // Pair(item, isPoster)
+                                            val list = mutableListOf<Pair<CommunityMediaItem, Boolean>>()
                                             val maxLen = maxOf(uiState.posters.size, uiState.covers.size)
                                             for (i in 0 until maxLen) {
                                                 if (i < uiState.posters.size) list.add(uiState.posters[i] to true)
@@ -1049,7 +1086,7 @@ fun StreamingScreen(
                                         }
 
                                         if (interleavedMedia.isNotEmpty()) {
-                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Spacer(modifier = Modifier.height(10.dp))
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
@@ -1057,12 +1094,27 @@ fun StreamingScreen(
                                                 horizontalArrangement = Arrangement.SpaceBetween,
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Text(
-                                                    text = "COVER & POSTER",
-                                                    color = ColorTextPrimary,
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
+                                                Row(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .clickable { viewModel.toggleGallerySheet(0) }
+                                                        .padding(vertical = 4.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = "COVER & POSTER",
+                                                        color = ColorTextPrimary,
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Icon(
+                                                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                                        contentDescription = "Lihat Semua Cover & Poster",
+                                                        tint = Color.White,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
                                                 IconButton(
                                                     onClick = { viewModel.toggleGallerySheet(0) },
                                                     modifier = Modifier.size(36.dp)
@@ -1088,7 +1140,7 @@ fun StreamingScreen(
                                                     val placeholderRes = if (isPoster) R.drawable.placeholder_yuranime else R.drawable.placeholder_yuranime_wide
                                                     Box(
                                                         modifier = Modifier
-                                                            .height(195.dp)
+                                                            .height(176.dp)
                                                             .aspectRatio(if (isPoster) 2f / 3f else 16f / 9f)
                                                             .clip(RoundedCornerShape(8.dp))
                                                             .background(Color(0xFF181A22))
@@ -1114,7 +1166,7 @@ fun StreamingScreen(
                                         }
                                     }
 
-                                    // Section: COMMENTS (X)
+                                    // Section: COMMENTS (ALL)
                                     item(key = "comments_header") {
                                         Column(
                                             modifier = Modifier
@@ -1129,64 +1181,287 @@ fun StreamingScreen(
                                                 horizontalArrangement = Arrangement.SpaceBetween,
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Text(
-                                                    text = "COMMENTS (${uiState.comments.size})",
-                                                    color = ColorTextPrimary,
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                Icon(
-                                                    imageVector = Icons.Default.Sort,
-                                                    contentDescription = "Sort",
-                                                    tint = ColorTextSecondary,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = "COMMENTS (${uiState.comments.size})",
+                                                        color = ColorTextPrimary,
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    if (uiState.isLoadingMoreComments) {
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        CircularProgressIndicator(
+                                                            color = Color.White,
+                                                            strokeWidth = 1.5.dp,
+                                                            modifier = Modifier.size(12.dp)
+                                                        )
+                                                    }
+                                                }
+                                                Row(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .clickable {
+                                                            viewModel.toggleCommentSort()
+                                                            val sortLabel = if (uiState.commentSort == "new") "Terpopuler" else "Terbaru"
+                                                            Toast.makeText(context, "Urutkan: $sortLabel", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = if (uiState.commentSort == "popular") "Top" else "Terbaru",
+                                                        color = Color(0xFF9CA3AF),
+                                                        fontSize = 11.5.sp,
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Icon(
+                                                        imageVector = Icons.Default.Sort,
+                                                        contentDescription = "Urutkan komentar",
+                                                        tint = Color.White,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
                                             }
-                                            Spacer(modifier = Modifier.height(10.dp))
+                                            Spacer(modifier = Modifier.height(8.dp))
                                         }
                                     }
 
-                                    // Comments Items
-                                    items(uiState.comments, key = { it.id ?: it.hashCode().toString() }) { comment ->
-                                        CommentItemRow(
-                                            comment = comment,
-                                            onReplyClick = { viewModel.openReplies(comment) },
-                                            onRequireLogin = { viewModel.triggerLoginPrompt() }
-                                        )
+                                    if (uiState.isLoadingComments && uiState.comments.isEmpty()) {
+                                        item(key = "comments_loading") {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 24.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                CircularProgressIndicator(
+                                                    color = Color.White,
+                                                    strokeWidth = 2.dp,
+                                                    modifier = Modifier.size(22.dp)
+                                                )
+                                            }
+                                        }
+                                    } else if (uiState.comments.isEmpty()) {
+                                        item(key = "comments_empty") {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 16.dp, vertical = 24.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "Belum ada komentar di episode ini. Jadilah yang pertama berkomentar!",
+                                                    color = Color(0xFF9CA3AF),
+                                                    fontSize = 12.5.sp,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        items(
+                                            items = uiState.comments,
+                                            key = { it.id ?: "${it.userName}_${it.time}_${it.hashCode()}" }
+                                        ) { comment ->
+                                            CommentItemRow(
+                                                comment = comment,
+                                                onReplyClick = { viewModel.openReplies(comment) },
+                                                onCopyText = { textToCopy ->
+                                                    val clean = InlineStickerCodec.toReadableCopyText(textToCopy)
+                                                    if (clean.isNotBlank()) {
+                                                        clipboardManager.setText(AnnotatedString(clean))
+                                                        Toast.makeText(context, "Komentar disalin", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                                onDeleteLocal = { commentId ->
+                                                    viewModel.deleteLocalComment(commentId)
+                                                    Toast.makeText(context, "Komentar dihapus", Toast.LENGTH_SHORT).show()
+                                                },
+                                                onRequireLogin = { viewModel.triggerLoginPrompt() }
+                                            )
+                                            HorizontalDivider(
+                                                thickness = 0.5.dp,
+                                                color = Color(0x14FFFFFF),
+                                                modifier = Modifier.padding(horizontal = 16.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
+                    }
 
-                        // Floating Chat FAB (Bottom-Right, Orange Glassmorphism)
-                        if (uiState.activeCommentForReplies == null && !uiState.isGallerySheetOpen) {
-                            Box(
+                    // Sticky Bottom Comment Input Bar + Sticker Picker (menggantikan FAB Chat Oranye)
+                    if (uiState.activeCommentForReplies == null && !uiState.isGallerySheetOpen) {
+                        val canSendComment = commentComposerState.hasSendableContent()
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF0B0B0B))
+                                .navigationBarsPadding()
+                                .imePadding()
+                        ) {
+                            HorizontalDivider(thickness = 0.5.dp, color = Color(0x1AFFFFFF))
+                            Row(
                                 modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(end = 20.dp, bottom = 24.dp)
-                                    .size(52.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.linearGradient(
-                                            listOf(ColorAccentPrimary, Color(0xFFFF6D3F))
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // User Avatar di kiri (statis tanpa dekorasi bergerak)
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF1A1C22)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (currentUserAvatar.isNotBlank()) {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(context)
+                                                .data(currentUserAvatar)
+                                                .crossfade(true)
+                                                .build(),
+                                            contentDescription = "Avatar pengguna",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .clip(CircleShape)
                                         )
-                                    )
-                                    .border(1.dp, Color(0x66FFFFFF), CircleShape)
-                                    .clickable {
-                                        val localDb = LocalAuthDatabase(context)
-                                        if (!localDb.isLoggedIn()) {
-                                            viewModel.triggerLoginPrompt()
-                                        } else {
-                                            viewModel.toggleCommentInput()
+                                    } else if (isUserSignedIn && currentUserName.isNotBlank()) {
+                                        Text(
+                                            text = currentUserName.take(1).uppercase(Locale.ROOT),
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.Person,
+                                            contentDescription = "Avatar",
+                                            tint = Color(0xFF9CA3AF),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                // Kolom input bulat gelap + ikon Emoji/Stiker + ikon Kirim di kanan
+                                Row(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .heightIn(min = 42.dp)
+                                        .clip(RoundedCornerShape(22.dp))
+                                        .background(Color(0xFF1A1C22))
+                                        .padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier.weight(1f),
+                                        contentAlignment = Alignment.CenterStart
+                                    ) {
+                                        InlineStickerInputField(
+                                            state = commentComposerState,
+                                            placeholder = "Tulis komentar...",
+                                            cursorColor = Color.White,
+                                            placeholderColor = Color(0xFF8E929B),
+                                            modifier = Modifier.focusRequester(commentInputFocusRequester),
+                                            onFocused = {
+                                                if (!isUserSignedIn) {
+                                                    viewModel.triggerLoginPrompt()
+                                                } else {
+                                                    showCommentStickerPanel = false
+                                                }
+                                            }
+                                        )
+                                    }
+
+                                    // Ikon Emoji / Stiker
+                                    IconButton(
+                                        onClick = {
+                                            if (!isUserSignedIn) {
+                                                viewModel.triggerLoginPrompt()
+                                            } else if (showCommentStickerPanel) {
+                                                showCommentStickerPanel = false
+                                                commentInputFocusRequester.requestFocus()
+                                                keyboardController?.show()
+                                            } else {
+                                                keyboardController?.hide()
+                                                showCommentStickerPanel = true
+                                            }
+                                        },
+                                        modifier = Modifier.size(34.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (showCommentStickerPanel) {
+                                                Icons.Rounded.Keyboard
+                                            } else {
+                                                Icons.Outlined.SentimentSatisfied
+                                            },
+                                            contentDescription = if (showCommentStickerPanel) "Tampilkan keyboard" else "Pilih stiker atau emoji",
+                                            tint = if (showCommentStickerPanel) Color.White else Color(0xFF9CA3AF),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    // Ikon Kirim
+                                    IconButton(
+                                        onClick = {
+                                            if (!isUserSignedIn) {
+                                                viewModel.triggerLoginPrompt()
+                                            } else if (canSendComment) {
+                                                val encoded = commentComposerState.exportEncodedText()
+                                                if (encoded.isNotBlank()) {
+                                                    val newComment = localDb.addLocalComment(
+                                                        episodeId = uiState.episodeId,
+                                                        text = encoded,
+                                                        customUserName = currentUserName,
+                                                        customAvatarUrl = currentUserAvatar
+                                                    )
+                                                    viewModel.addLocalComment(newComment)
+                                                    commentComposerState.clear()
+                                                    showCommentStickerPanel = false
+                                                    keyboardController?.hide()
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.size(34.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.Send,
+                                            contentDescription = "Kirim komentar",
+                                            tint = if (canSendComment) Color.White else Color(0xFF6B7280),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Panel Stiker 2 Mode (Inline Emoji-Sticker & Stiker Besar) dari Global Chat
+                            AnimatedVisibility(
+                                visible = showCommentStickerPanel && isUserSignedIn,
+                                enter = expandVertically() + fadeIn(),
+                                exit = shrinkVertically() + fadeOut()
+                            ) {
+                                ChatStickerPanel(
+                                    onInsertInlineSticker = { sticker ->
+                                        commentComposerState.insertInlineSticker(sticker.url)
+                                    },
+                                    onSendLargeSticker = { sticker ->
+                                        if (sticker.url.isNotBlank()) {
+                                            val newComment = localDb.addLocalComment(
+                                                episodeId = uiState.episodeId,
+                                                text = "[sticker:${sticker.url}]",
+                                                customUserName = currentUserName,
+                                                customAvatarUrl = currentUserAvatar
+                                            )
+                                            viewModel.addLocalComment(newComment)
+                                            showCommentStickerPanel = false
                                         }
                                     },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ChatBubble,
-                                    contentDescription = "Tulis Komentar",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
+                                    onBackspace = { commentComposerState.backspace() },
+                                    accentColor = Color.White
                                 )
                             }
                         }
@@ -1214,30 +1489,14 @@ fun StreamingScreen(
             )
         }
 
-        // Comment Input Dialog
-        if (uiState.isCommentInputOpen) {
-            CommentInputDialog(
-                onDismiss = { viewModel.toggleCommentInput() },
-                onSend = { text ->
-                    val localDb = LocalAuthDatabase(context)
-                    val newComment = localDb.addLocalComment(
-                        episodeId = uiState.episodeId,
-                        text = text
-                    )
-                    viewModel.addLocalComment(newComment)
-                }
-            )
-        }
-
         // Login Required Alert Dialog
         if (uiState.showLoginPrompt) {
             LoginRequiredDialog(
                 onDismiss = { viewModel.dismissLoginPrompt() },
                 onSimulateLogin = {
-                    val localDb = LocalAuthDatabase(context)
-                    localDb.setLoggedIn(true, "OtakuKeren")
+                    localDb.setLoggedIn(true, "Member Yuranime")
                     viewModel.dismissLoginPrompt()
-                    Toast.makeText(context, "Berhasil masuk sebagai OtakuKeren", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Berhasil masuk untuk berkomentar", Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -1322,38 +1581,67 @@ private fun CustomExoPlayerView(
     onEpisodeChange: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
     var showControls by remember { mutableStateOf(true) }
     var isSeeking by remember { mutableStateOf(false) }
     var sliderPosition by remember { mutableLongStateOf(0L) }
+    val seekPreviewManager = remember { SeekPreviewManager(maxFrames = 18) }
+    var previewFrameBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    var isLoadingPreviewFrame by remember { mutableStateOf(false) }
+    var controlsRowWidthPx by remember { mutableIntStateOf(0) }
+    var seekbarStartXPx by remember { mutableFloatStateOf(0f) }
+    var seekbarWidthPx by remember { mutableFloatStateOf(1f) }
     var autoSkippedIntroForEp by remember { mutableStateOf<String?>(null) }
     var playerBoxWidthPx by remember { mutableIntStateOf(0) }
     var doubleTapSide by remember { mutableIntStateOf(0) } // -1 = kiri (mundur), 1 = kanan (maju)
     var doubleTapCumulativeSec by remember { mutableIntStateOf(0) }
     var doubleTapEventToken by remember { mutableIntStateOf(0) }
+    var pendingSeekBasePosMs by remember { mutableLongStateOf(-1L) }
+    var pendingSeekTargetPosMs by remember { mutableLongStateOf(-1L) }
+    val gestureScope = rememberCoroutineScope()
+    var pendingSingleTapJob by remember { mutableStateOf<Job?>(null) }
+    var lastSingleTapUptimeMs by remember { mutableLongStateOf(0L) }
+    var lastSingleTapSide by remember { mutableIntStateOf(0) }
+    var lastSkipTapUptimeMs by remember { mutableLongStateOf(0L) }
     val latestUiState by rememberUpdatedState(uiState)
     val latestOnEpisodeChange by rememberUpdatedState(onEpisodeChange)
+    val latestPlayerBoxWidthPx by rememberUpdatedState(playerBoxWidthPx)
+
+    val exoPlayer = remember(context) {
+        StreamingPlayerHolder.getOrCreatePlayer(context)
+    }
 
     LaunchedEffect(doubleTapEventToken) {
         if (doubleTapEventToken > 0) {
-            delay(850L)
+            delay(270L)
+            val targetPos = pendingSeekTargetPosMs
+            if (targetPos >= 0L) {
+                exoPlayer.seekTo(targetPos)
+                val dur = exoPlayer.duration
+                viewModel.updatePosition(targetPos, dur, exoPlayer.bufferedPosition)
+                StreamingPlayerHolder.updatePlaybackProgress(targetPos, dur, exoPlayer.isPlaying)
+                pendingSeekTargetPosMs = -1L
+                pendingSeekBasePosMs = -1L
+            }
+            delay(500L)
             doubleTapSide = 0
             doubleTapCumulativeSec = 0
         }
     }
 
-    // Initialize ExoPlayer
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            playWhenReady = uiState.autoPlayEnabled
-            repeatMode = Player.REPEAT_MODE_OFF
-        }
-    }
+    // Gunakan sesi ExoPlayer bersama dari StreamingPlayerHolder agar mini-player & PiP berjalan tanpa mengulang video
+    val isInSystemPip by StreamingPlayerHolder.isInSystemPip.collectAsStateWithLifecycle()
 
     // Bind playback listener
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 viewModel.setPlaying(isPlaying)
+                StreamingPlayerHolder.updatePlaybackProgress(
+                    exoPlayer.currentPosition,
+                    exoPlayer.duration,
+                    isPlaying
+                )
             }
             override fun onPlaybackStateChanged(playbackState: Int) {
                 val activeState = latestUiState
@@ -1361,6 +1649,7 @@ private fun CustomExoPlayerView(
                     val duration = exoPlayer.duration
                     val pos = exoPlayer.currentPosition
                     viewModel.updatePosition(pos, duration, exoPlayer.bufferedPosition)
+                    StreamingPlayerHolder.updatePlaybackProgress(pos, duration, exoPlayer.isPlaying)
                 } else if (playbackState == Player.STATE_ENDED) {
                     val mIdEnded = activeState.movieId.ifBlank { activeState.episode?.idMovie ?: "" }
                     if (mIdEnded.isNotBlank() && activeState.episodeId.isNotBlank()) {
@@ -1407,17 +1696,45 @@ private fun CustomExoPlayerView(
         exoPlayer.addListener(listener)
         onDispose {
             exoPlayer.removeListener(listener)
-            exoPlayer.release()
         }
     }
 
-    // Memisahkan Logika "Ganti Episode" vs "Ganti Resolusi"
+    // Memisahkan Logika "Ganti Episode" vs "Ganti Resolusi" vs "Kembali dari Mini-Player/PiP"
     var lastLoadedEpisodeId by remember { mutableStateOf<String?>(null) }
     val currentEpisodeId = uiState.episodeId
     val currentStreamUrl = server?.link.orEmpty()
+    val currentAnimeTitle = uiState.movieDetail?.movie?.title
+        ?: uiState.episode?.title?.substringBefore(" Episode")
+        ?: ""
+    val currentEpNum = uiState.episode?.index ?: "1"
+    val currentThumbUrl = uiState.movieDetail?.movie?.getEffectiveCover()?.ifBlank { null }
+        ?: uiState.episode?.getEffectiveImage()?.ifBlank { null }
+        ?: uiState.movieDetail?.movie?.getEffectivePoster()
+        ?: ""
+
+    LaunchedEffect(currentEpisodeId, currentStreamUrl, currentAnimeTitle, currentEpNum, currentThumbUrl) {
+        if (currentStreamUrl.isNotBlank()) {
+            StreamingPlayerHolder.updateActiveMedia(
+                episodeId = currentEpisodeId,
+                movieId = uiState.movieId.ifBlank { uiState.episode?.idMovie ?: "" },
+                streamUrl = currentStreamUrl,
+                animeTitle = currentAnimeTitle,
+                episodeNumber = currentEpNum,
+                thumbnailUrl = currentThumbUrl
+            )
+        }
+    }
 
     LaunchedEffect(currentEpisodeId, currentStreamUrl) {
         if (currentStreamUrl.isNotBlank()) {
+            if (StreamingPlayerHolder.isAlreadyLoaded(currentEpisodeId, currentStreamUrl)) {
+                // Melanjutkan sesi pemutaran yang sudah berjalan dari Mini-Player / PiP tanpa mengulang dari awal
+                lastLoadedEpisodeId = currentEpisodeId
+                viewModel.setPlaying(exoPlayer.isPlaying)
+                viewModel.updatePosition(exoPlayer.currentPosition, exoPlayer.duration, exoPlayer.bufferedPosition)
+                return@LaunchedEffect
+            }
+
             val isResolutionChangeOnly = (lastLoadedEpisodeId != null && lastLoadedEpisodeId == currentEpisodeId)
             val savedPosition = if (isResolutionChangeOnly) {
                 exoPlayer.currentPosition
@@ -1430,6 +1747,15 @@ private fun CustomExoPlayerView(
                 }
             }
 
+            StreamingPlayerHolder.updateActiveMedia(
+                episodeId = currentEpisodeId,
+                movieId = uiState.movieId.ifBlank { uiState.episode?.idMovie ?: "" },
+                streamUrl = currentStreamUrl,
+                animeTitle = currentAnimeTitle,
+                episodeNumber = currentEpNum,
+                thumbnailUrl = currentThumbUrl
+            )
+
             exoPlayer.stop()
             exoPlayer.clearMediaItems()
             exoPlayer.setMediaItem(MediaItem.fromUri(currentStreamUrl))
@@ -1439,11 +1765,62 @@ private fun CustomExoPlayerView(
 
             lastLoadedEpisodeId = currentEpisodeId
         } else {
-            if (lastLoadedEpisodeId != null && lastLoadedEpisodeId != currentEpisodeId) {
+            if (lastLoadedEpisodeId != null && lastLoadedEpisodeId != currentEpisodeId &&
+                !StreamingPlayerHolder.isAlreadyLoaded(currentEpisodeId, currentStreamUrl)
+            ) {
                 exoPlayer.stop()
                 exoPlayer.clearMediaItems()
                 viewModel.updatePosition(0L, 0L)
             }
+        }
+    }
+
+    // Auto-clear cache frame preview RAM & state skip setiap ganti episode atau keluar dari player
+    LaunchedEffect(currentEpisodeId) {
+        previewFrameBitmap = null
+        isLoadingPreviewFrame = false
+        seekPreviewManager.clearAll()
+        pendingSingleTapJob?.cancel()
+        pendingSeekBasePosMs = -1L
+        pendingSeekTargetPosMs = -1L
+        doubleTapSide = 0
+        doubleTapCumulativeSec = 0
+        lastSingleTapUptimeMs = 0L
+        lastSingleTapSide = 0
+        lastSkipTapUptimeMs = 0L
+    }
+
+    DisposableEffect(seekPreviewManager) {
+        onDispose {
+            previewFrameBitmap = null
+            seekPreviewManager.clearAll()
+        }
+    }
+
+    val seekBucketKey = if (isSeeking) seekPreviewManager.bucketKeyFor(sliderPosition) else -1L
+    LaunchedEffect(isSeeking, seekBucketKey, currentStreamUrl, currentEpisodeId) {
+        if (!isSeeking || currentStreamUrl.isBlank()) {
+            isLoadingPreviewFrame = false
+            return@LaunchedEffect
+        }
+        val cached = seekPreviewManager.getCachedFrame(sliderPosition)
+        if (cached != null) {
+            previewFrameBitmap = cached
+            isLoadingPreviewFrame = false
+            return@LaunchedEffect
+        }
+        isLoadingPreviewFrame = true
+        delay(85L)
+        val extracted = seekPreviewManager.getOrExtractFrame(
+            streamUrl = currentStreamUrl,
+            episodeId = currentEpisodeId,
+            positionMs = sliderPosition
+        )
+        if (isSeeking) {
+            if (extracted != null) {
+                previewFrameBitmap = extracted
+            }
+            isLoadingPreviewFrame = false
         }
     }
 
@@ -1455,7 +1832,7 @@ private fun CustomExoPlayerView(
     // Periodic time tracking (real-time 250ms untuk seekbar, buffer, & tombol Skip Intro / Skip Outro akurat)
     LaunchedEffect(uiState.isPlaying) {
         while (true) {
-            if (!isSeeking) {
+            if (!isSeeking && pendingSeekTargetPosMs < 0L) {
                 viewModel.updatePosition(
                     positionMs = exoPlayer.currentPosition,
                     durationMs = exoPlayer.duration,
@@ -1501,58 +1878,107 @@ private fun CustomExoPlayerView(
         }
     }
 
-    // Auto hide controls after 4 seconds
-    LaunchedEffect(showControls) {
-        if (showControls && !uiState.isLocked) {
+    // Auto hide controls after 4 seconds (jeda saat user sedang menggeser seekbar)
+    LaunchedEffect(showControls, isSeeking) {
+        if (showControls && !uiState.isLocked && !isSeeking) {
             delay(4000)
             showControls = false
         }
     }
 
+    val triggerInstantSkip: (Int) -> Unit = { tapSide ->
+        val activeState = latestUiState
+        val stepSec = activeState.doubleTapSeekSeconds.coerceIn(5, 30)
+        val rawDur = exoPlayer.duration.takeIf { it > 0L } ?: activeState.durationMs
+        val maxPos = if (rawDur > 0L) rawDur else Long.MAX_VALUE
+
+        val nextSec = if (doubleTapSide == tapSide && doubleTapCumulativeSec > 0) {
+            doubleTapCumulativeSec + stepSec
+        } else {
+            pendingSeekBasePosMs = if (pendingSeekTargetPosMs >= 0L) {
+                pendingSeekTargetPosMs
+            } else {
+                exoPlayer.currentPosition
+            }
+            stepSec
+        }
+        val basePos = if (pendingSeekBasePosMs >= 0L) pendingSeekBasePosMs else exoPlayer.currentPosition
+        val targetPos = (basePos + (tapSide * nextSec * 1000L)).coerceIn(0L, maxPos)
+
+        pendingSeekBasePosMs = basePos
+        pendingSeekTargetPosMs = targetPos
+        doubleTapSide = tapSide
+        doubleTapCumulativeSec = nextSec
+        doubleTapEventToken++
+
+        // Perbarui UI seekbar & waktu secara instan sementara seekTo() didebounce 270ms
+        viewModel.updatePosition(targetPos, exoPlayer.duration, exoPlayer.bufferedPosition)
+        StreamingPlayerHolder.updatePlaybackProgress(targetPos, exoPlayer.duration, exoPlayer.isPlaying)
+    }
+    val latestTriggerInstantSkip by rememberUpdatedState(triggerInstantSkip)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { playerBoxWidthPx = it.width }
-            .pointerInput(
-                uiState.isLocked,
-                uiState.doubleTapSeekEnabled,
-                uiState.doubleTapSeekSeconds,
-                uiState.durationMs,
-                playerBoxWidthPx
-            ) {
-                detectTapGestures(
-                    onTap = {
-                        if (!uiState.isLocked) {
-                            showControls = !showControls
-                            if (!showControls && uiState.isSettingsOpen) {
-                                viewModel.toggleSettings()
+            .pointerInput(exoPlayer, currentEpisodeId) {
+                val touchSlopPx = viewConfiguration.touchSlop
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val up = waitForUpOrCancellation() ?: return@awaitEachGesture
+                    if (up.isConsumed) return@awaitEachGesture
+                    if ((up.position - down.position).getDistance() > touchSlopPx) {
+                        return@awaitEachGesture
+                    }
+                    up.consume()
+
+                    val now = SystemClock.uptimeMillis()
+                    val width = latestPlayerBoxWidthPx
+                    val activeState = latestUiState
+                    val tapSide = if (width > 0 && up.position.x < width * 0.5f) -1 else 1
+
+                    if (!activeState.isLocked && activeState.doubleTapSeekEnabled && width > 0) {
+                        val inActiveSkipChain = doubleTapSide == tapSide && (now - lastSkipTapUptimeMs) <= 750L
+                        val isSecondTapOfDouble = lastSingleTapSide == tapSide && (now - lastSingleTapUptimeMs) <= 320L
+
+                        when {
+                            inActiveSkipChain -> {
+                                // Ketukan ke-3, ke-4, dst: akumulasi instan tanpa tunggu apa pun
+                                pendingSingleTapJob?.cancel()
+                                lastSkipTapUptimeMs = now
+                                latestTriggerInstantSkip(tapSide)
+                            }
+                            isSecondTapOfDouble -> {
+                                // Ketukan ke-2 cepat: batalkan toggle kontrol & langsung skip
+                                pendingSingleTapJob?.cancel()
+                                lastSingleTapUptimeMs = 0L
+                                lastSingleTapSide = 0
+                                lastSkipTapUptimeMs = now
+                                latestTriggerInstantSkip(tapSide)
+                            }
+                            else -> {
+                                // Ketukan pertama: tunggu singkat 210ms untuk mendeteksi double-tap sebelum toggle kontrol
+                                lastSingleTapUptimeMs = now
+                                lastSingleTapSide = tapSide
+                                pendingSingleTapJob?.cancel()
+                                pendingSingleTapJob = gestureScope.launch {
+                                    delay(210L)
+                                    if (!latestUiState.isLocked) {
+                                        showControls = !showControls
+                                        if (!showControls && latestUiState.isSettingsOpen) {
+                                            viewModel.toggleSettings()
+                                        }
+                                    }
+                                }
                             }
                         }
-                    },
-                    onDoubleTap = { offset ->
-                        if (!uiState.isLocked && uiState.doubleTapSeekEnabled && playerBoxWidthPx > 0) {
-                            val stepSec = uiState.doubleTapSeekSeconds.coerceIn(5, 30)
-                            val isLeft = offset.x < (playerBoxWidthPx * 0.5f)
-                            val deltaMs = if (isLeft) -(stepSec * 1000L) else (stepSec * 1000L)
-                            val rawDur = exoPlayer.duration.takeIf { it > 0L } ?: uiState.durationMs
-                            val maxPos = if (rawDur > 0L) rawDur else Long.MAX_VALUE
-                            val newPos = (exoPlayer.currentPosition + deltaMs).coerceIn(0L, maxPos)
-                            exoPlayer.seekTo(newPos)
-                            viewModel.updatePosition(newPos, exoPlayer.duration, exoPlayer.bufferedPosition)
-
-                            val targetSide = if (isLeft) -1 else 1
-                            doubleTapCumulativeSec = if (doubleTapSide == targetSide) {
-                                doubleTapCumulativeSec + stepSec
-                            } else {
-                                stepSec
-                            }
-                            doubleTapSide = targetSide
-                            doubleTapEventToken++
-                        } else if (!uiState.isLocked) {
-                            showControls = !showControls
+                    } else if (!activeState.isLocked) {
+                        showControls = !showControls
+                        if (!showControls && activeState.isSettingsOpen) {
+                            viewModel.toggleSettings()
                         }
                     }
-                )
+                }
             }
     ) {
         // Player Surface
@@ -1566,6 +1992,18 @@ private fun CustomExoPlayerView(
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
                 }
+            },
+            update = { pv ->
+                if (isInSystemPip) {
+                    if (pv.player != null) pv.player = null
+                } else {
+                    if (pv.player !== exoPlayer) {
+                        pv.player = exoPlayer
+                    }
+                }
+            },
+            onRelease = { pv ->
+                pv.player = null
             },
             modifier = Modifier.fillMaxSize()
         )
@@ -1603,7 +2041,7 @@ private fun CustomExoPlayerView(
                 Icon(
                     imageVector = Icons.Default.Lock,
                     contentDescription = "Kunci Layar",
-                    tint = ColorAccentPrimary,
+                    tint = ColorStreamAccent,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -1668,11 +2106,11 @@ private fun CustomExoPlayerView(
                     }
                 }
 
-                // Center Rewind, Pure White Glassmorphism Play/Pause, Forward (NO GREEN)
+                // Center Rewind, Clean White Play/Pause, Forward (tanpa lingkaran gelap/transparan di belakang tombol)
                 Row(
                     modifier = Modifier.align(Alignment.Center),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(28.dp)
+                    horizontalArrangement = Arrangement.spacedBy(32.dp)
                 ) {
                     // Rewind 10s
                     IconButton(
@@ -1681,45 +2119,40 @@ private fun CustomExoPlayerView(
                             exoPlayer.seekTo(newPos)
                             viewModel.updatePosition(newPos, exoPlayer.duration)
                         },
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.FastRewind,
                             contentDescription = "Mundur 10 detik",
                             tint = Color.White,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(30.dp)
                         )
                     }
 
-                    // Center Play / Pause Big Button with Pure White Glassmorphism (NO GREEN)
+                    // Center Play / Pause Icon Langsung di Atas Video (Putih Bersih)
                     if (uiState.isLoading || server == null) {
                         Box(
                             modifier = Modifier.size(56.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(36.dp),
+                                modifier = Modifier.size(34.dp),
                                 strokeWidth = 3.dp,
-                                color = Color(0xFFFF5722)
+                                color = Color.White
                             )
                         }
                     } else {
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x33FFFFFF))
-                                .border(1.5.dp, Color(0x66FFFFFF), CircleShape)
-                                .clickable {
-                                    if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
-                                },
-                            contentAlignment = Alignment.Center
+                        IconButton(
+                            onClick = {
+                                if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                            },
+                            modifier = Modifier.size(56.dp)
                         ) {
                             Icon(
                                 imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                 contentDescription = "Play/Pause",
                                 tint = Color.White,
-                                modifier = Modifier.size(34.dp)
+                                modifier = Modifier.size(38.dp)
                             )
                         }
                     }
@@ -1731,18 +2164,23 @@ private fun CustomExoPlayerView(
                             exoPlayer.seekTo(newPos)
                             viewModel.updatePosition(newPos, exoPlayer.duration)
                         },
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.FastForward,
                             contentDescription = "Maju 10 detik",
                             tint = Color.White,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(30.dp)
                         )
                     }
                 }
 
-                // Bottom Control Bar (Progress, Time, Fullscreen)
+                // Bottom Control Bar (Preview Saat Geser + Progress + Time + Fullscreen)
+                val totalDuration = if (uiState.durationMs > 0) uiState.durationMs else 1L
+                val currentPos = if (isSeeking) sliderPosition else uiState.currentPositionMs
+                val sliderFraction = (currentPos.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
+                val bufferedFraction = (uiState.bufferedPositionMs.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
+
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -1757,9 +2195,92 @@ private fun CustomExoPlayerView(
                             }
                         )
                 ) {
+                    // Kotak Preview Frame Video + Waktu Melayang di Atas Posisi Jari saat Seekbar Digeser
+                    if (isSeeking && controlsRowWidthPx > 0) {
+                        val previewWidthDp = 128.dp
+                        val previewHeightDp = 72.dp
+                        val previewWidthPx = with(density) { previewWidthDp.toPx() }
+                        val fingerXPx = seekbarStartXPx + (sliderFraction * seekbarWidthPx)
+                        val clampedOffsetX = (fingerXPx - previewWidthPx * 0.5f)
+                            .coerceIn(0f, (controlsRowWidthPx - previewWidthPx).coerceAtLeast(0f))
+                            .roundToInt()
+                        val fallbackThumbUrl = uiState.episode?.getEffectiveImage()?.ifBlank { null }
+                            ?: uiState.movieDetail?.movie?.getEffectiveCover()?.ifBlank { null }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .offset { IntOffset(clampedOffsetX, 0) }
+                                    .width(previewWidthDp)
+                                    .height(previewHeightDp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF0E1015))
+                                    .border(1.dp, Color(0x99FFFFFF), RoundedCornerShape(8.dp))
+                            ) {
+                                val frame = previewFrameBitmap
+                                if (frame != null) {
+                                    Image(
+                                        bitmap = frame,
+                                        contentDescription = "Preview ${formatTime(sliderPosition)}",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else if (!fallbackThumbUrl.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(context)
+                                            .data(fallbackThumbUrl)
+                                            .size(160, 90)
+                                            .crossfade(false)
+                                            .build(),
+                                        contentDescription = "Preview ${formatTime(sliderPosition)}",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(26.dp)
+                                        .align(Alignment.BottomCenter)
+                                        .background(
+                                            Brush.verticalGradient(
+                                                listOf(Color.Transparent, Color(0xCC000000))
+                                            )
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = formatTime(sliderPosition),
+                                        color = Color.White,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                if (isLoadingPreviewFrame && frame == null) {
+                                    CircularProgressIndicator(
+                                        color = Color.White,
+                                        strokeWidth = 1.5.dp,
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(5.dp)
+                                            .size(12.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Time and Progress Row
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onSizeChanged { controlsRowWidthPx = it.width },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Current Time
@@ -1772,12 +2293,6 @@ private fun CustomExoPlayerView(
 
                         Spacer(modifier = Modifier.width(6.dp))
 
-                        // Seekbar Modern (YouTube-style): track tipis, progres oranye/koral, buffer abu-abu, segmen Intro/Outro kuning, thumb lingkaran
-                        val totalDuration = if (uiState.durationMs > 0) uiState.durationMs else 1L
-                        val currentPos = if (isSeeking) sliderPosition else uiState.currentPositionMs
-                        val sliderFraction = (currentPos.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
-                        val bufferedFraction = (uiState.bufferedPositionMs.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
-
                         ModernPlayerSeekbar(
                             progressFraction = sliderFraction,
                             bufferedFraction = bufferedFraction,
@@ -1787,7 +2302,11 @@ private fun CustomExoPlayerView(
                             isDragging = isSeeking,
                             onSeekChange = { frac ->
                                 isSeeking = true
-                                sliderPosition = (frac * totalDuration).toLong()
+                                val nextPos = (frac * totalDuration).toLong()
+                                sliderPosition = nextPos
+                                seekPreviewManager.getCachedFrame(nextPos)?.let { cached ->
+                                    previewFrameBitmap = cached
+                                }
                             },
                             onSeekCommit = { frac ->
                                 val targetMs = (frac * totalDuration).toLong()
@@ -1796,7 +2315,12 @@ private fun CustomExoPlayerView(
                                 viewModel.updatePosition(targetMs, exoPlayer.duration, exoPlayer.bufferedPosition)
                                 isSeeking = false
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .onGloballyPositioned { coords ->
+                                    seekbarStartXPx = coords.positionInParent().x
+                                    seekbarWidthPx = coords.size.width.toFloat().coerceAtLeast(1f)
+                                }
                         )
 
                         Spacer(modifier = Modifier.width(6.dp))
@@ -1948,7 +2472,7 @@ private fun ActionButtonItem(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = ColorAccentPrimary,
+                tint = ColorStreamAccent,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.height(3.dp))
@@ -2014,7 +2538,7 @@ private fun ServerPickerOverlay(
                             .clip(RoundedCornerShape(8.dp))
                             .border(
                                 width = if (isSelected) 1.5.dp else 0.5.dp,
-                                color = if (isSelected) ColorAccentPrimary else Color(0x33FFFFFF),
+                                color = if (isSelected) ColorStreamAccent else Color(0x33FFFFFF),
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .background(Color(0xFF1E222D))
@@ -2048,13 +2572,13 @@ private fun ServerPickerOverlay(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
-                                    .border(1.dp, if (isSelected) ColorAccentPrimary else Color.White, CircleShape),
+                                    .border(1.dp, if (isSelected) ColorStreamAccent else Color(0x88FFFFFF), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.PlayArrow,
                                     contentDescription = null,
-                                    tint = if (isSelected) ColorAccentPrimary else Color.White,
+                                    tint = if (isSelected) ColorStreamAccent else Color(0xCCFFFFFF),
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -2069,7 +2593,7 @@ private fun ServerPickerOverlay(
                                 )
                                 Text(
                                     text = "${srv.quality ?: "720p"} ${srv.type ?: "direct"}",
-                                    color = if (isSelected) ColorAccentPrimary else Color(0xFFD1D5DB),
+                                    color = if (isSelected) ColorStreamAccent else Color(0xFFD1D5DB),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -2151,13 +2675,13 @@ private fun LoveItRatingDialog(
                         .fillMaxWidth()
                         .height(44.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(ColorAccentPrimary)
+                        .background(ColorStreamAccent)
                         .clickable { onDismiss() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "Kirim Rating",
-                        color = Color.White,
+                        color = Color(0xFF0B0B0B),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -2176,31 +2700,43 @@ private fun DoubleTapSeekOverlay(
     seconds: Int,
     modifier: Modifier = Modifier
 ) {
+    val tapPulseScale = remember { Animatable(1f) }
+    LaunchedEffect(seconds) {
+        if (seconds > 0) {
+            tapPulseScale.snapTo(1.16f)
+            tapPulseScale.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 130)
+            )
+        }
+    }
+
     AnimatedVisibility(
         visible = visible && seconds > 0,
-        enter = fadeIn(tween(120)),
-        exit = fadeOut(tween(240)),
+        enter = fadeIn(tween(90)) + scaleIn(initialScale = 0.9f, animationSpec = tween(110)),
+        exit = fadeOut(tween(180)) + scaleOut(targetScale = 0.94f, animationSpec = tween(180)),
         modifier = modifier
     ) {
         Column(
             modifier = Modifier
-                .clip(RoundedCornerShape(24.dp))
-                .background(Color(0x990B0B0E))
-                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(24.dp))
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .graphicsLayer {
+                    val s = tapPulseScale.value
+                    scaleX = s
+                    scaleY = s
+                },
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Icon(
                 imageVector = if (side < 0) Icons.Default.FastRewind else Icons.Default.FastForward,
                 contentDescription = if (side < 0) "Mundur $seconds detik" else "Maju $seconds detik",
                 tint = Color.White,
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier.size(32.dp)
             )
             Text(
-                text = if (side < 0) "-$seconds dtk" else "+$seconds dtk",
+                text = if (side < 0) "-${seconds}s" else "+${seconds}s",
                 color = Color.White,
-                fontSize = 12.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -2296,11 +2832,11 @@ private fun ModernPlayerSeekbar(
                 )
             }
 
-            // 3. Progres yang sudah berjalan (Aksen Oranye/Koral)
+            // 3. Progres yang sudah berjalan (Putih Bersih #FFFFFF)
             val progW = (w * progressFraction.coerceIn(0f, 1f))
             if (progW > 0f) {
                 drawRoundRect(
-                    color = ColorAccentPrimary,
+                    color = Color.White,
                     topLeft = Offset(0f, topY),
                     size = Size(progW, th),
                     cornerRadius = corner
@@ -2329,25 +2865,20 @@ private fun ModernPlayerSeekbar(
                 }
             }
 
-            // 5. Thumb lingkaran kecil presisi yang membesar halus saat disentuh/digeser
+            // 5. Thumb lingkaran kecil presisi berwarna putih bersih (#FFFFFF)
             val r = thumbRadius.toPx()
             val cx = progW.coerceIn(r, (w - r).coerceAtLeast(r))
             val cy = h * 0.5f
             if (isDragging) {
                 drawCircle(
-                    color = Color(0x45FF5722),
-                    radius = r * 1.75f,
+                    color = Color(0x40FFFFFF),
+                    radius = r * 1.7f,
                     center = Offset(cx, cy)
                 )
             }
             drawCircle(
                 color = Color.White,
                 radius = r,
-                center = Offset(cx, cy)
-            )
-            drawCircle(
-                color = ColorAccentPrimary,
-                radius = (r - 1.5.dp.toPx()).coerceAtLeast(2f),
                 center = Offset(cx, cy)
             )
         }
@@ -2485,8 +3016,8 @@ private fun FloatingSettingsMenu(
                                 viewModel.setDoubleTapSeekEnabled(context, enabled)
                             },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = ColorAccentPrimary,
+                                checkedThumbColor = Color(0xFF0B0B0B),
+                                checkedTrackColor = Color.White,
                                 uncheckedThumbColor = Color(0xFF9CA3AF),
                                 uncheckedTrackColor = Color(0xFF2A2A2A)
                             )
@@ -2547,8 +3078,8 @@ private fun FloatingSettingsMenu(
                             checked = uiState.autoNextEpisode,
                             onCheckedChange = { viewModel.toggleAutoNext() },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = ColorAccentPrimary,
+                                checkedThumbColor = Color(0xFF0B0B0B),
+                                checkedTrackColor = Color.White,
                                 uncheckedThumbColor = Color(0xFF9CA3AF),
                                 uncheckedTrackColor = Color(0xFF2A2A2A)
                             )
@@ -2575,8 +3106,8 @@ private fun FloatingSettingsMenu(
                                 checked = uiState.isLocked,
                                 onCheckedChange = { viewModel.toggleLock() },
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = ColorAccentPrimary,
+                                    checkedThumbColor = Color(0xFF0B0B0B),
+                                    checkedTrackColor = Color.White,
                                     uncheckedThumbColor = Color(0xFF9CA3AF),
                                     uncheckedTrackColor = Color(0xFF2A2A2A)
                                 )
@@ -2627,14 +3158,14 @@ private fun FloatingSettingsMenu(
                         ) {
                             Text(
                                 text = "${server.quality ?: "720p"} • ${server.name ?: "Server"}",
-                                color = if (isSelected) ColorAccentPrimary else Color(0xFFE5E7EB),
+                                color = if (isSelected) Color.White else Color(0xFFD1D5DB),
                                 fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
                             if (isSelected) {
                                 Text(
                                     text = "✓",
-                                    color = ColorAccentPrimary,
+                                    color = Color.White,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -2687,14 +3218,14 @@ private fun FloatingSettingsMenu(
                         ) {
                             Text(
                                 text = speedLabel,
-                                color = if (isSelected) ColorAccentPrimary else Color(0xFFE5E7EB),
+                                color = if (isSelected) Color.White else Color(0xFFD1D5DB),
                                 fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
                             if (isSelected) {
                                 Text(
                                     text = "✓",
-                                    color = ColorAccentPrimary,
+                                    color = Color.White,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -2746,14 +3277,14 @@ private fun FloatingSettingsMenu(
                         ) {
                             Text(
                                 text = "$sec detik",
-                                color = if (isSelected) ColorAccentPrimary else Color(0xFFE5E7EB),
+                                color = if (isSelected) Color.White else Color(0xFFD1D5DB),
                                 fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
                             if (isSelected) {
                                 Text(
                                     text = "✓",
-                                    color = ColorAccentPrimary,
+                                    color = Color.White,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -2766,163 +3297,280 @@ private fun FloatingSettingsMenu(
     }
 }
 
-// ==================== 6. COMMENT ITEM ROW ====================
+// ==================== 6. COMMENT ITEM ROW & STICKER BODY ====================
+
+@Composable
+private fun CommentTextOrStickerBody(rawText: String) {
+    val context = LocalContext.current
+    val trimmed = rawText.trim()
+    val stickerMatch = LARGE_COMMENT_STICKER_REGEX.find(trimmed)
+    if (stickerMatch != null) {
+        val rawUrl = stickerMatch.groupValues.getOrNull(1).orEmpty()
+        var resolvedUrl by remember(rawUrl) { mutableStateOf(rawUrl) }
+        val request = remember(context, resolvedUrl) {
+            ImageRequest.Builder(context)
+                .data(resolvedUrl)
+                .size(220, 220)
+                .crossfade(false)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .listener(
+                    onError = { _, _ ->
+                        if (resolvedUrl.contains("stickerly.pstatic.net", ignoreCase = true) &&
+                            resolvedUrl.contains(".webp", ignoreCase = true)
+                        ) {
+                            resolvedUrl = resolvedUrl.replace(
+                                Regex("""\.webp(\?.*)?$""", RegexOption.IGNORE_CASE)
+                            ) { ".png${it.groupValues.getOrNull(1).orEmpty()}" }
+                        }
+                    }
+                )
+                .build()
+        }
+        AsyncImage(
+            model = request,
+            contentDescription = "Stiker komentar",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .padding(top = 2.dp)
+                .size(88.dp)
+        )
+    } else if (rawText.contains("[s:")) {
+        InlineStickerText(
+            rawText = rawText,
+            textColor = Color(0xFFE5E7EB),
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+            stickerSizeSp = 22.sp
+        )
+    } else {
+        Text(
+            text = rawText,
+            color = Color(0xFFE5E7EB),
+            fontSize = 13.sp,
+            lineHeight = 18.sp
+        )
+    }
+}
 
 @Composable
 private fun CommentItemRow(
     comment: EpisodeCommentItem,
     onReplyClick: () -> Unit,
+    onCopyText: (String) -> Unit = {},
+    onDeleteLocal: (String) -> Unit = {},
     onRequireLogin: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val localDb = remember { LocalAuthDatabase(context) }
-    var isLiked by remember { mutableStateOf(localDb.getReaction(comment.id ?: "") == "like") }
-    var isDisliked by remember { mutableStateOf(localDb.getReaction(comment.id ?: "") == "dislike") }
+    val isUserSignedIn = localDb.isLoggedIn() || FirebaseManager.isUserLoggedIn()
+    var isLiked by remember(comment.id) { mutableStateOf(localDb.getReaction(comment.id ?: "") == "like") }
+    var isDisliked by remember(comment.id) { mutableStateOf(localDb.getReaction(comment.id ?: "") == "dislike") }
+    var showMenu by remember { mutableStateOf(false) }
+
+    val effectiveAvatar = comment.getEffectiveAvatarUrl()
+    val hasCustomPhotoAvatar = !comment.avatarUrl.isNullOrBlank()
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        // Animated Pokemon GIF Avatar via Coil GifDecoder
+        // Avatar bulat di kiri
         AsyncImage(
             model = ImageRequest.Builder(context)
-                .data(comment.getPokemonAvatarUrl())
+                .data(effectiveAvatar)
                 .decoderFactory(
                     if (Build.VERSION.SDK_INT >= 28) ImageDecoderDecoder.Factory()
                     else GifDecoder.Factory()
                 )
                 .crossfade(true)
                 .build(),
-            contentDescription = "Avatar",
+            contentDescription = "Avatar ${comment.userName ?: "Pengguna"}",
             modifier = Modifier
                 .size(34.dp)
-                .clip(CircleShape),
-            contentScale = ContentScale.Fit
+                .clip(CircleShape)
+                .background(Color(0xFF1A1C22)),
+            contentScale = if (hasCustomPhotoAvatar) ContentScale.Crop else ContentScale.Fit
         )
 
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            // Username and Time
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = comment.userName ?: "Pengguna",
-                    color = ColorTextPrimary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(text = "•", color = ColorTextSecondary, fontSize = 11.sp)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = comment.time ?: "",
-                    color = ColorTextSecondary,
-                    fontSize = 11.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(3.dp))
-
-            // Comment Body
-            Text(
-                text = comment.text ?: "",
-                color = Color(0xFFE5E7EB),
-                fontSize = 12.5.sp,
-                lineHeight = 17.sp
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Action Row: Likes, Dislikes, Balasan (Full Width, SpaceBetween, No pill border)
+            // Username (tebal putih) + titik pemisah + waktu relatif (abu-abu) + menu titik tiga di kanan
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Like (Left)
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable {
-                        if (!localDb.isLoggedIn()) {
-                            onRequireLogin()
-                        } else {
-                            isLiked = !isLiked
-                            if (isLiked) {
-                                isDisliked = false
-                                localDb.saveReaction(comment.id ?: "", "like")
-                            } else {
-                                localDb.saveReaction(comment.id ?: "", "")
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = comment.userName ?: "Pengguna",
+                        color = Color.White,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "•", color = Color(0xFF9CA3AF), fontSize = 11.5.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = comment.time ?: "",
+                        color = Color(0xFF9CA3AF),
+                        fontSize = 11.5.sp,
+                        maxLines = 1
+                    )
+                }
+
+                Box {
+                    IconButton(
+                        onClick = { showMenu = true },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Opsi komentar",
+                            tint = Color(0xFF9CA3AF),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        containerColor = Color(0xFF181A22)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Balas", color = Color.White, fontSize = 13.sp) },
+                            onClick = {
+                                showMenu = false
+                                onReplyClick()
                             }
+                        )
+                        val rawBody = comment.text.orEmpty()
+                        if (rawBody.isNotBlank() && !LARGE_COMMENT_STICKER_REGEX.matches(rawBody.trim())) {
+                            DropdownMenuItem(
+                                text = { Text("Salin teks", color = Color.White, fontSize = 13.sp) },
+                                onClick = {
+                                    showMenu = false
+                                    onCopyText(rawBody)
+                                }
+                            )
+                        }
+                        if (comment.isLocal && !comment.id.isNullOrBlank()) {
+                            DropdownMenuItem(
+                                text = { Text("Hapus komentar", color = Color(0xFFF43F5E), fontSize = 13.sp) },
+                                onClick = {
+                                    showMenu = false
+                                    onDeleteLocal(comment.id)
+                                }
+                            )
                         }
                     }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Teks komentar & stiker
+            CommentTextOrStickerBody(rawText = comment.text ?: "")
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Baris aksi berurutan: Like + angka like, Dislike, dan ikon Chat/Reply + "Reply"
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(22.dp)
+            ) {
+                // Like
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable {
+                            if (!isUserSignedIn) {
+                                onRequireLogin()
+                            } else {
+                                isLiked = !isLiked
+                                if (isLiked) {
+                                    isDisliked = false
+                                    localDb.saveReaction(comment.id ?: "", "like")
+                                } else {
+                                    localDb.saveReaction(comment.id ?: "", "")
+                                }
+                            }
+                        }
+                        .padding(vertical = 2.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ThumbUp,
+                        imageVector = if (isLiked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
                         contentDescription = "Like",
-                        tint = if (isLiked) ColorAccentPrimary else ColorTextSecondary,
-                        modifier = Modifier.size(14.dp)
+                        tint = if (isLiked) Color.White else Color(0xFF9CA3AF),
+                        modifier = Modifier.size(15.dp)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(5.dp))
+                    val baseLikes = comment.like?.toIntOrNull() ?: 0
                     Text(
-                        text = (comment.like?.toIntOrNull() ?: 0 + if (isLiked) 1 else 0).toString(),
-                        color = ColorTextSecondary,
-                        fontSize = 11.5.sp
+                        text = (baseLikes + if (isLiked) 1 else 0).toString(),
+                        color = if (isLiked) Color.White else Color(0xFF9CA3AF),
+                        fontSize = 12.sp
                     )
                 }
 
-                // Dislike (Center)
+                // Dislike
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable {
-                        if (!localDb.isLoggedIn()) {
-                            onRequireLogin()
-                        } else {
-                            isDisliked = !isDisliked
-                            if (isDisliked) {
-                                isLiked = false
-                                localDb.saveReaction(comment.id ?: "", "dislike")
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable {
+                            if (!isUserSignedIn) {
+                                onRequireLogin()
                             } else {
-                                localDb.saveReaction(comment.id ?: "", "")
+                                isDisliked = !isDisliked
+                                if (isDisliked) {
+                                    isLiked = false
+                                    localDb.saveReaction(comment.id ?: "", "dislike")
+                                } else {
+                                    localDb.saveReaction(comment.id ?: "", "")
+                                }
                             }
                         }
-                    }
+                        .padding(vertical = 2.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ThumbDown,
+                        imageVector = if (isDisliked) Icons.Filled.ThumbDown else Icons.Outlined.ThumbDown,
                         contentDescription = "Dislike",
-                        tint = if (isDisliked) ColorAccentPrimary else ColorTextSecondary,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = (comment.dislike?.toIntOrNull() ?: 0 + if (isDisliked) 1 else 0).toString(),
-                        color = ColorTextSecondary,
-                        fontSize = 11.5.sp
+                        tint = if (isDisliked) Color.White else Color(0xFF9CA3AF),
+                        modifier = Modifier.size(15.dp)
                     )
                 }
 
-                // Balasan (Right): Orange chat icon + grey text, NO border, NO pill
+                // Reply
                 val replayCount = comment.replay?.toIntOrNull() ?: 0
-                val replayText = if (replayCount > 0) "$replayCount Balasan" else "Balasan"
+                val replayText = if (replayCount > 0) "Reply ($replayCount)" else "Reply"
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { onReplyClick() }
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { onReplyClick() }
+                        .padding(vertical = 2.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ChatBubble,
-                        contentDescription = "Balasan",
-                        tint = Color(0xFFFF5722),
-                        modifier = Modifier.size(13.dp)
+                        imageVector = Icons.Outlined.ChatBubbleOutline,
+                        contentDescription = "Reply",
+                        tint = Color(0xFF9CA3AF),
+                        modifier = Modifier.size(14.5.dp)
                     )
                     Spacer(modifier = Modifier.width(5.dp))
                     Text(
                         text = replayText,
                         color = Color(0xFF9CA3AF),
-                        fontSize = 11.5.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -2940,16 +3588,23 @@ private fun CommentRepliesView(
     isLoading: Boolean,
     onBackClick: () -> Unit,
     onRequireLogin: () -> Unit = {},
+    onDeleteLocalReply: (String) -> Unit = {},
     onSendReply: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val localDb = remember { LocalAuthDatabase(context) }
-    var replyText by remember { mutableStateOf("") }
+    val isUserSignedIn = localDb.isLoggedIn() || FirebaseManager.isUserLoggedIn()
+    val replyComposerState = remember { InlineStickerComposerState() }
+    val replyFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var showReplyStickerPanel by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(ColorBackgroundPrimary)
+            .navigationBarsPadding()
+            .imePadding()
     ) {
         // Header
         Row(
@@ -2975,7 +3630,7 @@ private fun CommentRepliesView(
             )
         }
 
-        HorizontalDivider(thickness = 0.5.dp, color = Color(0x33FFFFFF))
+        HorizontalDivider(thickness = 0.5.dp, color = Color(0x22FFFFFF))
 
         LazyColumn(
             modifier = Modifier
@@ -2999,7 +3654,7 @@ private fun CommentRepliesView(
                 HorizontalDivider(thickness = 0.5.dp, color = Color(0x22FFFFFF))
             }
 
-            if (isLoading) {
+            if (isLoading && replies.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier
@@ -3007,7 +3662,7 @@ private fun CommentRepliesView(
                             .padding(24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = ColorAccentPrimary, modifier = Modifier.size(28.dp))
+                        CircularProgressIndicator(color = ColorStreamAccent, modifier = Modifier.size(28.dp))
                     }
                 }
             } else if (replies.isEmpty()) {
@@ -3025,128 +3680,211 @@ private fun CommentRepliesView(
                 items(replies, key = { it.id ?: it.hashCode().toString() }) { rep ->
                     CommentReplyItemRow(
                         reply = rep,
-                        onRequireLogin = onRequireLogin
+                        onRequireLogin = onRequireLogin,
+                        onDeleteLocal = onDeleteLocalReply
+                    )
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = Color(0x12FFFFFF),
+                        modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }
             }
         }
 
-        // Reply Input Bar
+        // Reply Input Bar + Sticker Support
+        HorizontalDivider(thickness = 0.5.dp, color = Color(0x1AFFFFFF))
+        val canSendReply = replyComposerState.hasSendableContent()
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF161922))
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .background(Color(0xFF0B0B0B))
+                .padding(horizontal = 14.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .height(42.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xFF222634))
-                    .padding(horizontal = 14.dp),
+                    .heightIn(min = 42.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(Color(0xFF1A1C22))
+                    .padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                BasicTextField(
-                    value = replyText,
-                    onValueChange = { replyText = it },
+                Box(
                     modifier = Modifier.weight(1f),
-                    textStyle = TextStyle(color = ColorTextPrimary, fontSize = 13.sp),
-                    singleLine = true,
-                    cursorBrush = SolidColor(ColorAccentPrimary),
-                    decorationBox = { innerTextField ->
-                        if (replyText.isEmpty()) {
-                            Text(text = "Tulis Balasan..", color = Color(0xFF6B7280), fontSize = 13.sp)
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    InlineStickerInputField(
+                        state = replyComposerState,
+                        placeholder = "Tulis balasan...",
+                        cursorColor = Color.White,
+                        placeholderColor = Color(0xFF8E929B),
+                        modifier = Modifier.focusRequester(replyFocusRequester),
+                        onFocused = { showReplyStickerPanel = false }
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        if (!isUserSignedIn) {
+                            onRequireLogin()
+                        } else if (showReplyStickerPanel) {
+                            showReplyStickerPanel = false
+                            replyFocusRequester.requestFocus()
+                            keyboardController?.show()
+                        } else {
+                            keyboardController?.hide()
+                            showReplyStickerPanel = true
                         }
-                        innerTextField()
-                    }
-                )
+                    },
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        imageVector = if (showReplyStickerPanel) Icons.Rounded.Keyboard else Icons.Outlined.SentimentSatisfied,
+                        contentDescription = "Stiker balasan",
+                        tint = if (showReplyStickerPanel) Color.White else Color(0xFF9CA3AF),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        if (!isUserSignedIn) {
+                            onRequireLogin()
+                        } else if (canSendReply) {
+                            val encoded = replyComposerState.exportEncodedText()
+                            if (encoded.isNotBlank()) {
+                                onSendReply(encoded)
+                                replyComposerState.clear()
+                                showReplyStickerPanel = false
+                                keyboardController?.hide()
+                            }
+                        }
+                    },
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Kirim balasan",
+                        tint = if (canSendReply) Color.White else Color(0xFF6B7280),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
+        }
 
-            Spacer(modifier = Modifier.width(8.dp))
-
-            IconButton(
-                onClick = {
-                    if (!localDb.isLoggedIn()) {
-                        onRequireLogin()
-                    } else if (replyText.isNotBlank()) {
-                        onSendReply(replyText.trim())
-                        replyText = ""
+        AnimatedVisibility(
+            visible = showReplyStickerPanel && isUserSignedIn,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            ChatStickerPanel(
+                onInsertInlineSticker = { sticker ->
+                    replyComposerState.insertInlineSticker(sticker.url)
+                },
+                onSendLargeSticker = { sticker ->
+                    if (sticker.url.isNotBlank()) {
+                        onSendReply("[sticker:${sticker.url}]")
+                        showReplyStickerPanel = false
                     }
                 },
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Send,
-                    contentDescription = "Kirim",
-                    tint = ColorAccentPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+                onBackspace = { replyComposerState.backspace() },
+                accentColor = Color.White
+            )
         }
     }
 }
 
-// Sub-Item Balasan: Pokemon Avatar on the RIGHT side
+// Sub-Item Balasan
 @Composable
 private fun CommentReplyItemRow(
     reply: EpisodeCommentItem,
-    onRequireLogin: () -> Unit = {}
+    onRequireLogin: () -> Unit = {},
+    onDeleteLocal: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val localDb = remember { LocalAuthDatabase(context) }
-    var isLiked by remember { mutableStateOf(localDb.getReaction(reply.id ?: "") == "like") }
-    var isDisliked by remember { mutableStateOf(localDb.getReaction(reply.id ?: "") == "dislike") }
+    val isUserSignedIn = localDb.isLoggedIn() || FirebaseManager.isUserLoggedIn()
+    var isLiked by remember(reply.id) { mutableStateOf(localDb.getReaction(reply.id ?: "") == "like") }
+    var isDisliked by remember(reply.id) { mutableStateOf(localDb.getReaction(reply.id ?: "") == "dislike") }
+    val effectiveAvatar = reply.getEffectiveAvatarUrl()
+    val hasCustomPhotoAvatar = !reply.avatarUrl.isNullOrBlank()
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.Top
     ) {
-        // Left Column: User info, Comment text, Like & Dislike
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(effectiveAvatar)
+                .decoderFactory(
+                    if (Build.VERSION.SDK_INT >= 28) ImageDecoderDecoder.Factory()
+                    else GifDecoder.Factory()
+                )
+                .crossfade(true)
+                .build(),
+            contentDescription = "Avatar",
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF1A1C22)),
+            contentScale = if (hasCustomPhotoAvatar) ContentScale.Crop else ContentScale.Fit
+        )
+
+        Spacer(modifier = Modifier.width(10.dp))
+
         Column(modifier = Modifier.weight(1f)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = reply.userName ?: "Pengguna",
-                    color = ColorTextPrimary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(text = "•", color = ColorTextSecondary, fontSize = 11.sp)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = reply.time ?: "",
-                    color = ColorTextSecondary,
-                    fontSize = 11.sp
-                )
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = reply.userName ?: "Pengguna",
+                        color = ColorTextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "•", color = ColorTextSecondary, fontSize = 11.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = reply.time ?: "",
+                        color = ColorTextSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+                if (reply.isLocal && !reply.id.isNullOrBlank()) {
+                    Text(
+                        text = "Hapus",
+                        color = Color(0xFFF43F5E),
+                        fontSize = 11.sp,
+                        modifier = Modifier
+                            .clickable { onDeleteLocal(reply.id) }
+                            .padding(4.dp)
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            Text(
-                text = reply.text ?: "",
-                color = Color(0xFFE5E7EB),
-                fontSize = 12.5.sp,
-                lineHeight = 17.sp
-            )
+            CommentTextOrStickerBody(rawText = reply.text ?: "")
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Like
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable {
-                        if (!localDb.isLoggedIn()) onRequireLogin()
+                        if (!isUserSignedIn) onRequireLogin()
                         else {
                             isLiked = !isLiked
                             if (isLiked) {
@@ -3159,24 +3897,23 @@ private fun CommentReplyItemRow(
                     }
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ThumbUp,
+                        imageVector = if (isLiked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
                         contentDescription = "Like",
-                        tint = if (isLiked) ColorAccentPrimary else ColorTextSecondary,
+                        tint = if (isLiked) Color.White else ColorTextSecondary,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = (reply.like?.toIntOrNull() ?: 0 + if (isLiked) 1 else 0).toString(),
-                        color = ColorTextSecondary,
+                        text = ((reply.like?.toIntOrNull() ?: 0) + if (isLiked) 1 else 0).toString(),
+                        color = if (isLiked) Color.White else ColorTextSecondary,
                         fontSize = 11.sp
                     )
                 }
 
-                // Dislike
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable {
-                        if (!localDb.isLoggedIn()) onRequireLogin()
+                        if (!isUserSignedIn) onRequireLogin()
                         else {
                             isDisliked = !isDisliked
                             if (isDisliked) {
@@ -3189,130 +3926,18 @@ private fun CommentReplyItemRow(
                     }
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ThumbDown,
+                        imageVector = if (isDisliked) Icons.Filled.ThumbDown else Icons.Outlined.ThumbDown,
                         contentDescription = "Dislike",
-                        tint = if (isDisliked) ColorAccentPrimary else ColorTextSecondary,
+                        tint = if (isDisliked) Color.White else ColorTextSecondary,
                         modifier = Modifier.size(14.dp)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = (reply.dislike?.toIntOrNull() ?: 0 + if (isDisliked) 1 else 0).toString(),
-                        color = ColorTextSecondary,
-                        fontSize = 11.sp
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        // Right side: Pokemon Animated GIF Avatar (Matching Screenshot_20261031_125604_ANIMEIN)
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(reply.getPokemonAvatarUrl())
-                .decoderFactory(
-                    if (Build.VERSION.SDK_INT >= 28) ImageDecoderDecoder.Factory()
-                    else GifDecoder.Factory()
-                )
-                .crossfade(true)
-                .build(),
-            contentDescription = "Avatar",
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape),
-            contentScale = ContentScale.Fit
-        )
-    }
-}
-
-// ==================== 7B. COMMENT INPUT & LOGIN REQUIRED DIALOGS ====================
-
-@Composable
-private fun CommentInputDialog(
-    onDismiss: () -> Unit,
-    onSend: (String) -> Unit
-) {
-    var text by remember { mutableStateOf("") }
-    Dialog(onDismissRequest = onDismiss) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFF181A22))
-                .padding(18.dp)
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Tulis Komentar",
-                    color = ColorTextPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(90.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF222634))
-                        .padding(12.dp)
-                ) {
-                    BasicTextField(
-                        value = text,
-                        onValueChange = { text = it },
-                        modifier = Modifier.fillMaxSize(),
-                        textStyle = TextStyle(color = ColorTextPrimary, fontSize = 13.sp),
-                        cursorBrush = SolidColor(ColorAccentPrimary),
-                        decorationBox = { innerTextField ->
-                            if (text.isEmpty()) {
-                                Text(
-                                    text = "Tulis tanggapanmu mengenai anime ini...",
-                                    color = Color(0xFF6B7280),
-                                    fontSize = 12.5.sp
-                                )
-                            }
-                            innerTextField()
-                        }
-                    )
-                }
-                Spacer(modifier = Modifier.height(14.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Batal",
-                        color = ColorTextSecondary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier
-                            .clickable { onDismiss() }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (text.isNotBlank()) ColorAccentPrimary else Color(0x40FF5722))
-                            .clickable(enabled = text.isNotBlank()) {
-                                onSend(text)
-                                onDismiss()
-                            }
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = "Kirim",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
             }
         }
     }
 }
+
+// ==================== 7B. LOGIN REQUIRED DIALOG ====================
 
 @Composable
 private fun LoginRequiredDialog(
@@ -3339,7 +3964,7 @@ private fun LoginRequiredDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Fitur ini memerlukan autentikasi akun. Silakan login untuk memberikan like, dislike, atau komentar.",
+                    text = "Fitur ini memerlukan akun aktif. Silakan masuk terlebih dahulu untuk memberikan like, dislike, atau komentar.",
                     color = ColorTextSecondary,
                     fontSize = 12.5.sp,
                     textAlign = TextAlign.Center
@@ -3365,11 +3990,11 @@ private fun LoginRequiredDialog(
                             .weight(1f)
                             .height(42.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(ColorAccentPrimary)
+                            .background(ColorStreamAccent)
                             .clickable { onSimulateLogin() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "Masuk Akun", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text(text = "Masuk Akun", color = Color(0xFF0B0B0B), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -3421,13 +4046,13 @@ private fun FullGallerySheet(
         TabRow(
             selectedTabIndex = selectedTab,
             containerColor = ColorBackgroundPrimary,
-            contentColor = ColorAccentPrimary,
+            contentColor = ColorStreamAccent,
             indicator = { tabPositions ->
                 Box(
                     modifier = Modifier
                         .tabIndicatorOffset(tabPositions[selectedTab])
                         .height(2.5.dp)
-                        .background(ColorAccentPrimary)
+                        .background(ColorStreamAccent)
                 )
             },
             divider = {}
@@ -3438,7 +4063,7 @@ private fun FullGallerySheet(
                 text = {
                     Text(
                         text = "POSTER",
-                        color = if (selectedTab == 0) ColorAccentPrimary else ColorTextSecondary,
+                        color = if (selectedTab == 0) ColorStreamAccent else ColorTextSecondary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -3450,7 +4075,7 @@ private fun FullGallerySheet(
                 text = {
                     Text(
                         text = "COVER",
-                        color = if (selectedTab == 1) ColorAccentPrimary else ColorTextSecondary,
+                        color = if (selectedTab == 1) ColorStreamAccent else ColorTextSecondary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )

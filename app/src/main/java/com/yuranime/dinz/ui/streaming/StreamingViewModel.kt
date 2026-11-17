@@ -1,8 +1,10 @@
 package com.yuranime.dinz.ui.streaming
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yuranime.dinz.data.local.AppPreferences
+import com.yuranime.dinz.data.local.LocalAuthDatabase
 import com.yuranime.dinz.data.model.EpisodeCommentItem
 import com.yuranime.dinz.data.model.EpisodeItem
 import com.yuranime.dinz.data.model.MovieDetailData
@@ -40,9 +42,110 @@ class StreamingViewModel(
     private val episodesPageCache = mutableMapOf<Int, List<EpisodeItem>>()
     private val preloadedStreams = mutableMapOf<String, StreamData>()
     private var episodeJob: Job? = null
+    private var commentsJob: Job? = null
     private var preloadJob: Job? = null
     private var skipJob: Job? = null
     private var manualServerSelected: Boolean = false
+    private var localDb: LocalAuthDatabase? = null
+
+    fun attachContext(context: Context) {
+        if (localDb == null) {
+            localDb = LocalAuthDatabase(context.applicationContext)
+            val currentEpId = _uiState.value.episodeId
+            if (currentEpId.isNotBlank()) {
+                val localList = localDb?.getLocalComments(currentEpId).orEmpty()
+                if (localList.isNotEmpty()) {
+                    _uiState.update { state ->
+                        state.copy(comments = mergeComments(localList, state.comments, state.commentSort))
+                    }
+                }
+            }
+        }
+    }
+
+    private fun mergeComments(
+        localList: List<EpisodeCommentItem>,
+        remoteList: List<EpisodeCommentItem>,
+        sort: String
+    ): List<EpisodeCommentItem> {
+        val seen = HashSet<String>()
+        val combined = mutableListOf<EpisodeCommentItem>()
+        for (item in localList) {
+            val k = item.id?.takeIf { it.isNotBlank() } ?: "${item.userName}|${item.time}|${item.text}"
+            if (seen.add(k)) combined.add(item)
+        }
+        val sortedRemote = if (sort == "popular") {
+            remoteList.sortedByDescending { it.like?.toIntOrNull() ?: 0 }
+        } else {
+            remoteList
+        }
+        for (item in sortedRemote) {
+            val k = item.id?.takeIf { it.isNotBlank() } ?: "${item.userName}|${item.time}|${item.text}"
+            if (seen.add(k)) combined.add(item)
+        }
+        return combined
+    }
+
+    private fun launchLoadAllComments(episodeId: String, sort: String) {
+        commentsJob?.cancel()
+        val initialLocal = localDb?.getLocalComments(episodeId).orEmpty()
+        _uiState.update {
+            it.copy(
+                comments = initialLocal,
+                isLoadingComments = true,
+                isLoadingMoreComments = false
+            )
+        }
+        commentsJob = viewModelScope.launch {
+            var hasReceivedFirstBatch = false
+            repository.getAllEpisodeComments(
+                idEpisode = episodeId,
+                sort = sort,
+                onPageLoaded = { accumulatedRemote ->
+                    if (_uiState.value.episodeId != episodeId) return@getAllEpisodeComments
+                    val localList = localDb?.getLocalComments(episodeId).orEmpty()
+                    val merged = mergeComments(localList, accumulatedRemote, sort)
+                    val stillLoadingMore = accumulatedRemote.isNotEmpty() && accumulatedRemote.size % 30 == 0
+                    hasReceivedFirstBatch = true
+                    _uiState.update {
+                        it.copy(
+                            comments = merged,
+                            isLoadingComments = false,
+                            isLoadingMoreComments = stillLoadingMore
+                        )
+                    }
+                }
+            ).onSuccess { allRemote ->
+                if (_uiState.value.episodeId != episodeId) return@onSuccess
+                val localList = localDb?.getLocalComments(episodeId).orEmpty()
+                val merged = mergeComments(localList, allRemote, sort)
+                _uiState.update {
+                    it.copy(
+                        comments = merged,
+                        isLoadingComments = false,
+                        isLoadingMoreComments = false
+                    )
+                }
+            }.onFailure {
+                if (_uiState.value.episodeId != episodeId) return@onFailure
+                _uiState.update {
+                    it.copy(
+                        comments = if (hasReceivedFirstBatch) it.comments else localDb?.getLocalComments(episodeId).orEmpty(),
+                        isLoadingComments = false,
+                        isLoadingMoreComments = false
+                    )
+                }
+            }
+        }
+    }
+
+    fun toggleCommentSort() {
+        val epId = _uiState.value.episodeId
+        if (epId.isBlank()) return
+        val nextSort = if (_uiState.value.commentSort == "new") "popular" else "new"
+        _uiState.update { it.copy(commentSort = nextSort) }
+        launchLoadAllComments(epId, nextSort)
+    }
 
     fun syncPlaybackPreferences(
         preferredQuality: String,
@@ -175,18 +278,33 @@ class StreamingViewModel(
         }
 
         episodeJob?.cancel()
+        commentsJob?.cancel()
         skipJob?.cancel()
         manualServerSelected = false
 
+        val activeHolderMeta = StreamingPlayerHolder.metadata.value
+        val canResumeExistingPlayer = StreamingPlayerHolder.isAlreadyLoaded(episodeId, activeHolderMeta.streamUrl)
+        val initialActiveServer = if (canResumeExistingPlayer) {
+            ServerItem(
+                id = "active_pip_session",
+                link = activeHolderMeta.streamUrl,
+                quality = _uiState.value.preferredQuality.ifBlank { "Auto" },
+                name = "Active"
+            )
+        } else {
+            null
+        }
+
         _uiState.update {
             it.copy(
-                isLoading = true,
+                isLoading = !canResumeExistingPlayer,
                 errorMessage = null,
                 episodeId = episodeId,
                 movieId = movieId,
-                currentPositionMs = 0L,
-                durationMs = 0L,
-                isPlaying = false,
+                selectedServer = initialActiveServer,
+                currentPositionMs = if (canResumeExistingPlayer) activeHolderMeta.positionMs else 0L,
+                durationMs = if (canResumeExistingPlayer) activeHolderMeta.durationMs else 0L,
+                isPlaying = if (canResumeExistingPlayer) activeHolderMeta.isPlaying else false,
                 introSegment = null,
                 outroSegment = null,
                 skipSourceLabel = null,
@@ -197,22 +315,29 @@ class StreamingViewModel(
             )
         }
 
+        launchLoadAllComments(episodeId, _uiState.value.commentSort)
+
         episodeJob = viewModelScope.launch {
             val streamResult = preloadedStreams.remove(episodeId)?.let { Result.success(it) }
                 ?: repository.getEpisodeStream(episodeId)
             if (streamResult.isFailure) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = streamResult.exceptionOrNull()?.message ?: "Gagal memuat stream episode"
-                    )
+                if (!canResumeExistingPlayer) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = streamResult.exceptionOrNull()?.message ?: "Gagal memuat stream episode"
+                        )
+                    }
                 }
                 return@launch
             }
 
             val streamData = streamResult.getOrNull()
             val servers = streamData?.servers ?: emptyList()
-            val defaultServer = resolvePreferredServer(servers, _uiState.value.preferredQuality)
+            val matchedRunningServer = if (canResumeExistingPlayer) {
+                servers.firstOrNull { it.link == activeHolderMeta.streamUrl } ?: initialActiveServer
+            } else null
+            val defaultServer = matchedRunningServer ?: resolvePreferredServer(servers, _uiState.value.preferredQuality)
 
             _uiState.update {
                 it.copy(
@@ -225,7 +350,7 @@ class StreamingViewModel(
             }
             schedulePreloadNextEpisode(streamData, episodeId)
 
-            // Fetch movie detail, comments, covers/posters, and episodes in parallel
+            // Fetch movie detail, covers/posters, and episodes in parallel (all comments load concurrently via launchLoadAllComments)
             val resolvedMovieId = effectiveMovieId.ifBlank { streamData?.episode?.idMovie ?: "" }
             if (resolvedMovieId.isNotBlank() && resolvedMovieId != cachedMovieId) {
                 cachedMovieId = resolvedMovieId
@@ -236,7 +361,6 @@ class StreamingViewModel(
                 if (resolvedMovieId.isNotBlank()) repository.getMovieDetail(resolvedMovieId)
                 else Result.success(null)
             }
-            val commentsDeferred = async { repository.getEpisodeComments(episodeId, page = 0, sort = "new") }
             val postersDeferred = async { if (resolvedMovieId.isNotBlank()) repository.getMoviePosters(resolvedMovieId) else Result.success(emptyList()) }
             val coversDeferred = async { if (resolvedMovieId.isNotBlank()) repository.getMovieCovers(resolvedMovieId) else Result.success(emptyList()) }
             val episodesPage0Deferred = async {
@@ -248,7 +372,6 @@ class StreamingViewModel(
             }
 
             val movieDetail = movieDetailDeferred.await().getOrNull()
-            val comments = commentsDeferred.await().getOrDefault(emptyList())
             val posters = postersDeferred.await().getOrDefault(emptyList())
             val covers = coversDeferred.await().getOrDefault(emptyList())
             val page0Episodes = episodesPage0Deferred.await().getOrDefault(emptyList())
@@ -277,7 +400,6 @@ class StreamingViewModel(
                 _uiState.update {
                     it.copy(
                         movieDetail = movieDetail,
-                        comments = comments,
                         posters = posters,
                         covers = covers,
                         episodes = allEpisodes,
@@ -294,7 +416,6 @@ class StreamingViewModel(
                 _uiState.update {
                     it.copy(
                         movieDetail = movieDetail,
-                        comments = comments,
                         posters = posters,
                         covers = covers,
                         totalEpisodesCount = maxEpNum,
@@ -317,7 +438,7 @@ class StreamingViewModel(
      * 1. Mengubah state currentEpisodeId dan currentEpisodeNumber secara instan.
      * 2. Mereset posisi durasi ke 0L dan mengosongkan selectedServer agar player tidak memutar stream lama.
      * 3. Memanggil ulang API Stream/Server Resolusi untuk newEpisodeId.
-     * 4. Memanggil ulang API Komentar dan views untuk newEpisodeId.
+     * 4. Memanggil ulang API Komentar (semua halaman) dan views untuk newEpisodeId.
      */
     fun selectEpisode(newEpisodeId: String, newEpisodeNumber: String? = null) {
         if (_uiState.value.episodeId == newEpisodeId && !_uiState.value.isLoading && _uiState.value.selectedServer != null) {
@@ -325,6 +446,7 @@ class StreamingViewModel(
         }
 
         episodeJob?.cancel()
+        commentsJob?.cancel()
         skipJob?.cancel()
         manualServerSelected = false
 
@@ -358,6 +480,8 @@ class StreamingViewModel(
             )
         }
 
+        launchLoadAllComments(newEpisodeId, _uiState.value.commentSort)
+
         val currentMovieDetail = _uiState.value.movieDetail
         val currentTotalEps = _uiState.value.totalEpisodesCount
         if (currentMovieDetail != null && !targetEpNumber.isNullOrBlank()) {
@@ -374,10 +498,8 @@ class StreamingViewModel(
                 preloadedStreams.remove(newEpisodeId)?.let { Result.success(it) }
                     ?: repository.getEpisodeStream(newEpisodeId)
             }
-            val commentsDeferred = async { repository.getEpisodeComments(newEpisodeId, page = 0, sort = "new") }
 
             val streamResult = streamDeferred.await()
-            val commentsResult = commentsDeferred.await()
 
             if (streamResult.isFailure) {
                 _uiState.update {
@@ -393,8 +515,6 @@ class StreamingViewModel(
             val servers = streamData?.servers ?: emptyList()
             val defaultServer = resolvePreferredServer(servers, _uiState.value.preferredQuality)
 
-            val comments = commentsResult.getOrDefault(emptyList())
-
             _uiState.update {
                 it.copy(
                     isLoading = false,
@@ -402,7 +522,6 @@ class StreamingViewModel(
                     episodeNext = streamData?.episodeNext,
                     servers = servers,
                     selectedServer = defaultServer,
-                    comments = comments,
                     currentPositionMs = 0L,
                     durationMs = 0L
                 )
@@ -539,21 +658,29 @@ class StreamingViewModel(
 
     fun openReplies(comment: EpisodeCommentItem) {
         val cid = comment.id ?: return
+        val localReplies = localDb?.getLocalReplies(cid).orEmpty()
         _uiState.update {
             it.copy(
                 activeCommentForReplies = comment,
                 isLoadingReplies = true,
-                repliesList = emptyList()
+                repliesList = localReplies
             )
         }
 
         viewModelScope.launch {
-            val result = repository.getCommentReplies(cid, page = 1)
-            val replies = result.getOrDefault(emptyList())
+            val result = if (comment.isLocal) {
+                Result.success(emptyList())
+            } else {
+                repository.getAllCommentReplies(cid)
+            }
+            val remoteReplies = result.getOrDefault(emptyList())
+            val merged = (localDb?.getLocalReplies(cid).orEmpty() + remoteReplies).distinctBy {
+                it.id?.takeIf { id -> id.isNotBlank() } ?: "${it.userName}|${it.time}|${it.text}"
+            }
             _uiState.update {
                 it.copy(
                     isLoadingReplies = false,
-                    repliesList = replies
+                    repliesList = merged
                 )
             }
         }
@@ -594,6 +721,17 @@ class StreamingViewModel(
             it.copy(
                 comments = listOf(comment) + it.comments,
                 isCommentInputOpen = false
+            )
+        }
+    }
+
+    fun deleteLocalComment(commentId: String) {
+        if (commentId.isBlank()) return
+        localDb?.deleteLocalComment(commentId)
+        _uiState.update { state ->
+            state.copy(
+                comments = state.comments.filterNot { it.id == commentId },
+                repliesList = state.repliesList.filterNot { it.id == commentId }
             )
         }
     }

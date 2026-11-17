@@ -207,6 +207,8 @@ fun InlineStickerInputField(
     placeholder: String = "Tulis pesan...",
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    cursorColor: Color = Color(0xFFFF5722),
+    placeholderColor: Color = Color(0xFF64748B),
     onFocused: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -231,7 +233,7 @@ fun InlineStickerInputField(
             lineHeight = 20.sp,
             fontFamily = SfProFontFamily
         ),
-        cursorBrush = SolidColor(Color(0xFFFF5722)),
+        cursorBrush = SolidColor(cursorColor),
         maxLines = 4,
         visualTransformation = InlineStickerSlotVisualTransformation,
         onTextLayout = { layout -> textLayoutResult = layout },
@@ -245,7 +247,7 @@ fun InlineStickerInputField(
                 if (state.isEmpty) {
                     Text(
                         text = placeholder,
-                        color = Color(0xFF64748B),
+                        color = placeholderColor,
                         fontSize = 14.sp,
                         fontFamily = SfProFontFamily
                     )

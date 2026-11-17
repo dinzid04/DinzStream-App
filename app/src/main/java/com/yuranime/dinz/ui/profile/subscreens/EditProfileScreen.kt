@@ -491,8 +491,8 @@ fun EditProfileScreen(
                 // Layer Live Preview Border Avatar (discord_assets): 100.dp tepat konsentris
                 if (selectedBorderUrl.isNotBlank()) {
                     AnimatedCosmeticImage(
-                        url = DiscordCosmeticsRepository.getOptimizedUrl(selectedBorderUrl, size = 240, animated = true),
-                        isAnimated = true,
+                        url = DiscordCosmeticsRepository.getOptimizedUrl(selectedBorderUrl, size = 240, animated = false),
+                        isAnimated = false,
                         contentDescription = "Live Preview Border Avatar",
                         modifier = Modifier.size(100.dp)
                     )
@@ -1171,7 +1171,7 @@ fun EditProfileScreen(
 
         // Live Preview Profile Effect di Luar/Depan Full Screen (zIndex = 50f)
         if (selectedProfileEffectUrl.isNotBlank()) {
-            val previewEffectDef = remember(selectedProfileEffectUrl) {
+            val previewEffectDef = remember(selectedProfileEffectUrl, allProfileEffects) {
                 DiscordCosmeticsRepository.findEffect(context, selectedProfileEffectUrl)
             }
             val previewLayers = remember(previewEffectDef, selectedProfileEffectUrl) {
@@ -1252,8 +1252,8 @@ private fun EditCosmeticCard(
                     }
                 }
                 AnimatedCosmeticImage(
-                    url = DiscordCosmeticsRepository.getOptimizedUrl(imageUrl, size = 160, animated = true),
-                    isAnimated = true,
+                    url = DiscordCosmeticsRepository.getOptimizedUrl(imageUrl, size = 160, animated = false),
+                    isAnimated = false,
                     contentDescription = name,
                     modifier = Modifier.size(72.dp)
                 )

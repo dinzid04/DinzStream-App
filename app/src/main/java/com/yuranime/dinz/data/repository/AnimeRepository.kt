@@ -352,6 +352,57 @@ class AnimeRepository(
         }
     }
 
+    suspend fun getAllEpisodeComments(
+        idEpisode: String,
+        sort: String = "new",
+        onPageLoaded: suspend (List<EpisodeCommentItem>) -> Unit = {}
+    ): Result<List<EpisodeCommentItem>> = withContext(Dispatchers.IO) {
+        val accumulated = mutableListOf<EpisodeCommentItem>()
+        val seenKeys = HashSet<String>()
+        var page = 0
+        val maxPages = 150
+
+        try {
+            while (page <= maxPages) {
+                val response = try {
+                    api.getEpisodeComments(idEpisode = idEpisode, page = page, sort = sort)
+                } catch (e: Exception) {
+                    if (page == 0 && accumulated.isEmpty()) {
+                        return@withContext Result.failure(e)
+                    }
+                    break
+                }
+
+                val pageItems = response.data?.comments.orEmpty()
+                if (pageItems.isEmpty()) break
+
+                var addedInPage = 0
+                for (item in pageItems) {
+                    val key = item.id?.takeIf { it.isNotBlank() }
+                        ?: "${item.userName.orEmpty()}|${item.time.orEmpty()}|${item.text.orEmpty()}"
+                    if (seenKeys.add(key)) {
+                        accumulated.add(item)
+                        addedInPage++
+                    }
+                }
+
+                if (addedInPage > 0 || page == 0) {
+                    onPageLoaded(accumulated.toList())
+                }
+
+                // Server mengembalikan maksimal 30 item per halaman; jika < 30 atau tidak ada item baru, pagination tuntas
+                if (pageItems.size < 30 || addedInPage == 0) {
+                    break
+                }
+                page++
+            }
+            Result.success(accumulated.toList())
+        } catch (e: Exception) {
+            if (accumulated.isNotEmpty()) Result.success(accumulated.toList())
+            else Result.failure(e)
+        }
+    }
+
     suspend fun getCommentReplies(idComment: String, page: Int = 1): Result<List<EpisodeCommentItem>> = withContext(Dispatchers.IO) {
         try {
             val response = api.getCommentReplies(idComment = idComment, page = page)
@@ -359,6 +410,47 @@ class AnimeRepository(
             Result.success(replies)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    suspend fun getAllCommentReplies(idComment: String): Result<List<EpisodeCommentItem>> = withContext(Dispatchers.IO) {
+        val accumulated = mutableListOf<EpisodeCommentItem>()
+        val seenKeys = HashSet<String>()
+        var page = 1
+        val maxPages = 50
+
+        try {
+            while (page <= maxPages) {
+                val response = try {
+                    api.getCommentReplies(idComment = idComment, page = page)
+                } catch (e: Exception) {
+                    if (page == 1 && accumulated.isEmpty()) {
+                        return@withContext Result.failure(e)
+                    }
+                    break
+                }
+                val pageItems = response.data?.replies.orEmpty()
+                if (pageItems.isEmpty()) break
+
+                var addedInPage = 0
+                for (item in pageItems) {
+                    val key = item.id?.takeIf { it.isNotBlank() }
+                        ?: "${item.userName.orEmpty()}|${item.time.orEmpty()}|${item.text.orEmpty()}"
+                    if (seenKeys.add(key)) {
+                        accumulated.add(item)
+                        addedInPage++
+                    }
+                }
+
+                if (pageItems.size < 30 || addedInPage == 0) {
+                    break
+                }
+                page++
+            }
+            Result.success(accumulated.toList())
+        } catch (e: Exception) {
+            if (accumulated.isNotEmpty()) Result.success(accumulated.toList())
+            else Result.failure(e)
         }
     }
 

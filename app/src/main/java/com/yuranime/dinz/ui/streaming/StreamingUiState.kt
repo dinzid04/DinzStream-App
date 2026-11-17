@@ -37,6 +37,9 @@ data class StreamingUiState(
     val servers: List<ServerItem> = emptyList(),
     val selectedServer: ServerItem? = null,
     val comments: List<EpisodeCommentItem> = emptyList(),
+    val commentSort: String = "new",
+    val isLoadingComments: Boolean = false,
+    val isLoadingMoreComments: Boolean = false,
     val posters: List<CommunityMediaItem> = emptyList(),
     val covers: List<CommunityMediaItem> = emptyList(),
     // Player controls

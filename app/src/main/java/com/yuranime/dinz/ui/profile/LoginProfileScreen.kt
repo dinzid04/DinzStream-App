@@ -53,6 +53,7 @@ import kotlinx.coroutines.isActive
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -109,6 +110,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -149,6 +151,8 @@ import com.yuranime.dinz.ui.components.liquidGlassBackdrop
 import com.yuranime.dinz.ui.leaderboard.LeaderboardScreen
 import com.yuranime.dinz.ui.profile.subscreens.DownloadsScreen
 import com.yuranime.dinz.ui.profile.subscreens.EditProfileScreen
+import com.yuranime.dinz.ui.profile.subscreens.LegalDocumentScreen
+import com.yuranime.dinz.ui.profile.subscreens.LegalDocumentType
 import com.yuranime.dinz.ui.profile.subscreens.NameStyleShopScreen
 import com.yuranime.dinz.ui.profile.subscreens.PointsRewardsScreen
 import com.yuranime.dinz.ui.profile.subscreens.SettingsScreen
@@ -172,7 +176,9 @@ enum class ProfileSubScreen {
     SHOP,
     DOWNLOADS,
     COLLECTION_HISTORY,
-    SETTINGS
+    SETTINGS,
+    TERMS_OF_SERVICE,
+    PRIVACY_POLICY
 }
 
 enum class TrailingType {
@@ -198,6 +204,7 @@ fun LoginProfileScreen(
     val authDb = remember { LocalAuthDatabase(context) }
 
     var currentSubScreen by remember { mutableStateOf(ProfileSubScreen.MAIN) }
+    var legalOriginSubScreen by remember { mutableStateOf(ProfileSubScreen.SETTINGS) }
     var isLoggingIn by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showTitlePickerDialog by remember { mutableStateOf(false) }
@@ -344,6 +351,14 @@ fun LoginProfileScreen(
                 },
                 onGuestLoginClick = {
                     onTabSelected(NavTab.HOME)
+                },
+                onOpenTermsClick = {
+                    legalOriginSubScreen = ProfileSubScreen.MAIN
+                    currentSubScreen = ProfileSubScreen.TERMS_OF_SERVICE
+                },
+                onOpenPrivacyPolicyClick = {
+                    legalOriginSubScreen = ProfileSubScreen.MAIN
+                    currentSubScreen = ProfileSubScreen.PRIVACY_POLICY
                 }
             )
         } else {
@@ -397,10 +412,11 @@ fun LoginProfileScreen(
             targetItem = currentSubScreen.takeIf { it != ProfileSubScreen.MAIN },
             isTopmost = isTabActive && currentSubScreen != ProfileSubScreen.MAIN,
             onBack = {
-                currentSubScreen = if (currentSubScreen == ProfileSubScreen.NAME_STYLE_SHOP) {
-                    ProfileSubScreen.EDIT_PROFILE
-                } else {
-                    ProfileSubScreen.MAIN
+                currentSubScreen = when (currentSubScreen) {
+                    ProfileSubScreen.NAME_STYLE_SHOP -> ProfileSubScreen.EDIT_PROFILE
+                    ProfileSubScreen.TERMS_OF_SERVICE,
+                    ProfileSubScreen.PRIVACY_POLICY -> legalOriginSubScreen
+                    else -> ProfileSubScreen.MAIN
                 }
             }
         ) { subScreen ->
@@ -465,7 +481,27 @@ fun LoginProfileScreen(
                                 Toast.LENGTH_SHORT
                             ).show()
                         },
-                        onCheckUpdateClick = onCheckUpdateClick
+                        onCheckUpdateClick = onCheckUpdateClick,
+                        onOpenTermsClick = {
+                            legalOriginSubScreen = ProfileSubScreen.SETTINGS
+                            currentSubScreen = ProfileSubScreen.TERMS_OF_SERVICE
+                        },
+                        onOpenPrivacyPolicyClick = {
+                            legalOriginSubScreen = ProfileSubScreen.SETTINGS
+                            currentSubScreen = ProfileSubScreen.PRIVACY_POLICY
+                        }
+                    )
+                }
+                ProfileSubScreen.TERMS_OF_SERVICE -> {
+                    LegalDocumentScreen(
+                        documentType = LegalDocumentType.TERMS_OF_SERVICE,
+                        onBackClick = { currentSubScreen = legalOriginSubScreen }
+                    )
+                }
+                ProfileSubScreen.PRIVACY_POLICY -> {
+                    LegalDocumentScreen(
+                        documentType = LegalDocumentType.PRIVACY_POLICY,
+                        onBackClick = { currentSubScreen = legalOriginSubScreen }
                     )
                 }
                 ProfileSubScreen.MAIN -> Unit
@@ -540,6 +576,8 @@ private fun UserProfileView(
         }
     }
 
+    val catalogRev by DiscordCosmeticsRepository.catalogRevision.collectAsState()
+
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             DiscordCosmeticsRepository.getAllBorders(context)
@@ -547,7 +585,7 @@ private fun UserProfileView(
         }
     }
 
-    val effectDef = remember(equippedProfileEffectUrl) {
+    val effectDef = remember(equippedProfileEffectUrl, catalogRev) {
         if (equippedProfileEffectUrl.isNotBlank()) {
             DiscordCosmeticsRepository.findEffect(context, equippedProfileEffectUrl)
         } else {
@@ -559,12 +597,8 @@ private fun UserProfileView(
             ?: if (equippedProfileEffectUrl.isNotBlank()) listOf(equippedProfileEffectUrl) else emptyList()
     }
 
-    val resolvedBorderUrl = remember(equippedBorderUrl, cosmeticAnimate) {
-        if (!cosmeticAnimate && equippedBorderUrl.contains("passthrough=true")) {
-            equippedBorderUrl.replace("passthrough=true", "passthrough=false")
-        } else {
-            equippedBorderUrl
-        }
+    val resolvedBorderUrl = remember(equippedBorderUrl) {
+        DiscordCosmeticsRepository.getOptimizedUrl(equippedBorderUrl, size = 240, animated = false)
     }
 
     val animatedExpProgress by animateFloatAsState(
@@ -686,8 +720,8 @@ private fun UserProfileView(
                 // Layer Border Avatar Asli (discord_assets): 102.dp tepat konsentris di Alignment.Center
                 if (resolvedBorderUrl.isNotBlank()) {
                     AnimatedCosmeticImage(
-                        url = DiscordCosmeticsRepository.getOptimizedUrl(resolvedBorderUrl, size = 240, animated = cosmeticAnimate),
-                        isAnimated = cosmeticAnimate,
+                        url = DiscordCosmeticsRepository.getOptimizedUrl(resolvedBorderUrl, size = 240, animated = false),
+                        isAnimated = false,
                         contentDescription = "Avatar Border",
                         modifier = Modifier.size(102.dp)
                     )
@@ -1937,7 +1971,9 @@ private fun LoginView(
     onSettingsClick: () -> Unit = {},
     onGoogleLoginClick: () -> Unit,
     onEmailLoginClick: () -> Unit,
-    onGuestLoginClick: () -> Unit
+    onGuestLoginClick: () -> Unit,
+    onOpenTermsClick: () -> Unit = {},
+    onOpenPrivacyPolicyClick: () -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -2105,6 +2141,7 @@ private fun LoginView(
             val agreementText = remember {
                 buildAnnotatedString {
                     append("Dengan melanjutkan, kamu menyetujui ")
+                    pushStringAnnotation(tag = "LEGAL", annotation = "TOS")
                     withStyle(
                         style = SpanStyle(
                             color = Color.White,
@@ -2114,7 +2151,9 @@ private fun LoginView(
                     ) {
                         append("Ketentuan Layanan")
                     }
+                    pop()
                     append(" dan ")
+                    pushStringAnnotation(tag = "LEGAL", annotation = "PRIVACY")
                     withStyle(
                         style = SpanStyle(
                             color = Color.White,
@@ -2124,17 +2163,31 @@ private fun LoginView(
                     ) {
                         append("Kebijakan Privasi")
                     }
+                    pop()
                 }
             }
 
-            Text(
+            @Suppress("DEPRECATION")
+            ClickableText(
                 text = agreementText,
-                color = Color(0xFF94A3B8),
-                fontSize = 11.5.sp,
-                fontFamily = SfProFontFamily,
-                textAlign = TextAlign.Center,
-                lineHeight = 16.sp,
-                modifier = Modifier.fillMaxWidth(0.9f)
+                style = TextStyle(
+                    color = Color(0xFF94A3B8),
+                    fontSize = 11.5.sp,
+                    fontFamily = SfProFontFamily,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 16.sp
+                ),
+                modifier = Modifier.fillMaxWidth(0.9f),
+                onClick = { offset ->
+                    agreementText.getStringAnnotations(tag = "LEGAL", start = offset, end = offset)
+                        .firstOrNull()?.let { ann ->
+                            if (ann.item == "TOS") {
+                                onOpenTermsClick()
+                            } else if (ann.item == "PRIVACY") {
+                                onOpenPrivacyPolicyClick()
+                            }
+                        }
+                }
             )
 
             Spacer(modifier = Modifier.height(24.dp))

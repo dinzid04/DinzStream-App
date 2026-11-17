@@ -106,7 +106,8 @@ fun ChatStickerPanel(
     onInsertInlineSticker: (StickerItem) -> Unit,
     onSendLargeSticker: (StickerItem) -> Unit,
     onBackspace: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    accentColor: Color = Color(0xFFFF5722)
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -462,7 +463,7 @@ fun ChatStickerPanel(
                             fontSize = 14.sp,
                             fontFamily = SfProFontFamily
                         ),
-                        cursorBrush = SolidColor(Color(0xFFFF5722)),
+                        cursorBrush = SolidColor(accentColor),
                         decorationBox = { inner ->
                             Box(contentAlignment = Alignment.CenterStart) {
                                 if (searchQuery.isEmpty()) {
@@ -598,7 +599,7 @@ fun ChatStickerPanel(
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 CircularProgressIndicator(
-                                    color = Color(0xFFFF5722),
+                                    color = accentColor,
                                     strokeWidth = 2.5.dp,
                                     modifier = Modifier.size(26.dp)
                                 )
@@ -688,7 +689,7 @@ fun ChatStickerPanel(
                         verticalArrangement = Arrangement.Center
                     ) {
                         CircularProgressIndicator(
-                            color = Color(0xFFFF5722),
+                            color = accentColor,
                             strokeWidth = 2.5.dp,
                             modifier = Modifier.size(26.dp)
                         )
@@ -760,7 +761,7 @@ fun ChatStickerPanel(
                                     } else {
                                         Text(
                                             text = pack.name.take(1).uppercase(),
-                                            color = Color(0xFFFF5722),
+                                            color = accentColor,
                                             fontSize = 20.sp,
                                             fontWeight = FontWeight.Bold,
                                             fontFamily = SfProFontFamily
@@ -796,7 +797,7 @@ fun ChatStickerPanel(
                         verticalArrangement = Arrangement.Center
                     ) {
                         CircularProgressIndicator(
-                            color = Color(0xFFFF5722),
+                            color = accentColor,
                             strokeWidth = 2.5.dp,
                             modifier = Modifier.size(26.dp)
                         )
@@ -980,7 +981,7 @@ fun ChatStickerPanel(
                                 .background(if (isSelected) Color(0xFF232736) else Color.Transparent)
                                 .border(
                                     width = if (isSelected) 1.dp else 0.dp,
-                                    color = if (isSelected) Color(0xFFFF5722) else Color.Transparent,
+                                    color = if (isSelected) accentColor else Color.Transparent,
                                     shape = RoundedCornerShape(9.dp)
                                 )
                                 .clickable {

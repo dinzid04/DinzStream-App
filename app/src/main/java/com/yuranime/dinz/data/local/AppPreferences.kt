@@ -45,6 +45,7 @@ object AppPreferences {
     private const val KEY_PRELOAD_NEXT_EPISODE = "key_preload_next_episode"
     private const val KEY_DOUBLE_TAP_SEEK_ENABLED = "key_double_tap_seek_enabled"
     private const val KEY_DOUBLE_TAP_SEEK_SECONDS = "key_double_tap_seek_seconds"
+    private const val KEY_RELEASE_NOTIFICATIONS_ENABLED = "key_release_notifications_enabled"
     private const val KEY_SHOW_MINI_TITLE = "key_show_mini_title"
     private const val KEY_SHOW_CUSTOM_TITLE = "key_show_custom_title"
     private const val KEY_SHOW_ROLE = "key_show_role"
@@ -108,6 +109,9 @@ object AppPreferences {
     private val _doubleTapSeekSeconds = MutableStateFlow(10)
     val doubleTapSeekSeconds: StateFlow<Int> = _doubleTapSeekSeconds.asStateFlow()
 
+    private val _releaseNotificationsEnabled = MutableStateFlow(true)
+    val releaseNotificationsEnabled: StateFlow<Boolean> = _releaseNotificationsEnabled.asStateFlow()
+
     fun init(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val modeId = prefs.getInt(KEY_SLIDER_MODE, HomeSliderMode.DEFAULT.id)
@@ -126,6 +130,7 @@ object AppPreferences {
         _doubleTapSeekEnabled.value = prefs.getBoolean(KEY_DOUBLE_TAP_SEEK_ENABLED, true)
         val rawSkipSec = prefs.getInt(KEY_DOUBLE_TAP_SEEK_SECONDS, 10)
         _doubleTapSeekSeconds.value = if (rawSkipSec in setOf(5, 10, 15, 30)) rawSkipSec else 10
+        _releaseNotificationsEnabled.value = prefs.getBoolean(KEY_RELEASE_NOTIFICATIONS_ENABLED, true)
     }
 
     fun setSliderMode(context: Context, mode: HomeSliderMode) {
@@ -208,6 +213,14 @@ object AppPreferences {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putInt(KEY_DOUBLE_TAP_SEEK_SECONDS, valid)
+            .apply()
+    }
+
+    fun setReleaseNotificationsEnabled(context: Context, enabled: Boolean) {
+        _releaseNotificationsEnabled.value = enabled
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_RELEASE_NOTIFICATIONS_ENABLED, enabled)
             .apply()
     }
 

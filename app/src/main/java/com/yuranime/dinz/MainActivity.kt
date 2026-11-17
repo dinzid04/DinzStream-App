@@ -1,17 +1,34 @@
 package com.yuranime.dinz
 
+import android.Manifest
+import android.app.PendingIntent
+import android.app.PictureInPictureParams
+import android.app.RemoteAction
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
+import android.util.Rational
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
+import com.yuranime.dinz.data.notification.AnimeReleaseScheduler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -62,7 +79,10 @@ import com.yuranime.dinz.ui.profile.LoginProfileScreen
 import com.yuranime.dinz.ui.search.SearchScreen
 import com.yuranime.dinz.ui.search.SearchViewModel
 import com.yuranime.dinz.ui.splash.YuranimeSplashScreen
+import com.yuranime.dinz.ui.streaming.InAppFloatingMiniPlayer
+import com.yuranime.dinz.ui.streaming.StreamingPlayerHolder
 import com.yuranime.dinz.ui.streaming.StreamingScreen
+import com.yuranime.dinz.ui.streaming.SystemPipPlayerOverlay
 import com.yuranime.dinz.ui.theme.ColorBackgroundPrimary
 import com.yuranime.dinz.ui.theme.YuranimeTheme
 import com.yuranime.dinz.ui.update.UpdateMiniProgressBanner
@@ -78,8 +98,160 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        private const val ACTION_PIP_PLAY_PAUSE = "com.yuranime.dinz.ACTION_PIP_PLAY_PAUSE"
+        private const val ACTION_PIP_CLOSE = "com.yuranime.dinz.ACTION_PIP_CLOSE"
+    }
+
+    private var isInPipModeState by mutableStateOf(false)
+    private var wasInPipSession = false
+    private var pipExpandTrigger by mutableStateOf(0)
+    private var pendingNotifAnimeId by mutableStateOf<String?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val notifAnimeId = intent.getStringExtra(AnimeReleaseScheduler.EXTRA_OPEN_ANIME_ID)
+        if (!notifAnimeId.isNullOrBlank()) {
+            pendingNotifAnimeId = notifAnimeId
+        }
+    }
+
+    private val pipActionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                ACTION_PIP_PLAY_PAUSE -> {
+                    StreamingPlayerHolder.togglePlayPause()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        updateSystemPipParams()
+                    }
+                }
+                ACTION_PIP_CLOSE -> {
+                    StreamingPlayerHolder.stopAndClear(this@MainActivity)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        updateSystemPipParams()
+                    }
+                    if (isInPipModeState) {
+                        moveTaskToBack(true)
+                    }
+                }
+            }
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun buildPipParams(): PictureInPictureParams {
+        val isPlaying = StreamingPlayerHolder.metadata.value.isPlaying
+        val playPauseAction = RemoteAction(
+            Icon.createWithResource(
+                this,
+                if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+            ),
+            if (isPlaying) "Jeda" else "Putar",
+            if (isPlaying) "Jeda video" else "Putar video",
+            PendingIntent.getBroadcast(
+                this,
+                101,
+                Intent(ACTION_PIP_PLAY_PAUSE).setPackage(packageName),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
+        val closeAction = RemoteAction(
+            Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel),
+            "Tutup",
+            "Hentikan pemutaran",
+            PendingIntent.getBroadcast(
+                this,
+                102,
+                Intent(ACTION_PIP_CLOSE).setPackage(packageName),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
+
+        val builder = PictureInPictureParams.Builder()
+            .setAspectRatio(Rational(16, 9))
+            .setActions(listOf(playPauseAction, closeAction))
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val shouldAutoEnter = StreamingPlayerHolder.isActivelyPlaying()
+            builder.setAutoEnterEnabled(shouldAutoEnter)
+            builder.setSeamlessResizeEnabled(true)
+        }
+        return builder.build()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun updateSystemPipParams() {
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) return
+        runCatching {
+            setPictureInPictureParams(buildPipParams())
+        }
+    }
+
+    private fun tryEnterSystemPip() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) return
+        if (isInPipModeState || !StreamingPlayerHolder.isActivelyPlaying()) return
+        runCatching {
+            enterPictureInPictureMode(buildPipParams())
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        tryEnterSystemPip()
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        isInPipModeState = isInPictureInPictureMode
+        StreamingPlayerHolder.setSystemPipMode(isInPictureInPictureMode)
+        if (isInPictureInPictureMode) {
+            wasInPipSession = true
+        } else if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            // Pengguna mengetuk jendela PiP untuk kembali ke halaman pemutar penuh
+            wasInPipSession = false
+            pipExpandTrigger++
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (wasInPipSession && !isInPipModeState && !isChangingConfigurations) {
+            // Pengguna menutup jendela PiP sistem dengan tombol X / swipe
+            wasInPipSession = false
+            StreamingPlayerHolder.stopAndClear(this)
+        }
+    }
+
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(pipActionReceiver) }
+        if (!isChangingConfigurations) {
+            StreamingPlayerHolder.releaseCompletely(this)
+        }
+        super.onDestroy()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val initialNotifAnimeId = intent?.getStringExtra(AnimeReleaseScheduler.EXTRA_OPEN_ANIME_ID)
+        if (!initialNotifAnimeId.isNullOrBlank()) {
+            pendingNotifAnimeId = initialNotifAnimeId
+        }
+        AnimeReleaseScheduler.ensureNotificationChannel(this)
+        val pipFilter = IntentFilter().apply {
+            addAction(ACTION_PIP_PLAY_PAUSE)
+            addAction(ACTION_PIP_CLOSE)
+        }
+        ContextCompat.registerReceiver(
+            this,
+            pipActionReceiver,
+            pipFilter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
@@ -131,6 +303,84 @@ class MainActivity : ComponentActivity() {
                     var chatReturnComicMode by rememberSaveable { mutableStateOf(false) }
                     var chatReturnComicTab by rememberSaveable { mutableStateOf(ComicNavTab.HOME) }
                     var activeComicGenreFilter by remember { mutableStateOf<String?>(null) }
+
+                    val isMiniPlayerVisible by StreamingPlayerHolder.isMiniPlayerVisible.collectAsStateWithLifecycle()
+                    val activePlaybackMeta by StreamingPlayerHolder.metadata.collectAsStateWithLifecycle()
+
+                    val notifPermissionLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.RequestPermission()
+                    ) { granted ->
+                        if (granted) {
+                            AnimeReleaseScheduler.syncFullWeekScheduleInBackground(this@MainActivity, force = true)
+                        }
+                    }
+
+                    LaunchedEffect(showSplash) {
+                        if (!showSplash) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                !AnimeReleaseScheduler.hasNotificationPermission(this@MainActivity)
+                            ) {
+                                val prefs = getSharedPreferences("yuranime_ui_prefs", Context.MODE_PRIVATE)
+                                if (!prefs.getBoolean("asked_release_notif_perm", false)) {
+                                    prefs.edit().putBoolean("asked_release_notif_perm", true).apply()
+                                    notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                            } else {
+                                AnimeReleaseScheduler.syncFullWeekScheduleInBackground(this@MainActivity)
+                            }
+                        }
+                    }
+
+                    LaunchedEffect(pendingNotifAnimeId, showSplash) {
+                        val targetId = pendingNotifAnimeId
+                        if (!showSplash && !targetId.isNullOrBlank()) {
+                            selectedStreamingEpisodeId = null
+                            selectedCuplixItem = null
+                            selectedAnimeId = targetId
+                            pendingNotifAnimeId = null
+                        }
+                    }
+
+                    LaunchedEffect(
+                        activePlaybackMeta.isPlaying,
+                        activePlaybackMeta.episodeId,
+                        selectedStreamingEpisodeId,
+                        isMiniPlayerVisible
+                    ) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            updateSystemPipParams()
+                        }
+                    }
+
+                    LaunchedEffect(pipExpandTrigger) {
+                        if (pipExpandTrigger > 0) {
+                            val meta = StreamingPlayerHolder.metadata.value
+                            if (meta.episodeId.isNotBlank()) {
+                                StreamingPlayerHolder.exitMiniPlayerKeepingPlayback()
+                                if (meta.movieId.isNotBlank()) {
+                                    selectedStreamingMovieId = meta.movieId
+                                }
+                                selectedStreamingEpisodeId = meta.episodeId
+                            }
+                        }
+                    }
+
+                    val openEpisodePlayer: (String, String) -> Unit = { epId, mId ->
+                        StreamingPlayerHolder.exitMiniPlayerKeepingPlayback()
+                        if (mId.isNotBlank()) {
+                            selectedStreamingMovieId = mId
+                        }
+                        selectedStreamingEpisodeId = epId
+                    }
+
+                    val minimizeOrCloseStreaming: () -> Unit = {
+                        if (StreamingPlayerHolder.isActivelyPlaying()) {
+                            StreamingPlayerHolder.enterMiniPlayer()
+                        } else {
+                            StreamingPlayerHolder.stopAndClear(this@MainActivity)
+                        }
+                        selectedStreamingEpisodeId = null
+                    }
 
                     fun openGlobalChat() {
                         if (currentTab != NavTab.CHAT) {
@@ -416,8 +666,7 @@ class MainActivity : ComponentActivity() {
                                                         onTabSelected = onComicProfileTabSelected,
                                                         onAnimeClick = { animeId -> selectedAnimeId = animeId },
                                                         onEpisodeClick = { epId, mId ->
-                                                            selectedStreamingMovieId = mId
-                                                            selectedStreamingEpisodeId = epId
+                                                            openEpisodePlayer(epId, mId)
                                                         },
                                                         onComicChapterClick = { chId -> selectedComicChapterId = chId },
                                                         onCheckUpdateClick = onManualUpdateCheck,
@@ -430,8 +679,7 @@ class MainActivity : ComponentActivity() {
                                                         onTabSelected = onAnimeTabSelected,
                                                         onAnimeClick = { animeId -> selectedAnimeId = animeId },
                                                         onEpisodeClick = { epId, mId ->
-                                                            selectedStreamingMovieId = mId
-                                                            selectedStreamingEpisodeId = epId
+                                                            openEpisodePlayer(epId, mId)
                                                         },
                                                         onCuplixClick = { cuplixItem -> selectedCuplixItem = cuplixItem },
                                                         onBirthdayClick = { bItem -> selectedBirthdayItem = bItem },
@@ -498,8 +746,7 @@ class MainActivity : ComponentActivity() {
                                                         onTabSelected = onAnimeTabSelected,
                                                         onAnimeClick = { animeId -> selectedAnimeId = animeId },
                                                         onEpisodeClick = { epId, mId ->
-                                                            selectedStreamingMovieId = mId
-                                                            selectedStreamingEpisodeId = epId
+                                                            openEpisodePlayer(epId, mId)
                                                         },
                                                         onComicChapterClick = { chId -> selectedComicChapterId = chId },
                                                         onCheckUpdateClick = onManualUpdateCheck,
@@ -538,8 +785,7 @@ class MainActivity : ComponentActivity() {
                                 onBackClick = { selectedAnimeId = null },
                                 onAnimeClick = { newId -> selectedAnimeId = newId },
                                 onEpisodeClick = { epId ->
-                                    selectedStreamingMovieId = animeId
-                                    selectedStreamingEpisodeId = epId
+                                    openEpisodePlayer(epId, animeId)
                                 },
                                 onCuplixClick = { cuplixItem ->
                                     selectedCuplixItem = cuplixItem
@@ -550,13 +796,13 @@ class MainActivity : ComponentActivity() {
                         PredictiveBackItemOverlay(
                             targetItem = selectedStreamingEpisodeId,
                             isTopmost = topmostOverlay == "STREAMING",
-                            onBack = { selectedStreamingEpisodeId = null },
+                            onBack = { minimizeOrCloseStreaming() },
                             exitDurationMs = 190
                         ) { episodeId ->
                             StreamingScreen(
                                 episodeId = episodeId,
                                 movieId = selectedStreamingMovieId ?: selectedAnimeId ?: "",
-                                onBackClick = { selectedStreamingEpisodeId = null },
+                                onBackClick = { minimizeOrCloseStreaming() },
                                 onEpisodeChange = { newEpId ->
                                     selectedStreamingEpisodeId = newEpId
                                 }
@@ -577,8 +823,7 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onEpisodeClick = { epId, mId ->
                                     selectedCuplixItem = null
-                                    selectedStreamingMovieId = mId
-                                    selectedStreamingEpisodeId = epId
+                                    openEpisodePlayer(epId, mId)
                                 }
                             )
                         }
@@ -720,7 +965,27 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        if (showSplash) {
+                        // In-App Floating Mini-Player (Draggable ke sudut layar manapun ala YouTube Premium)
+                        if (isMiniPlayerVisible && selectedStreamingEpisodeId == null && !isInPipModeState && !showSplash) {
+                            InAppFloatingMiniPlayer(
+                                onExpand = { epId, mId ->
+                                    openEpisodePlayer(epId, mId)
+                                },
+                                onClose = {
+                                    StreamingPlayerHolder.stopAndClear(this@MainActivity)
+                                },
+                                modifier = Modifier.zIndex(85f)
+                            )
+                        }
+
+                        // Tampilan Khusus Picture-in-Picture (PiP) Sistem Android saat keluar ke Home HP
+                        if (isInPipModeState) {
+                            SystemPipPlayerOverlay(
+                                modifier = Modifier.zIndex(120f)
+                            )
+                        }
+
+                        if (showSplash && !isInPipModeState) {
                             YuranimeSplashScreen(
                                 onSplashFinished = { showSplash = false }
                             )
