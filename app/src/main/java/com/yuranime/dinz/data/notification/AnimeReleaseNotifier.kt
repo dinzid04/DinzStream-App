@@ -660,8 +660,7 @@ class AnimeReleaseBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action.orEmpty()
         if (action == Intent.ACTION_BOOT_COMPLETED ||
-            action == Intent.ACTION_MY_PACKAGE_REPLACED ||
-            action == "android.intent.action.QUICKBOOT_POWERON"
+            action == Intent.ACTION_MY_PACKAGE_REPLACED
         ) {
             AppPreferences.init(context.applicationContext)
             AnimeReleaseScheduler.rescheduleSavedAlarms(context.applicationContext)

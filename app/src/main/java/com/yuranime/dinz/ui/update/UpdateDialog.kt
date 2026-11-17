@@ -1,12 +1,7 @@
 package com.yuranime.dinz.ui.update
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,7 +49,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.content.ContextCompat
 import com.yuranime.dinz.data.update.AppUpdateInfo
 import com.yuranime.dinz.data.update.UpdateDownloadManager
 import com.yuranime.dinz.data.update.UpdateDownloadState
@@ -76,20 +70,9 @@ fun UpdateNoticeDialog(
     val context = LocalContext.current
     val downloadState by UpdateDownloadManager.downloadState.collectAsState()
 
-    val notifPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { _ ->
-        UpdateDownloadManager.startDownload(context, updateInfo)
-    }
-
     val startBackgroundUpdate: () -> Unit = {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            UpdateDownloadManager.startDownload(context, updateInfo)
-        }
+        UpdateDownloadManager.startDownload(context, updateInfo)
+        onDismiss()
     }
 
     val handleMinimizeOrDismiss: () -> Unit = {

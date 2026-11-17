@@ -1702,7 +1702,14 @@ private fun CustomExoPlayerView(
     // Memisahkan Logika "Ganti Episode" vs "Ganti Resolusi" vs "Kembali dari Mini-Player/PiP"
     var lastLoadedEpisodeId by remember { mutableStateOf<String?>(null) }
     val currentEpisodeId = uiState.episodeId
-    val currentStreamUrl = server?.link.orEmpty()
+    val currentStreamUrl = remember(server?.link) {
+        val raw = server?.link?.trim().orEmpty()
+        if (raw.startsWith("http://", ignoreCase = true)) {
+            "https://" + raw.removePrefix("http://")
+        } else {
+            raw
+        }
+    }
     val currentAnimeTitle = uiState.movieDetail?.movie?.title
         ?: uiState.episode?.title?.substringBefore(" Episode")
         ?: ""

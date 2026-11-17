@@ -32,10 +32,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.Logout
@@ -48,7 +46,6 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Cached
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.FastForward
@@ -59,7 +56,6 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Policy
-import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Smartphone
@@ -94,8 +90,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.yuranime.dinz.BuildConfig
 import com.yuranime.dinz.data.firebase.FirebaseManager
 import com.yuranime.dinz.data.local.AppPreferences
@@ -205,7 +199,6 @@ fun SettingsScreen(
     // Sheets & Dialogs
     var showQualitySheet by remember { mutableStateOf(false) }
     var showSpeedSheet by remember { mutableStateOf(false) }
-    var showPrivacyFaqDialog by remember { mutableStateOf(false) }
     var inlineLegalDoc by remember { mutableStateOf<LegalDocumentType?>(null) }
 
     BackHandler(enabled = inlineLegalDoc != null) {
@@ -592,15 +585,6 @@ fun SettingsScreen(
                         )
                         SettingsGroupDivider()
                         SettingsValueRow(
-                            icon = Icons.Rounded.Security,
-                            iconTint = Color(0xFFFACC15),
-                            title = "Privasi & FAQ",
-                            value = "Buka",
-                            showChevron = true,
-                            onClick = { showPrivacyFaqDialog = true }
-                        )
-                        SettingsGroupDivider()
-                        SettingsValueRow(
                             icon = Icons.Rounded.Gavel,
                             iconTint = Color(0xFFBED62C),
                             title = "Terms of Service",
@@ -892,17 +876,6 @@ fun SettingsScreen(
         }
     }
 
-    // Dialog Privasi & FAQ
-    if (showPrivacyFaqDialog) {
-        PrivacyFaqDialog(
-            onDismiss = { showPrivacyFaqDialog = false },
-            onCheckUpdateClick = {
-                showPrivacyFaqDialog = false
-                onCheckUpdateClick()
-            }
-        )
-    }
-
     inlineLegalDoc?.let { docType ->
         LegalDocumentScreen(
             documentType = docType,
@@ -1162,166 +1135,6 @@ private fun IosToggleSwitch(
                 .size(24.dp)
                 .clip(CircleShape)
                 .background(Color.White)
-        )
-    }
-}
-
-@Composable
-private fun PrivacyFaqDialog(
-    onDismiss: () -> Unit,
-    onCheckUpdateClick: () -> Unit
-) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .clip(RoundedCornerShape(22.dp))
-                .background(SettingsCardBg)
-                .border(1.dp, SettingsCardBorder, RoundedCornerShape(22.dp))
-                .padding(20.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SettingsIconBadge(
-                    icon = Icons.Rounded.Security,
-                    tint = Color(0xFFFACC15)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Privasi & FAQ Yuranime",
-                    color = Color.White,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily,
-                    modifier = Modifier.weight(1f)
-                )
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF1A1D27))
-                        .clickable(onClick = onDismiss),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = "Tutup",
-                        tint = SettingsMutedText,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-            HorizontalDivider(thickness = 0.5.dp, color = SettingsDividerColor)
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(290.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                FaqItem(
-                    question = "Data apa saja yang disimpan Yuranime?",
-                    answer = "Profil, progres EXP, gaya nama, lencana, dan preferensi visibilitas disimpan aman melalui Firebase Firestore agar tersinkronisasi lintas sesi. Unduhan komik offline dan cache media disimpan hanya secara lokal di penyimpanan internal perangkat."
-                )
-                FaqItem(
-                    question = "Bagaimana cara menyembunyikan Title atau Role?",
-                    answer = "Aktifkan atau matikan toggle Tampilkan Mini-Title, Tampilkan Custom Title, dan Tampilkan Role & Lencana pada seksi Tampilan. Perubahan langsung tersinkronisasi ke Profil, Preview Profil, dan Global Chat."
-                )
-                FaqItem(
-                    question = "Apa kegunaan Pramuat Episode & Lewati Intro?",
-                    answer = "Pramuat Episode Berikutnya menyiapkan stream episode selanjutnya di latar belakang sehingga perpindahan episode instan. Lewati Intro Otomatis melompati segmen opening saat memutar episode penuh."
-                )
-                FaqItem(
-                    question = "Apakah Bersihkan Cache menghapus unduhan offline?",
-                    answer = "Tidak. Bersihkan Cache hanya menghapus berkas sementara gambar Coil, stiker, dan buffer sementara di cacheDir tanpa menyentuh chapter komik offline maupun riwayat akun."
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF1A1D27))
-                        .border(1.dp, SettingsCardBorder, RoundedCornerShape(12.dp))
-                        .clickable(onClick = onCheckUpdateClick)
-                        .padding(vertical = 11.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Cek Pembaruan",
-                        color = SettingsTitleText,
-                        fontSize = 13.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = SfProFontFamily,
-                        textAlign = TextAlign.Center
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFE11D48))
-                        .clickable(onClick = onDismiss)
-                        .padding(vertical = 11.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Mengerti",
-                        color = Color.White,
-                        fontSize = 13.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FaqItem(
-    question: String,
-    answer: String
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color(0xFF161923))
-            .border(0.7.dp, SettingsCardBorder, RoundedCornerShape(14.dp))
-            .padding(12.dp)
-    ) {
-        Text(
-            text = question,
-            color = SettingsTitleText,
-            fontSize = 13.5.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = SfProFontFamily
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = answer,
-            color = SettingsMutedText,
-            fontSize = 12.sp,
-            lineHeight = 17.sp,
-            fontFamily = SfProFontFamily
         )
     }
 }
