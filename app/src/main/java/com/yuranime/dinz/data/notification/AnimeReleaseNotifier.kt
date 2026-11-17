@@ -652,19 +652,3 @@ class AnimeReleaseReceiver : BroadcastReceiver() {
         }
     }
 }
-
-/**
- * Menjadwalkan ulang notifikasi rilis anime otomatis setelah perangkat restart atau aplikasi diperbarui.
- */
-class AnimeReleaseBootReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        val action = intent.action.orEmpty()
-        if (action == Intent.ACTION_BOOT_COMPLETED ||
-            action == Intent.ACTION_MY_PACKAGE_REPLACED
-        ) {
-            AppPreferences.init(context.applicationContext)
-            AnimeReleaseScheduler.rescheduleSavedAlarms(context.applicationContext)
-            AnimeReleaseScheduler.syncFullWeekScheduleInBackground(context.applicationContext)
-        }
-    }
-}
