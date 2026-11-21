@@ -246,49 +246,6 @@ class ComicRepository(
             }
         } catch (_: Exception) {}
 
-        // Fallback 1: KomikStation Latest
-        try {
-            val ksRes = komikStationScraper.getHomeData()
-            if (ksRes.isSuccess) {
-                val ksData = ksRes.getOrNull()
-                val candidateList = ksData?.latestComics?.ifEmpty { null }
-                    ?: ksData?.popularToday?.ifEmpty { null }
-                    ?: ksData?.seriesTabs?.firstOrNull()?.items
-                if (!candidateList.isNullOrEmpty()) {
-                    val converted = candidateList.take(12).map { card ->
-                        ComicItem(
-                            id = card.id,
-                            title = card.title,
-                            format = card.format.ifBlank { "Manhwa" },
-                            countryCode = when (card.format.lowercase()) {
-                                "manhua" -> "CN"
-                                "manga" -> "JP"
-                                else -> "KR"
-                            },
-                            coverPortrait = card.coverUrl,
-                            rating = 8.5f,
-                            status = "ongoing",
-                            chapters = card.latestChapters.take(3).map { ch ->
-                                ComicChapterItem(
-                                    id = ch.chapterId,
-                                    comicId = card.id,
-                                    number = ch.chapterNumber,
-                                    title = "Chapter ${ch.chapterNumber}",
-                                    releaseTime = ch.releaseTime,
-                                    releaseDate = ch.releaseDate,
-                                    formattedDate = ch.releaseTime,
-                                    thumbnailUrl = card.coverUrl
-                                )
-                            }
-                        )
-                    }
-                    if (converted.size >= 6) {
-                        return@withContext Result.success(converted)
-                    }
-                }
-            }
-        } catch (_: Exception) {}
-
         val fallbackLatest = cachedLatestComics
         if (!fallbackLatest.isNullOrEmpty() && fallbackLatest.size >= 12) {
             return@withContext Result.success(fallbackLatest)
