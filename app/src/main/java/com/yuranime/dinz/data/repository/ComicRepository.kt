@@ -181,7 +181,7 @@ class ComicRepository(
         forceRefresh: Boolean = false
     ): Result<List<ComicItem>> = withContext(Dispatchers.IO) {
         val snapshot = cachedLatestComics
-        if (!forceRefresh && page == 1 && !snapshot.isNullOrEmpty()) {
+        if (!forceRefresh && page == 1 && !snapshot.isNullOrEmpty() && snapshot.size >= 12) {
             return@withContext Result.success(snapshot)
         }
 
@@ -189,66 +189,111 @@ class ComicRepository(
             val response = api.getLatestManga(page = page, pageSize = pageSize)
             val dtos = response.data ?: emptyList()
 
-            val comicsWithChapters = coroutineScope {
-                dtos.map { mangaDto ->
-                    async {
-                        val mangaId = mangaDto.mangaId.orEmpty()
-                        val portraitCover = resolveCoverUrl(mangaDto.coverPortraitUrl, mangaDto.coverImageUrl)
-                        var chapters = emptyList<ComicChapterItem>()
+            if (dtos.isNotEmpty()) {
+                val comicsWithChapters = coroutineScope {
+                    dtos.map { mangaDto ->
+                        async {
+                            val mangaId = mangaDto.mangaId.orEmpty()
+                            val portraitCover = resolveCoverUrl(mangaDto.coverPortraitUrl, mangaDto.coverImageUrl)
+                            var chapters = emptyList<ComicChapterItem>()
 
-                        // Ambil 3 chapter terbaru untuk setiap komik
-                        if (mangaId.isNotBlank()) {
-                            try {
-                                val chResponse = api.getMangaChapters(
-                                    mangaId = mangaId,
-                                    page = 1,
-                                    pageSize = 3
-                                )
-                                chapters = (chResponse.data ?: emptyList()).map { ch ->
-                                    val numStr = formatChapterNumber(ch.chapterNumber)
-                                    val thumb = ch.thumbnailImageUrl
-                                        ?.takeIf { it.isNotBlank() && !it.endsWith("default.jpg") }
-                                        ?: portraitCover
-                                    ComicChapterItem(
-                                        id = ch.chapterId.orEmpty(),
-                                        comicId = mangaId,
-                                        number = numStr,
-                                        title = ch.chapterTitle?.takeIf { it.isNotBlank() } ?: "Chapter $numStr",
-                                        releaseTime = formatRelativeTime(ch.releaseDate),
-                                        releaseDate = ch.releaseDate,
-                                        formattedDate = formatShortIndoDate(ch.releaseDate),
-                                        thumbnailUrl = thumb,
-                                        viewCount = ch.viewCount ?: 0L
+                            // Ambil 3 chapter terbaru untuk setiap komik
+                            if (mangaId.isNotBlank()) {
+                                try {
+                                    val chResponse = api.getMangaChapters(
+                                        mangaId = mangaId,
+                                        page = 1,
+                                        pageSize = 3
                                     )
-                                }
-                            } catch (_: Exception) {}
+                                    chapters = (chResponse.data ?: emptyList()).map { ch ->
+                                        val numStr = formatChapterNumber(ch.chapterNumber)
+                                        val thumb = ch.thumbnailImageUrl
+                                            ?.takeIf { it.isNotBlank() && !it.endsWith("default.jpg") }
+                                            ?: portraitCover
+                                        ComicChapterItem(
+                                            id = ch.chapterId.orEmpty(),
+                                            comicId = mangaId,
+                                            number = numStr,
+                                            title = ch.chapterTitle?.takeIf { it.isNotBlank() } ?: "Chapter $numStr",
+                                            releaseTime = formatRelativeTime(ch.releaseDate),
+                                            releaseDate = ch.releaseDate,
+                                            formattedDate = formatShortIndoDate(ch.releaseDate),
+                                            thumbnailUrl = thumb,
+                                            viewCount = ch.viewCount ?: 0L
+                                        )
+                                    }
+                                } catch (_: Exception) {}
+                            }
+
+                            // Pastikan selalu memiliki tepat 3 baris chapter yang rapi dan sejajar
+                            val guaranteedChapters = ensureThreeChapters(
+                                fetched = chapters,
+                                mangaDto = mangaDto,
+                                mangaId = mangaId,
+                                fallbackThumb = portraitCover
+                            )
+
+                            mapToComicItem(mangaDto, guaranteedChapters)
                         }
+                    }.map { it.await() }
+                }
 
-                        // Pastikan selalu memiliki tepat 3 baris chapter yang rapi dan sejajar
-                        val guaranteedChapters = ensureThreeChapters(
-                            fetched = chapters,
-                            mangaDto = mangaDto,
-                            mangaId = mangaId,
-                            fallbackThumb = portraitCover
+                if (page == 1 && comicsWithChapters.isNotEmpty()) {
+                    cachedLatestComics = comicsWithChapters
+                }
+
+                return@withContext Result.success(comicsWithChapters)
+            }
+        } catch (_: Exception) {}
+
+        // Fallback 1: KomikStation Latest
+        try {
+            val ksRes = komikStationScraper.getHomeData()
+            if (ksRes.isSuccess) {
+                val ksData = ksRes.getOrNull()
+                val candidateList = ksData?.latestComics?.ifEmpty { null }
+                    ?: ksData?.popularToday?.ifEmpty { null }
+                    ?: ksData?.seriesTabs?.firstOrNull()?.items
+                if (!candidateList.isNullOrEmpty()) {
+                    val converted = candidateList.take(12).map { card ->
+                        ComicItem(
+                            id = card.id,
+                            title = card.title,
+                            format = card.format.ifBlank { "Manhwa" },
+                            countryCode = when (card.format.lowercase()) {
+                                "manhua" -> "CN"
+                                "manga" -> "JP"
+                                else -> "KR"
+                            },
+                            coverPortrait = card.coverUrl,
+                            rating = 8.5f,
+                            status = "ongoing",
+                            chapters = card.latestChapters.take(3).map { ch ->
+                                ComicChapterItem(
+                                    id = ch.chapterId,
+                                    comicId = card.id,
+                                    number = ch.chapterNumber,
+                                    title = "Chapter ${ch.chapterNumber}",
+                                    releaseTime = ch.releaseTime,
+                                    releaseDate = ch.releaseDate,
+                                    formattedDate = ch.releaseTime,
+                                    thumbnailUrl = card.coverUrl
+                                )
+                            }
                         )
-
-                        mapToComicItem(mangaDto, guaranteedChapters)
                     }
-                }.map { it.await() }
+                    if (converted.size >= 6) {
+                        return@withContext Result.success(converted)
+                    }
+                }
             }
+        } catch (_: Exception) {}
 
-            if (page == 1 && comicsWithChapters.isNotEmpty()) {
-                cachedLatestComics = comicsWithChapters
-            }
-
-            Result.success(comicsWithChapters)
-        } catch (e: Exception) {
-            val fallbackLatest = cachedLatestComics
-            if (!fallbackLatest.isNullOrEmpty()) {
-                return@withContext Result.success(fallbackLatest)
-            }
-            Result.success(getFallbackComics())
+        val fallbackLatest = cachedLatestComics
+        if (!fallbackLatest.isNullOrEmpty() && fallbackLatest.size >= 12) {
+            return@withContext Result.success(fallbackLatest)
         }
+        Result.success(getFallbackComics())
     }
 
     suspend fun getComicDetail(mangaId: String): Result<ComicDetail> = withContext(Dispatchers.IO) {
@@ -681,6 +726,146 @@ class ComicRepository(
                     ComicChapterItem("a3d395c1-0a5f-4ca2-b013-633f59ab2c38", "022a0a28-cfef-42e4-90aa-ec364068792d", "40", "Chapter 40", "1 hour ago", formattedDate = "8 Nov 26", viewCount = 840),
                     ComicChapterItem("ch-39", "022a0a28-cfef-42e4-90aa-ec364068792d", "39", "Chapter 39", "7 days ago", formattedDate = "1 Nov 26", viewCount = 1920),
                     ComicChapterItem("ch-38", "022a0a28-cfef-42e4-90aa-ec364068792d", "38", "Chapter 38", "14 days ago", formattedDate = "25 Okt 26", viewCount = 2410)
+                )
+            ),
+            ComicItem(
+                id = "ks:solo-leveling-ragnarok",
+                title = "Solo Leveling: Ragnarok",
+                format = "Manhwa",
+                countryCode = "KR",
+                coverPortrait = "https://assets.shngm.id/thumbnail/image/d00e4253-656d-481e-b3ef-701e4c6d451e.jpg",
+                rating = 9.8f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("slr-ch-36", "ks:solo-leveling-ragnarok", "36", "Chapter 36", "2 hours ago", formattedDate = "8 Nov 26", viewCount = 5100),
+                    ComicChapterItem("slr-ch-35", "ks:solo-leveling-ragnarok", "35", "Chapter 35", "7 days ago", formattedDate = "1 Nov 26", viewCount = 9200),
+                    ComicChapterItem("slr-ch-34", "ks:solo-leveling-ragnarok", "34", "Chapter 34", "14 days ago", formattedDate = "25 Okt 26", viewCount = 11400)
+                )
+            ),
+            ComicItem(
+                id = "ks:magic-emperor",
+                title = "Magic Emperor",
+                format = "Manhua",
+                countryCode = "CN",
+                coverPortrait = "https://assets.shngm.id/thumbnail/image/8ee2f1c8-2b81-420d-b4b1-912c9c7f9999.jpg",
+                rating = 9.4f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("me-ch-625", "ks:magic-emperor", "625", "Chapter 625", "3 hours ago", formattedDate = "8 Nov 26", viewCount = 4200),
+                    ComicChapterItem("me-ch-624", "ks:magic-emperor", "624", "Chapter 624", "3 days ago", formattedDate = "5 Nov 26", viewCount = 7600),
+                    ComicChapterItem("me-ch-623", "ks:magic-emperor", "623", "Chapter 623", "7 days ago", formattedDate = "1 Nov 26", viewCount = 8900)
+                )
+            ),
+            ComicItem(
+                id = "ks:reincarnation-of-the-suicidal-battle-god",
+                title = "Reincarnation of the Suicidal Battle God",
+                format = "Manhwa",
+                countryCode = "KR",
+                coverPortrait = "https://assets.shngm.id/thumbnail/cover/doom_breaker_banner.jpg",
+                rating = 9.7f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("rsbg-ch-115", "ks:reincarnation-of-the-suicidal-battle-god", "115", "Chapter 115", "5 hours ago", formattedDate = "8 Nov 26", viewCount = 3800),
+                    ComicChapterItem("rsbg-ch-114", "ks:reincarnation-of-the-suicidal-battle-god", "114", "Chapter 114", "7 days ago", formattedDate = "1 Nov 26", viewCount = 7100),
+                    ComicChapterItem("rsbg-ch-113", "ks:reincarnation-of-the-suicidal-battle-god", "113", "Chapter 113", "14 days ago", formattedDate = "25 Okt 26", viewCount = 9400)
+                )
+            ),
+            ComicItem(
+                id = "ks:nano-machine",
+                title = "Nano Machine",
+                format = "Manhwa",
+                countryCode = "KR",
+                coverPortrait = "https://assets.shngm.id/thumbnail/image/nano_machine_cover.jpg",
+                rating = 9.6f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("nm-ch-238", "ks:nano-machine", "238", "Chapter 238", "6 hours ago", formattedDate = "8 Nov 26", viewCount = 6200),
+                    ComicChapterItem("nm-ch-237", "ks:nano-machine", "237", "Chapter 237", "7 days ago", formattedDate = "1 Nov 26", viewCount = 10400),
+                    ComicChapterItem("nm-ch-236", "ks:nano-machine", "236", "Chapter 236", "14 days ago", formattedDate = "25 Okt 26", viewCount = 12900)
+                )
+            ),
+            ComicItem(
+                id = "ks:omniscient-reader",
+                title = "Omniscient Reader's Viewpoint",
+                format = "Manhwa",
+                countryCode = "KR",
+                coverPortrait = "https://assets.shngm.id/thumbnail/image/orv_cover_main.jpg",
+                rating = 9.9f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("orv-ch-241", "ks:omniscient-reader", "241", "Chapter 241", "8 hours ago", formattedDate = "8 Nov 26", viewCount = 8900),
+                    ComicChapterItem("orv-ch-240", "ks:omniscient-reader", "240", "Chapter 240", "7 days ago", formattedDate = "1 Nov 26", viewCount = 14200),
+                    ComicChapterItem("orv-ch-239", "ks:omniscient-reader", "239", "Chapter 239", "14 days ago", formattedDate = "25 Okt 26", viewCount = 18100)
+                )
+            ),
+            ComicItem(
+                id = "ks:damn-reincarnation",
+                title = "Damn Reincarnation",
+                format = "Manhwa",
+                countryCode = "KR",
+                coverPortrait = "https://assets.shngm.id/thumbnail/image/damn_reincarnation_cover.jpg",
+                rating = 9.3f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("dr-ch-92", "ks:damn-reincarnation", "92", "Chapter 92", "12 hours ago", formattedDate = "8 Nov 26", viewCount = 3100),
+                    ComicChapterItem("dr-ch-91", "ks:damn-reincarnation", "91", "Chapter 91", "7 days ago", formattedDate = "1 Nov 26", viewCount = 6800),
+                    ComicChapterItem("dr-ch-90", "ks:damn-reincarnation", "90", "Chapter 90", "14 days ago", formattedDate = "25 Okt 26", viewCount = 8900)
+                )
+            ),
+            ComicItem(
+                id = "ks:the-greatest-estate-developer",
+                title = "The Greatest Estate Developer",
+                format = "Manhwa",
+                countryCode = "KR",
+                coverPortrait = "https://assets.shngm.id/thumbnail/image/estate_developer_cover.jpg",
+                rating = 9.9f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("ged-ch-170", "ks:the-greatest-estate-developer", "170", "Chapter 170", "1 day ago", formattedDate = "7 Nov 26", viewCount = 7800),
+                    ComicChapterItem("ged-ch-169", "ks:the-greatest-estate-developer", "169", "Chapter 169", "7 days ago", formattedDate = "1 Nov 26", viewCount = 13500),
+                    ComicChapterItem("ged-ch-168", "ks:the-greatest-estate-developer", "168", "Chapter 168", "14 days ago", formattedDate = "25 Okt 26", viewCount = 16200)
+                )
+            ),
+            ComicItem(
+                id = "ks:pick-me-up-infinite-gacha",
+                title = "Pick Me Up, Infinite Gacha",
+                format = "Manhwa",
+                countryCode = "KR",
+                coverPortrait = "https://assets.shngm.id/thumbnail/image/pick_me_up_cover.jpg",
+                rating = 9.6f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("pmu-ch-120", "ks:pick-me-up-infinite-gacha", "120", "Chapter 120", "1 day ago", formattedDate = "7 Nov 26", viewCount = 4900),
+                    ComicChapterItem("pmu-ch-119", "ks:pick-me-up-infinite-gacha", "119", "Chapter 119", "7 days ago", formattedDate = "1 Nov 26", viewCount = 9100),
+                    ComicChapterItem("pmu-ch-118", "ks:pick-me-up-infinite-gacha", "118", "Chapter 118", "14 days ago", formattedDate = "25 Okt 26", viewCount = 11300)
+                )
+            ),
+            ComicItem(
+                id = "ks:revenge-of-iron-blooded-sword-hound",
+                title = "Revenge of the Iron-Blooded Sword Hound",
+                format = "Manhwa",
+                countryCode = "KR",
+                coverPortrait = "https://assets.shngm.id/thumbnail/image/sword_hound_cover.jpg",
+                rating = 9.5f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("sh-ch-98", "ks:revenge-of-iron-blooded-sword-hound", "98", "Chapter 98", "2 days ago", formattedDate = "6 Nov 26", viewCount = 4100),
+                    ComicChapterItem("sh-ch-97", "ks:revenge-of-iron-blooded-sword-hound", "97", "Chapter 97", "8 days ago", formattedDate = "31 Okt 26", viewCount = 8200),
+                    ComicChapterItem("sh-ch-96", "ks:revenge-of-iron-blooded-sword-hound", "96", "Chapter 96", "15 days ago", formattedDate = "24 Okt 26", viewCount = 10100)
+                )
+            ),
+            ComicItem(
+                id = "ks:martial-peak",
+                title = "Martial Peak",
+                format = "Manhua",
+                countryCode = "CN",
+                coverPortrait = "https://assets.shngm.id/thumbnail/image/martial_peak_cover.jpg",
+                rating = 9.2f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("mp-ch-3820", "ks:martial-peak", "3820", "Chapter 3820", "2 days ago", formattedDate = "6 Nov 26", viewCount = 3300),
+                    ComicChapterItem("mp-ch-3819", "ks:martial-peak", "3819", "Chapter 3819", "4 days ago", formattedDate = "4 Nov 26", viewCount = 5900),
+                    ComicChapterItem("mp-ch-3818", "ks:martial-peak", "3818", "Chapter 3818", "6 days ago", formattedDate = "2 Nov 26", viewCount = 7400)
                 )
             )
         )

@@ -111,16 +111,22 @@ object UpdateDownloadManager {
         val isHtmlReleaseFallback = secureUrl == updateInfo.htmlUrl.trim() &&
             !secureUrl.contains(".apk", ignoreCase = true)
 
-        if (secureUrl.isBlank() || isHtmlReleaseFallback) {
-            _activeUpdateInfo.value = updateInfo
-            _isMinimized.value = false
-            _downloadState.value = UpdateDownloadState.Failed(
-                version = version,
-                message = "Tautan file APK belum tersedia pada rilis ini.",
-                downloadUrl = secureUrl,
-                htmlUrl = updateInfo.htmlUrl
-            )
-            return
+        var finalDownloadUrl = secureUrl
+        if (finalDownloadUrl.isBlank() || isHtmlReleaseFallback) {
+            val directApk = UpdateChecker.resolveDirectApkUrl(updateInfo.latestVersion, finalDownloadUrl)
+            if (directApk.contains(".apk", ignoreCase = true)) {
+                finalDownloadUrl = directApk
+            } else {
+                _activeUpdateInfo.value = updateInfo
+                _isMinimized.value = false
+                _downloadState.value = UpdateDownloadState.Failed(
+                    version = version,
+                    message = "Tautan file APK belum tersedia pada rilis ini.",
+                    downloadUrl = secureUrl,
+                    htmlUrl = updateInfo.htmlUrl
+                )
+                return
+            }
         }
 
         val current = _downloadState.value
@@ -149,15 +155,15 @@ object UpdateDownloadManager {
             val dmSucceeded = downloadViaSystemDownloadManager(
                 appCtx = appCtx,
                 version = version,
-                secureUrl = secureUrl,
+                secureUrl = finalDownloadUrl,
                 fileName = fileName
             )
             if (!dmSucceeded && isActive) {
                 executeOkHttpDownload(
                     appCtx = appCtx,
-                    updateInfo = updateInfo,
+                    updateInfo = updateInfo.copy(downloadUrl = finalDownloadUrl),
                     version = version,
-                    secureUrl = secureUrl,
+                    secureUrl = finalDownloadUrl,
                     fileName = fileName
                 )
             }
@@ -526,6 +532,10 @@ object UpdateDownloadManager {
             setDataAndType(uri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+            putExtra(Intent.EXTRA_RETURN_RESULT, true)
+            putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, appCtx.packageName)
         }
     }
 

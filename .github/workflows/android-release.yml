@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "2.9.3"
+  APP_VERSION: "2.9.4"
 
 jobs:
   build:
@@ -63,19 +63,22 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Full-Length YT Music Soundtrack, Unduh Lagu & Notif Update In-App (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Redesain Detail Anime Minimalis, 12 Komik Beranda & In-App Auto Update (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
             ### Pembaruan Utama v${{ env.APP_VERSION }}:
-            1. **Soundtrack Full-Length (YT Music) & Unduh Lagu Offline:**
-               - Lagu Opening & Ending dari metadata anime (AnimeThemes / Jikan / MyAnimeList) dicocokkan ke YouTube Music Innertube (`WEB_REMIX` + `VISIONOS` audio stream) untuk pemutaran audio **full-length** lengkap dengan durasi asli, cover album resolusi tinggi, dan cadangan Deezer/iTunes/MusicBrainz.
-               - Menambahkan tombol **Unduh Lagu** pada setiap item soundtrack untuk menyimpan file audio (`.m4a`/`.webm`/`.mp3`) langsung ke `Music/Yuranime`.
-               - Tab `SOUNDTRACK` kini selalu tampil di halaman detail anime dan menampilkan informasi yang jelas jika anime tidak memiliki lagu Opening maupun Ending.
-            2. **Notifikasi Update In-App Lebih Andal (Tanpa Bolak-Balik Chrome):**
-               - Menambahkan retry otomatis & fallback halaman publik GitHub Releases bebas rate-limit pada `UpdateChecker`, serta DNS IPv4-first agar popup update selalu muncul di dalam aplikasi saat dibuka dan langsung mengunduh + auto-install APK di latar belakang.
-            3. **Video Player Modern, Sync Watch History Firebase & Stabilitas:**
-               - Seekbar modern dengan penanda Intro/Outro kuning (`#FACC15`), gestur Double-Tap to Seek + pengaturannya, sinkronisasi Watch History ke Firestore untuk pengguna login, serta perbaikan stabilitas Edit Profil & `GlobalCrashHandler`.
+            1. **Redesain Halaman Detail Anime Sesuai Desain Minimalis:**
+               - Cover hero dibuat lebih tinggi dan luas (355dp) dengan degradasi multi-stop halus yang menyatu langsung ke warna latar `#0B0B0B` tanpa garis batas.
+               - Label `ONGOING` dan `SERIES` dipindahkan tepat di atas judul anime dengan tipografi minimalis tanpa overlay box dan tanpa shadow.
+               - Top bar dibersihkan: tombol Back di kiri, Favorit & Share di kanan tanpa pill box, serta menghapus icon pensil/edit.
+            2. **Bagian Komik Terbaru di Beranda (12 Komik ke Bawah):**
+               - Menampilkan 12 komik (6 baris x 2 kolom) secara penuh ke bawah.
+               - Poster komik dan daftar 3 chapter disinkronkan presisi menggunakan `IntrinsicSize.Min` dan `fillMaxHeight()` agar 100% sejajar rata horizontal.
+               - Menyediakan cadangan fallback 12 komik lengkap dengan chapter & fallback KomikStation jika API utama terhambat.
+            3. **In-App Updater Langsung & Mitigasi Google Play Protect:**
+               - Ekstraksi tautan APK langsung dijamin valid tanpa redirect manual ke Chrome browser.
+               - Pemasangan APK didukung flag `EXTRA_NOT_UNKNOWN_SOURCE`, `FLAG_ACTIVITY_CLEAR_TOP`, serta panduan resmi saat muncul verifikasi Google Play Protect.
           draft: false
           prerelease: false
           make_latest: true

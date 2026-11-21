@@ -405,6 +405,15 @@ fun UpdateNoticeDialog(
                                         fontFamily = SfProFontFamily
                                     )
                                 }
+
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "🛡️ Tips: Jika muncul konfirmasi Google Play Protect ('Aplikasi tidak dikenal'), ketuk 'Rincian lebih lanjut' lalu pilih 'Tetap instal'. Pembaruan Yuranime 100% aman dan diverifikasi resmi.",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 11.sp,
+                                    fontFamily = SfProFontFamily,
+                                    lineHeight = 15.sp
+                                )
                             }
 
                             is UpdateDownloadState.Failed -> {

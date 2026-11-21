@@ -5,9 +5,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -40,7 +42,7 @@ private const val COMIC_IMAGE_REFERER = "https://app.shinigami.asia/"
 
 /**
  * Section Komik Terbaru di HomeScreen:
- * - 10 komik terbaru (5 baris ke bawah x 2 kolom berdampingan).
+ * - 12 komik terbaru (6 baris ke bawah x 2 kolom berdampingan).
  * - TANPA kotak/card overlay abu-abu (#141418) dan TANPA border di belakang item komik.
  * - Judul dikunci tepat 2 baris (minLines = 2, maxLines = 2) agar bendera dan 3 chapter
  *   di kolom kiri dan kanan 100% sejajar rata horizontal.
@@ -54,8 +56,8 @@ fun ComicLatestSection(
 ) {
     if (comics.isEmpty()) return
 
-    // Ambil 10 komik terbaru dan susun menjadi 5 baris x 2 kolom
-    val displayComics = comics.take(10)
+    // Ambil 12 komik terbaru dan susun menjadi 6 baris x 2 kolom ke bawah
+    val displayComics = comics.take(12)
     val rows = displayComics.chunked(2)
 
     Column(
@@ -100,7 +102,7 @@ fun ComicLatestSection(
 
 /**
  * Item Komik Bersih Tanpa Kotak/Border Overlay:
- * - Poster vertikal di kiri langsung di atas latar utama (#0B0B0B).
+ * - Poster vertikal di kiri langsung di atas latar utama (#0B0B0B), tinggi 100% presisi sejajar dengan kolom chapter.
  * - Judul komik 2 baris rata (minLines = 2, maxLines = 2) + bendera negara + 3 chapter sejajar.
  */
 @Composable
@@ -116,14 +118,15 @@ fun ComicGridCard(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .height(IntrinsicSize.Min)
             .clickable(onClick = onComicClick),
         verticalAlignment = Alignment.Top
     ) {
-        // SISI KIRI: Poster Komik Vertikal Murni (Tanpa kotak overlay di belakangnya)
+        // SISI KIRI: Poster Komik Vertikal Murni (Tinggi sinkron & sejajar penuh dengan teks info & chapter)
         Box(
             modifier = Modifier
-                .width(68.dp)
-                .aspectRatio(2f / 3f)
+                .width(70.dp)
+                .fillMaxHeight()
                 .clip(RoundedCornerShape(8.dp))
         ) {
             AsyncImage(
@@ -145,34 +148,39 @@ fun ComicGridCard(
 
         // SISI KANAN: Judul (2 baris tetap), Bendera Negara, dan 3 Chapter Terbaru Sejajar
         Column(
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = comic.title,
-                color = Color.White,
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = SfProFontFamily,
-                minLines = 2,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 15.sp
-            )
+            Column {
+                Text(
+                    text = comic.title,
+                    color = Color.White,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SfProFontFamily,
+                    minLines = 2,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 15.sp
+                )
 
-            Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-            // Ikon Bendera Negara (China / Jepang / Korea)
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(comic.flagUrl)
-                    .crossfade(false)
-                    .build(),
-                contentDescription = comic.format,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(width = 18.dp, height = 12.dp)
-                    .clip(RoundedCornerShape(2.5.dp))
-            )
+                // Ikon Bendera Negara (China / Jepang / Korea)
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(comic.flagUrl)
+                        .crossfade(false)
+                        .build(),
+                    contentDescription = comic.format,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(width = 18.dp, height = 12.dp)
+                        .clip(RoundedCornerShape(2.5.dp))
+                )
+            }
 
             Spacer(modifier = Modifier.height(6.dp))
 

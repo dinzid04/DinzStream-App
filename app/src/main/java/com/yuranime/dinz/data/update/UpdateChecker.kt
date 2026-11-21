@@ -109,8 +109,8 @@ object UpdateChecker {
                             }
                         }
 
-                        if (apkDownloadUrl.isBlank()) {
-                            apkDownloadUrl = htmlUrl
+                        if (apkDownloadUrl.isBlank() || !apkDownloadUrl.contains(".apk", ignoreCase = true)) {
+                            apkDownloadUrl = resolveDirectApkUrl(tagName, apkDownloadUrl)
                         }
 
                         if (releaseBody.isBlank() || releaseBody.length < 50) {
@@ -205,8 +205,8 @@ object UpdateChecker {
                     }
                 }
             }
-            if (apkDownloadUrl.isBlank()) {
-                apkDownloadUrl = htmlUrl
+            if (apkDownloadUrl.isBlank() || !apkDownloadUrl.contains(".apk", ignoreCase = true)) {
+                apkDownloadUrl = resolveDirectApkUrl(tagName, apkDownloadUrl)
             }
 
             val isNewer = isNewerVersion(remote = tagName, local = currentVersionName)
@@ -222,6 +222,22 @@ object UpdateChecker {
             throw e
         } catch (_: Exception) {
             return null
+        }
+    }
+
+    fun resolveDirectApkUrl(tagName: String, candidateUrl: String? = null): String {
+        if (!candidateUrl.isNullOrBlank() && candidateUrl.contains(".apk", ignoreCase = true)) {
+            return candidateUrl
+        }
+        val cleanTag = tagName.trim()
+        val runNumber = cleanTag.substringAfter("-build-", "").ifBlank {
+            cleanTag.substringAfter("-b", "")
+        }
+        val versionPart = cleanTag.removePrefix("v").removePrefix("V").substringBefore("-build-").substringBefore("-b")
+        return if (runNumber.isNotBlank()) {
+            "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/download/$cleanTag/Yuranime-v${versionPart}-b${runNumber}.apk"
+        } else {
+            "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/download/$cleanTag/Yuranime-v${versionPart}.apk"
         }
     }
 

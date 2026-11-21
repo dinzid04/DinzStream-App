@@ -697,7 +697,7 @@ private fun HeroCoverHeader(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(260.dp) // Proportional enlarged cover
+            .height(355.dp) // Enlarged taller hero cover
     ) {
         // Landscape Cover Image
         AsyncImage(
@@ -712,23 +712,24 @@ private fun HeroCoverHeader(
             contentScale = ContentScale.Crop
         )
 
-        // Smooth Dark Gradient (Matte clean fade)
+        // Smooth Dark Multi-stop Gradient (Matte clean fade directly blending to #0B0B0B without hard borders)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0x88000000),
-                            Color(0x33000000),
-                            Color(0xCC0B0B0B),
-                            ColorBackgroundPrimary
-                        )
+                        0.00f to Color(0x66000000),      // Subtle status bar tint
+                        0.22f to Color.Transparent,     // Clear hero artwork
+                        0.45f to Color(0x220B0B0B),     // Very gradual darkening
+                        0.65f to Color(0x770B0B0B),     // Smooth mid-tone
+                        0.82f to Color(0xCC0B0B0B),     // Deep dark
+                        0.94f to Color(0xFA0B0B0B),     // Almost background
+                        1.00f to ColorBackgroundPrimary // Seamlessly blends into page background
                     )
                 )
         )
 
-        // Top Control Bar with statusBarsPadding (Transparent floating icons without black circles)
+        // Top Control Bar with statusBarsPadding (Transparent floating actions: Back on left, Star & Share on right)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -750,43 +751,11 @@ private fun HeroCoverHeader(
                 )
             }
 
-            // Right: Badges & Outline Actions
+            // Right: Favorite & Share (Without pill box badges)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Status Pill (e.g. ONGOING / FINISHED)
-                val statusText = (movie.status ?: "ONGOING").uppercase()
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0x33FFFFFF))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = statusText,
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                // Type Pill (e.g. SERIES / MOVIE) - Teal
-                val typeText = (movie.type ?: "SERIES").uppercase()
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xFF0D9488))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = typeText,
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
                 // Favorite Icon (Outline white, gold when active)
                 IconButton(
                     onClick = onFavoriteClick,
@@ -820,12 +789,38 @@ private fun HeroCoverHeader(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Left: Title + Views + Favorites (Using Vector Icons, No emojis)
+            // Left: Status/Type Text + Title + Views + Favorites
             Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                // Minimalist Pure Text Labels: ONGOING & SERIES (No box overlay, no shadow, clean typography)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val statusText = (movie.status ?: "ONGOING").uppercase()
+                    Text(
+                        text = statusText,
+                        color = Color(0xFFD1D5DB),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.6.sp
+                    )
+
+                    val typeText = (movie.type ?: "SERIES").uppercase()
+                    Text(
+                        text = typeText,
+                        color = Color(0xFF2DD4BF),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.6.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
                 Text(
                     text = movie.title ?: "",
                     color = ColorTextPrimary,
@@ -1085,25 +1080,6 @@ private fun TabInfoContent(
                     )
                 }
             }
-        }
-
-        // Floating Action Button Edit (Bottom Right)
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(20.dp)
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF1E2028))
-                .clickable { /* Edit metadata action */ },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = "Edit Info",
-                tint = ColorAccentPrimary,
-                modifier = Modifier.size(20.dp)
-            )
         }
     }
 }
