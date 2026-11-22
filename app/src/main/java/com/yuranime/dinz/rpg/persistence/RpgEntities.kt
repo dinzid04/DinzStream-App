@@ -6,26 +6,36 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "rpg_player_state")
 data class PlayerStateEntity(
     @PrimaryKey val userUid: String,
-    val posX: Float = 144f,
-    val posY: Float = 224f,
+    val currentMapId: String = "overworld",
+    val posX: Float = 14f * 16f + 8f,
+    val posY: Float = 43f * 16f + 8f,
     val facing: String = "down",
     val level: Int = 1,
     val exp: Int = 0,
-    val coins: Int = 120,
+    val coins: Int = 150,
+    val energy: Int = 100,
     val fishingLevel: Int = 1,
     val fishingExp: Int = 0,
     val farmingLevel: Int = 1,
     val farmingExp: Int = 0,
     val gatheringLevel: Int = 1,
     val gatheringExp: Int = 0,
+    val miningLevel: Int = 1,
+    val miningExp: Int = 0,
+    val cookingLevel: Int = 1,
+    val cookingExp: Int = 0,
+    val craftingLevel: Int = 1,
+    val craftingExp: Int = 0,
     val houseTier: Int = 1,
-    val gameTimeHours: Float = 8.5f,
+    val gameTimeHours: Float = 8.0f,
     val dayCount: Int = 1,
     val selectedToolId: String = "tool_rod_basic",
     val selectedSeedId: String = "seed_carrot",
-    val shirtColorHex: Long = 0xFF48A298,
-    val hatColorHex: Long = 0xFFE2B65E,
-    val ribbonColorHex: Long = 0xFFA84238,
+    val presetId: String = "princess",
+    val outfitTintHex: Long = 0xFFFFFFFF,
+    val accentHex: Long = 0xFFC84B31,
+    val discoveredRegionsCsv: String = "homestead,farm_fields,village_plaza",
+    val openedChestsCsv: String = "",
     val updatedAtMs: Long = System.currentTimeMillis()
 )
 
@@ -73,6 +83,7 @@ data class CropPlotEntity(
 data class PlacedObjectEntity(
     val userUid: String,
     val objectId: String,
+    val mapId: String = "overworld",
     val itemId: String,
     val tileX: Int,
     val tileY: Int,
@@ -93,4 +104,13 @@ data class AchievementEntity(
     val achievementId: String,
     val progress: Int,
     val unlocked: Boolean
+)
+
+@Entity(tableName = "rpg_npc_friendship", primaryKeys = ["userUid", "npcId"])
+data class NpcFriendshipEntity(
+    val userUid: String,
+    val npcId: String,
+    val points: Int,
+    val talkedToday: Boolean,
+    val giftedToday: Boolean
 )

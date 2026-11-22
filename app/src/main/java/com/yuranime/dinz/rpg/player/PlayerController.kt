@@ -8,17 +8,20 @@ import com.yuranime.dinz.rpg.model.PlayerAction
 import com.yuranime.dinz.rpg.model.PlayerCustomization
 import com.yuranime.dinz.rpg.model.RpgCatalog
 import com.yuranime.dinz.rpg.model.TreeHealthState
+import com.yuranime.dinz.rpg.npc.NpcSystem
 import com.yuranime.dinz.rpg.world.HomesteadWorld
 import kotlin.math.abs
 import kotlin.math.hypot
 
 class PlayerController {
-    var x: Float = 144f + 8f
-    var y: Float = 224f + 8f
+    var x: Float = 14f * HomesteadWorld.TILE_SIZE + 8f
+    var y: Float = 43f * HomesteadWorld.TILE_SIZE + 8f
     var direction: Direction = Direction.DOWN
     var action: PlayerAction = PlayerAction.IDLE
     var stateTime: Float = 0f
     var isRunning: Boolean = false
+    var energy: Int = 100
+    val maxEnergy: Int = 100
     var selectedToolId: String = "tool_rod_basic"
     var selectedSeedId: String = "seed_carrot"
     var customization: PlayerCustomization = PlayerCustomization()
@@ -31,6 +34,50 @@ class PlayerController {
     var joyX: Float = 0f
     @Volatile
     var joyY: Float = 0f
+    @Volatile
+    var sensitivity: Float = 1.0f
+
+    // Tap-to-Move A* Pathfinding state
+    val autoPath: MutableList<Pair<Int, Int>> = mutableListOf()
+    var pendingTapAction: ContextualAction? = null
+        private set
+    var tapMarkerTile: Pair<Int, Int>? = null
+        private set
+    var tapMarkerTimer: Float = 0f
+        private set
+    private var stuckTimer: Float = 0f
+
+    val isAutoWalking: Boolean get() = autoPath.isNotEmpty()
+
+    fun consumeEnergy(cost: Int): Boolean {
+        if (cost <= 0) return true
+        energy = (energy - cost).coerceAtLeast(0)
+        return true
+    }
+
+    fun restoreEnergy(amount: Int) {
+        if (amount <= 0) return
+        energy = (energy + amount).coerceAtMost(maxEnergy)
+    }
+
+    fun setAutoPath(
+        path: List<Pair<Int, Int>>,
+        pendingAction: ContextualAction? = null,
+        markerTile: Pair<Int, Int>? = null
+    ) {
+        autoPath.clear()
+        autoPath.addAll(path)
+        pendingTapAction = pendingAction
+        tapMarkerTile = markerTile ?: path.lastOrNull()
+        tapMarkerTimer = 1.6f
+        stuckTimer = 0f
+    }
+
+    fun cancelAutoPath() {
+        autoPath.clear()
+        pendingTapAction = null
+        stuckTimer = 0f
+    }
 
     fun triggerActionAnimation(newAction: PlayerAction, duration: Float) {
         action = newAction
@@ -51,6 +98,19 @@ class PlayerController {
         actionLockTimer = 0f
     }
 
+    fun faceTile(tx: Int, ty: Int) {
+        val wx = tx * HomesteadWorld.TILE_SIZE + 8f
+        val wy = ty * HomesteadWorld.TILE_SIZE + 8f
+        val dx = wx - x
+        val dy = wy - y
+        if (abs(dx) < 0.5f && abs(dy) < 0.5f) return
+        direction = if (abs(dx) > abs(dy)) {
+            if (dx > 0f) Direction.RIGHT else Direction.LEFT
+        } else {
+            if (dy > 0f) Direction.UP else Direction.DOWN
+        }
+    }
+
     fun getTileX(): Int = (x / HomesteadWorld.TILE_SIZE).toInt()
     fun getTileY(): Int = (y / HomesteadWorld.TILE_SIZE).toInt()
 
@@ -65,10 +125,26 @@ class PlayerController {
         }
     }
 
-    fun update(dt: Float, world: HomesteadWorld, isFishingActive: Boolean, onFootstep: () -> Unit) {
+    fun update(
+        dt: Float,
+        world: HomesteadWorld,
+        playerLevel: Int,
+        isFishingActive: Boolean,
+        isDialogueActive: Boolean,
+        onFootstep: () -> Unit,
+        onBlockedRegion: (String) -> Unit,
+        onPendingActionReached: (ContextualAction) -> Unit
+    ) {
         stateTime += dt
+        if (tapMarkerTimer > 0f) {
+            tapMarkerTimer = (tapMarkerTimer - dt).coerceAtLeast(0f)
+            if (tapMarkerTimer <= 0f && autoPath.isEmpty()) tapMarkerTile = null
+        }
 
-        if (isFishingActive) return
+        if (isFishingActive || isDialogueActive) {
+            cancelAutoPath()
+            return
+        }
 
         if (actionLockTimer > 0f) {
             actionLockTimer = (actionLockTimer - dt).coerceAtLeast(0f)
@@ -79,15 +155,17 @@ class PlayerController {
             return
         }
 
-        val ix = joyX
-        val iy = joyY
+        val ix = joyX * sensitivity
+        val iy = joyY * sensitivity
         val mag = hypot(ix.toDouble(), iy.toDouble()).toFloat()
 
         if (mag > 0.12f) {
+            // Manual joystick overrides any active A* tap-to-move path immediately!
+            if (autoPath.isNotEmpty() || pendingTapAction != null) cancelAutoPath()
             val nx = ix / mag
             val ny = iy / mag
             val clampedMag = mag.coerceAtMost(1f)
-            val speed = (if (isRunning) 88f else 56f) * clampedMag
+            val speed = (if (isRunning) 94f else 62f) * clampedMag
 
             direction = if (abs(nx) > abs(ny)) {
                 if (nx > 0f) Direction.RIGHT else Direction.LEFT
@@ -95,45 +173,139 @@ class PlayerController {
                 if (ny > 0f) Direction.UP else Direction.DOWN
             }
 
-            // Axis-separated AABB collision sliding for butter-smooth movement along walls/fences/water!
-            val nextX = (x + nx * speed * dt).coerceIn(20f, HomesteadWorld.WORLD_W - 20f)
-            if (!world.isBlockedAtWorldPos(nextX, y)) {
-                x = nextX
-            }
-            val nextY = (y + ny * speed * dt).coerceIn(20f, HomesteadWorld.WORLD_H - 20f)
-            if (!world.isBlockedAtWorldPos(x, nextY)) {
-                y = nextY
-            }
+            moveWithCollision(nx * speed * dt, ny * speed * dt, world, playerLevel, onBlockedRegion)
+            setMovingAnim(dt, onFootstep)
+            return
+        }
 
-            val moveAction = if (isRunning) PlayerAction.RUN else PlayerAction.WALK
-            if (action != moveAction) {
-                action = moveAction
-                stateTime = 0f
-            }
+        // Follow A* Tap-to-Move Path
+        if (autoPath.isNotEmpty()) {
+            val (targetTx, targetTy) = autoPath.first()
+            val targetWx = targetTx * HomesteadWorld.TILE_SIZE + 8f
+            val targetWy = targetTy * HomesteadWorld.TILE_SIZE + 8f
+            val dx = targetWx - x
+            val dy = targetWy - y
+            val dist = hypot(dx.toDouble(), dy.toDouble()).toFloat()
 
-            stepSoundTimer -= dt
-            if (stepSoundTimer <= 0f) {
-                onFootstep()
-                stepSoundTimer = if (isRunning) 0.24f else 0.36f
+            if (dist <= 2.2f) {
+                x = targetWx
+                y = targetWy
+                autoPath.removeAt(0)
+                stuckTimer = 0f
+                if (autoPath.isEmpty()) {
+                    val act = pendingTapAction
+                    pendingTapAction = null
+                    tapMarkerTile = null
+                    action = PlayerAction.IDLE
+                    stateTime = 0f
+                    if (act != null) {
+                        faceTile(act.targetTileX, act.targetTileY)
+                        onPendingActionReached(act)
+                    }
+                }
+            } else {
+                val nx = dx / dist
+                val ny = dy / dist
+                val speed = if (isRunning) 94f else 68f
+                val step = (speed * dt).coerceAtMost(dist)
+                direction = if (abs(nx) > abs(ny)) {
+                    if (nx > 0f) Direction.RIGHT else Direction.LEFT
+                } else {
+                    if (ny > 0f) Direction.UP else Direction.DOWN
+                }
+                val oldX = x
+                val oldY = y
+                moveWithCollision(nx * step, ny * step, world, playerLevel, onBlockedRegion)
+                if (hypot((x - oldX).toDouble(), (y - oldY).toDouble()) < 0.05) {
+                    stuckTimer += dt
+                    if (stuckTimer > 0.35f) cancelAutoPath()
+                } else {
+                    stuckTimer = 0f
+                }
+                setMovingAnim(dt, onFootstep)
             }
-        } else {
-            if (action != PlayerAction.IDLE) {
-                action = PlayerAction.IDLE
-                stateTime = 0f
-            }
-            stepSoundTimer = 0.08f
+            return
+        }
+
+        // If player tapped an adjacent target with zero walk path, execute right away!
+        val immediate = pendingTapAction
+        if (immediate != null) {
+            pendingTapAction = null
+            faceTile(immediate.targetTileX, immediate.targetTileY)
+            onPendingActionReached(immediate)
+            return
+        }
+
+        if (action != PlayerAction.IDLE) {
+            action = PlayerAction.IDLE
+            stateTime = 0f
+        }
+        stepSoundTimer = 0.08f
+    }
+
+    private fun setMovingAnim(dt: Float, onFootstep: () -> Unit) {
+        val moveAction = if (isRunning) PlayerAction.RUN else PlayerAction.WALK
+        if (action != moveAction) {
+            action = moveAction
+            stateTime = 0f
+        }
+        stepSoundTimer -= dt
+        if (stepSoundTimer <= 0f) {
+            onFootstep()
+            stepSoundTimer = if (isRunning) 0.23f else 0.34f
         }
     }
 
-    /**
-     * Scans facing tile and adjacent 1-tile ring to provide intelligent, dynamic contextual actions.
-     */
-    fun detectContextAction(world: HomesteadWorld, inventory: InventorySystem): ContextualAction {
+    private fun moveWithCollision(
+        dx: Float,
+        dy: Float,
+        world: HomesteadWorld,
+        playerLevel: Int,
+        onBlockedRegion: (String) -> Unit
+    ) {
+        val minX = 16f
+        val maxX = (world.worldW - 16f).coerceAtLeast(minX + 1f)
+        val minY = 6f
+        val maxY = (world.worldH - 16f).coerceAtLeast(minY + 1f)
+
+        val nextX = (x + dx).coerceIn(minX, maxX)
+        if (!world.isBlockedAtWorldPos(nextX, y, playerLevel)) {
+            x = nextX
+        } else {
+            checkLockedRegionHint((nextX / HomesteadWorld.TILE_SIZE).toInt(), getTileY(), world, playerLevel, onBlockedRegion)
+        }
+
+        val nextY = (y + dy).coerceIn(minY, maxY)
+        if (!world.isBlockedAtWorldPos(x, nextY, playerLevel)) {
+            y = nextY
+        } else {
+            checkLockedRegionHint(getTileX(), (nextY / HomesteadWorld.TILE_SIZE).toInt(), world, playerLevel, onBlockedRegion)
+        }
+    }
+
+    private fun checkLockedRegionHint(
+        tx: Int,
+        ty: Int,
+        world: HomesteadWorld,
+        playerLevel: Int,
+        onBlockedRegion: (String) -> Unit
+    ) {
+        if (world.currentMapId.isIndoor) return
+        val reg = world.getRegionAt(world.currentMapId, tx, ty)
+        if (!world.isRegionUnlocked(reg, playerLevel)) {
+            onBlockedRegion("Butuh Level ${reg.requiredLevel} untuk membuka ${reg.displayName}!")
+        }
+    }
+
+    fun detectContextAction(
+        world: HomesteadWorld,
+        inventory: InventorySystem,
+        npcSystem: NpcSystem
+    ): ContextualAction {
         val (fx, fy) = getFacingTile()
         val px = getTileX()
         val py = getTileY()
 
-        // Candidate tiles prioritized: facing tile first, then current tile, then orthogonal neighbors
         val candidates = listOf(
             fx to fy,
             px to py,
@@ -143,27 +315,55 @@ class PlayerController {
             (px + 1) to py
         ).distinct()
 
-        // 1. Check nearby NPC / Station landmarks (Merchant, Selling Bin, Storage Chest, House Door)
+        // 1. Living Village NPC nearby
+        val nearNpc = npcSystem.findNpcAtOrNearTile(world.currentMapId, fx, fy, 1)
+            ?: npcSystem.findNpcAtOrNearTile(world.currentMapId, px, py, 1)
+        if (nearNpc != null) {
+            return ContextualAction(
+                type = ContextActionType.TALK_NPC,
+                label = "Bicara ${nearNpc.def.name}",
+                targetTileX = nearNpc.tileX,
+                targetTileY = nearNpc.tileY,
+                targetId = nearNpc.def.id
+            )
+        }
+
+        // 2. Doors & Cave Portals
         for ((cx, cy) in candidates) {
-            if (cx in (HomesteadWorld.MERCHANT_TILE_X - 1)..(HomesteadWorld.MERCHANT_TILE_X + 2) &&
-                cy in (HomesteadWorld.MERCHANT_TILE_Y - 1)..(HomesteadWorld.MERCHANT_TILE_Y + 1)
-            ) {
-                return ContextualAction(ContextActionType.OPEN_MERCHANT, "Toko Merchant", cx, cy)
-            }
-            if (cx == HomesteadWorld.SELL_BIN_TILE_X && cy == HomesteadWorld.SELL_BIN_TILE_Y) {
-                return ContextualAction(ContextActionType.OPEN_SELL_BIN, "Jual Hasil", cx, cy)
-            }
-            if (cx == HomesteadWorld.STORAGE_TILE_X && cy == HomesteadWorld.STORAGE_TILE_Y) {
-                return ContextualAction(ContextActionType.OPEN_STORAGE, "Peti Simpan", cx, cy)
-            }
-            if (cx in (HomesteadWorld.HOUSE_DOOR_X - 1)..(HomesteadWorld.HOUSE_DOOR_X + 1) &&
-                cy in HomesteadWorld.HOUSE_DOOR_Y..(HomesteadWorld.HOUSE_DOOR_Y + 1)
-            ) {
-                return ContextualAction(ContextActionType.OPEN_HOUSE_UPGRADE, "Upgrade Rumah", cx, cy)
+            val portal = world.getPortalAt(cx, cy)
+            if (portal != null) {
+                return ContextualAction(
+                    type = ContextActionType.ENTER_PORTAL,
+                    label = portal.label,
+                    targetTileX = cx,
+                    targetTileY = cy,
+                    targetId = portal.targetMap.id
+                )
             }
         }
 
-        // 2. Check facing tile first for Water (Fishing), Trees (Chopping), Crops/Soil (Farming)
+        // 3. Interactive Building/Homestead Stations (Bed, Stove, Workbench, Storage, Sell Bin, Shop, Blacksmith)
+        for ((cx, cy) in candidates) {
+            val st = world.getStationAt(cx, cy)
+            if (st != null) {
+                return ContextualAction(st.actionType, st.label, cx, cy)
+            }
+        }
+
+        // 4. Treasure Chests & Wild Forageables
+        for ((cx, cy) in candidates) {
+            val chest = world.getChestAt(cx, cy)
+            if (chest != null) {
+                return ContextualAction(ContextActionType.OPEN_CHEST, "Buka ${chest.label}", cx, cy, chest.id)
+            }
+            val forage = world.getForageAt(cx, cy)
+            if (forage != null) {
+                val fname = RpgCatalog.itemById[forage.itemId]?.name ?: "Hasil Alam"
+                return ContextualAction(ContextActionType.GATHER_FORAGE, "Ambil $fname", cx, cy, forage.id)
+            }
+        }
+
+        // 5. Facing Water (Fishing), Trees (Chopping), Ore Rocks (Mining)
         if (world.isWaterTile(fx, fy)) {
             return ContextualAction(
                 type = ContextActionType.FISH,
@@ -179,13 +379,18 @@ class PlayerController {
             return ContextualAction(ContextActionType.CHOP_TREE, "Tebang ${facingTree.type.displayName}", fx, fy, facingTree.id)
         }
 
-        // Check farm tiles (facing first, then standing tile)
+        val facingOre = world.getOreAt(fx, fy)
+        if (facingOre != null) {
+            return ContextualAction(ContextActionType.MINE_ORE, "Tambang ${facingOre.type.displayName}", fx, fy, facingOre.id)
+        }
+
+        // 6. Farmable Tiles
         for ((cx, cy) in listOf(fx to fy, px to py)) {
             if (world.isFarmableTile(cx, cy)) {
                 val plot = world.cropPlots["${cx}_${cy}"]
                 return when {
                     plot == null || !plot.isTilled -> ContextualAction(ContextActionType.TILL_SOIL, "Cangkul Tanah", cx, cy)
-                    plot.isHarvestable -> ContextualAction(ContextActionType.HARVEST_CROP, "Panen ${plot.cropType?.displayName ?: "Sayur"}", cx, cy)
+                    plot.isHarvestable -> ContextualAction(ContextActionType.HARVEST_CROP, "Panen ${plot.cropType?.displayName ?: "Tanaman"}", cx, cy)
                     plot.cropType == null -> {
                         val seedName = RpgCatalog.itemById[selectedSeedId]?.name?.removePrefix("Bibit ") ?: "Bibit"
                         ContextualAction(ContextActionType.PLANT_SEED, "Tanam $seedName", cx, cy)
@@ -196,7 +401,7 @@ class PlayerController {
             }
         }
 
-        // 3. Check adjacent tiles for water / tree if player isn't facing directly at it
+        // 7. Adjacent Water, Trees, or Ores
         for ((cx, cy) in candidates) {
             if (world.isWaterTile(cx, cy)) {
                 return ContextualAction(ContextActionType.FISH, "Pancing", cx, cy, habitat = world.getWaterHabitat(cx, cy))
@@ -205,16 +410,20 @@ class PlayerController {
             if (adjTree != null && adjTree.state != TreeHealthState.STUMP && adjTree.state != TreeHealthState.FALLING) {
                 return ContextualAction(ContextActionType.CHOP_TREE, "Tebang ${adjTree.type.displayName}", cx, cy, adjTree.id)
             }
+            val adjOre = world.getOreAt(cx, cy)
+            if (adjOre != null) {
+                return ContextualAction(ContextActionType.MINE_ORE, "Tambang ${adjOre.type.displayName}", cx, cy, adjOre.id)
+            }
         }
 
-        // 4. Check placed objects (pick up / interact)
+        // 8. Placed Decor / Furniture Pickup
         val placed = world.getPlacedObjectAt(fx, fy)
         if (placed != null) {
-            val name = RpgCatalog.itemById[placed.itemId]?.name ?: "Dekorasi"
+            val name = RpgCatalog.itemById[placed.itemId]?.name ?: "Furnitur"
             return ContextualAction(ContextActionType.INTERACT_DECOR, "Ambil $name", fx, fy, placed.id)
         }
 
-        // 5. If player holds a tree sapling (Oak/Sakura) on open grass, offer Plant Tree!
+        // 9. Tree Sapling Planting on open grass
         if ((selectedSeedId == "seed_oak" || selectedSeedId == "seed_sakura") &&
             inventory.hasItem(selectedSeedId, 1) &&
             world.isGrassPlantableForTree(fx, fy)

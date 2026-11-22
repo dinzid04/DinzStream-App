@@ -3,6 +3,7 @@ package com.yuranime.dinz.rpg.quests
 import com.yuranime.dinz.rpg.model.AchievementState
 import com.yuranime.dinz.rpg.model.FishRarity
 import com.yuranime.dinz.rpg.model.QuestState
+import com.yuranime.dinz.rpg.model.QuestType
 import com.yuranime.dinz.rpg.model.RpgCatalog
 import com.yuranime.dinz.rpg.persistence.AchievementEntity
 import com.yuranime.dinz.rpg.persistence.FishCollectionEntity
@@ -17,10 +18,17 @@ class ProgressionSystem {
     var farmingExp: Int = 0
     var gatheringLevel: Int = 1
     var gatheringExp: Int = 0
+    var miningLevel: Int = 1
+    var miningExp: Int = 0
+    var cookingLevel: Int = 1
+    var cookingExp: Int = 0
+    var craftingLevel: Int = 1
+    var craftingExp: Int = 0
 
-    private val fishCollection = linkedMapOf<String, Pair<Int, Long>>() // fishId -> (count, firstMs)
-    private val questProgress = linkedMapOf<String, Pair<Int, Boolean>>() // id -> (progress, claimed)
-    private val achievementProgress = linkedMapOf<String, Pair<Int, Boolean>>() // id -> (progress, unlocked)
+    private val fishCollection = linkedMapOf<String, Pair<Int, Long>>()
+    private val questProgress = linkedMapOf<String, Pair<Int, Boolean>>()
+    private val achievementProgress = linkedMapOf<String, Pair<Int, Boolean>>()
+    private val metNpcIds = linkedSetOf<String>()
 
     init {
         resetDefaults()
@@ -28,7 +36,7 @@ class ProgressionSystem {
 
     fun resetDefaults() {
         questProgress.clear()
-        RpgCatalog.dailyQuests.forEach { questProgress[it.id] = 0 to false }
+        RpgCatalog.quests.forEach { questProgress[it.id] = 0 to false }
         achievementProgress.clear()
         RpgCatalog.achievements.forEach { achievementProgress[it.id] = 0 to false }
     }
@@ -53,6 +61,12 @@ class ProgressionSystem {
         }
     }
 
+    fun resetDailyQuests() {
+        RpgCatalog.quests.filter { it.type == QuestType.DAILY }.forEach { q ->
+            questProgress[q.id] = 0 to false
+        }
+    }
+
     fun addPlayerExp(amount: Int): Boolean {
         if (amount <= 0) return false
         exp += amount
@@ -65,28 +79,44 @@ class ProgressionSystem {
         return leveledUp
     }
 
-    fun addFishingExp(amount: Int) {
-        fishingExp += amount
-        while (fishingExp >= 60 + (fishingLevel - 1) * 40) {
-            fishingExp -= 60 + (fishingLevel - 1) * 40
-            fishingLevel++
+    private fun advanceSkill(curExp: Int, curLevel: Int, delta: Int): Pair<Int, Int> {
+        var e = curExp + delta
+        var lvl = curLevel
+        while (e >= 60 + (lvl - 1) * 40) {
+            e -= 60 + (lvl - 1) * 40
+            lvl++
         }
+        return e to lvl
+    }
+
+    fun addFishingExp(amount: Int) {
+        val (e, l) = advanceSkill(fishingExp, fishingLevel, amount)
+        fishingExp = e; fishingLevel = l
     }
 
     fun addFarmingExp(amount: Int) {
-        farmingExp += amount
-        while (farmingExp >= 60 + (farmingLevel - 1) * 40) {
-            farmingExp -= 60 + (farmingLevel - 1) * 40
-            farmingLevel++
-        }
+        val (e, l) = advanceSkill(farmingExp, farmingLevel, amount)
+        farmingExp = e; farmingLevel = l
     }
 
     fun addGatheringExp(amount: Int) {
-        gatheringExp += amount
-        while (gatheringExp >= 60 + (gatheringLevel - 1) * 40) {
-            gatheringExp -= 60 + (gatheringLevel - 1) * 40
-            gatheringLevel++
-        }
+        val (e, l) = advanceSkill(gatheringExp, gatheringLevel, amount)
+        gatheringExp = e; gatheringLevel = l
+    }
+
+    fun addMiningExp(amount: Int) {
+        val (e, l) = advanceSkill(miningExp, miningLevel, amount)
+        miningExp = e; miningLevel = l
+    }
+
+    fun addCookingExp(amount: Int) {
+        val (e, l) = advanceSkill(cookingExp, cookingLevel, amount)
+        cookingExp = e; cookingLevel = l
+    }
+
+    fun addCraftingExp(amount: Int) {
+        val (e, l) = advanceSkill(craftingExp, craftingLevel, amount)
+        craftingExp = e; craftingLevel = l
     }
 
     fun recordFishCaught(fishId: String, rarity: FishRarity): List<String> {
@@ -97,12 +127,13 @@ class ProgressionSystem {
         if (addPlayerExp(rarity.expReward)) notices.add("Naik ke Level $playerLevel!")
 
         incrementQuest("q_catch_3_fish", 1)
+        incrementQuest("s_taro_angler", 1)
         incrementAchievement("a_first_fish", 1)?.let { notices.add(it) }
         incrementAchievement("a_fish_15", 1)?.let { notices.add(it) }
         if (rarity == FishRarity.RARE || rarity == FishRarity.EPIC || rarity == FishRarity.LEGENDARY) {
             incrementAchievement("a_rare_fish", 1)?.let { notices.add(it) }
         }
-        setAchievementProgress("a_collector_6", fishCollection.size)?.let { notices.add(it) }
+        setAchievementProgress("a_collector_8", fishCollection.size)?.let { notices.add(it) }
         return notices
     }
 
@@ -112,6 +143,22 @@ class ProgressionSystem {
         if (addPlayerExp(expReward)) notices.add("Naik ke Level $playerLevel!")
         incrementQuest("q_collect_10_wood", woodGained)
         incrementAchievement("a_chop_10", 1)?.let { notices.add(it) }
+        return notices
+    }
+
+    fun recordOreMined(expReward: Int): List<String> {
+        val notices = mutableListOf<String>()
+        addMiningExp(expReward)
+        if (addPlayerExp(expReward)) notices.add("Naik ke Level $playerLevel!")
+        incrementQuest("m_crystal_miner", 1)
+        incrementAchievement("a_mine_10", 1)?.let { notices.add(it) }
+        return notices
+    }
+
+    fun recordForaged(): List<String> {
+        val notices = mutableListOf<String>()
+        addGatheringExp(12)
+        if (addPlayerExp(10)) notices.add("Naik ke Level $playerLevel!")
         return notices
     }
 
@@ -127,8 +174,49 @@ class ProgressionSystem {
         val notices = mutableListOf<String>()
         addFarmingExp(expReward)
         if (addPlayerExp(expReward)) notices.add("Naik ke Level $playerLevel!")
-        incrementQuest("q_harvest_3_crops", 1)
+        incrementQuest("s_hana_harvest", 1)
         incrementAchievement("a_harvest_10", 1)?.let { notices.add(it) }
+        return notices
+    }
+
+    fun recordDishCooked(expReward: Int): List<String> {
+        val notices = mutableListOf<String>()
+        addCookingExp(expReward)
+        if (addPlayerExp(expReward)) notices.add("Naik ke Level $playerLevel!")
+        incrementQuest("m_chef_lesson", 1)
+        incrementAchievement("a_cook_5", 1)?.let { notices.add(it) }
+        return notices
+    }
+
+    fun recordItemCrafted(expReward: Int): List<String> {
+        val notices = mutableListOf<String>()
+        addCraftingExp(expReward)
+        if (addPlayerExp(expReward)) notices.add("Naik ke Level $playerLevel!")
+        incrementQuest("q_build_2_items", 1)
+        return notices
+    }
+
+    fun recordRegionDiscovered(totalDiscovered: Int): List<String> {
+        val notices = mutableListOf<String>()
+        if (addPlayerExp(22)) notices.add("Naik ke Level $playerLevel!")
+        setQuestProgress("m_welcome_explore", totalDiscovered)
+        setAchievementProgress("a_explore_8", totalDiscovered)?.let { notices.add(it) }
+        return notices
+    }
+
+    fun recordNpcTalked(npcId: String): List<String> {
+        val notices = mutableListOf<String>()
+        if (metNpcIds.add(npcId)) {
+            if (addPlayerExp(10)) notices.add("Naik ke Level $playerLevel!")
+            incrementQuest("m_meet_villagers", 1)
+        }
+        return notices
+    }
+
+    fun recordNpcGifted(): List<String> {
+        val notices = mutableListOf<String>()
+        if (addPlayerExp(14)) notices.add("Naik ke Level $playerLevel!")
+        incrementQuest("s_gift_friend", 1)
         return notices
     }
 
@@ -138,6 +226,7 @@ class ProgressionSystem {
 
     fun recordObjectBuilt(): List<String> {
         val notices = mutableListOf<String>()
+        addCraftingExp(14)
         if (addPlayerExp(15)) notices.add("Naik ke Level $playerLevel!")
         incrementQuest("q_build_2_items", 1)
         return notices
@@ -145,17 +234,30 @@ class ProgressionSystem {
 
     fun recordHouseUpgraded(newTier: Int): List<String> {
         val notices = mutableListOf<String>()
-        if (addPlayerExp(newTier * 45)) notices.add("Naik ke Level $playerLevel!")
-        if (newTier >= 2) setAchievementProgress("a_house_tier2", 1)?.let { notices.add(it) }
-        if (newTier >= 3) setAchievementProgress("a_house_tier3", 1)?.let { notices.add(it) }
+        if (addPlayerExp(newTier * 55)) notices.add("Naik ke Level $playerLevel!")
+        if (newTier >= 2) {
+            setQuestProgress("m_dream_home", 1)
+            setAchievementProgress("a_house_tier2", 1)?.let { notices.add(it) }
+        }
+        if (newTier >= 3) {
+            setAchievementProgress("a_house_tier3", 1)?.let { notices.add(it) }
+        }
         return notices
     }
 
     private fun incrementQuest(questId: String, delta: Int) {
-        val def = RpgCatalog.dailyQuests.find { it.id == questId } ?: return
+        val def = RpgCatalog.quests.find { it.id == questId } ?: return
         val cur = questProgress[questId] ?: (0 to false)
         if (!cur.second) {
             questProgress[questId] = (cur.first + delta).coerceAtMost(def.targetCount) to false
+        }
+    }
+
+    private fun setQuestProgress(questId: String, value: Int) {
+        val def = RpgCatalog.quests.find { it.id == questId } ?: return
+        val cur = questProgress[questId] ?: (0 to false)
+        if (!cur.second && value > cur.first) {
+            questProgress[questId] = value.coerceAtMost(def.targetCount) to false
         }
     }
 
@@ -178,7 +280,7 @@ class ProgressionSystem {
     }
 
     fun claimQuest(questId: String): Pair<Int, Int>? {
-        val def = RpgCatalog.dailyQuests.find { it.id == questId } ?: return null
+        val def = RpgCatalog.quests.find { it.id == questId } ?: return null
         val cur = questProgress[questId] ?: return null
         if (cur.second || cur.first < def.targetCount) return null
         questProgress[questId] = cur.first to true
@@ -188,7 +290,7 @@ class ProgressionSystem {
 
     fun getCaughtFishCounts(): Map<String, Int> = fishCollection.mapValues { it.value.first }
 
-    fun getQuestStates(): List<QuestState> = RpgCatalog.dailyQuests.map { def ->
+    fun getQuestStates(): List<QuestState> = RpgCatalog.quests.map { def ->
         val st = questProgress[def.id] ?: (0 to false)
         QuestState(def = def, progress = st.first, claimed = st.second)
     }

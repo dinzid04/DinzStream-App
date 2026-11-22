@@ -21,7 +21,7 @@ class FarmingSystem(
 ) {
     fun tillSoil(tileX: Int, tileY: Int): FarmActionResult {
         if (!world.isFarmableTile(tileX, tileY)) {
-            return FarmActionResult(false, "Hanya lahan kebun berpagar yang bisa dicangkul.")
+            return FarmActionResult(false, "Hanya lahan pertanian berpagar yang bisa dicangkul.")
         }
         val key = "${tileX}_${tileY}"
         val existing = world.cropPlots[key]
@@ -34,20 +34,18 @@ class FarmingSystem(
 
     fun plantSeed(tileX: Int, tileY: Int, seedItemId: String): FarmActionResult {
         if (!world.isFarmableTile(tileX, tileY)) {
-            return FarmActionResult(false, "Tanam bibit di petak lahan kebun.")
+            return FarmActionResult(false, "Tanam bibit di petak lahan pertanian.")
         }
         val cropType = CropType.entries.find { it.seedItemId == seedItemId }
-            ?: return FarmActionResult(false, "Pilih bibit sayuran terlebih dahulu.")
+            ?: return FarmActionResult(false, "Pilih bibit tanaman terlebih dahulu.")
         if (!inventory.hasItem(seedItemId, 1)) {
-            return FarmActionResult(false, "Stok bibit ${cropType.displayName} habis! Beli di Merchant.")
+            return FarmActionResult(false, "Stok bibit ${cropType.displayName} habis! Beli di Toko Hana.")
         }
         val key = "${tileX}_${tileY}"
         val plot = world.cropPlots[key] ?: CropPlot(tileX, tileY, isTilled = true).also {
             world.cropPlots[key] = it
         }
-        if (!plot.isTilled) {
-            plot.isTilled = true
-        }
+        if (!plot.isTilled) plot.isTilled = true
         if (plot.cropType != null) {
             return FarmActionResult(false, "Petak ini sudah ada tanamannya.")
         }
@@ -67,7 +65,7 @@ class FarmingSystem(
             return FarmActionResult(false, "Tanah belum dicangkul.")
         }
         plot.isWatered = true
-        return FarmActionResult(true, "Tanaman disiram! Pertumbuhan 2x lebih cepat.", watered = true)
+        return FarmActionResult(true, "Tanaman disiram! Tumbuh 2x lebih cepat.", watered = true)
     }
 
     fun harvestCrop(tileX: Int, tileY: Int): FarmActionResult {
@@ -78,9 +76,8 @@ class FarmingSystem(
         if (crop == null || !plot.isHarvestable) {
             return FarmActionResult(false, "Tanaman belum matang untuk dipanen.")
         }
-        val qty = if (Random.nextFloat() < 0.30f) 2 else 1
+        val qty = if (Random.nextFloat() < 0.32f) 2 else 1
         inventory.addItem(crop.harvestItemId, qty)
-        // Small chance of bonus seed
         if (Random.nextFloat() < 0.35f) {
             inventory.addItem(crop.seedItemId, 1)
         }
@@ -102,13 +99,11 @@ class FarmingSystem(
             }
             val crop = plot.cropType ?: continue
             if (plot.stage >= 4) continue
-            // Watered crops grow 2.2x faster than dry crops!
             val multiplier = if (plot.isWatered) 2.2f else 0.75f
             plot.growthProgress += (dt * multiplier) / crop.stageDurationSeconds
             while (plot.growthProgress >= 1f && plot.stage < 4) {
                 plot.growthProgress -= 1f
                 plot.stage++
-                // Soil dries out each stage unless raining
                 if (!world.isRaining && plot.stage < 4) {
                     plot.isWatered = false
                 }

@@ -10,7 +10,6 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,10 +21,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -57,20 +57,21 @@ import kotlinx.coroutines.launch
 enum class ActiveRpgModal {
     NONE,
     INVENTORY,
+    CHARACTER,
+    CRAFTING,
     MERCHANT,
-    CONSTRUCTION,
     QUESTS_ALMANAC,
-    CUSTOMIZATION,
+    WORLD_MAP,
     SETTINGS
 }
 
-private val RpgDarkColorScheme = darkColorScheme(
-    primary = Color(0xFFEA580C),
+private val RpgParchmentColorScheme = lightColorScheme(
+    primary = RpgTerracotta,
     onPrimary = Color.White,
-    background = Color(0xFF101512),
-    onBackground = Color(0xFFF6F1E7),
-    surface = Color(0xFF1E1A16),
-    onSurface = Color(0xFFF6F1E7)
+    background = RpgParchment,
+    onBackground = RpgInkDark,
+    surface = RpgParchmentSoft,
+    onSurface = RpgInkDark
 )
 
 class RpgGameActivity : FragmentActivity(), SafeAndroidFragmentApplication.Callbacks {
@@ -96,6 +97,7 @@ class RpgGameActivity : FragmentActivity(), SafeAndroidFragmentApplication.Callb
     private var gameInstance: CozyFishingGame? = null
     private lateinit var settingsStore: RpgSettingsStore
     private val pendingModalState = mutableStateOf(ActiveRpgModal.NONE)
+    private val pendingCraftingTab = mutableIntStateOf(0)
     private val engineErrorState = mutableStateOf<String?>(null)
 
     fun getOrCreateGame(): CozyFishingGame? {
@@ -108,11 +110,28 @@ class RpgGameActivity : FragmentActivity(), SafeAndroidFragmentApplication.Callb
             userDisplayName = activeUserName
         ) { req ->
             runOnUiThread {
-                pendingModalState.value = when (req) {
-                    RpgModalRequest.MERCHANT, RpgModalRequest.SELL_BIN -> ActiveRpgModal.MERCHANT
-                    RpgModalRequest.STORAGE -> ActiveRpgModal.INVENTORY
-                    RpgModalRequest.HOUSE_UPGRADE -> ActiveRpgModal.CONSTRUCTION
-                    RpgModalRequest.NONE -> ActiveRpgModal.NONE
+                when (req) {
+                    RpgModalRequest.MERCHANT, RpgModalRequest.SELL_BIN -> {
+                        pendingModalState.value = ActiveRpgModal.MERCHANT
+                    }
+                    RpgModalRequest.STORAGE -> {
+                        pendingModalState.value = ActiveRpgModal.INVENTORY
+                    }
+                    RpgModalRequest.COOKING -> {
+                        pendingCraftingTab.intValue = 0
+                        pendingModalState.value = ActiveRpgModal.CRAFTING
+                    }
+                    RpgModalRequest.CRAFTING -> {
+                        pendingCraftingTab.intValue = 1
+                        pendingModalState.value = ActiveRpgModal.CRAFTING
+                    }
+                    RpgModalRequest.HOUSE_UPGRADE -> {
+                        pendingCraftingTab.intValue = 2
+                        pendingModalState.value = ActiveRpgModal.CRAFTING
+                    }
+                    RpgModalRequest.NONE -> {
+                        pendingModalState.value = ActiveRpgModal.NONE
+                    }
                 }
             }
         }.also { gameInstance = it }
@@ -126,8 +145,7 @@ class RpgGameActivity : FragmentActivity(), SafeAndroidFragmentApplication.Callb
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Selalu pass null ke super agar FragmentManager tidak pernah me-restore RpgGameFragment lama
-        // yang punya GL context kadaluarsa atau ID view berbeda saat rotasi/recreation.
+        // Selalu pass null agar FragmentManager tidak me-restore GL context kadaluarsa
         super.onCreate(null)
 
         try {
@@ -145,7 +163,7 @@ class RpgGameActivity : FragmentActivity(), SafeAndroidFragmentApplication.Callb
             isSessionAuthorized = false
             Toast.makeText(
                 this,
-                "Willowbrook Cove RPG hanya untuk pengguna yang sudah login.",
+                "Sakura Vale RPG hanya untuk pengguna yang sudah login.",
                 Toast.LENGTH_LONG
             ).show()
             finish()
@@ -170,10 +188,9 @@ class RpgGameActivity : FragmentActivity(), SafeAndroidFragmentApplication.Callb
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
-                setBackgroundColor(android.graphics.Color.parseColor("#101512"))
+                setBackgroundColor(android.graphics.Color.parseColor("#141E18"))
             }
 
-            // ID statis compile-time dari res/values/ids.xml (anti crash View.generateViewId mismatch)
             val fragmentContainer = FragmentContainerView(this).apply {
                 id = R.id.rpg_game_container
                 layoutParams = FrameLayout.LayoutParams(
@@ -189,11 +206,11 @@ class RpgGameActivity : FragmentActivity(), SafeAndroidFragmentApplication.Callb
                     FrameLayout.LayoutParams.MATCH_PARENT
                 )
                 setContent {
-                    // Pakai MaterialTheme langsung tanpa SideEffect mutasi window (hindari bentrok 60Hz dengan GLSurfaceView)
-                    MaterialTheme(colorScheme = RpgDarkColorScheme) {
+                    MaterialTheme(colorScheme = RpgParchmentColorScheme) {
                         val hud by game.hudState.collectAsState()
                         val settings by settingsStore.settingsFlow.collectAsState(initial = RpgAudioVideoSettings())
                         var activeModal by remember { pendingModalState }
+                        var craftTab by remember { pendingCraftingTab }
                         val initError by remember { engineErrorState }
                         val scope = rememberCoroutineScope()
 
@@ -202,7 +219,9 @@ class RpgGameActivity : FragmentActivity(), SafeAndroidFragmentApplication.Callb
                                 sfxVol = settings.sfxVolume,
                                 bgmVol = settings.bgmVolume,
                                 zoom = settings.cameraZoom,
-                                weatherEnabled = settings.weatherEnabled
+                                weatherEnabled = settings.weatherEnabled,
+                                raylightEnabled = settings.raylightEnabled,
+                                sensitivity = settings.controls.controlSensitivity
                             )
                         }
                         LaunchedEffect(activeModal) {
@@ -214,7 +233,7 @@ class RpgGameActivity : FragmentActivity(), SafeAndroidFragmentApplication.Callb
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(Color(0xF0101512))
+                                    .background(Color(0xEE1A120D))
                                     .padding(24.dp),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -222,50 +241,40 @@ class RpgGameActivity : FragmentActivity(), SafeAndroidFragmentApplication.Callb
                                     modifier = Modifier
                                         .widthIn(max = 420.dp)
                                         .clip(RoundedCornerShape(14.dp))
-                                        .background(RpgPanelSolid)
-                                        .border(1.5.dp, RpgBorderWarm, RoundedCornerShape(14.dp))
+                                        .background(RpgParchment)
+                                        .border(2.5.dp, RpgCedarDark, RoundedCornerShape(14.dp))
                                         .padding(20.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     Text(
                                         text = "Tidak Dapat Memuat Game",
-                                        color = RpgCreamText,
+                                        color = RpgInkDark,
                                         fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.ExtraBold,
                                         fontFamily = SfProFontFamily
                                     )
                                     Text(
                                         text = activeError,
-                                        color = RpgMutedText,
+                                        color = RpgInkMuted,
                                         fontSize = 12.sp,
                                         fontFamily = SfProFontFamily,
                                         textAlign = TextAlign.Center
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .height(44.dp)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(RpgEmberAccent)
-                                            .clickable { finish() }
-                                            .padding(horizontal = 20.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "Kembali ke Profil",
-                                            color = Color.White,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = SfProFontFamily
-                                        )
-                                    }
+                                    RpgActionButton(
+                                        text = "Kembali ke Profil",
+                                        onClick = { finish() },
+                                        containerColor = RpgTerracotta
+                                    )
                                 }
                             }
                         } else {
                             RpgHudOverlay(
                                 hud = hud,
+                                controls = settings.controls,
                                 activeModal = activeModal,
+                                onWorldTap = { sx, sy, vw, vh -> game.onWorldScreenTap(sx, sy, vw, vh) },
                                 onJoystickChange = { x, y -> game.setJoystick(x, y) },
                                 onToggleSprint = { game.toggleSprint() },
                                 onContextAction = { game.onContextualActionPressed() },
@@ -275,17 +284,29 @@ class RpgGameActivity : FragmentActivity(), SafeAndroidFragmentApplication.Callb
                                 onRotateBuild = { game.rotateConstruction() },
                                 onConfirmBuild = { game.confirmBuildPlacement() },
                                 onCancelBuild = { game.cancelConstruction() },
-                                onOpenModal = { modal -> activeModal = modal }
+                                onDialogueTalkAgain = { game.talkAgainActiveNpc() },
+                                onDialogueGiveGift = { itemId -> game.giveGiftToActiveNpc(itemId) },
+                                onDialogueService = { game.openActiveNpcService() },
+                                onDialogueClose = { game.closeNpcDialogue() },
+                                onConfirmSleep = { game.confirmSleep() },
+                                onCancelSleep = { game.cancelSleep() },
+                                onOpenModal = { modal ->
+                                    if (modal == ActiveRpgModal.CRAFTING) craftTab = 0
+                                    activeModal = modal
+                                }
                             )
 
                             if (activeModal != ActiveRpgModal.NONE) {
                                 RpgModalRouter(
                                     activeModal = activeModal,
+                                    craftingInitialTab = craftTab,
                                     hud = hud,
                                     settings = settings,
                                     onDismiss = { activeModal = ActiveRpgModal.NONE },
                                     onSelectSeed = { game.selectSeed(it) },
                                     onSelectTool = { game.selectTool(it) },
+                                    onEatFood = { game.eatFood(it) },
+                                    onCraftRecipe = { game.craftRecipe(it) },
                                     onStartBuild = { itemId ->
                                         activeModal = ActiveRpgModal.NONE
                                         game.startConstruction(itemId)
@@ -303,6 +324,9 @@ class RpgGameActivity : FragmentActivity(), SafeAndroidFragmentApplication.Callb
                                     onBgmChange = { v -> scope.launch { settingsStore.updateBgmVolume(v) } },
                                     onZoomChange = { z -> scope.launch { settingsStore.updateCameraZoom(z) } },
                                     onWeatherToggle = { w -> scope.launch { settingsStore.updateWeatherEnabled(w) } },
+                                    onRaylightToggle = { r -> scope.launch { settingsStore.updateRaylightEnabled(r) } },
+                                    onControlsChange = { ctrl -> scope.launch { settingsStore.updateControls(ctrl) } },
+                                    onResetControls = { scope.launch { settingsStore.resetControlsToDefault() } },
                                     onManualSave = { game.saveGameAsync(silent = false) },
                                     onExitGame = {
                                         game.saveGameAsync(silent = true)
@@ -317,7 +341,6 @@ class RpgGameActivity : FragmentActivity(), SafeAndroidFragmentApplication.Callb
             root.addView(composeHud)
             setContentView(root)
 
-            // Terapkan immersive fullscreen SETELAH setContentView selesai terpasang
             window.decorView.post {
                 applyFullscreenSystemBars()
             }
@@ -342,7 +365,7 @@ class RpgGameActivity : FragmentActivity(), SafeAndroidFragmentApplication.Callb
             Log.e(TAG, "Gagal membuka RpgGameActivity: ${t.message}", t)
             Toast.makeText(
                 this,
-                "Gagal membuka Willowbrook Cove RPG: ${t.localizedMessage ?: "Kesalahan grafis"}",
+                "Gagal membuka Sakura Vale RPG: ${t.localizedMessage ?: "Kesalahan grafis"}",
                 Toast.LENGTH_LONG
             ).show()
             finish()

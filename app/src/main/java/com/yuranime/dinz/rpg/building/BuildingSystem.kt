@@ -3,6 +3,7 @@ package com.yuranime.dinz.rpg.building
 import com.yuranime.dinz.rpg.economy.EconomySystem
 import com.yuranime.dinz.rpg.inventory.InventorySystem
 import com.yuranime.dinz.rpg.model.BuildPreviewState
+import com.yuranime.dinz.rpg.model.MapId
 import com.yuranime.dinz.rpg.model.PlacedObject
 import com.yuranime.dinz.rpg.model.RpgCatalog
 import com.yuranime.dinz.rpg.world.HomesteadWorld
@@ -22,9 +23,9 @@ class BuildingSystem(
         private set
     var selectedItemId: String? = null
         private set
-    var previewTileX: Int = 9
+    var previewTileX: Int = 14
         private set
-    var previewTileY: Int = 13
+    var previewTileY: Int = 42
         private set
     var rotation: Int = 0
         private set
@@ -47,8 +48,8 @@ class BuildingSystem(
 
     fun updatePreviewTile(tileX: Int, tileY: Int) {
         if (!isBuildMode) return
-        previewTileX = tileX.coerceIn(1, HomesteadWorld.MAP_TILES_W - 2)
-        previewTileY = tileY.coerceIn(1, HomesteadWorld.MAP_TILES_H - 2)
+        previewTileX = tileX.coerceIn(1, (world.mapWidthTiles - 2).coerceAtLeast(1))
+        previewTileY = tileY.coerceIn(1, (world.mapHeightTiles - 2).coerceAtLeast(1))
     }
 
     fun rotatePreview() {
@@ -58,24 +59,32 @@ class BuildingSystem(
     }
 
     fun canPlaceAt(tileX: Int, tileY: Int): Boolean {
+        // Allow decorating both the Overworld Homestead AND inside Player House!
+        if (world.currentMapId != MapId.OVERWORLD && world.currentMapId != MapId.PLAYER_HOUSE) return false
         if (!world.isInBounds(tileX, tileY)) return false
         if (world.isMapSolidTile(tileX, tileY) || world.isWaterTile(tileX, tileY)) return false
         if (world.isFarmableTile(tileX, tileY)) return false
         if (world.getTreeAt(tileX, tileY) != null) return false
+        if (world.getOreAt(tileX, tileY) != null) return false
         if (world.getPlacedObjectAt(tileX, tileY) != null) return false
-        // Keep house door & spawn clear
-        if (tileX == HomesteadWorld.HOUSE_DOOR_X && tileY == HomesteadWorld.HOUSE_DOOR_Y) return false
+        if (world.getPortalAt(tileX, tileY) != null) return false
+        if (world.currentMapId == MapId.OVERWORLD &&
+            tileX in (HomesteadWorld.HOUSE_DOOR_X - 1)..(HomesteadWorld.HOUSE_DOOR_X + 1) &&
+            tileY in (HomesteadWorld.HOUSE_DOOR_Y - 1)..HomesteadWorld.HOUSE_DOOR_Y
+        ) return false
         return true
     }
 
     fun confirmPlacement(): BuildResult {
-        val itemId = selectedItemId ?: return BuildResult(false, "Pilih objek konstruksi dulu.")
+        val itemId = selectedItemId ?: return BuildResult(false, "Pilih furnitur atau dekorasi dulu.")
         val def = RpgCatalog.itemById[itemId] ?: return BuildResult(false, "Objek tidak valid.")
+        if (world.currentMapId != MapId.OVERWORLD && world.currentMapId != MapId.PLAYER_HOUSE) {
+            return BuildResult(false, "Furnitur hanya dapat dipasang di luar desa atau di dalam Rumahmu.")
+        }
         if (!canPlaceAt(previewTileX, previewTileY)) {
-            return BuildResult(false, "Lokasi terhalang! Pindahkan karakter ke rumput kosong.")
+            return BuildResult(false, "Lokasi terhalang! Pindah ke petak kosong.")
         }
 
-        // First check if player already owns the item in inventory; otherwise craft from Wood & Stone!
         if (inventory.hasItem(itemId, 1)) {
             inventory.removeItem(itemId, 1)
         } else {
@@ -90,6 +99,7 @@ class BuildingSystem(
 
         val obj = PlacedObject(
             id = "obj_${System.currentTimeMillis()}_${previewTileX}_${previewTileY}",
+            mapId = world.currentMapId,
             itemId = itemId,
             tileX = previewTileX,
             tileY = previewTileY,
@@ -101,7 +111,7 @@ class BuildingSystem(
 
     fun removeObjectAt(tileX: Int, tileY: Int): BuildResult {
         val existing = world.getPlacedObjectAt(tileX, tileY)
-            ?: return BuildResult(false, "Tidak ada objek di petak ini.")
+            ?: return BuildResult(false, "Tidak ada furnitur di petak ini.")
         world.placedObjects.remove(existing)
         inventory.addItem(existing.itemId, 1)
         val name = RpgCatalog.itemById[existing.itemId]?.name ?: "Objek"
@@ -121,9 +131,13 @@ class BuildingSystem(
         if (!inventory.hasItem("res_stone", spec.stoneCost)) {
             return BuildResult(false, "Butuh ${spec.stoneCost} Batu untuk ${spec.name}.")
         }
+        if (spec.ironCost > 0 && !inventory.hasItem("ore_iron", spec.ironCost)) {
+            return BuildResult(false, "Butuh ${spec.ironCost} Bijih Besi (dari Pegunungan/Gua Kristal).")
+        }
         economy.coins -= spec.coinCost
         inventory.removeItem("res_wood", spec.woodCost)
         inventory.removeItem("res_stone", spec.stoneCost)
+        if (spec.ironCost > 0) inventory.removeItem("ore_iron", spec.ironCost)
         world.houseTier = nextTier
         return BuildResult(true, "Rumah di-upgrade ke ${spec.name}!", newHouseTier = nextTier)
     }

@@ -15,22 +15,33 @@ enum class InventorySortMode(val label: String) {
 class InventorySystem {
     private val items = linkedMapOf<String, Int>()
 
+    private val coreStarterTools = listOf(
+        "tool_rod_basic",
+        "tool_axe",
+        "tool_pickaxe",
+        "tool_hoe",
+        "tool_watering_can",
+        "tool_hammer"
+    )
+
     fun initStarterKit() {
         items.clear()
-        // Essential starter tools
-        items["tool_rod_basic"] = 1
-        items["tool_axe"] = 1
-        items["tool_hoe"] = 1
-        items["tool_watering_can"] = 1
-        // Starter seeds & basic building supplies so player can immediately try every mechanic!
+        coreStarterTools.forEach { items[it] = 1 }
+        // Starter seeds, food & building supplies so player can immediately enjoy every RPG loop
         items["seed_carrot"] = 6
         items["seed_potato"] = 4
-        items["seed_tomato"] = 2
+        items["seed_tomato"] = 3
+        items["seed_strawberry"] = 2
+        items["seed_wheat"] = 3
         items["seed_oak"] = 2
-        items["res_wood"] = 10
-        items["res_stone"] = 6
+        items["seed_sakura"] = 2
+        items["food_onigiri"] = 3
+        items["food_honey_tea"] = 2
+        items["res_wood"] = 12
+        items["res_stone"] = 8
         items["fence_wood"] = 4
-        items["lamp_post"] = 1
+        items["lamp_post"] = 2
+        items["flower_pot"] = 2
     }
 
     fun loadFromEntities(entities: List<InventoryItemEntity>) {
@@ -44,8 +55,7 @@ class InventorySystem {
                 items[e.itemId] = e.quantity
             }
         }
-        // Guarantee starter tools always present
-        listOf("tool_rod_basic", "tool_axe", "tool_hoe", "tool_watering_can").forEach { toolId ->
+        coreStarterTools.forEach { toolId ->
             if ((items[toolId] ?: 0) <= 0) items[toolId] = 1
         }
     }
@@ -91,6 +101,8 @@ class InventorySystem {
 
     fun getBestAxeDamage(): Int = if (hasTool("tool_axe_iron")) 2 else 1
 
+    fun getBestPickaxeDamage(): Int = if (hasTool("tool_pickaxe_gold")) 2 else 1
+
     fun getStacks(sortMode: InventorySortMode = InventorySortMode.CATEGORY): List<InventoryStack> {
         val list = items.filter { it.value > 0 }.map { InventoryStack(it.key, it.value) }
         return when (sortMode) {
@@ -106,5 +118,12 @@ class InventorySystem {
 
     fun getItemsByCategory(category: ItemCategory): List<InventoryStack> {
         return getStacks().filter { RpgCatalog.itemById[it.itemId]?.category == category }
+    }
+
+    fun getGiftableItems(): List<InventoryStack> {
+        return getStacks(InventorySortMode.VALUE).filter { stack ->
+            val cat = RpgCatalog.itemById[stack.itemId]?.category
+            cat != null && cat != ItemCategory.TOOLS
+        }
     }
 }

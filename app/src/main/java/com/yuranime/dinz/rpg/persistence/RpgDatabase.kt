@@ -84,6 +84,15 @@ interface RpgSaveDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAchievements(achievements: List<AchievementEntity>)
 
+    @Query("SELECT * FROM rpg_npc_friendship WHERE userUid = :userUid")
+    suspend fun getNpcFriendships(userUid: String): List<NpcFriendshipEntity>
+
+    @Query("DELETE FROM rpg_npc_friendship WHERE userUid = :userUid")
+    suspend fun clearNpcFriendships(userUid: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNpcFriendships(entries: List<NpcFriendshipEntity>)
+
     @Transaction
     suspend fun saveFullSnapshot(snapshot: RpgSaveBundle) {
         val uid = snapshot.player.userUid
@@ -102,6 +111,8 @@ interface RpgSaveDao {
         if (snapshot.quests.isNotEmpty()) insertQuests(snapshot.quests)
         clearAchievements(uid)
         if (snapshot.achievements.isNotEmpty()) insertAchievements(snapshot.achievements)
+        clearNpcFriendships(uid)
+        if (snapshot.npcFriendships.isNotEmpty()) insertNpcFriendships(snapshot.npcFriendships)
     }
 }
 
@@ -113,7 +124,8 @@ data class RpgSaveBundle(
     val crops: List<CropPlotEntity>,
     val placedObjects: List<PlacedObjectEntity>,
     val quests: List<QuestProgressEntity>,
-    val achievements: List<AchievementEntity>
+    val achievements: List<AchievementEntity>,
+    val npcFriendships: List<NpcFriendshipEntity> = emptyList()
 )
 
 @Database(
@@ -125,9 +137,10 @@ data class RpgSaveBundle(
         CropPlotEntity::class,
         PlacedObjectEntity::class,
         QuestProgressEntity::class,
-        AchievementEntity::class
+        AchievementEntity::class,
+        NpcFriendshipEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class RpgDatabase : RoomDatabase() {
@@ -168,15 +181,11 @@ class RpgSaveRepository(context: Context) {
             crops = dao.getCrops(userUid),
             placedObjects = dao.getPlacedObjects(userUid),
             quests = dao.getQuests(userUid),
-            achievements = dao.getAchievements(userUid)
+            achievements = dao.getAchievements(userUid),
+            npcFriendships = dao.getNpcFriendships(userUid)
         )
     }
 
-    /**
-     * Memuat progres terbaru untuk akun yang login:
-     * Membandingkan cache lokal Room (per-UID) dengan database cloud Firestore milik user,
-     * lalu otomatis menyinkronkan versi terbaru di kedua arah.
-     */
     suspend fun loadLatestForUser(userUid: String): RpgLoadResult = withContext(Dispatchers.IO) {
         if (userUid.isBlank()) return@withContext RpgLoadResult(null, "Belum Login")
 

@@ -5,24 +5,39 @@ import com.badlogic.gdx.audio.Music
 import com.badlogic.gdx.audio.Sound
 
 enum class RpgSfx(val filePath: String) {
-    STEP("rpg/audio/sfx_step.wav"),
-    CAST("rpg/audio/sfx_cast.wav"),
-    BITE("rpg/audio/sfx_bite.wav"),
-    CATCH("rpg/audio/sfx_catch.wav"),
-    AXE("rpg/audio/sfx_axe.wav"),
-    TREE_FALL("rpg/audio/sfx_tree_fall.wav"),
-    WOOD_PICKUP("rpg/audio/sfx_wood_pickup.wav"),
-    PLANT("rpg/audio/sfx_plant.wav"),
-    WATER("rpg/audio/sfx_water.wav"),
-    HARVEST("rpg/audio/sfx_harvest.wav"),
-    BUILD("rpg/audio/sfx_build.wav"),
-    UI("rpg/audio/sfx_ui.wav"),
-    COIN("rpg/audio/sfx_coin.wav")
+    STEP("rpg/audio/sfx/sfx_step.wav"),
+    CAST("rpg/audio/sfx/sfx_cast.wav"),
+    BITE("rpg/audio/sfx/sfx_bite.wav"),
+    CATCH("rpg/audio/sfx/sfx_catch.wav"),
+    AXE("rpg/audio/sfx/sfx_axe.wav"),
+    MINE("rpg/audio/sfx/sfx_mine.wav"),
+    TREE_FALL("rpg/audio/sfx/sfx_tree_fall.wav"),
+    WOOD_PICKUP("rpg/audio/sfx/sfx_pickup.wav"),
+    PLANT("rpg/audio/sfx/sfx_plant.wav"),
+    WATER("rpg/audio/sfx/sfx_water.wav"),
+    HARVEST("rpg/audio/sfx/sfx_harvest.wav"),
+    BUILD("rpg/audio/sfx/sfx_levelup.wav"),
+    UI("rpg/audio/sfx/sfx_ui.wav"),
+    CANCEL("rpg/audio/sfx/sfx_cancel.wav"),
+    COIN("rpg/audio/sfx/sfx_coin.wav"),
+    TALK("rpg/audio/sfx/sfx_talk.wav"),
+    DOOR("rpg/audio/sfx/sfx_door.wav")
 }
 
 class RpgAudioManager {
+    companion object {
+        val BGM_TRACKS = mapOf(
+            "village" to "rpg/audio/music/bgm_village.ogg",
+            "homestead" to "rpg/audio/music/bgm_homestead.ogg",
+            "water" to "rpg/audio/music/bgm_water.ogg",
+            "cave" to "rpg/audio/music/bgm_cave.ogg",
+            "ruins" to "rpg/audio/music/bgm_ruins.ogg"
+        )
+    }
+
     private val sounds = mutableMapOf<RpgSfx, Sound>()
     private var bgm: Music? = null
+    private var currentTrackKey: String = ""
 
     @Volatile
     var sfxVolume: Float = 0.8f
@@ -34,14 +49,14 @@ class RpgAudioManager {
     var bgmVolume: Float = 0.45f
         set(value) {
             field = value.coerceIn(0f, 1f)
-            try {
+            runCatching {
                 bgm?.volume = field
-                if (field <= 0.001f) {
+                if (field <= 0.005f) {
                     if (bgm?.isPlaying == true) bgm?.pause()
                 } else {
                     if (bgm != null && bgm?.isPlaying == false) bgm?.play()
                 }
-            } catch (_: Exception) {}
+            }
         }
 
     fun load() {
@@ -53,13 +68,23 @@ class RpgAudioManager {
                 }
             }
         }
+        switchBgm("homestead")
+    }
+
+    fun switchBgm(trackKey: String) {
+        if (trackKey == currentTrackKey && bgm != null) return
+        val path = BGM_TRACKS[trackKey] ?: BGM_TRACKS["homestead"] ?: return
         runCatching {
-            val bgmHandle = Gdx.files.internal("rpg/audio/bgm_homestead.wav")
-            if (bgmHandle.exists()) {
-                bgm = Gdx.audio.newMusic(bgmHandle).apply {
+            bgm?.stop()
+            bgm?.dispose()
+            bgm = null
+            val fh = Gdx.files.internal(path)
+            if (fh.exists()) {
+                currentTrackKey = trackKey
+                bgm = Gdx.audio.newMusic(fh).apply {
                     isLooping = true
                     volume = bgmVolume
-                    if (bgmVolume > 0.001f) play()
+                    if (bgmVolume > 0.005f) play()
                 }
             }
         }
@@ -91,5 +116,6 @@ class RpgAudioManager {
         sounds.clear()
         runCatching { bgm?.stop(); bgm?.dispose() }
         bgm = null
+        currentTrackKey = ""
     }
 }

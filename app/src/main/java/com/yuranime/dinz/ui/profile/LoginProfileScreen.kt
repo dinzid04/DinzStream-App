@@ -1192,11 +1192,11 @@ private fun UserProfileView(
                 val rpgSubtitle = if ((profile?.rpgLevel ?: 0) > 0) {
                     "Lv.${profile?.rpgLevel ?: 1} • ${profile?.rpgCoins ?: 0} Koin • Tersimpan di akun $displayName"
                 } else {
-                    "Game pixel-art mancing, bertani & bangun rumah • Akun Login"
+                    "Anime Cozy Sandbox RPG: Mancing, Bertani, Tambang & Desa • Akun Login"
                 }
                 CleanEditorialNavRow(
                     icon = Icons.Outlined.SportsEsports,
-                    title = "Willowbrook Cove RPG",
+                    title = "Sakura Vale RPG",
                     subtitle = rpgSubtitle,
                     iconTint = Color(0xFFFF5722),
                     onClick = onOpenRpgGameClick

@@ -27,16 +27,16 @@ class FishingSystem {
         private set
 
     private var phaseTimer: Float = 0f
-    private var waitTargetDuration: Float = 2.5f
+    private var waitTargetDuration: Float = 2.4f
     private var activeFish: FishSpecies? = null
     private var indicatorPos: Float = 0.5f
     private var indicatorVel: Float = 0.72f
     private var sweetCenter: Float = 0.5f
-    private var sweetHalfW: Float = 0.14f
+    private var sweetHalfW: Float = 0.145f
     private var catchProgress: Float = 0.28f
-    private var tensionTimeLeft: Float = 10f
+    private var tensionTimeLeft: Float = 11f
     private var lastMessage: String = ""
-    private var activeHabitat: WaterHabitat = WaterHabitat.POND
+    private var activeHabitat: WaterHabitat = WaterHabitat.LAKE
     private var isNight: Boolean = false
     private var rodId: String = "tool_rod_basic"
     private var fishingLevel: Int = 1
@@ -62,11 +62,11 @@ class FishingSystem {
         splashTimer = 0f
         lastMessage = ""
         val speedFactor = when (bestRodId) {
-            "tool_rod_golden" -> 0.7f
-            "tool_rod_bamboo" -> 0.85f
+            "tool_rod_golden" -> 0.68f
+            "tool_rod_bamboo" -> 0.84f
             else -> 1.0f
         }
-        waitTargetDuration = (1.6f + Random.nextFloat() * 2.2f) * speedFactor
+        waitTargetDuration = (1.5f + Random.nextFloat() * 2.1f) * speedFactor
     }
 
     fun cancel() {
@@ -75,28 +75,22 @@ class FishingSystem {
         splashTimer = 0f
     }
 
-    /**
-     * Player taps the timing button during BITE (hook the fish) or MINIGAME (strike inside green sweet zone!).
-     */
     fun onTimingTap(): FishingEventResult {
         when (phase) {
             FishingPhase.WAITING -> {
-                // Pulled too early
-                lastMessage = "Terlalu cepat! Tunggu pelampung bergetar."
+                lastMessage = "Terlalu cepat! Tunggu pelampung bergetar (!)."
                 phase = FishingPhase.ESCAPED
                 phaseTimer = 0f
                 return FishingEventResult(escaped = true)
             }
             FishingPhase.BITE -> {
-                // Hooked! Launch timing mini-game
                 startMinigame()
                 return FishingEventResult(splashTriggered = true)
             }
             FishingPhase.MINIGAME -> {
                 val dist = abs(indicatorPos - sweetCenter)
                 return if (dist <= sweetHalfW) {
-                    // Sweet spot hit! Boost catch progress & shift sweet zone slightly
-                    catchProgress = (catchProgress + 0.29f).coerceAtMost(1f)
+                    catchProgress = (catchProgress + 0.30f).coerceAtMost(1f)
                     splashTimer = 0.35f
                     sweetCenter = (0.20f + Random.nextFloat() * 0.60f)
                     if (catchProgress >= 1f) {
@@ -109,12 +103,11 @@ class FishingSystem {
                         FishingEventResult(splashTriggered = true)
                     }
                 } else {
-                    // Missed sweet spot -> slight progress loss
                     catchProgress = (catchProgress - 0.14f).coerceAtLeast(0f)
                     if (catchProgress <= 0f) {
                         phase = FishingPhase.ESCAPED
                         phaseTimer = 0f
-                        lastMessage = "Ikannya lolos! Coba tekan saat garis masuk zona hijau."
+                        lastMessage = "Ikannya lepas! Tekan saat garis masuk zona hijau."
                         FishingEventResult(escaped = true)
                     } else {
                         FishingEventResult()
@@ -131,27 +124,33 @@ class FishingSystem {
         phase = FishingPhase.MINIGAME
         phaseTimer = 0f
         indicatorPos = 0.15f
-        val baseSpeed = 0.68f * fish.difficulty
-        indicatorVel = baseSpeed
+        indicatorVel = 0.66f * fish.difficulty
         val rodBonus = when (rodId) {
             "tool_rod_golden" -> 0.06f
             "tool_rod_bamboo" -> 0.03f
             else -> 0f
         }
         val levelBonus = (fishingLevel - 1).coerceAtMost(10) * 0.005f
-        sweetHalfW = (0.145f - (fish.difficulty - 1f) * 0.03f + rodBonus + levelBonus).coerceIn(0.085f, 0.22f)
+        sweetHalfW = (0.145f - (fish.difficulty - 1f) * 0.03f + rodBonus + levelBonus).coerceIn(0.088f, 0.22f)
         sweetCenter = 0.35f + Random.nextFloat() * 0.3f
         catchProgress = 0.26f
-        tensionTimeLeft = 11f
+        tensionTimeLeft = 11.5f
         splashTimer = 0.45f
     }
 
     private fun rollFishSpecies(): FishSpecies {
-        val candidates = RpgCatalog.fishSpecies.filter {
-            it.habitat == WaterHabitat.BOTH || it.habitat == activeHabitat
-        }
+        val candidates = RpgCatalog.fishSpecies.filter { fish ->
+            when (activeHabitat) {
+                WaterHabitat.LAKE -> fish.habitat == WaterHabitat.LAKE || fish.habitat == WaterHabitat.BOTH
+                WaterHabitat.RIVER -> fish.habitat == WaterHabitat.RIVER || fish.habitat == WaterHabitat.BOTH
+                WaterHabitat.OCEAN -> fish.habitat == WaterHabitat.OCEAN
+                WaterHabitat.CAVE -> fish.habitat == WaterHabitat.CAVE || fish.id == "fish_moon_eel"
+                WaterHabitat.BOTH -> fish.habitat == WaterHabitat.LAKE || fish.habitat == WaterHabitat.RIVER || fish.habitat == WaterHabitat.BOTH
+            }
+        }.ifEmpty { RpgCatalog.fishSpecies }
+
         val rodRareBoost = when (rodId) {
-            "tool_rod_golden" -> 1.6f
+            "tool_rod_golden" -> 1.65f
             "tool_rod_bamboo" -> 1.25f
             else -> 1.0f
         }
@@ -183,7 +182,7 @@ class FishingSystem {
         phaseTimer += dt
         when (phase) {
             FishingPhase.CASTING -> {
-                if (phaseTimer >= 0.42f) {
+                if (phaseTimer >= 0.38f) {
                     phase = FishingPhase.WAITING
                     phaseTimer = 0f
                     splashTimer = 0.38f
@@ -199,11 +198,10 @@ class FishingSystem {
                 }
             }
             FishingPhase.BITE -> {
-                // Give player generous 2.2s window to hook!
-                if (phaseTimer >= 2.2f) {
+                if (phaseTimer >= 2.3f) {
                     phase = FishingPhase.ESCAPED
                     phaseTimer = 0f
-                    lastMessage = "Ikan melepaskan umpan! Cepat tarik saat muncul tanda (!)."
+                    lastMessage = "Ikan melepas umpan! Cepat tekan saat tanda (!) muncul."
                     return FishingEventResult(escaped = true)
                 }
             }
@@ -216,8 +214,7 @@ class FishingSystem {
                     indicatorPos = 0f
                     indicatorVel = abs(indicatorVel)
                 }
-                // Gentle progress drain if player hesitates
-                catchProgress = (catchProgress - dt * 0.032f).coerceAtLeast(0f)
+                catchProgress = (catchProgress - dt * 0.030f).coerceAtLeast(0f)
                 tensionTimeLeft = (tensionTimeLeft - dt).coerceAtLeast(0f)
                 if (tensionTimeLeft <= 0f || catchProgress <= 0f) {
                     phase = FishingPhase.ESCAPED
@@ -227,7 +224,7 @@ class FishingSystem {
                 }
             }
             FishingPhase.CAUGHT, FishingPhase.ESCAPED -> {
-                if (phaseTimer >= 1.55f) {
+                if (phaseTimer >= 1.50f) {
                     phase = FishingPhase.IDLE
                     activeFish = null
                 }

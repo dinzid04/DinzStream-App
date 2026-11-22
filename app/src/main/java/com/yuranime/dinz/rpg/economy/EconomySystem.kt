@@ -12,9 +12,10 @@ data class TransactionResult(
 
 class EconomySystem(private val inventory: InventorySystem) {
 
-    var coins: Int = 120
+    var coins: Int = 150
 
     fun buyItem(itemId: String, quantity: Int = 1): TransactionResult {
+        val safeQty = quantity.coerceAtLeast(1)
         val def = RpgCatalog.itemById[itemId]
             ?: return TransactionResult(false, 0, "Item tidak ditemukan.")
         if (def.buyPrice <= 0) {
@@ -23,11 +24,12 @@ class EconomySystem(private val inventory: InventorySystem) {
         if (def.category == ItemCategory.TOOLS && inventory.hasTool(itemId)) {
             return TransactionResult(false, 0, "Kamu sudah memiliki ${def.name}!")
         }
-        val totalCost = def.buyPrice * quantity
+        val actualReq = if (def.category == ItemCategory.TOOLS) 1 else safeQty
+        val totalCost = def.buyPrice * actualReq
         if (coins < totalCost) {
             return TransactionResult(false, 0, "Koin tidak cukup (butuh $totalCost koin).")
         }
-        val added = inventory.addItem(itemId, quantity)
+        val added = inventory.addItem(itemId, actualReq)
         if (added <= 0) {
             return TransactionResult(false, 0, "Tas penuh untuk ${def.name}.")
         }
@@ -43,7 +45,7 @@ class EconomySystem(private val inventory: InventorySystem) {
             return TransactionResult(false, 0, "${def.name} tidak bisa dijual.")
         }
         val available = inventory.getQuantity(itemId)
-        val sellQty = quantity.coerceAtMost(available)
+        val sellQty = quantity.coerceIn(1, available.coerceAtLeast(1)).coerceAtMost(available)
         if (sellQty <= 0) {
             return TransactionResult(false, 0, "Tidak ada ${def.name} untuk dijual.")
         }
@@ -76,11 +78,11 @@ class EconomySystem(private val inventory: InventorySystem) {
     }
 
     fun sellAllFishAndCrops(): TransactionResult {
-        val fishStacks = inventory.getItemsByCategory(ItemCategory.FISH)
-        val cropStacks = inventory.getItemsByCategory(ItemCategory.CROPS)
-        val all = fishStacks + cropStacks
+        val all = inventory.getItemsByCategory(ItemCategory.FISH) +
+            inventory.getItemsByCategory(ItemCategory.CROPS) +
+            inventory.getItemsByCategory(ItemCategory.FORAGE)
         if (all.isEmpty()) {
-            return TransactionResult(false, 0, "Belum ada ikan atau sayuran untuk dijual.")
+            return TransactionResult(false, 0, "Belum ada ikan, panen, atau hasil alam untuk dijual.")
         }
         var totalEarned = 0
         var totalItems = 0

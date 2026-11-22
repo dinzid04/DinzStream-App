@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "3.0.2"
+  APP_VERSION: "4.0.0"
 
 jobs:
   build:
@@ -67,18 +67,23 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Fix TMX CSV Map Parser Willowbrook Cove RPG (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Sakura Vale Anime Cozy Sandbox RPG (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
-            ### Pembaruan Utama v${{ env.APP_VERSION }}:
-            1. **Perbaikan Error `Gagal memuat aset game: For input string: "4 4"` pada Willowbrook Cove RPG:**
-               - Memperbaiki format CSV `<data encoding="csv">` pada seluruh 8 layer `starter_homestead.tmx` (menambahkan tanda koma penutup di akhir setiap baris sesuai spesifikasi Tiled TMX & `BaseTmxMapLoader.getTileIds()`).
-               - Menerapkan filter tekstur `TextureFilter.Nearest` eksplisit pada `TmxMapLoader.Parameters` agar peta pixel-art tampil tajam.
-               - Menambahkan pengujian langsung `BaseTmxMapLoader.getTileIds()` pada seluruh 8 layer peta di unit test CI.
-            2. **Tetap Menyertakan Seluruh Perbaikan v3.0.1:**
-               - Bebas crash/restart loop (`SafeAndroidFragmentApplication` + `SafeAndroidGraphics` + LibGDX `1.13.5` 16KB ELF).
-               - Akses khusus akun login dan sinkronisasi penuh ke database Firebase Firestore akun login.
+            ### Pembaruan Besar v${{ env.APP_VERSION }} (Sakura Vale: Anime Cozy Sandbox RPG):
+            1. **Overhaul Total Aset Pixel-Art Anime 16-bit CC0 (100% Offline):**
+               - Mengganti seluruh aset game dengan paket CC0 Ninja Adventure (Pixel-Boy & AAA) yang serasi: 8 preset protagonis anime + potret wajah, 8 warga desa hidup, 5 hewan desa, 9 tileset HD pixel-art, air terjun & kincir angin beranimasi, 16 spesies ikan, 6 tanaman (5 tahap), 6 mineral tambang, 14 furnitur/dekorasi, 13 hidangan anime, 5 musik OGG adaptif, dan 17 efek suara WAV.
+            2. **Dunia Multi-Wilayah 80x64 + 6 Interior & Gua yang Bisa Dimasuki:**
+               - 13 wilayah terhubung (Homestead, Lahan Pertanian, Alun-Alun, Pasar, Permukiman, Danau Bisikan, Lembah Sungai, Hutan Rimba, Pantai Samudra, Pegunungan Utara, Gua Kristal, Hutan Sakura Rahasia Lv.2, Reruntuhan Kuno Lv.3).
+               - 6 peta interior/gua nyata dengan transisi halus: Rumah Petualang (tidur, dapur, meja kerja, peti), Toko Hana, Kedai Teh Sakura, Bengkel Kenji, Pendopo Tetua Haru, dan Gua Kristal Tambang.
+            3. **Kontrol Mobile RPG Profesional:**
+               - Mode Hybrid, Joystick Saja, atau Ketuk-Jalan Saja dengan A* Pathfinding nyata dan interaksi kontekstual otomatis saat mengetuk warga, pohon, batu tambang, air, kebun, atau pintu.
+               - Pengaturan lengkap joystick (Tetap/Mengambang, Kiri/Kanan, ukuran, transparansi, sensitivitas) tersimpan otomatis.
+            4. **Desain Ulang Total Antarmuka RPG & Simulasi Desa Hidup:**
+               - UI bergaya kayu cedar & perkamen JRPG dengan potret wajah anime, sistem energi, 6 keahlian hidup, memasak, kerajinan, dekorasi dalam/luar rumah, jadwal harian 8 NPC + hati persahabatan + hadiah, serta Peta Dunia interaktif.
+            5. **Tetap Aman, Login-Only & Sinkron Cloud Akun:**
+               - Tetap eksklusif untuk akun login, tersimpan per-UID di Room v3 dan tersinkron otomatis ke Firebase Firestore akun login (kompatibel mundur dengan save v2).
           draft: false
           prerelease: false
           make_latest: true

@@ -1,15 +1,13 @@
 package com.yuranime.dinz.rpg.ui
 
-import android.graphics.BitmapFactory
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,21 +18,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Backpack
-import androidx.compose.material.icons.outlined.Checkroom
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Construction
-import androidx.compose.material.icons.outlined.DirectionsRun
-import androidx.compose.material.icons.outlined.EmojiEvents
-import androidx.compose.material.icons.outlined.RotateRight
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,72 +33,40 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yuranime.dinz.rpg.model.ContextActionType
+import com.yuranime.dinz.rpg.model.ControlMode
+import com.yuranime.dinz.rpg.model.ControlSettings
 import com.yuranime.dinz.rpg.model.FishingPhase
+import com.yuranime.dinz.rpg.model.FishingUiState
 import com.yuranime.dinz.rpg.model.ItemCategory
+import com.yuranime.dinz.rpg.model.NpcDialogueUiState
 import com.yuranime.dinz.rpg.model.RpgCatalog
 import com.yuranime.dinz.rpg.model.RpgHudSnapshot
 import com.yuranime.dinz.ui.theme.SfProFontFamily
 import kotlinx.coroutines.delay
-import java.util.Locale
 import kotlin.math.hypot
-
-// Cozy Timber & Parchment HUD Palette (High Contrast WCAG AA+, Zero Generic Gradients)
-internal val RpgPanelDark = Color(0xD91A1613)
-internal val RpgPanelSolid = Color(0xFF1E1A16)
-internal val RpgPanelElevated = Color(0xFF28221D)
-internal val RpgBorderWarm = Color(0xFF473B30)
-internal val RpgCreamText = Color(0xFFF6F1E7)
-internal val RpgMutedText = Color(0xFFB5A999)
-internal val RpgGoldAccent = Color(0xFFEAB308)
-internal val RpgLeafAccent = Color(0xFF4ADE80)
-internal val RpgWaterAccent = Color(0xFF38BDF8)
-internal val RpgEmberAccent = Color(0xFFEA580C)
-
-@Composable
-fun RpgAssetPixelImage(
-    assetPath: String,
-    contentDescription: String?,
-    modifier: Modifier = Modifier,
-    contentScale: ContentScale = ContentScale.Fit
-) {
-    val context = LocalContext.current
-    val bitmap: ImageBitmap? = remember(assetPath) {
-        runCatching {
-            context.assets.open(assetPath).use { stream ->
-                BitmapFactory.decodeStream(stream)?.asImageBitmap()
-            }
-        }.getOrNull()
-    }
-    if (bitmap != null) {
-        Image(
-            bitmap = bitmap,
-            contentDescription = contentDescription,
-            modifier = modifier,
-            contentScale = contentScale,
-            filterQuality = FilterQuality.None
-        )
-    }
-}
 
 @Composable
 fun RpgHudOverlay(
     hud: RpgHudSnapshot,
+    controls: ControlSettings,
     activeModal: ActiveRpgModal,
+    onWorldTap: (Float, Float, Float, Float) -> Unit,
     onJoystickChange: (Float, Float) -> Unit,
     onToggleSprint: () -> Unit,
     onContextAction: () -> Unit,
@@ -119,831 +76,944 @@ fun RpgHudOverlay(
     onRotateBuild: () -> Unit,
     onConfirmBuild: () -> Unit,
     onCancelBuild: () -> Unit,
+    onDialogueTalkAgain: () -> Unit,
+    onDialogueGiveGift: (String) -> Unit,
+    onDialogueService: () -> Unit,
+    onDialogueClose: () -> Unit,
+    onConfirmSleep: () -> Unit,
+    onCancelSleep: () -> Unit,
     onOpenModal: (ActiveRpgModal) -> Unit
 ) {
     var visibleToast by remember { mutableStateOf("") }
+    var rootSize by remember { mutableStateOf(IntSize.Zero) }
+
     LaunchedEffect(hud.toastId) {
         if (hud.toastMessage.isNotBlank()) {
             visibleToast = hud.toastMessage
-            delay(2600L)
+            delay(3200)
             visibleToast = ""
         }
     }
 
-    val unClaimedQuests = remember(hud.quests) {
-        hud.quests.count { it.isCompleted && !it.claimed }
-    }
+    val tapEnabled = activeModal == ActiveRpgModal.NONE &&
+        !hud.dialogueState.active &&
+        !hud.sleepPromptOpen &&
+        controls.controlMode != ControlMode.JOYSTICK_ONLY
+
+    val showJoystick = activeModal == ActiveRpgModal.NONE &&
+        !hud.dialogueState.active &&
+        !hud.sleepPromptOpen &&
+        hud.fishingState.phase == FishingPhase.IDLE &&
+        controls.controlMode != ControlMode.TAP_ONLY
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .safeDrawingPadding()
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .onSizeChanged { rootSize = it }
     ) {
-        // ==================== TOP-LEFT: STATUS BAR (COINS, LEVEL, EXP, CLOCK) ====================
-        Column(
-            modifier = Modifier.align(Alignment.TopStart),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
+        // 1. World Tap-to-Move & Contextual Tap Layer (sits underneath HUD controls!)
+        if (tapEnabled) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(rootSize, tapEnabled) {
+                        detectTapGestures { offset ->
+                            if (rootSize.width > 0 && rootSize.height > 0) {
+                                onWorldTap(offset.x, offset.y, rootSize.width.toFloat(), rootSize.height.toFloat())
+                            }
+                        }
+                    }
+            )
+        }
+
+        // 2. Floating Joystick Touch Surface (optional half-screen floating touch zone!)
+        if (showJoystick && controls.floatingJoystick) {
+            FloatingJoystickZone(
+                onLeft = !controls.joystickOnRight,
+                scale = controls.joystickScale,
+                opacity = controls.controlOpacity,
+                onJoystickChange = onJoystickChange,
+                modifier = Modifier
+                    .align(if (controls.joystickOnRight) Alignment.BottomEnd else Alignment.BottomStart)
+                    .fillMaxWidth(0.45f)
+                    .fillMaxHeight(0.62f)
+            )
+        }
+
+        // 3. Top-Left Anime Status Bar (Portrait + Lv/EXP + Energy + Coins + Region/Time)
+        if (activeModal == ActiveRpgModal.NONE) {
+            val preset = RpgCatalog.presetById[hud.customization.presetId] ?: RpgCatalog.protagonistPresets.first()
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(RpgPanelDark)
-                    .border(1.dp, RpgBorderWarm, RoundedCornerShape(10.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    .align(Alignment.TopStart)
+                    .padding(start = 12.dp, top = 10.dp),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Level & EXP Bar
-                Column(modifier = Modifier.width(94.dp)) {
+                // Player Portrait -> opens Character & Customization Screen
+                RpgPortraitFrame(
+                    facePath = preset.facePath,
+                    size = 52.dp,
+                    modifier = Modifier.clickable { onOpenModal(ActiveRpgModal.CHARACTER) }
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // Row 1: Level + EXP + Energy + Coins
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "LV.${hud.playerLevel}",
-                            color = RpgCreamText,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
-                        )
-                        Text(
-                            text = "${hud.exp}/${hud.nextLevelExp}",
-                            color = RpgMutedText,
-                            fontSize = 9.5.sp,
-                            fontFamily = SfProFontFamily
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(3.dp))
-                    val expFrac = (hud.exp.toFloat() / hud.nextLevelExp.coerceAtLeast(1)).coerceIn(0f, 1f)
-                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(5.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(Color(0xFF332B24))
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(RpgHudBg)
+                            .border(1.4.dp, RpgCedarLight, RoundedCornerShape(9.dp))
+                            .padding(horizontal = 9.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(expFrac)
-                                .fillMaxHeight()
-                                .background(RpgLeafAccent)
+                        Column {
+                            Text(
+                                text = "Lv.${hud.playerLevel}",
+                                color = Color(0xFFFFDF85),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontFamily = SfProFontFamily
+                            )
+                            val expRatio = (hud.exp.toFloat() / hud.nextLevelExp.coerceAtLeast(1)).coerceIn(0f, 1f)
+                            Box(
+                                modifier = Modifier
+                                    .width(42.dp)
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(Color(0xFF22150E))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(expRatio)
+                                        .fillMaxHeight()
+                                        .background(Color(0xFF4ADE80))
+                                )
+                            }
+                        }
+
+                        // Energy Bar
+                        Column {
+                            Text(
+                                text = "Energi ${hud.energy}",
+                                color = RpgCreamOnWood,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SfProFontFamily
+                            )
+                            val enRatio = (hud.energy.toFloat() / hud.maxEnergy.coerceAtLeast(1)).coerceIn(0f, 1f)
+                            val enColor = when {
+                                enRatio > 0.5f -> Color(0xFF4ADE80)
+                                enRatio > 0.2f -> Color(0xFFFBBF24)
+                                else -> Color(0xFFF87171)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .width(56.dp)
+                                    .height(5.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(Color(0xFF22150E))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(enRatio)
+                                        .fillMaxHeight()
+                                        .background(enColor)
+                                )
+                            }
+                        }
+
+                        RpgCoinBadge(coins = hud.coins, compact = true)
+                    }
+
+                    // Row 2: Region Name + Day + Clock + Weather (tap opens World Map!)
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(RpgHudBg)
+                            .border(1.dp, RpgCedarLight, RoundedCornerShape(8.dp))
+                            .clickable { onOpenModal(ActiveRpgModal.WORLD_MAP) }
+                            .padding(horizontal = 9.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val locTitle = if (hud.currentMapId.isIndoor) hud.currentMapId.displayName else hud.currentRegion.displayName
+                        Text(
+                            text = locTitle,
+                            color = Color(0xFFFFE7A0),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SfProFontFamily,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                        Text(
+                            text = "• H${hud.dayCount} ${formatRpgClock(hud.timeHours)}",
+                            color = RpgCreamOnWood,
+                            fontSize = 11.sp,
+                            fontFamily = SfProFontFamily
+                        )
+                        if (hud.isRaining && !hud.currentMapId.isIndoor) {
+                            Text(
+                                text = "Hujan",
+                                color = Color(0xFF93C5FD),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SfProFontFamily
+                            )
+                        }
                     }
                 }
+            }
 
-                // Divider
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .height(22.dp)
-                        .background(RpgBorderWarm)
-                )
-
-                // Coin Counter with Pixel Coin Icon
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RpgAssetPixelImage(
-                        assetPath = "rpg/ui/icon_coin.png",
-                        contentDescription = "Koin",
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(5.dp))
-                    Text(
-                        text = hud.coins.toString(),
-                        color = RpgGoldAccent,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
-                    )
-                }
-
-                // Divider
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .height(22.dp)
-                        .background(RpgBorderWarm)
-                )
-
-                // Day & Time Clock
-                val hr = hud.timeHours.toInt().coerceIn(0, 23)
-                val min = ((hud.timeHours - hr) * 60).toInt().coerceIn(0, 59)
-                val timeStr = String.format(Locale.US, "%02d:%02d", hr, min)
-                val weatherTag = if (hud.isRaining) "Hujan" else if (hr >= 19 || hr < 5) "Malam" else if (hr >= 17) "Senja" else "Cerah"
-                Column {
-                    Text(
-                        text = "Hari ${hud.dayCount} • $timeStr",
-                        color = RpgCreamText,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = SfProFontFamily
-                    )
-                    Text(
-                        text = weatherTag,
-                        color = if (hud.isRaining) RpgWaterAccent else RpgMutedText,
-                        fontSize = 9.5.sp,
-                        fontFamily = SfProFontFamily
-                    )
-                }
+            // 4. Top-Right RPG Quick Icon Bar (44dp+ targets, zero text clipping!)
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = 12.dp, top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                HudIconTile("Tas", "rpg/ui/icon_chest.png") { onOpenModal(ActiveRpgModal.INVENTORY) }
+                HudIconTile("Karya", "rpg/ui/icon_craft.png") { onOpenModal(ActiveRpgModal.CRAFTING) }
+                HudIconTile("Jurnal", "rpg/ui/icon_quest.png") { onOpenModal(ActiveRpgModal.QUESTS_ALMANAC) }
+                HudIconTile("Peta", "rpg/ui/icon_map.png") { onOpenModal(ActiveRpgModal.WORLD_MAP) }
+                HudMenuTile("Menu") { onOpenModal(ActiveRpgModal.SETTINGS) }
             }
         }
 
-        // ==================== TOP-RIGHT: COMPACT MENU SHORTCUTS ====================
-        Row(
-            modifier = Modifier.align(Alignment.TopEnd),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            HudShortcutButton(
-                icon = Icons.Outlined.Backpack,
-                label = "Tas",
-                onClick = { onOpenModal(ActiveRpgModal.INVENTORY) }
-            )
-            HudShortcutButton(
-                icon = Icons.Outlined.Construction,
-                label = "Bangun",
-                onClick = { onOpenModal(ActiveRpgModal.CONSTRUCTION) }
-            )
-            HudShortcutButton(
-                icon = Icons.Outlined.EmojiEvents,
-                label = "Misi",
-                badgeCount = unClaimedQuests,
-                onClick = { onOpenModal(ActiveRpgModal.QUESTS_ALMANAC) }
-            )
-            HudShortcutButton(
-                icon = Icons.Outlined.Checkroom,
-                label = "Gaya",
-                onClick = { onOpenModal(ActiveRpgModal.CUSTOMIZATION) }
-            )
-            HudShortcutButton(
-                icon = Icons.Outlined.Settings,
-                label = "Menu",
-                onClick = { onOpenModal(ActiveRpgModal.SETTINGS) }
-            )
-        }
-
-        // ==================== TOP-CENTER TOAST FEEDBACK ====================
-        AnimatedVisibility(
-            visible = visibleToast.isNotBlank() && activeModal == ActiveRpgModal.NONE,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 48.dp)
-        ) {
+        // 5. Crisp Top-Center Toast Banner
+        if (visibleToast.isNotBlank() && activeModal == ActiveRpgModal.NONE) {
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(RpgPanelDark)
-                    .border(1.dp, RpgBorderWarm, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                    .align(Alignment.TopCenter)
+                    .padding(top = 66.dp, start = 16.dp, end = 16.dp)
+                    .widthIn(max = 420.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(RpgParchment)
+                    .border(2.dp, RpgCedarDark, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 14.dp, vertical = 7.dp)
             ) {
                 Text(
                     text = visibleToast,
-                    color = RpgCreamText,
+                    color = RpgInkDark,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.Bold,
                     fontFamily = SfProFontFamily,
-                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
         }
 
-        // ==================== FISHING MINI-GAME OVERLAY ====================
-        if (hud.fishingState.phase != FishingPhase.IDLE && activeModal == ActiveRpgModal.NONE) {
-            FishingOverlayPanel(
-                hud = hud,
-                onTap = onFishingTap,
-                onCancel = onCancelFishing,
+        // 6. Fixed Virtual Analog Joystick (left or right side according to ControlSettings!)
+        if (showJoystick && !controls.floatingJoystick) {
+            FixedAnalogJoystick(
+                sizeDp = (118f * controls.joystickScale).dp,
+                opacity = controls.controlOpacity,
+                onJoystickChange = onJoystickChange,
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 14.dp)
+                    .align(if (controls.joystickOnRight) Alignment.BottomEnd else Alignment.BottomStart)
+                    .padding(horizontal = 18.dp, vertical = 16.dp)
             )
         }
 
-        // ==================== CONSTRUCTION MODE BAR ====================
-        if (hud.buildPreview.active && activeModal == ActiveRpgModal.NONE) {
-            ConstructionOverlayBar(
-                hud = hud,
-                onRotate = onRotateBuild,
-                onConfirm = onConfirmBuild,
-                onCancel = onCancelBuild,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 12.dp)
-            )
-        }
-
-        // ==================== BOTTOM-LEFT: VIRTUAL JOYSTICK + SPRINT ====================
-        if (activeModal == ActiveRpgModal.NONE && hud.fishingState.phase == FishingPhase.IDLE) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 6.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                VirtualJoystick(
-                    onMove = onJoystickChange
-                )
-
-                // Sprint toggle (48dp touch target)
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(if (hud.isRunning) RpgEmberAccent else RpgPanelDark)
-                        .border(1.5.dp, if (hud.isRunning) RpgGoldAccent else RpgBorderWarm, CircleShape)
-                        .clickable { onToggleSprint() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.DirectionsRun,
-                        contentDescription = if (hud.isRunning) "Berlari Aktif" else "Aktifkan Lari",
-                        tint = RpgCreamText,
-                        modifier = Modifier.size(22.dp)
+        // 7. Bottom Contextual Action Cluster (opposite side from joystick!)
+        if (activeModal == ActiveRpgModal.NONE && !hud.dialogueState.active && !hud.sleepPromptOpen) {
+            val actionAlign = if (controls.joystickOnRight) Alignment.BottomStart else Alignment.BottomEnd
+            when {
+                hud.fishingState.phase != FishingPhase.IDLE -> {
+                    FishingMinigameCard(
+                        state = hud.fishingState,
+                        onTap = onFishingTap,
+                        onCancel = onCancelFishing,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 14.dp, start = 16.dp, end = 16.dp)
                     )
                 }
-            }
-        }
-
-        // ==================== BOTTOM-RIGHT: CONTEXTUAL ACTION BUTTON + SEED SWITCHER ====================
-        if (activeModal == ActiveRpgModal.NONE && hud.fishingState.phase == FishingPhase.IDLE && !hud.buildPreview.active) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 6.dp, bottom = 6.dp),
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Show compact seed selector chip when near farmland or holding a sapling
-                val seedsInBag = remember(hud.inventory) {
-                    hud.inventory.filter { RpgCatalog.itemById[it.itemId]?.category == ItemCategory.SEEDS }
-                }
-                if (seedsInBag.isNotEmpty() && (
-                        hud.contextAction.type == ContextActionType.PLANT_SEED ||
-                            hud.contextAction.type == ContextActionType.TILL_SOIL ||
-                            hud.contextAction.type == ContextActionType.PLANT_SAPLING
-                        )
-                ) {
-                    Row(
+                hud.buildPreview.active -> {
+                    ConstructionActionBar(
+                        hud = hud,
+                        onRotate = onRotateBuild,
+                        onConfirm = onConfirmBuild,
+                        onCancel = onCancelBuild,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(RpgPanelDark)
-                            .border(1.dp, RpgBorderWarm, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 6.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 16.dp)
+                    )
+                }
+                else -> {
+                    Column(
+                        modifier = Modifier
+                            .align(actionAlign)
+                            .padding(horizontal = 16.dp, vertical = 16.dp)
+                            .alpha(controls.controlOpacity),
+                        horizontalAlignment = if (controls.joystickOnRight) Alignment.Start else Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        seedsInBag.take(4).forEach { st ->
-                            val def = RpgCatalog.itemById[st.itemId] ?: return@forEach
-                            val selected = hud.selectedSeedId == st.itemId
-                            Row(
+                        // Quick Seed Picker Strip when standing on farmable soil
+                        if (hud.contextAction.type in listOf(
+                                ContextActionType.TILL_SOIL,
+                                ContextActionType.PLANT_SEED,
+                                ContextActionType.WATER_CROP,
+                                ContextActionType.HARVEST_CROP
+                            )
+                        ) {
+                            val seeds = hud.inventory.filter {
+                                RpgCatalog.itemById[it.itemId]?.category == ItemCategory.SEEDS &&
+                                    it.itemId !in listOf("seed_oak", "seed_sakura")
+                            }
+                            if (seeds.isNotEmpty()) {
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(RpgHudBg)
+                                        .border(1.2.dp, RpgCedarLight, RoundedCornerShape(10.dp))
+                                        .padding(5.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    seeds.take(5).forEach { st ->
+                                        val def = RpgCatalog.itemById[st.itemId] ?: return@forEach
+                                        val sel = st.itemId == hud.selectedSeedId
+                                        Box(
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(RoundedCornerShape(7.dp))
+                                                .background(if (sel) RpgTerracotta else RpgHudCard)
+                                                .border(1.2.dp, if (sel) RpgGoldTrim else RpgCedarLight, RoundedCornerShape(7.dp))
+                                                .clickable { onSelectSeed(st.itemId) },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            RpgPixelSprite(def.spritePath, 20.dp)
+                                            Text(
+                                                text = "${st.quantity}",
+                                                color = Color.White,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomEnd)
+                                                    .padding(2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            val btnScale = controls.buttonScale
+                            // Sprint Toggle Pill
+                            Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (selected) Color(0xFF3A3026) else Color.Transparent)
-                                    .border(
-                                        1.dp,
-                                        if (selected) RpgLeafAccent else Color.Transparent,
-                                        RoundedCornerShape(6.dp)
-                                    )
-                                    .clickable { onSelectSeed(st.itemId) }
-                                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .size((50f * btnScale).dp)
+                                    .clip(CircleShape)
+                                    .background(if (hud.isRunning) RpgForestGreen else RpgHudCard)
+                                    .border(2.dp, if (hud.isRunning) RpgGoldTrim else RpgCedarLight, CircleShape)
+                                    .clickable(onClick = onToggleSprint),
+                                contentAlignment = Alignment.Center
                             ) {
-                                RpgAssetPixelImage(
-                                    assetPath = def.spritePath,
-                                    contentDescription = def.name,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
                                 Text(
-                                    text = "${st.quantity}",
-                                    color = RpgCreamText,
+                                    text = if (hud.isRunning) "LARI" else "JALAN",
+                                    color = RpgCreamOnWood,
                                     fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.ExtraBold,
                                     fontFamily = SfProFontFamily
+                                )
+                            }
+
+                            // Primary Dynamic Contextual Action Button
+                            val hasCtx = hud.contextAction.type != ContextActionType.NONE
+                            val actionColor = when (hud.contextAction.type) {
+                                ContextActionType.FISH -> RpgSkyBlue
+                                ContextActionType.HARVEST_CROP, ContextActionType.GATHER_FORAGE, ContextActionType.OPEN_CHEST -> RpgForestGreen
+                                ContextActionType.TALK_NPC, ContextActionType.ENTER_PORTAL, ContextActionType.SLEEP_BED -> Color(0xFFB46924)
+                                ContextActionType.NONE -> RpgHudCard
+                                else -> RpgTerracotta
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size((72f * btnScale).dp)
+                                    .clip(CircleShape)
+                                    .background(actionColor)
+                                    .border(2.5.dp, if (hasCtx) RpgGoldTrim else RpgCedarLight, CircleShape)
+                                    .clickable(onClick = onContextAction)
+                                    .padding(6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (hasCtx) hud.contextAction.label else "AKSI",
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontFamily = SfProFontFamily,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 12.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
                     }
                 }
-
-                // Dynamic Contextual Action Button (transforms based on nearby object!)
-                val ctx = hud.contextAction
-                val isActionAvailable = ctx.type != ContextActionType.NONE
-                val btnBg = when (ctx.type) {
-                    ContextActionType.FISH -> Color(0xFF0E7490)
-                    ContextActionType.CHOP_TREE -> Color(0xFFB45309)
-                    ContextActionType.HARVEST_CROP -> Color(0xFF15803D)
-                    ContextActionType.TILL_SOIL, ContextActionType.PLANT_SEED, ContextActionType.WATER_CROP, ContextActionType.PLANT_SAPLING -> Color(0xFF166534)
-                    ContextActionType.OPEN_MERCHANT, ContextActionType.OPEN_SELL_BIN -> Color(0xFFA16207)
-                    ContextActionType.OPEN_HOUSE_UPGRADE, ContextActionType.OPEN_STORAGE -> Color(0xFF7C2D12)
-                    ContextActionType.INTERACT_DECOR -> Color(0xFF475569)
-                    ContextActionType.NONE -> RpgPanelDark
-                }
-                val iconPath = when (ctx.type) {
-                    ContextActionType.FISH -> "rpg/objects/tool_rod_basic.png"
-                    ContextActionType.CHOP_TREE -> "rpg/objects/tool_axe.png"
-                    ContextActionType.TILL_SOIL, ContextActionType.PLANT_SEED, ContextActionType.PLANT_SAPLING -> "rpg/objects/tool_hoe.png"
-                    ContextActionType.WATER_CROP -> "rpg/objects/tool_watering_can.png"
-                    ContextActionType.HARVEST_CROP -> "rpg/objects/crop_carrot.png"
-                    ContextActionType.OPEN_MERCHANT, ContextActionType.OPEN_SELL_BIN -> "rpg/ui/icon_shop.png"
-                    ContextActionType.OPEN_HOUSE_UPGRADE -> "rpg/ui/icon_build.png"
-                    ContextActionType.OPEN_STORAGE -> "rpg/ui/icon_bag.png"
-                    else -> "rpg/ui/icon_bag.png"
-                }
-
-                Row(
-                    modifier = Modifier
-                        .height(54.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(btnBg)
-                        .border(
-                            width = 1.5.dp,
-                            color = if (isActionAvailable) RpgCreamText.copy(alpha = 0.5f) else RpgBorderWarm,
-                            shape = RoundedCornerShape(14.dp)
-                        )
-                        .clickable { onContextAction() }
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (isActionAvailable) {
-                        RpgAssetPixelImage(
-                            assetPath = iconPath,
-                            contentDescription = ctx.label,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    Text(
-                        text = if (isActionAvailable) ctx.label else "Aksi",
-                        color = if (isActionAvailable) Color.White else RpgMutedText,
-                        fontSize = 13.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
-                    )
-                }
             }
         }
-    }
-}
 
-@Composable
-private fun HudShortcutButton(
-    icon: ImageVector,
-    label: String,
-    badgeCount: Int = 0,
-    onClick: () -> Unit
-) {
-    Box {
-        Column(
-            modifier = Modifier
-                .size(width = 48.dp, height = 46.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(RpgPanelDark)
-                .border(1.dp, RpgBorderWarm, RoundedCornerShape(10.dp))
-                .clickable(onClick = onClick),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = RpgCreamText,
-                modifier = Modifier.size(18.dp)
-            )
-            Text(
-                text = label,
-                color = RpgMutedText,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = SfProFontFamily
+        // 8. Genuine Wood-Framed Anime NPC Dialogue Overlay (with Faceset Portrait, Hearts & Gifting!)
+        if (hud.dialogueState.active && activeModal == ActiveRpgModal.NONE) {
+            AnimeNpcDialogueBox(
+                dialogue = hud.dialogueState,
+                hud = hud,
+                onTalkAgain = onDialogueTalkAgain,
+                onGiveGift = onDialogueGiveGift,
+                onService = onDialogueService,
+                onClose = onDialogueClose,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             )
         }
-        if (badgeCount > 0) {
+
+        // 9. Sleep Confirmation Modal at Player House Bed
+        if (hud.sleepPromptOpen && activeModal == ActiveRpgModal.NONE) {
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(16.dp)
-                    .clip(CircleShape)
-                    .background(RpgEmberAccent),
+                    .fillMaxSize()
+                    .background(Color(0x881A100B)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = badgeCount.toString(),
-                    color = Color.White,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 380.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(RpgCedarDark)
+                        .border(2.5.dp, RpgGoldTrim, RoundedCornerShape(14.dp))
+                        .padding(5.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(RpgParchment)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Tidur Hingga Pagi?",
+                        color = RpgInkDark,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = SfProFontFamily
+                    )
+                    Text(
+                        text = "Istirahat di rumah akan memulihkan Energi 100%, menumbuhkan tanaman yang sudah disiram, menyegarkan Gua Kristal & misi harian, serta menyimpan progresmu ke akun.",
+                        color = RpgInkMuted,
+                        fontSize = 12.sp,
+                        fontFamily = SfProFontFamily,
+                        lineHeight = 17.sp
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        RpgActionButton(
+                            text = "Nanti Saja",
+                            onClick = onCancelSleep,
+                            containerColor = RpgLinen,
+                            contentColor = RpgInkDark,
+                            modifier = Modifier.weight(1f)
+                        )
+                        RpgActionButton(
+                            text = "Tidur Sekarang",
+                            onClick = onConfirmSleep,
+                            containerColor = RpgForestGreen,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun VirtualJoystick(
-    onMove: (Float, Float) -> Unit
+private fun HudIconTile(
+    label: String,
+    iconPath: String,
+    onClick: () -> Unit
 ) {
-    val maxRadiusPx = 92f
-    var knobOffset by remember { mutableStateOf(Offset.Zero) }
+    Column(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(RpgHudBg)
+            .border(1.4.dp, RpgCedarLight, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        RpgPixelSprite(iconPath, 20.dp)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = label,
+            color = RpgCreamOnWood,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = SfProFontFamily,
+            maxLines = 1
+        )
+    }
+}
 
+@Composable
+private fun HudMenuTile(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(116.dp)
+            .height(48.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(RpgTerracotta)
+            .border(1.4.dp, RpgGoldTrim, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = Color.White,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontFamily = SfProFontFamily
+        )
+    }
+}
+
+@Composable
+private fun FixedAnalogJoystick(
+    sizeDp: androidx.compose.ui.unit.Dp,
+    opacity: Float,
+    onJoystickChange: (Float, Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var knobOffset by remember { mutableStateOf(Offset.Zero) }
+    Box(
+        modifier = modifier
+            .size(sizeDp)
+            .alpha(opacity)
             .pointerInput(Unit) {
+                val maxRadius = size.width * 0.36f
                 detectDragGestures(
                     onDragStart = { start ->
-                        val cx = size.width / 2f
-                        val cy = size.height / 2f
-                        val dx = start.x - cx
-                        val dy = start.y - cy
-                        val dist = hypot(dx.toDouble(), dy.toDouble()).toFloat().coerceAtLeast(1f)
-                        val clamped = dist.coerceAtMost(maxRadiusPx)
-                        val ox = (dx / dist) * clamped
-                        val oy = (dy / dist) * clamped
-                        knobOffset = Offset(ox, oy)
-                        // Note: LibGDX Y points UP, screen Y points DOWN -> invert oy!
-                        onMove(ox / maxRadiusPx, -oy / maxRadiusPx)
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        val nx = knobOffset.x + dragAmount.x
-                        val ny = knobOffset.y + dragAmount.y
-                        val dist = hypot(nx.toDouble(), ny.toDouble()).toFloat().coerceAtLeast(1f)
-                        val clamped = dist.coerceAtMost(maxRadiusPx)
-                        val ox = (nx / dist) * clamped
-                        val oy = (ny / dist) * clamped
-                        knobOffset = Offset(ox, oy)
-                        onMove(ox / maxRadiusPx, -oy / maxRadiusPx)
+                        val c = Offset(size.width / 2f, size.height / 2f)
+                        val d = start - c
+                        val dist = hypot(d.x.toDouble(), d.y.toDouble()).toFloat()
+                        val clamped = if (dist > maxRadius) d * (maxRadius / dist) else d
+                        knobOffset = clamped
+                        onJoystickChange(clamped.x / maxRadius, -clamped.y / maxRadius)
                     },
                     onDragEnd = {
                         knobOffset = Offset.Zero
-                        onMove(0f, 0f)
+                        onJoystickChange(0f, 0f)
                     },
                     onDragCancel = {
                         knobOffset = Offset.Zero
-                        onMove(0f, 0f)
+                        onJoystickChange(0f, 0f)
                     }
-                )
-            },
-        contentAlignment = Alignment.Center
+                ) { change, _ ->
+                    change.consume()
+                    val c = Offset(size.width / 2f, size.height / 2f)
+                    val d = change.position - c
+                    val dist = hypot(d.x.toDouble(), d.y.toDouble()).toFloat()
+                    val clamped = if (dist > maxRadius) d * (maxRadius / dist) else d
+                    knobOffset = clamped
+                    onJoystickChange(clamped.x / maxRadius, -clamped.y / maxRadius)
+                }
+            }
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = Offset(size.width / 2f, size.height / 2f)
-            val baseR = size.minDimension * 0.44f
-            drawCircle(
-                color = Color(0x881A1613),
-                radius = baseR,
-                center = center
-            )
-            drawCircle(
-                color = Color(0x99A68B6A),
-                radius = baseR,
-                center = center,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f)
-            )
-            val thumbCenter = Offset(
-                center.x + knobOffset.x * 0.48f,
-                center.y + knobOffset.y * 0.48f
-            )
-            drawCircle(
-                color = Color(0xE6F6F1E7),
-                radius = baseR * 0.42f,
-                center = thumbCenter
+            val outerR = size.minDimension * 0.45f
+            val knobR = size.minDimension * 0.19f
+            drawCircle(color = Color(0x993E261B), radius = outerR, center = center)
+            drawCircle(color = Color(0xFFD9A648), radius = outerR, center = center, style = Stroke(width = 3.5f))
+            drawCircle(color = Color(0x44FDF6E7), radius = outerR * 0.55f, center = center, style = Stroke(width = 1.5f))
+            drawCircle(color = Color(0xFFF6ECD8), radius = knobR, center = center + knobOffset)
+            drawCircle(color = Color(0xFF4B3022), radius = knobR, center = center + knobOffset, style = Stroke(width = 3f))
+        }
+    }
+}
+
+@Composable
+private fun FloatingJoystickZone(
+    onLeft: Boolean,
+    scale: Float,
+    opacity: Float,
+    onJoystickChange: (Float, Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var baseCenter by remember { mutableStateOf<Offset?>(null) }
+    var knobOffset by remember { mutableStateOf(Offset.Zero) }
+    Box(
+        modifier = modifier
+            .alpha(opacity)
+            .pointerInput(scale) {
+                val maxR = 115f * scale
+                detectDragGestures(
+                    onDragStart = { start ->
+                        baseCenter = start
+                        knobOffset = Offset.Zero
+                        onJoystickChange(0f, 0f)
+                    },
+                    onDragEnd = {
+                        baseCenter = null
+                        knobOffset = Offset.Zero
+                        onJoystickChange(0f, 0f)
+                    },
+                    onDragCancel = {
+                        baseCenter = null
+                        knobOffset = Offset.Zero
+                        onJoystickChange(0f, 0f)
+                    }
+                ) { change, _ ->
+                    change.consume()
+                    val base = baseCenter ?: return@detectDragGestures
+                    val d = change.position - base
+                    val dist = hypot(d.x.toDouble(), d.y.toDouble()).toFloat()
+                    val clamped = if (dist > maxR) d * (maxR / dist) else d
+                    knobOffset = clamped
+                    onJoystickChange(clamped.x / maxR, -clamped.y / maxR)
+                }
+            }
+    ) {
+        val center = baseCenter
+        if (center != null) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val outerR = 115f * scale
+                val knobR = 46f * scale
+                drawCircle(color = Color(0x883E261B), radius = outerR, center = center)
+                drawCircle(color = Color(0xFFD9A648), radius = outerR, center = center, style = Stroke(width = 3.5f))
+                drawCircle(color = Color(0xFFF6ECD8), radius = knobR, center = center + knobOffset)
+                drawCircle(color = Color(0xFF4B3022), radius = knobR, center = center + knobOffset, style = Stroke(width = 3f))
+            }
+        } else {
+            Text(
+                text = "Geser untuk berjalan",
+                color = RpgCreamOnWood.copy(alpha = 0.55f),
+                fontSize = 10.sp,
+                fontFamily = SfProFontFamily,
+                modifier = Modifier
+                    .align(if (onLeft) Alignment.BottomStart else Alignment.BottomEnd)
+                    .padding(18.dp)
             )
         }
     }
 }
 
 @Composable
-private fun FishingOverlayPanel(
+private fun AnimeNpcDialogueBox(
+    dialogue: NpcDialogueUiState,
     hud: RpgHudSnapshot,
+    onTalkAgain: () -> Unit,
+    onGiveGift: (String) -> Unit,
+    onService: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var pickingGift by remember(dialogue.npcId) { mutableStateOf(false) }
+    val giftableItems = remember(hud.inventory) {
+        hud.inventory.filter {
+            val cat = RpgCatalog.itemById[it.itemId]?.category
+            cat != null && cat != ItemCategory.TOOLS
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .widthIn(max = 620.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(RpgCedarDark)
+            .border(2.5.dp, RpgGoldTrim, RoundedCornerShape(14.dp))
+            .padding(5.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(RpgParchment)
+            .border(1.5.dp, RpgCedarLight, RoundedCornerShape(10.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RpgPortraitFrame(facePath = dialogue.facePath, size = 62.dp)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = dialogue.npcName,
+                            color = RpgInkDark,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontFamily = SfProFontFamily
+                        )
+                        Text(
+                            text = dialogue.npcRole,
+                            color = RpgInkMuted,
+                            fontSize = 10.sp,
+                            fontFamily = SfProFontFamily
+                        )
+                    }
+                    RpgHeartMeter(hearts = dialogue.friendshipHearts.coerceAtMost(5), maxHearts = 5, heartSize = 13.dp)
+                }
+                Text(
+                    text = dialogue.text,
+                    color = RpgInkDark,
+                    fontSize = 12.sp,
+                    fontFamily = SfProFontFamily,
+                    lineHeight = 16.sp
+                )
+            }
+        }
+
+        if (pickingGift) {
+            if (giftableItems.isEmpty()) {
+                Text(
+                    text = "Belum ada item yang bisa dijadikan hadiah di tasmu.",
+                    color = RpgInkMuted,
+                    fontSize = 11.sp,
+                    fontFamily = SfProFontFamily
+                )
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    giftableItems.take(12).forEach { st ->
+                        val def = RpgCatalog.itemById[st.itemId] ?: return@forEach
+                        Row(
+                            modifier = Modifier
+                                .height(38.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(RpgLinen)
+                                .border(1.2.dp, RpgCedarMid, RoundedCornerShape(8.dp))
+                                .clickable {
+                                    pickingGift = false
+                                    onGiveGift(st.itemId)
+                                }
+                                .padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            RpgPixelSprite(def.spritePath, 20.dp)
+                            Text(
+                                text = "${def.name} (${st.quantity})",
+                                color = RpgInkDark,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = SfProFontFamily
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            RpgActionButton(
+                text = "Obrolan Lagi",
+                onClick = onTalkAgain,
+                containerColor = RpgCedarMid,
+                height = 38.dp,
+                modifier = Modifier.weight(1f)
+            )
+            RpgActionButton(
+                text = if (dialogue.giftedToday) "Sudah Diberi" else if (pickingGift) "Batal Hadiah" else "Beri Hadiah",
+                onClick = { pickingGift = !pickingGift },
+                containerColor = RpgForestGreen,
+                enabled = !dialogue.giftedToday,
+                height = 38.dp,
+                modifier = Modifier.weight(1f)
+            )
+            if (dialogue.opensShop || dialogue.opensCooking || dialogue.opensBlacksmith) {
+                val svcLabel = when {
+                    dialogue.opensShop -> "Buka Toko"
+                    dialogue.opensCooking -> "Masak"
+                    else -> "Bengkel"
+                }
+                RpgActionButton(
+                    text = svcLabel,
+                    onClick = onService,
+                    containerColor = RpgTerracotta,
+                    height = 38.dp,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            RpgActionButton(
+                text = "Tutup",
+                onClick = onClose,
+                containerColor = RpgLinen,
+                contentColor = RpgInkDark,
+                height = 38.dp
+            )
+        }
+    }
+}
+
+@Composable
+private fun FishingMinigameCard(
+    state: FishingUiState,
     onTap: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val fs = hud.fishingState
     Column(
         modifier = modifier
-            .width(340.dp)
+            .widthIn(max = 420.dp)
+            .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(RpgPanelDark)
-            .border(1.5.dp, if (fs.phase == FishingPhase.BITE) RpgGoldAccent else RpgBorderWarm, RoundedCornerShape(14.dp))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(RpgCedarDark)
+            .border(2.5.dp, RpgGoldTrim, RoundedCornerShape(14.dp))
+            .padding(5.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(RpgParchment)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        when (fs.phase) {
-            FishingPhase.CASTING, FishingPhase.WAITING -> {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (fs.phase == FishingPhase.CASTING) "Melempar kail..." else "Menunggu ikan menggigit...",
-                        color = RpgCreamText,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = SfProFontFamily
-                    )
-                    Text(
-                        text = "Batal",
-                        color = RpgMutedText,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(RpgPanelElevated)
-                            .clickable { onCancel() }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
-                }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val status = when (state.phase) {
+                FishingPhase.CASTING -> "Melempar kail..."
+                FishingPhase.WAITING -> "Menunggu gigitan ikan..."
+                FishingPhase.BITE -> "ADA GIGITAN! TEKAN TARIK SEKARANG!"
+                FishingPhase.MINIGAME -> "Tarik saat penanda di zona hijau!"
+                FishingPhase.CAUGHT -> state.lastResultMessage
+                FishingPhase.ESCAPED -> state.lastResultMessage
+                else -> ""
             }
-
-            FishingPhase.BITE -> {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "IKAN MENGGIGIT! (!)",
-                        color = RpgGoldAccent,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
-                    )
-                    Box(
-                        modifier = Modifier
-                            .height(44.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(RpgEmberAccent)
-                            .clickable { onTap() }
-                            .padding(horizontal = 18.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "TARIK!",
-                            color = Color.White,
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
-                        )
-                    }
-                }
-            }
-
-            FishingPhase.MINIGAME -> {
-                val rarityLabel = fs.targetFish?.rarity?.label ?: "Ikan"
-                val rarityColor = fs.targetFish?.rarity?.colorHex?.let { Color(it) } ?: RpgWaterAccent
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Tekan TARIK saat penanda di zona hijau",
-                        color = RpgCreamText,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = SfProFontFamily
-                    )
-                    Text(
-                        text = rarityLabel,
-                        color = rarityColor,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SfProFontFamily
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Timing Bar with Green Sweet Spot + Moving Indicator
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(22.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xFF0F172A))
-                        .border(1.dp, RpgBorderWarm, RoundedCornerShape(6.dp))
-                ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val w = size.width
-                        val h = size.height
-                        val zoneStart = ((fs.sweetZoneCenter - fs.sweetZoneHalfWidth).coerceIn(0f, 1f)) * w
-                        val zoneEnd = ((fs.sweetZoneCenter + fs.sweetZoneHalfWidth).coerceIn(0f, 1f)) * w
-                        drawRect(
-                            color = Color(0xFF22C55E),
-                            topLeft = Offset(zoneStart, 0f),
-                            size = androidx.compose.ui.geometry.Size(zoneEnd - zoneStart, h)
-                        )
-                        val markerX = fs.indicatorPos.coerceIn(0f, 1f) * w
-                        drawRect(
-                            color = Color.White,
-                            topLeft = Offset((markerX - 4f).coerceIn(0f, w - 8f), 0f),
-                            size = androidx.compose.ui.geometry.Size(8f, h)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Catch progress bar + Tap button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Progres Tangkap ${(fs.catchProgress * 100).toInt()}%",
-                            color = RpgMutedText,
-                            fontSize = 10.sp,
-                            fontFamily = SfProFontFamily
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(7.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color(0xFF2A241E))
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(fs.catchProgress.coerceIn(0f, 1f))
-                                    .fillMaxHeight()
-                                    .background(RpgWaterAccent)
-                            )
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .height(44.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFF0E7490))
-                            .border(1.dp, RpgWaterAccent, RoundedCornerShape(10.dp))
-                            .clickable { onTap() }
-                            .padding(horizontal = 20.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "TARIK!",
-                            color = Color.White,
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
-                        )
-                    }
-                }
-            }
-
-            FishingPhase.CAUGHT -> {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    fs.targetFish?.let { fish ->
-                        RpgAssetPixelImage(
-                            assetPath = fish.spritePath,
-                            contentDescription = fish.name,
-                            modifier = Modifier.size(width = 42.dp, height = 28.dp)
-                        )
-                    }
-                    Column {
-                        Text(
-                            text = fs.targetFish?.name ?: "Tangkapan Berhasil!",
-                            color = RpgGoldAccent,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = SfProFontFamily
-                        )
-                        Text(
-                            text = fs.lastResultMessage,
-                            color = RpgCreamText,
-                            fontSize = 11.5.sp,
-                            fontFamily = SfProFontFamily
-                        )
-                    }
-                }
-            }
-
-            FishingPhase.ESCAPED -> {
+            Text(
+                text = status,
+                color = if (state.phase == FishingPhase.BITE) RpgTerracotta else RpgInkDark,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontFamily = SfProFontFamily,
+                modifier = Modifier.weight(1f)
+            )
+            if (state.phase == FishingPhase.MINIGAME) {
                 Text(
-                    text = fs.lastResultMessage.ifBlank { "Ikan lolos!" },
-                    color = Color(0xFFFCA5A5),
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    text = "${state.tensionTimeLeft.toInt()}d",
+                    color = RpgInkMuted,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
                     fontFamily = SfProFontFamily
                 )
             }
+        }
 
-            else -> Unit
+        if (state.phase == FishingPhase.MINIGAME) {
+            // Timing Bar
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(22.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(RpgCedarDark)
+                    .border(1.5.dp, RpgCedarLight, RoundedCornerShape(6.dp))
+            ) {
+                val zStart = ((state.sweetZoneCenter - state.sweetZoneHalfWidth).coerceIn(0f, 1f)) * size.width
+                val zWidth = (state.sweetZoneHalfWidth * 2f).coerceIn(0.05f, 1f) * size.width
+                drawRect(color = RpgForestGreen, topLeft = Offset(zStart, 0f), size = androidx.compose.ui.geometry.Size(zWidth, size.height))
+                val indX = state.indicatorPos.coerceIn(0f, 1f) * size.width
+                drawRect(color = Color(0xFFFFF7CC), topLeft = Offset((indX - 4f).coerceAtLeast(0f), 0f), size = androidx.compose.ui.geometry.Size(8f, size.height))
+            }
+            // Catch Progress Bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(RpgLinen)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(state.catchProgress.coerceIn(0f, 1f))
+                        .fillMaxHeight()
+                        .background(RpgSkyBlue)
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            RpgActionButton(
+                text = "Batal",
+                onClick = onCancel,
+                containerColor = RpgLinen,
+                contentColor = RpgInkDark,
+                height = 42.dp
+            )
+            RpgActionButton(
+                text = when (state.phase) {
+                    FishingPhase.BITE -> "TARIK KAIL!"
+                    FishingPhase.MINIGAME -> "SENTAK!"
+                    else -> "Tarik"
+                },
+                onClick = onTap,
+                containerColor = if (state.phase == FishingPhase.BITE) RpgTerracotta else RpgForestGreen,
+                height = 42.dp,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
 
 @Composable
-private fun ConstructionOverlayBar(
+private fun ConstructionActionBar(
     hud: RpgHudSnapshot,
     onRotate: () -> Unit,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val def = hud.buildPreview.selectedItemId?.let { RpgCatalog.itemById[it] } ?: return
-    val ownedCount = hud.inventory.find { it.itemId == def.id }?.quantity ?: 0
-    val costText = if (ownedCount > 0) {
-        "Stok Tas: $ownedCount"
-    } else {
-        "Bahan: ${def.woodCost} Kayu, ${def.stoneCost} Batu"
-    }
-
+    val itemName = hud.buildPreview.selectedItemId?.let { RpgCatalog.itemById[it]?.name } ?: "Furnitur"
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(RpgPanelDark)
-            .border(1.5.dp, if (hud.buildPreview.isValid) RpgLeafAccent else Color(0xFFEF4444), RoundedCornerShape(12.dp))
+            .background(RpgCedarDark)
+            .border(2.dp, RpgGoldTrim, RoundedCornerShape(12.dp))
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        RpgAssetPixelImage(
-            assetPath = def.spritePath,
-            contentDescription = def.name,
-            modifier = Modifier.size(28.dp)
+        Text(
+            text = "$itemName (${if (hud.buildPreview.isValid) "Siap" else "Terhalang"})",
+            color = RpgCreamOnWood,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = SfProFontFamily
         )
-        Column {
-            Text(
-                text = "Pasang ${def.name}",
-                color = RpgCreamText,
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = SfProFontFamily
-            )
-            Text(
-                text = "$costText • ${if (hud.buildPreview.isValid) "Lokasi Siap" else "Terhalang"}",
-                color = if (hud.buildPreview.isValid) RpgLeafAccent else Color(0xFFFCA5A5),
-                fontSize = 10.5.sp,
-                fontFamily = SfProFontFamily
-            )
-        }
-
-        if (def.rotatable) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(RpgPanelElevated)
-                    .clickable { onRotate() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.RotateRight,
-                    contentDescription = "Putar",
-                    tint = RpgCreamText,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .height(40.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(if (hud.buildPreview.isValid) Color(0xFF15803D) else Color(0xFF3F3A36))
-                .clickable(enabled = hud.buildPreview.isValid) { onConfirm() }
-                .padding(horizontal = 14.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Pasang",
-                color = Color.White,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = SfProFontFamily
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF7F1D1D))
-                .clickable { onCancel() },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Close,
-                contentDescription = "Batal",
-                tint = Color.White,
-                modifier = Modifier.size(18.dp)
-            )
-        }
+        RpgActionButton(text = "Putar", onClick = onRotate, containerColor = RpgCedarMid, height = 38.dp)
+        RpgActionButton(
+            text = "Pasang",
+            onClick = onConfirm,
+            containerColor = RpgForestGreen,
+            enabled = hud.buildPreview.isValid,
+            height = 38.dp
+        )
+        RpgActionButton(text = "Batal", onClick = onCancel, containerColor = RpgTerracotta, height = 38.dp)
     }
 }
