@@ -888,7 +888,8 @@ private fun SettingsModalContent(
     onExitGame: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        ModalHeader("Pengaturan & Jeda", "Willowbrook Cove • Hari ${hud.dayCount}", hud.coins, onDismiss)
+        val accountLabel = hud.accountName.ifBlank { "Akun Login" }
+        ModalHeader("Pengaturan & Jeda", "$accountLabel • ${hud.cloudSyncStatus}", hud.coins, onDismiss)
         Spacer(modifier = Modifier.height(10.dp))
         HorizontalDivider(color = RpgBorderWarm, thickness = 1.dp)
         Spacer(modifier = Modifier.height(10.dp))

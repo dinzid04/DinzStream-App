@@ -1,5 +1,9 @@
 package com.yuranime.dinz.rpg
 
+import com.badlogic.gdx.files.FileHandle
+import com.badlogic.gdx.graphics.g2d.TextureAtlas
+import com.badlogic.gdx.utils.XmlReader
+import com.yuranime.dinz.rpg.audio.RpgSfx
 import com.yuranime.dinz.rpg.building.BuildingSystem
 import com.yuranime.dinz.rpg.economy.EconomySystem
 import com.yuranime.dinz.rpg.farming.FarmingSystem
@@ -7,18 +11,33 @@ import com.yuranime.dinz.rpg.fishing.FishingSystem
 import com.yuranime.dinz.rpg.inventory.InventorySortMode
 import com.yuranime.dinz.rpg.inventory.InventorySystem
 import com.yuranime.dinz.rpg.model.CropType
+import com.yuranime.dinz.rpg.model.Direction
 import com.yuranime.dinz.rpg.model.FishRarity
 import com.yuranime.dinz.rpg.model.FishingPhase
 import com.yuranime.dinz.rpg.model.ItemCategory
 import com.yuranime.dinz.rpg.model.RpgCatalog
+import com.yuranime.dinz.rpg.model.TreeHealthState
+import com.yuranime.dinz.rpg.model.TreeType
 import com.yuranime.dinz.rpg.model.WaterHabitat
+import com.yuranime.dinz.rpg.persistence.AchievementEntity
+import com.yuranime.dinz.rpg.persistence.CropPlotEntity
+import com.yuranime.dinz.rpg.persistence.FishCollectionEntity
+import com.yuranime.dinz.rpg.persistence.InventoryItemEntity
+import com.yuranime.dinz.rpg.persistence.PlacedObjectEntity
+import com.yuranime.dinz.rpg.persistence.PlayerStateEntity
+import com.yuranime.dinz.rpg.persistence.QuestProgressEntity
+import com.yuranime.dinz.rpg.persistence.RpgSaveBundle
+import com.yuranime.dinz.rpg.persistence.RpgSaveSerializer
+import com.yuranime.dinz.rpg.persistence.TreeStateEntity
 import com.yuranime.dinz.rpg.quests.ProgressionSystem
 import com.yuranime.dinz.rpg.world.HomesteadWorld
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class RpgSystemsUnitTest {
 
@@ -86,7 +105,6 @@ class RpgSystemsUnitTest {
         val waterRes = farming.waterPlot(15, 6)
         assertTrue(waterRes.success)
 
-        // Advance time until harvestable (stage 4)
         repeat(40) {
             farming.update(2.0f)
         }
@@ -152,7 +170,7 @@ class RpgSystemsUnitTest {
         val res = building.confirmPlacement()
         assertTrue("Bench should place cleanly on open tile", res.success)
         assertEquals(1, world.placedObjects.size)
-        assertEquals(5, inv.getQuantity("res_wood")) // Starter 10 - 5 wood cost
+        assertEquals(5, inv.getQuantity("res_wood"))
 
         val removeRes = building.removeObjectAt(10, 12)
         assertTrue(removeRes.success)
@@ -169,5 +187,146 @@ class RpgSystemsUnitTest {
         val reward = prog.claimQuest("q_catch_3_fish")
         assertNotNull(reward)
         assertTrue(prog.getQuestStates().first { it.def.id == "q_catch_3_fish" }.claimed)
+    }
+
+    @Test
+    fun saveSerializerRoundTripPreservesFullStateAndIsolatesUserUid() {
+        val uidA = "g_user_alpha_example_com"
+        val uidB = "g_user_beta_example_com"
+
+        val bundle = RpgSaveBundle(
+            player = PlayerStateEntity(
+                userUid = uidA,
+                posX = 212f,
+                posY = 168f,
+                facing = "right",
+                level = 7,
+                exp = 45,
+                coins = 1480,
+                fishingLevel = 5,
+                fishingExp = 30,
+                farmingLevel = 4,
+                farmingExp = 15,
+                gatheringLevel = 3,
+                gatheringExp = 20,
+                houseTier = 2,
+                gameTimeHours = 16.25f,
+                dayCount = 9,
+                selectedToolId = "tool_rod_golden",
+                selectedSeedId = "seed_pumpkin",
+                shirtColorHex = 0xFF56A854,
+                updatedAtMs = 1_760_000_000_000L
+            ),
+            inventory = listOf(
+                InventoryItemEntity(uidA, "tool_rod_golden", 1),
+                InventoryItemEntity(uidA, "fish_crimson_koi", 4)
+            ),
+            fishCollection = listOf(
+                FishCollectionEntity(uidA, "fish_crimson_koi", 4, 1_759_999_000_000L)
+            ),
+            trees = listOf(
+                TreeStateEntity(uidA, "tree_0", 3, 21, TreeType.OAK.id, 2, TreeHealthState.DAMAGED.name, 0f)
+            ),
+            crops = listOf(
+                CropPlotEntity(uidA, "15_6", 15, 6, true, true, CropType.PUMPKIN.id, 3, 12.5f)
+            ),
+            placedObjects = listOf(
+                PlacedObjectEntity(uidA, "obj_1", "lamp_post", 10, 12, 90)
+            ),
+            quests = listOf(
+                QuestProgressEntity(uidA, "q_catch_3_fish", 3, true)
+            ),
+            achievements = listOf(
+                AchievementEntity(uidA, "a_first_fish", 1, true)
+            )
+        )
+
+        val json = RpgSaveSerializer.toJson(bundle)
+        assertTrue(json.contains("fish_crimson_koi"))
+
+        val restoredForA = RpgSaveSerializer.fromJson(json, uidA)
+        assertNotNull(restoredForA)
+        assertEquals(uidA, restoredForA!!.player.userUid)
+        assertEquals(1480, restoredForA.player.coins)
+        assertEquals(7, restoredForA.player.level)
+        assertEquals(2, restoredForA.player.houseTier)
+        assertEquals(2, restoredForA.inventory.size)
+        assertEquals(1, restoredForA.placedObjects.size)
+
+        // Ensure UID binding enforces isolation when deserialized for a target account
+        val reboundForB = RpgSaveSerializer.fromJson(json, uidB)
+        assertNotNull(reboundForB)
+        assertEquals(uidB, reboundForB!!.player.userUid)
+        assertTrue(reboundForB.inventory.all { it.userUid == uidB })
+        assertTrue(reboundForB.trees.all { it.userUid == uidB })
+
+        // Verify summary map for Firestore profile document
+        val summary = RpgSaveSerializer.buildSummaryMap(restoredForA)
+        assertEquals(7, summary["level"])
+        assertEquals(1480, summary["coins"])
+        assertEquals(2, summary["houseTier"])
+        assertEquals(1, summary["fishSpeciesCaught"])
+
+        // Corrupted JSON never crashes
+        assertNull(RpgSaveSerializer.fromJson("{not-valid-json", uidA))
+        assertNull(RpgSaveSerializer.fromJson("", uidA))
+    }
+
+    @Test
+    fun bundledAssetsAtlasAndTmxMapAreValidAndComplete() {
+        val assetsRoot = listOf(
+            File("src/main/assets"),
+            File("app/src/main/assets")
+        ).firstOrNull { it.isDirectory }
+        assertNotNull("Assets directory should exist in test workspace", assetsRoot)
+
+        // 1. Validate LibGDX TextureAtlasData parses player.atlas with all 11 actions x 4 directions
+        val atlasFile = File(assetsRoot, "rpg/characters/player.atlas")
+        assertTrue("player.atlas must exist", atlasFile.isFile)
+        val atlasData = TextureAtlas.TextureAtlasData(
+            FileHandle(atlasFile),
+            FileHandle(atlasFile.parentFile),
+            false
+        )
+        assertEquals("Expected 1 atlas page", 1, atlasData.pages.size)
+        assertTrue("Expected 160 sliced player frames", atlasData.regions.size >= 140)
+
+        val expectedPrefixes = listOf(
+            "idle", "walk", "run", "fish_cast", "fish_wait", "fish_reel",
+            "axe", "hoe", "water", "harvest", "interact"
+        )
+        for (prefix in expectedPrefixes) {
+            for (dir in Direction.entries) {
+                val regionName = "${prefix}_${dir.key}"
+                val count = atlasData.regions.count { it.name == regionName }
+                assertTrue("Atlas missing animation region $regionName", count > 0)
+            }
+        }
+
+        // 2. Validate Tiled TMX + TSX XML structure & tileset PNG reference
+        val tmxFile = File(assetsRoot, "rpg/maps/starter_homestead.tmx")
+        val tsxFile = File(assetsRoot, "rpg/maps/homestead_tileset.tsx")
+        assertTrue("starter_homestead.tmx must exist", tmxFile.isFile)
+        assertTrue("homestead_tileset.tsx must exist", tsxFile.isFile)
+
+        val xml = XmlReader()
+        val mapElem = xml.parse(FileHandle(tmxFile))
+        assertEquals(30, mapElem.getIntAttribute("width"))
+        assertEquals(24, mapElem.getIntAttribute("height"))
+        assertEquals(8, mapElem.getChildrenByName("layer").size)
+
+        val tsxElem = xml.parse(FileHandle(tsxFile))
+        val imageSource = tsxElem.getChildByName("image").getAttribute("source")
+        val resolvedTileset = File(tsxFile.parentFile, imageSource).canonicalFile
+        assertTrue("Tileset image must exist at $resolvedTileset", resolvedTileset.isFile)
+
+        // 3. Validate all catalog sprites and audio assets exist on disk
+        for (item in RpgCatalog.items) {
+            assertTrue("Missing item sprite: ${item.spritePath}", File(assetsRoot, item.spritePath).isFile)
+        }
+        for (sfx in RpgSfx.entries) {
+            assertTrue("Missing SFX asset: ${sfx.filePath}", File(assetsRoot, sfx.filePath).isFile)
+        }
+        assertTrue("Missing BGM asset", File(assetsRoot, "rpg/audio/bgm_homestead.wav").isFile)
     }
 }

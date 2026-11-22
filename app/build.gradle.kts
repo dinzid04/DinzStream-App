@@ -120,8 +120,8 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
-    // Cozy Fishing RPG Engine (LibGDX 1.12.1 + Fragment Host)
-    val gdxVersion = "1.12.1"
+    // Cozy Fishing RPG Engine (LibGDX 1.13.5 w/ 16KB ELF alignment + Fragment Host)
+    val gdxVersion = "1.13.5"
     implementation("androidx.fragment:fragment-ktx:1.8.4")
     implementation("com.badlogicgames.gdx:gdx:$gdxVersion")
     implementation("com.badlogicgames.gdx:gdx-backend-android:$gdxVersion")

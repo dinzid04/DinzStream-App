@@ -257,7 +257,10 @@ data class RpgHudSnapshot(
     val achievements: List<AchievementState> = emptyList(),
     val customization: PlayerCustomization = PlayerCustomization(),
     val toastMessage: String = "",
-    val toastId: Long = 0L
+    val toastId: Long = 0L,
+    val accountName: String = "",
+    val cloudSyncStatus: String = "Menyinkronkan...",
+    val fatalErrorMessage: String? = null
 )
 
 object RpgCatalog {

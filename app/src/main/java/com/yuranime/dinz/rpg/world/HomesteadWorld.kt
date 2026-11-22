@@ -310,16 +310,16 @@ class HomesteadWorld {
 
     fun isNightOrDusk(): Boolean = timeHours >= 18.5f || timeHours < 5.5f
 
-    fun toTreeEntities(): List<TreeStateEntity> = trees.map {
-        TreeStateEntity(it.id, it.tileX, it.tileY, it.type.id, it.health, it.state.name, it.regrowTimer)
+    fun toTreeEntities(userUid: String): List<TreeStateEntity> = trees.map {
+        TreeStateEntity(userUid, it.id, it.tileX, it.tileY, it.type.id, it.health, it.state.name, it.regrowTimer)
     }
 
-    fun toCropEntities(): List<CropPlotEntity> = cropPlots.values.map {
-        CropPlotEntity(it.key, it.tileX, it.tileY, it.isTilled, it.isWatered, it.cropType?.id, it.stage, it.growthProgress)
+    fun toCropEntities(userUid: String): List<CropPlotEntity> = cropPlots.values.map {
+        CropPlotEntity(userUid, it.key, it.tileX, it.tileY, it.isTilled, it.isWatered, it.cropType?.id, it.stage, it.growthProgress)
     }
 
-    fun toPlacedEntities(): List<PlacedObjectEntity> = placedObjects.map {
-        PlacedObjectEntity(it.id, it.itemId, it.tileX, it.tileY, it.rotation)
+    fun toPlacedEntities(userUid: String): List<PlacedObjectEntity> = placedObjects.map {
+        PlacedObjectEntity(userUid, it.id, it.itemId, it.tileX, it.tileY, it.rotation)
     }
 
     fun dispose() {

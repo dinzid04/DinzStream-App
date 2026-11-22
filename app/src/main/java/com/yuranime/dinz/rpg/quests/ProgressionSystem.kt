@@ -198,15 +198,15 @@ class ProgressionSystem {
         AchievementState(def = def, progress = st.first, unlocked = st.second)
     }
 
-    fun toFishEntities(): List<FishCollectionEntity> = fishCollection.map { (id, pair) ->
-        FishCollectionEntity(id, pair.first, pair.second)
+    fun toFishEntities(userUid: String): List<FishCollectionEntity> = fishCollection.map { (id, pair) ->
+        FishCollectionEntity(userUid, id, pair.first, pair.second)
     }
 
-    fun toQuestEntities(): List<QuestProgressEntity> = questProgress.map { (id, pair) ->
-        QuestProgressEntity(id, pair.first, pair.second)
+    fun toQuestEntities(userUid: String): List<QuestProgressEntity> = questProgress.map { (id, pair) ->
+        QuestProgressEntity(userUid, id, pair.first, pair.second)
     }
 
-    fun toAchievementEntities(): List<AchievementEntity> = achievementProgress.map { (id, pair) ->
-        AchievementEntity(id, pair.first, pair.second)
+    fun toAchievementEntities(userUid: String): List<AchievementEntity> = achievementProgress.map { (id, pair) ->
+        AchievementEntity(userUid, id, pair.first, pair.second)
     }
 }

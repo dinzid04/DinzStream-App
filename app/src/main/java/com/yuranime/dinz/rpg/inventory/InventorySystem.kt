@@ -50,8 +50,8 @@ class InventorySystem {
         }
     }
 
-    fun toEntities(): List<InventoryItemEntity> {
-        return items.filter { it.value > 0 }.map { InventoryItemEntity(it.key, it.value) }
+    fun toEntities(userUid: String): List<InventoryItemEntity> {
+        return items.filter { it.value > 0 }.map { InventoryItemEntity(userUid, it.key, it.value) }
     }
 
     fun addItem(itemId: String, amount: Int): Int {

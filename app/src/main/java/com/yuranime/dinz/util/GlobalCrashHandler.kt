@@ -11,15 +11,16 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlin.system.exitProcess
 
 /**
- * Penangkap exception global agar error tak terduga pada thread latar atau komponen UI
- * tidak langsung menyebabkan force-close berulang tanpa pemulihan.
+ * Penangkap exception global dengan proteksi anti crash-loop agar aplikasi tidak pernah
+ * keluar-masuk berulang saat terjadi error fatal pada komponen tertentu.
  */
 object GlobalCrashHandler {
     private const val TAG = "YuranimeCrashHandler"
     private const val PREF_NAME = "yuranime_crash_prefs"
     private const val KEY_LAST_CRASH_MS = "last_crash_ms"
+    private const val KEY_CRASH_STREAK = "crash_streak"
     private const val KEY_LAST_CRASH_TRACE = "last_crash_trace"
-    private const val CRASH_LOOP_WINDOW_MS = 8_000L
+    private const val CRASH_LOOP_WINDOW_MS = 20_000L
 
     @Volatile
     private var installed = false
@@ -45,14 +46,13 @@ object GlobalCrashHandler {
                 thread == Looper.getMainLooper().thread
             }.getOrDefault(false)
 
-            // Exception fatal VM / OOM pada main thread tidak aman ditelan mentah-mentah
             val isVmFatal = throwable is VirtualMachineError
 
             if (!isMainThread && !isVmFatal) {
-                // Background worker error dicatat aman tanpa membunuh seluruh aplikasi
                 return@setDefaultUncaughtExceptionHandler
             }
 
+            // Jangan pernah melakukan auto-relaunch jika sudah pernah crash dalam 20 detik terakhir
             if (isMainThread && !isVmFatal && !isInCrashLoop(app)) {
                 markCrashTimestamp(app)
                 val restarted = runCatching {
@@ -84,19 +84,45 @@ object GlobalCrashHandler {
         }
     }
 
-    private fun isInCrashLoop(context: Context): Boolean {
-        val lastMs = runCatching {
+    fun getLastCrashTrace(context: Context): String {
+        return runCatching {
             context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-                .getLong(KEY_LAST_CRASH_MS, 0L)
-        }.getOrDefault(0L)
-        return lastMs > 0L && (System.currentTimeMillis() - lastMs) < CRASH_LOOP_WINDOW_MS
+                .getString(KEY_LAST_CRASH_TRACE, "").orEmpty()
+        }.getOrDefault("")
+    }
+
+    private fun isInCrashLoop(context: Context): Boolean {
+        val prefs = runCatching {
+            context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        }.getOrNull() ?: return true
+        val lastMs = prefs.getLong(KEY_LAST_CRASH_MS, 0L)
+        val streak = prefs.getInt(KEY_CRASH_STREAK, 0)
+        val withinWindow = lastMs > 0L && (System.currentTimeMillis() - lastMs) < CRASH_LOOP_WINDOW_MS
+        return withinWindow || streak >= 2
     }
 
     private fun markCrashTimestamp(context: Context) {
         runCatching {
+            val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            val now = System.currentTimeMillis()
+            val lastMs = prefs.getLong(KEY_LAST_CRASH_MS, 0L)
+            val newStreak = if (lastMs > 0L && (now - lastMs) < 60_000L) {
+                prefs.getInt(KEY_CRASH_STREAK, 0) + 1
+            } else {
+                1
+            }
+            prefs.edit()
+                .putLong(KEY_LAST_CRASH_MS, now)
+                .putInt(KEY_CRASH_STREAK, newStreak)
+                .commit()
+        }
+    }
+
+    fun resetCrashStreak(context: Context) {
+        runCatching {
             context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
                 .edit()
-                .putLong(KEY_LAST_CRASH_MS, System.currentTimeMillis())
+                .putInt(KEY_CRASH_STREAK, 0)
                 .apply()
         }
     }
@@ -106,7 +132,7 @@ object GlobalCrashHandler {
             context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putString(KEY_LAST_CRASH_TRACE, trace)
-                .apply()
+                .commit()
         }
     }
 }

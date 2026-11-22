@@ -1,6 +1,7 @@
 package com.yuranime.dinz.rpg.engine
 
 import android.content.Context
+import android.util.Log
 import com.badlogic.gdx.ApplicationAdapter
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.Color
@@ -53,15 +54,21 @@ enum class RpgModalRequest {
 
 class CozyFishingGame(
     private val appContext: Context,
+    private val userUid: String,
+    private val userDisplayName: String,
     private val onOpenModalRequest: (RpgModalRequest) -> Unit
 ) : ApplicationAdapter() {
+
+    companion object {
+        private const val TAG = "CozyFishingGame"
+    }
 
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val saveRepo = RpgSaveRepository(appContext)
 
-    private lateinit var camera: OrthographicCamera
-    private lateinit var batch: SpriteBatch
-    private lateinit var mapRenderer: OrthogonalTiledMapRenderer
+    private var camera: OrthographicCamera? = null
+    private var batch: SpriteBatch? = null
+    private var mapRenderer: OrthogonalTiledMapRenderer? = null
 
     private val assets = RpgAssetManager()
     private val audio = RpgAudioManager()
@@ -75,7 +82,12 @@ class CozyFishingGame(
     private val farming = FarmingSystem(world, inventory)
     private val building = BuildingSystem(world, inventory, economy)
 
-    private val _hudState = MutableStateFlow(RpgHudSnapshot())
+    private val _hudState = MutableStateFlow(
+        RpgHudSnapshot(
+            accountName = userDisplayName,
+            cloudSyncStatus = "Menyinkronkan akun..."
+        )
+    )
     val hudState: StateFlow<RpgHudSnapshot> = _hudState.asStateFlow()
 
     @Volatile
@@ -84,44 +96,75 @@ class CozyFishingGame(
     private var isPausedByMenu: Boolean = false
     @Volatile
     private var sortMode: InventorySortMode = InventorySortMode.CATEGORY
+    @Volatile
+    private var glAssetsReady: Boolean = false
+    @Volatile
+    private var isDisposed: Boolean = false
 
     private var globalAnimTime: Float = 0f
     private var uiSyncTimer: Float = 0f
     private var autoSaveTimer: Float = 0f
     private var toastMessage: String = ""
     private var toastCounter: Long = 0L
-    private var isInitialized: Boolean = false
+    private var cloudSyncStatus: String = "Menyinkronkan akun..."
+    private var fatalErrorMessage: String? = null
+    private var isSaveReady: Boolean = false
 
     // Ground & below-player layers vs foreground layer indices in starter_homestead.tmx
     private val baseLayerIndices = intArrayOf(0, 1, 2, 3, 4)
     private val foregroundLayerIndices = intArrayOf(7)
 
-    override fun create() {
-        camera = OrthographicCamera()
-        batch = SpriteBatch()
-
-        assets.load()
-        audio.load()
-        world.loadMap()
-        inventory.initStarterKit()
-        mapRenderer = OrthogonalTiledMapRenderer(world.tiledMap, 1f)
-
-        // Load saved Room state asynchronously and apply safely on GL thread
-        ioScope.launch {
-            val saved = runCatching { saveRepo.loadGame() }.getOrNull()
-            Gdx.app.postRunnable {
-                if (saved != null) {
-                    applySaveBundle(saved)
-                    showToast("Selamat datang kembali di Willowbrook! (Hari ${world.dayCount})")
-                } else {
-                    showToast("Selamat datang di Willowbrook Cove! Dekati kolam untuk memancing.")
-                }
-                isInitialized = true
-                pushHudSnapshot()
+    private inline fun postToGl(crossinline block: () -> Unit) {
+        if (isDisposed) return
+        val app = Gdx.app ?: return
+        app.postRunnable {
+            if (isDisposed) return@postRunnable
+            try {
+                block()
+            } catch (t: Throwable) {
+                Log.e(TAG, "Safely caught GL runnable error: ${t.message}", t)
             }
         }
-        isInitialized = true
-        pushHudSnapshot()
+    }
+
+    override fun create() {
+        try {
+            camera = OrthographicCamera()
+            batch = SpriteBatch()
+
+            assets.load()
+            audio.load()
+            world.loadMap()
+            inventory.initStarterKit()
+            mapRenderer = OrthogonalTiledMapRenderer(world.tiledMap, 1f)
+            glAssetsReady = true
+
+            // Muat progres lokal & cloud Firestore milik akun yang login secara asinkron
+            ioScope.launch {
+                val result = runCatching { saveRepo.loadLatestForUser(userUid) }.getOrNull()
+                postToGl {
+                    if (result?.bundle != null) {
+                        applySaveBundle(result.bundle)
+                        cloudSyncStatus = result.sourceLabel
+                        isSaveReady = true
+                        showToast("Selamat datang kembali, $userDisplayName! (Hari ${world.dayCount})")
+                    } else {
+                        cloudSyncStatus = result?.sourceLabel ?: "Database Akun Siap"
+                        isSaveReady = true
+                        showToast("Halo $userDisplayName! Dekati kolam untuk mulai memancing.")
+                        // Simpan kondisi awal akun ke database agar langsung tercatat pada akun user
+                        saveGameAsync(silent = true)
+                    }
+                    pushHudSnapshot()
+                }
+            }
+            pushHudSnapshot()
+        } catch (t: Throwable) {
+            Log.e(TAG, "Gagal inisialisasi CozyFishingGame: ${t.message}", t)
+            glAssetsReady = false
+            fatalErrorMessage = "Gagal memuat aset game: ${t.localizedMessage ?: t.javaClass.simpleName}"
+            pushHudSnapshot()
+        }
     }
 
     private fun applySaveBundle(bundle: RpgSaveBundle) {
@@ -156,26 +199,39 @@ class CozyFishingGame(
     }
 
     override fun resize(width: Int, height: Int) {
-        if (width <= 0 || height <= 0) return
-        val aspect = width.toFloat() / height.toFloat()
-        // Crisp pixel-art viewport showing ~11 tiles tall (176 world units) -> lush & readable on phone!
-        val viewH = 180f
-        val viewW = viewH * aspect
-        camera.setToOrtho(false, viewW, viewH)
-        camera.position.set(player.x, player.y, 0f)
-        camera.update()
+        try {
+            if (width <= 0 || height <= 0) return
+            val cam = camera ?: return
+            val aspect = width.toFloat() / height.toFloat()
+            val viewH = 180f
+            val viewW = viewH * aspect
+            cam.setToOrtho(false, viewW, viewH)
+            cam.position.set(player.x, player.y, 0f)
+            cam.update()
+        } catch (t: Throwable) {
+            Log.w(TAG, "resize error: ${t.message}", t)
+        }
     }
 
     override fun render() {
-        val rawDt = Gdx.graphics.deltaTime.coerceIn(0f, 0.05f)
-        val dt = if (isPausedByMenu) 0f else rawDt
-        globalAnimTime += rawDt
+        try {
+            Gdx.gl.glClearColor(0.10f, 0.16f, 0.12f, 1f)
+            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+            if (!glAssetsReady || isDisposed) return
 
-        updateGame(dt)
-        renderWorld()
+            val rawDt = Gdx.graphics.deltaTime.coerceIn(0f, 0.05f)
+            val dt = if (isPausedByMenu) 0f else rawDt
+            globalAnimTime += rawDt
+
+            updateGame(dt)
+            renderWorld()
+        } catch (t: Throwable) {
+            Log.e(TAG, "Safely caught render loop error: ${t.message}", t)
+        }
     }
 
     private fun updateGame(dt: Float) {
+        val cam = camera ?: return
         if (dt > 0f) {
             world.update(dt) { regrownTree ->
                 particles.spawnLeaves(
@@ -187,7 +243,6 @@ class CozyFishingGame(
             }
             farming.update(dt)
 
-            // Fishing update
             val fishRes = fishing.update(dt)
             if (fishRes.biteTriggered) {
                 audio.play(RpgSfx.BITE)
@@ -200,7 +255,6 @@ class CozyFishingGame(
                 player.clearAction()
             }
 
-            // Update player animation while fishing
             when (fishing.phase) {
                 FishingPhase.CASTING -> player.setFishingAnimation(PlayerAction.FISH_CAST)
                 FishingPhase.WAITING, FishingPhase.BITE -> player.setFishingAnimation(PlayerAction.FISH_WAIT)
@@ -209,24 +263,25 @@ class CozyFishingGame(
                 else -> Unit
             }
 
-            // Player movement & collision
             player.update(dt, world, fishing.isActive()) {
                 audio.play(RpgSfx.STEP, 0.92f + Random.nextFloat() * 0.16f)
             }
 
-            // Keep construction placement ghost right in front of the player
             if (building.isBuildMode) {
                 val (fx, fy) = player.getFacingTile()
                 building.updatePreviewTile(fx, fy)
             }
 
-            // Ambient rain particles
             if (world.isRaining) {
-                particles.spawnRain(camera.position.x, camera.position.y, camera.viewportWidth * camera.zoom, camera.viewportHeight * camera.zoom)
+                particles.spawnRain(
+                    cam.position.x,
+                    cam.position.y,
+                    cam.viewportWidth * cam.zoom,
+                    cam.viewportHeight * cam.zoom
+                )
             }
             particles.update(dt)
 
-            // Auto-save every 20 seconds
             autoSaveTimer += dt
             if (autoSaveTimer >= 20f) {
                 autoSaveTimer = 0f
@@ -234,10 +289,9 @@ class CozyFishingGame(
             }
         }
 
-        // Smooth camera follow clamped neatly to Starter Homestead boundaries
-        camera.zoom = MathUtils.lerp(camera.zoom, cameraZoom.coerceIn(0.75f, 1.45f), 0.12f)
-        val halfW = (camera.viewportWidth * camera.zoom) * 0.5f
-        val halfH = (camera.viewportHeight * camera.zoom) * 0.5f
+        cam.zoom = MathUtils.lerp(cam.zoom, cameraZoom.coerceIn(0.75f, 1.45f), 0.12f)
+        val halfW = (cam.viewportWidth * cam.zoom) * 0.5f
+        val halfH = (cam.viewportHeight * cam.zoom) * 0.5f
         val targetX = if (HomesteadWorld.WORLD_W > halfW * 2f) {
             player.x.coerceIn(halfW, HomesteadWorld.WORLD_W - halfW)
         } else {
@@ -248,11 +302,10 @@ class CozyFishingGame(
         } else {
             HomesteadWorld.WORLD_H * 0.5f
         }
-        camera.position.x = MathUtils.lerp(camera.position.x, targetX, 0.14f)
-        camera.position.y = MathUtils.lerp(camera.position.y, targetY, 0.14f)
-        camera.update()
+        cam.position.x = MathUtils.lerp(cam.position.x, targetX, 0.14f)
+        cam.position.y = MathUtils.lerp(cam.position.y, targetY, 0.14f)
+        cam.update()
 
-        // Sync HUD snapshot smoothly (~18 Hz during normal play, 60 Hz during fishing minigame!)
         uiSyncTimer += Gdx.graphics.deltaTime
         val syncInterval = if (fishing.phase == FishingPhase.MINIGAME || fishing.phase == FishingPhase.BITE) 0.016f else 0.06f
         if (uiSyncTimer >= syncInterval) {
@@ -262,73 +315,68 @@ class CozyFishingGame(
     }
 
     private fun renderWorld() {
+        val cam = camera ?: return
+        val spriteBatch = batch ?: return
+        val renderer = mapRenderer ?: return
+
         Gdx.gl.glClearColor(0.18f, 0.32f, 0.22f, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
 
-        // 1. Render base TMX layers (ground, decor, water, buildings, docks/bridges/fences)
-        mapRenderer.setView(camera)
-        mapRenderer.render(baseLayerIndices)
+        renderer.setView(cam)
+        renderer.render(baseLayerIndices)
 
-        batch.projectionMatrix = camera.combined
-        batch.begin()
+        spriteBatch.projectionMatrix = cam.combined
+        spriteBatch.begin()
 
-        // 2. Render Animated Water Shimmer over water tiles
         val waterFrame = assets.waterAnim.getKeyFrame(globalAnimTime)
         for ((wx, wy) in world.waterTiles) {
-            batch.draw(waterFrame, wx * HomesteadWorld.TILE_SIZE, wy * HomesteadWorld.TILE_SIZE, 16f, 16f)
+            spriteBatch.draw(waterFrame, wx * HomesteadWorld.TILE_SIZE, wy * HomesteadWorld.TILE_SIZE, 16f, 16f)
         }
 
-        // 3. Render Ambient Swaying Grass & Flowers
         val grassFrame = assets.grassSwayAnim.getKeyFrame(globalAnimTime)
         for ((gx, gy) in world.swayGrassTiles) {
-            batch.draw(grassFrame, gx * HomesteadWorld.TILE_SIZE, gy * HomesteadWorld.TILE_SIZE, 16f, 16f)
+            spriteBatch.draw(grassFrame, gx * HomesteadWorld.TILE_SIZE, gy * HomesteadWorld.TILE_SIZE, 16f, 16f)
         }
         val flowerFrame = assets.flowerSwayAnim.getKeyFrame(globalAnimTime)
         for ((fx, fy) in world.flowerTiles) {
-            batch.draw(flowerFrame, fx * HomesteadWorld.TILE_SIZE, fy * HomesteadWorld.TILE_SIZE, 16f, 16f)
+            spriteBatch.draw(flowerFrame, fx * HomesteadWorld.TILE_SIZE, fy * HomesteadWorld.TILE_SIZE, 16f, 16f)
         }
 
-        // 4. Render Dynamic Tilled / Watered Soil Plots
         for (plot in world.cropPlots.values) {
             if (!plot.isTilled) continue
             val soilTex = if (plot.isWatered) assets.wateredSoilTex else assets.tilledSoilTex
-            batch.draw(soilTex, plot.tileX * HomesteadWorld.TILE_SIZE, plot.tileY * HomesteadWorld.TILE_SIZE, 16f, 16f)
+            spriteBatch.draw(soilTex, plot.tileX * HomesteadWorld.TILE_SIZE, plot.tileY * HomesteadWorld.TILE_SIZE, 16f, 16f)
         }
 
-        // 5. Render Subtle Contextual Target Tile Indicator on ground
         val ctx = player.detectContextAction(world, inventory)
         if (!building.isBuildMode && !fishing.isActive() && ctx.type != ContextActionType.NONE) {
             val pulse = 0.22f + 0.12f * sin(globalAnimTime * 4f)
-            batch.setColor(1f, 0.92f, 0.45f, pulse)
-            batch.draw(
+            spriteBatch.setColor(1f, 0.92f, 0.45f, pulse)
+            spriteBatch.draw(
                 assets.whitePixel,
                 ctx.targetTileX * HomesteadWorld.TILE_SIZE,
                 ctx.targetTileY * HomesteadWorld.TILE_SIZE,
                 16f, 16f
             )
-            batch.setColor(1f, 1f, 1f, 1f)
+            spriteBatch.setColor(1f, 1f, 1f, 1f)
         }
 
-        // 6. Y-Sorted Dynamic Entities (House, Crops, Trees, Placed Furniture, Merchant NPC, Player!)
         val drawables = mutableListOf<Pair<Float, () -> Unit>>()
 
-        // Upgradeable Starter House (80x80 at tile (7, 17))
         val houseY = HomesteadWorld.HOUSE_TILE_Y * HomesteadWorld.TILE_SIZE
         drawables.add(houseY to {
             val houseTex = assets.houseTextures[world.houseTier] ?: assets.houseTextures[1]
             if (houseTex != null) {
-                batch.draw(houseTex, HomesteadWorld.HOUSE_TILE_X * HomesteadWorld.TILE_SIZE, houseY - 6f, 80f, 80f)
+                spriteBatch.draw(houseTex, HomesteadWorld.HOUSE_TILE_X * HomesteadWorld.TILE_SIZE, houseY - 6f, 80f, 80f)
             }
         })
 
-        // Merchant NPC beside stall
         val merchantY = HomesteadWorld.MERCHANT_TILE_Y * HomesteadWorld.TILE_SIZE - 2f
         drawables.add(merchantY to {
             val mFrame = assets.merchantAnim.getKeyFrame(globalAnimTime)
-            batch.draw(mFrame, HomesteadWorld.MERCHANT_TILE_X * HomesteadWorld.TILE_SIZE, merchantY - 4f, 32f, 32f)
+            spriteBatch.draw(mFrame, HomesteadWorld.MERCHANT_TILE_X * HomesteadWorld.TILE_SIZE, merchantY - 4f, 32f, 32f)
         })
 
-        // Crops (with gentle breeze sway!)
         for (plot in world.cropPlots.values) {
             val crop = plot.cropType ?: continue
             val cy = plot.tileY * HomesteadWorld.TILE_SIZE
@@ -336,12 +384,11 @@ class CozyFishingGame(
                 val tex = assets.cropStageTextures[crop to plot.stage]
                 if (tex != null) {
                     val swayX = if (plot.stage >= 2) sin(globalAnimTime * 2.5f + plot.tileX) * 0.6f else 0f
-                    batch.draw(tex, plot.tileX * HomesteadWorld.TILE_SIZE + swayX, cy, 16f, 24f)
+                    spriteBatch.draw(tex, plot.tileX * HomesteadWorld.TILE_SIZE + swayX, cy, 16f, 24f)
                 }
             })
         }
 
-        // Trees (with hit-shake, falling animation, and stumps!)
         for (tree in world.trees) {
             val ty = tree.tileY * HomesteadWorld.TILE_SIZE
             drawables.add(ty to {
@@ -351,22 +398,21 @@ class CozyFishingGame(
                 if (tree.state == TreeHealthState.FALLING) {
                     val fAnim = assets.treeFallingAnims[tree.type]
                     val frame = fAnim?.getKeyFrame(tree.fallTimer)
-                    if (frame != null) batch.draw(frame, dx, dy, 32f, 48f)
+                    if (frame != null) spriteBatch.draw(frame, dx, dy, 32f, 48f)
                 } else {
                     val tex = assets.treeStaticTextures[tree.type to tree.state]
-                    if (tex != null) batch.draw(tex, dx, dy, 32f, 48f)
+                    if (tex != null) spriteBatch.draw(tex, dx, dy, 32f, 48f)
                 }
             })
         }
 
-        // Placed Furniture & Decorations
         for (obj in world.placedObjects) {
             val oy = obj.tileY * HomesteadWorld.TILE_SIZE
             drawables.add(oy to {
                 val tex = assets.objectTextures[obj.itemId]
                 if (tex != null) {
                     val ox = obj.tileX * HomesteadWorld.TILE_SIZE
-                    batch.draw(
+                    spriteBatch.draw(
                         tex,
                         ox, oy,
                         8f, 8f,
@@ -380,26 +426,21 @@ class CozyFishingGame(
             })
         }
 
-        // Player Character (with subtle customization tint modulation!)
         drawables.add(player.y to {
             val pFrame = assets.getPlayerFrame(player.action, player.direction, player.stateTime)
-            // Subtle warm tint blend based on customization shirt choice
             val tintR = ((player.customization.shirtColorHex shr 16) and 0xFF) / 255f
             val tintG = ((player.customization.shirtColorHex shr 8) and 0xFF) / 255f
             val tintB = (player.customization.shirtColorHex and 0xFF) / 255f
-            // Blend 82% true sprite + 18% custom tint so skin/hat stay natural while outfit shifts noticeably
-            batch.setColor(0.82f + tintR * 0.18f, 0.82f + tintG * 0.18f, 0.82f + tintB * 0.18f, 1f)
-            batch.draw(pFrame, player.x - 16f, player.y - 6f, 32f, 32f)
-            batch.setColor(1f, 1f, 1f, 1f)
+            spriteBatch.setColor(0.82f + tintR * 0.18f, 0.82f + tintG * 0.18f, 0.82f + tintB * 0.18f, 1f)
+            spriteBatch.draw(pFrame, player.x - 16f, player.y - 6f, 32f, 32f)
+            spriteBatch.setColor(1f, 1f, 1f, 1f)
         })
 
-        // Sort descending by Y (higher Y drawn behind lower Y in top-down RPGs)
         drawables.sortByDescending { it.first }
         for ((_, drawFn) in drawables) {
             drawFn()
         }
 
-        // 7. Fishing Line, Animated Bobber, Water Ripples & Splash FX
         if (fishing.isActive()) {
             val rodTipX = player.x + when (player.direction) {
                 Direction.RIGHT -> 12f
@@ -411,40 +452,35 @@ class CozyFishingGame(
                 Direction.DOWN -> 4f
                 else -> 12f
             }
-            // Draw crisp fishing line segments
-            drawPixelLine(batch, rodTipX, rodTipY, fishing.bobberX, fishing.bobberY + 2f)
+            drawPixelLine(spriteBatch, rodTipX, rodTipY, fishing.bobberX, fishing.bobberY + 2f)
 
-            // Animated ripple rings around bobber
             val ripFrame = assets.rippleAnim.getKeyFrame(globalAnimTime)
-            batch.draw(ripFrame, fishing.bobberX - 8f, fishing.bobberY - 8f, 16f, 16f)
+            spriteBatch.draw(ripFrame, fishing.bobberX - 8f, fishing.bobberY - 8f, 16f, 16f)
 
-            // Bobber sprite (bobs gently or plunges on BITE!)
             val bobOffset = if (fishing.phase == FishingPhase.BITE) -2.5f else sin(globalAnimTime * 4f) * 1.1f
             val bobTex = if (fishing.phase == FishingPhase.BITE || fishing.phase == FishingPhase.MINIGAME) {
                 assets.bobberBite
             } else {
                 assets.bobberIdle
             }
-            batch.draw(bobTex, fishing.bobberX - 8f, fishing.bobberY - 6f + bobOffset, 16f, 16f)
+            spriteBatch.draw(bobTex, fishing.bobberX - 8f, fishing.bobberY - 6f + bobOffset, 16f, 16f)
 
-            // Fishing splash animation on cast/bite/reel
             if (fishing.splashTimer > 0f) {
                 val spFrame = assets.splashAnim.getKeyFrame(0.55f - fishing.splashTimer)
-                batch.draw(spFrame, fishing.bobberX - 12f, fishing.bobberY - 8f, 24f, 24f)
+                spriteBatch.draw(spFrame, fishing.bobberX - 12f, fishing.bobberY - 8f, 24f, 24f)
             }
         }
 
-        // 8. Construction Mode Placement Preview (Green valid / Red blocked!)
         if (building.isBuildMode) {
             val px = building.previewTileX * HomesteadWorld.TILE_SIZE
             val py = building.previewTileY * HomesteadWorld.TILE_SIZE
             val valid = building.canPlaceAt(building.previewTileX, building.previewTileY)
-            batch.setColor(if (valid) 0.25f else 0.95f, if (valid) 0.92f else 0.25f, 0.35f, 0.38f)
-            batch.draw(assets.whitePixel, px, py, 16f, 16f)
+            spriteBatch.setColor(if (valid) 0.25f else 0.95f, if (valid) 0.92f else 0.25f, 0.35f, 0.38f)
+            spriteBatch.draw(assets.whitePixel, px, py, 16f, 16f)
             val objTex = building.selectedItemId?.let { assets.objectTextures[it] }
             if (objTex != null) {
-                batch.setColor(if (valid) 0.85f else 1f, if (valid) 1f else 0.55f, if (valid) 0.85f else 0.55f, 0.78f)
-                batch.draw(
+                spriteBatch.setColor(if (valid) 0.85f else 1f, if (valid) 1f else 0.55f, if (valid) 0.85f else 0.55f, 0.78f)
+                spriteBatch.draw(
                     objTex,
                     px, py,
                     8f, 8f,
@@ -455,68 +491,62 @@ class CozyFishingGame(
                     false, false
                 )
             }
-            batch.setColor(1f, 1f, 1f, 1f)
+            spriteBatch.setColor(1f, 1f, 1f, 1f)
         }
 
-        // 9. Particles (wood chips, leaves, water splashes, harvest sparkles, rain)
-        particles.render(batch, assets)
+        particles.render(spriteBatch, assets)
+        spriteBatch.end()
 
-        batch.end()
-
-        // 10. Foreground TMX layer
-        mapRenderer.render(foregroundLayerIndices)
-
-        // 11. Day & Night Cozy Lighting Tint + Warm Lamp Glows at Dusk/Night
-        renderDayNightOverlay()
+        renderer.render(foregroundLayerIndices)
+        renderDayNightOverlay(cam, spriteBatch)
     }
 
-    private fun drawPixelLine(batch: SpriteBatch, x0: Float, y0: Float, x1: Float, y1: Float) {
+    private fun drawPixelLine(spriteBatch: SpriteBatch, x0: Float, y0: Float, x1: Float, y1: Float) {
         val steps = 18
-        batch.setColor(0.92f, 0.98f, 1f, 0.85f)
+        spriteBatch.setColor(0.92f, 0.98f, 1f, 0.85f)
         for (i in 0..steps) {
             val t = i / steps.toFloat()
             val sag = sin(t * Math.PI).toFloat() * -4f
             val lx = x0 + (x1 - x0) * t
             val ly = y0 + (y1 - y0) * t + sag
-            batch.draw(assets.whitePixel, lx, ly, 1f, 1f)
+            spriteBatch.draw(assets.whitePixel, lx, ly, 1f, 1f)
         }
-        batch.setColor(1f, 1f, 1f, 1f)
+        spriteBatch.setColor(1f, 1f, 1f, 1f)
     }
 
-    private fun renderDayNightOverlay() {
+    private fun renderDayNightOverlay(cam: OrthographicCamera, spriteBatch: SpriteBatch) {
         val h = world.timeHours
         val tint: Color? = when {
             h in 5.5f..7.5f -> {
                 val k = 1f - (h - 5.5f) / 2f
-                Color(0.95f, 0.62f, 0.38f, 0.16f * k) // Golden dawn
+                Color(0.95f, 0.62f, 0.38f, 0.16f * k)
             }
             h in 17.5f..20.0f -> {
                 val k = (h - 17.5f) / 2.5f
-                Color(0.85f - 0.72f * k, 0.42f - 0.28f * k, 0.25f + 0.18f * k, 0.18f + 0.28f * k) // Sunset -> twilight
+                Color(0.85f - 0.72f * k, 0.42f - 0.28f * k, 0.25f + 0.18f * k, 0.18f + 0.28f * k)
             }
             h >= 20.0f || h < 5.5f -> {
-                Color(0.08f, 0.12f, 0.28f, 0.44f) // Cozy starlit blue night
+                Color(0.08f, 0.12f, 0.28f, 0.44f)
             }
             world.isRaining -> {
-                Color(0.16f, 0.24f, 0.34f, 0.16f) // Gentle rainy tint
+                Color(0.16f, 0.24f, 0.34f, 0.16f)
             }
             else -> null
         }
 
         if (tint != null) {
-            batch.projectionMatrix = camera.combined
-            batch.begin()
-            batch.setColor(tint)
-            val left = camera.position.x - camera.viewportWidth * camera.zoom * 0.6f
-            val bottom = camera.position.y - camera.viewportHeight * camera.zoom * 0.6f
-            batch.draw(
+            spriteBatch.projectionMatrix = cam.combined
+            spriteBatch.begin()
+            spriteBatch.setColor(tint)
+            val left = cam.position.x - cam.viewportWidth * cam.zoom * 0.6f
+            val bottom = cam.position.y - cam.viewportHeight * cam.zoom * 0.6f
+            spriteBatch.draw(
                 assets.whitePixel,
                 left,
                 bottom,
-                camera.viewportWidth * camera.zoom * 1.2f,
-                camera.viewportHeight * camera.zoom * 1.2f
+                cam.viewportWidth * cam.zoom * 1.2f,
+                cam.viewportHeight * cam.zoom * 1.2f
             )
-            // Warm glowing pools around street lamps, campfires, lanterns & house windows at dusk/night!
             if (world.isNightOrDusk()) {
                 val glowSpots = mutableListOf(
                     (6 * 16f + 8f) to (14 * 16f + 10f),
@@ -529,13 +559,13 @@ class CozyFishingGame(
                         glowSpots.add((obj.tileX * 16f + 8f) to (obj.tileY * 16f + 8f))
                     }
                 }
-                batch.setColor(1f, 0.86f, 0.45f, 0.22f)
+                spriteBatch.setColor(1f, 0.86f, 0.45f, 0.22f)
                 for ((gx, gy) in glowSpots) {
-                    batch.draw(assets.whitePixel, gx - 18f, gy - 18f, 36f, 36f)
+                    spriteBatch.draw(assets.whitePixel, gx - 18f, gy - 18f, 36f, 36f)
                 }
             }
-            batch.setColor(1f, 1f, 1f, 1f)
-            batch.end()
+            spriteBatch.setColor(1f, 1f, 1f, 1f)
+            spriteBatch.end()
         }
     }
 
@@ -547,7 +577,7 @@ class CozyFishingGame(
     }
 
     fun toggleSprint() {
-        Gdx.app.postRunnable {
+        postToGl {
             player.isRunning = !player.isRunning
             audio.play(RpgSfx.UI)
             pushHudSnapshot()
@@ -563,7 +593,7 @@ class CozyFishingGame(
     }
 
     fun selectSeed(seedId: String) {
-        Gdx.app.postRunnable {
+        postToGl {
             player.selectedSeedId = seedId
             audio.play(RpgSfx.UI)
             pushHudSnapshot()
@@ -571,7 +601,7 @@ class CozyFishingGame(
     }
 
     fun selectTool(toolId: String) {
-        Gdx.app.postRunnable {
+        postToGl {
             player.selectedToolId = toolId
             audio.play(RpgSfx.UI)
             pushHudSnapshot()
@@ -580,21 +610,22 @@ class CozyFishingGame(
 
     fun setInventorySort(mode: InventorySortMode) {
         sortMode = mode
-        Gdx.app.postRunnable {
+        postToGl {
             audio.play(RpgSfx.UI)
             pushHudSnapshot()
         }
     }
 
     fun onContextualActionPressed() {
-        Gdx.app.postRunnable {
+        postToGl {
+            if (!glAssetsReady) return@postToGl
             if (building.isBuildMode) {
                 confirmBuildPlacementInternal()
-                return@postRunnable
+                return@postToGl
             }
             if (fishing.isActive()) {
                 handleFishingTapInternal()
-                return@postRunnable
+                return@postToGl
             }
 
             val ctx = player.detectContextAction(world, inventory)
@@ -602,7 +633,6 @@ class CozyFishingGame(
                 ContextActionType.FISH -> {
                     val tx = ctx.targetTileX * HomesteadWorld.TILE_SIZE + 8f
                     val ty = ctx.targetTileY * HomesteadWorld.TILE_SIZE + 8f
-                    // Face water tile cleanly
                     val dx = tx - player.x
                     val dy = ty - player.y
                     player.direction = if (abs(dx) > abs(dy)) {
@@ -644,7 +674,6 @@ class CozyFishingGame(
                             inventory.addItem("res_wood", gainedWood)
                             val gotHardwood = Random.nextFloat() < tree.type.hardwoodChance
                             if (gotHardwood) inventory.addItem("res_hardwood", 1)
-                            // Occasional stone drop from roots
                             if (Random.nextFloat() < 0.35f) inventory.addItem("res_stone", 1)
                             audio.play(RpgSfx.WOOD_PICKUP)
                             val notices = progression.recordTreeChopped(gainedWood, tree.type.expReward)
@@ -670,7 +699,6 @@ class CozyFishingGame(
 
                 ContextActionType.PLANT_SEED -> {
                     player.triggerActionAnimation(PlayerAction.HOE, 0.32f)
-                    // Auto-pick an available crop seed if selected seed is empty or sapling
                     val seedToUse = if (player.selectedSeedId.startsWith("seed_") &&
                         player.selectedSeedId !in listOf("seed_oak", "seed_sakura") &&
                         inventory.hasItem(player.selectedSeedId, 1)
@@ -769,7 +797,7 @@ class CozyFishingGame(
     }
 
     fun onFishingTap() {
-        Gdx.app.postRunnable { handleFishingTapInternal() }
+        postToGl { handleFishingTapInternal() }
     }
 
     private fun handleFishingTapInternal() {
@@ -784,7 +812,6 @@ class CozyFishingGame(
             audio.play(RpgSfx.CATCH)
             particles.spawnHarvestSparkles(player.x, player.y + 16f, 14)
             val notices = progression.recordFishCaught(caught.id, caught.rarity)
-            // Award achievement coins automatically if any achievement unlocked
             for (ach in progression.getAchievementStates()) {
                 if (ach.unlocked && notices.any { it.contains(ach.def.title) }) {
                     economy.coins += ach.def.coinReward
@@ -800,7 +827,7 @@ class CozyFishingGame(
     }
 
     fun cancelFishing() {
-        Gdx.app.postRunnable {
+        postToGl {
             fishing.cancel()
             player.clearAction()
             audio.play(RpgSfx.UI)
@@ -808,9 +835,8 @@ class CozyFishingGame(
         }
     }
 
-    // Construction actions
     fun startConstruction(itemId: String) {
-        Gdx.app.postRunnable {
+        postToGl {
             val (fx, fy) = player.getFacingTile()
             building.startBuildMode(itemId, fx, fy)
             audio.play(RpgSfx.UI)
@@ -820,7 +846,7 @@ class CozyFishingGame(
     }
 
     fun rotateConstruction() {
-        Gdx.app.postRunnable {
+        postToGl {
             building.rotatePreview()
             audio.play(RpgSfx.UI)
             pushHudSnapshot()
@@ -828,7 +854,7 @@ class CozyFishingGame(
     }
 
     fun cancelConstruction() {
-        Gdx.app.postRunnable {
+        postToGl {
             building.cancelBuildMode()
             audio.play(RpgSfx.UI)
             pushHudSnapshot()
@@ -836,7 +862,7 @@ class CozyFishingGame(
     }
 
     fun confirmBuildPlacement() {
-        Gdx.app.postRunnable { confirmBuildPlacementInternal() }
+        postToGl { confirmBuildPlacementInternal() }
     }
 
     private fun confirmBuildPlacementInternal() {
@@ -856,7 +882,7 @@ class CozyFishingGame(
     }
 
     fun upgradeHouse() {
-        Gdx.app.postRunnable {
+        postToGl {
             val res = building.upgradeHouse()
             if (res.success && res.newHouseTier != null) {
                 audio.play(RpgSfx.BUILD)
@@ -881,9 +907,8 @@ class CozyFishingGame(
         }
     }
 
-    // Shop & Inventory actions
     fun buyShopItem(itemId: String, quantity: Int = 1) {
-        Gdx.app.postRunnable {
+        postToGl {
             val res = economy.buyItem(itemId, quantity)
             audio.play(if (res.success) RpgSfx.COIN else RpgSfx.UI)
             showToast(res.message)
@@ -893,7 +918,7 @@ class CozyFishingGame(
     }
 
     fun sellInventoryItem(itemId: String, quantity: Int = 1) {
-        Gdx.app.postRunnable {
+        postToGl {
             val res = economy.sellItem(itemId, quantity)
             if (res.success) {
                 audio.play(RpgSfx.COIN)
@@ -906,7 +931,7 @@ class CozyFishingGame(
     }
 
     fun sellAllFish() {
-        Gdx.app.postRunnable {
+        postToGl {
             val res = economy.sellAllInCategory(ItemCategory.FISH)
             if (res.success) {
                 audio.play(RpgSfx.COIN)
@@ -919,7 +944,7 @@ class CozyFishingGame(
     }
 
     fun sellAllFishAndCrops() {
-        Gdx.app.postRunnable {
+        postToGl {
             val res = economy.sellAllFishAndCrops()
             if (res.success) {
                 audio.play(RpgSfx.COIN)
@@ -932,7 +957,7 @@ class CozyFishingGame(
     }
 
     fun discardItem(itemId: String, quantity: Int = 1) {
-        Gdx.app.postRunnable {
+        postToGl {
             val def = RpgCatalog.itemById[itemId]
             if (def?.category == ItemCategory.TOOLS) {
                 showToast("Alat utama tidak bisa dibuang.")
@@ -945,7 +970,7 @@ class CozyFishingGame(
     }
 
     fun claimQuestReward(questId: String) {
-        Gdx.app.postRunnable {
+        postToGl {
             val reward = progression.claimQuest(questId)
             if (reward != null) {
                 economy.coins += reward.first
@@ -958,7 +983,7 @@ class CozyFishingGame(
     }
 
     fun updateCustomization(custom: PlayerCustomization) {
-        Gdx.app.postRunnable {
+        postToGl {
             player.customization = custom
             audio.play(RpgSfx.UI)
             saveGameAsync(silent = true)
@@ -975,10 +1000,10 @@ class CozyFishingGame(
     }
 
     fun saveGameAsync(silent: Boolean = false) {
-        if (!isInitialized) return
+        if (!isSaveReady || !glAssetsReady || userUid.isBlank()) return
         val bundle = RpgSaveBundle(
             player = PlayerStateEntity(
-                id = 1,
+                userUid = userUid,
                 posX = player.x,
                 posY = player.y,
                 facing = player.direction.key,
@@ -1001,22 +1026,26 @@ class CozyFishingGame(
                 ribbonColorHex = player.customization.ribbonColorHex,
                 updatedAtMs = System.currentTimeMillis()
             ),
-            inventory = inventory.toEntities(),
-            fishCollection = progression.toFishEntities(),
-            trees = world.toTreeEntities(),
-            crops = world.toCropEntities(),
-            placedObjects = world.toPlacedEntities(),
-            quests = progression.toQuestEntities(),
-            achievements = progression.toAchievementEntities()
+            inventory = inventory.toEntities(userUid),
+            fishCollection = progression.toFishEntities(userUid),
+            trees = world.toTreeEntities(userUid),
+            crops = world.toCropEntities(userUid),
+            placedObjects = world.toPlacedEntities(userUid),
+            quests = progression.toQuestEntities(userUid),
+            achievements = progression.toAchievementEntities(userUid)
         )
         ioScope.launch {
-            runCatching { saveRepo.saveGame(bundle) }
-            if (!silent) {
-                Gdx.app.postRunnable {
+            val cloudSynced = runCatching { saveRepo.saveGame(bundle) }.getOrDefault(false)
+            postToGl {
+                cloudSyncStatus = if (cloudSynced) "Tersinkron ke Database Akun" else "Tersimpan Lokal (Offline)"
+                if (!silent) {
                     audio.play(RpgSfx.UI)
-                    showToast("Progres permainan berhasil disimpan!")
-                    pushHudSnapshot()
+                    showToast(
+                        if (cloudSynced) "Progres berhasil disimpan ke database akun!"
+                        else "Progres disimpan lokal (akan sinkron saat online)."
+                    )
                 }
+                pushHudSnapshot()
             }
         }
     }
@@ -1043,7 +1072,7 @@ class CozyFishingGame(
             isRunning = player.isRunning,
             selectedToolId = player.selectedToolId,
             selectedSeedId = player.selectedSeedId,
-            contextAction = player.detectContextAction(world, inventory),
+            contextAction = if (glAssetsReady) player.detectContextAction(world, inventory) else _hudState.value.contextAction,
             fishingState = fishing.toUiState(),
             buildPreview = building.toPreviewState(),
             inventory = inventory.getStacks(sortMode),
@@ -1052,26 +1081,38 @@ class CozyFishingGame(
             achievements = progression.getAchievementStates(),
             customization = player.customization,
             toastMessage = toastMessage,
-            toastId = toastCounter
+            toastId = toastCounter,
+            accountName = userDisplayName,
+            cloudSyncStatus = cloudSyncStatus,
+            fatalErrorMessage = fatalErrorMessage
         )
     }
 
     override fun pause() {
-        audio.pauseBgm()
-        saveGameAsync(silent = true)
+        runCatching {
+            audio.pauseBgm()
+            saveGameAsync(silent = true)
+        }
     }
 
     override fun resume() {
-        audio.resumeBgm()
+        runCatching {
+            audio.resumeBgm()
+        }
     }
 
     override fun dispose() {
-        saveGameAsync(silent = true)
-        runCatching { mapRenderer.dispose() }
-        runCatching { batch.dispose() }
-        world.dispose()
-        assets.dispose()
-        audio.dispose()
-        ioScope.cancel()
+        if (isDisposed) return
+        isDisposed = true
+        glAssetsReady = false
+        runCatching { mapRenderer?.dispose() }
+        mapRenderer = null
+        runCatching { batch?.dispose() }
+        batch = null
+        camera = null
+        runCatching { world.dispose() }
+        runCatching { assets.dispose() }
+        runCatching { audio.dispose() }
+        runCatching { ioScope.cancel() }
     }
 }

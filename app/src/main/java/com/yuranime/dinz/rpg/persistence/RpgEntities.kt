@@ -5,7 +5,7 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "rpg_player_state")
 data class PlayerStateEntity(
-    @PrimaryKey val id: Int = 1,
+    @PrimaryKey val userUid: String,
     val posX: Float = 144f,
     val posY: Float = 224f,
     val facing: String = "down",
@@ -29,22 +29,25 @@ data class PlayerStateEntity(
     val updatedAtMs: Long = System.currentTimeMillis()
 )
 
-@Entity(tableName = "rpg_inventory")
+@Entity(tableName = "rpg_inventory", primaryKeys = ["userUid", "itemId"])
 data class InventoryItemEntity(
-    @PrimaryKey val itemId: String,
+    val userUid: String,
+    val itemId: String,
     val quantity: Int
 )
 
-@Entity(tableName = "rpg_fish_collection")
+@Entity(tableName = "rpg_fish_collection", primaryKeys = ["userUid", "fishId"])
 data class FishCollectionEntity(
-    @PrimaryKey val fishId: String,
+    val userUid: String,
+    val fishId: String,
     val caughtCount: Int,
     val firstCaughtAtMs: Long
 )
 
-@Entity(tableName = "rpg_trees")
+@Entity(tableName = "rpg_trees", primaryKeys = ["userUid", "treeId"])
 data class TreeStateEntity(
-    @PrimaryKey val treeId: String,
+    val userUid: String,
+    val treeId: String,
     val tileX: Int,
     val tileY: Int,
     val treeType: String,
@@ -53,9 +56,10 @@ data class TreeStateEntity(
     val regrowTimer: Float
 )
 
-@Entity(tableName = "rpg_crops")
+@Entity(tableName = "rpg_crops", primaryKeys = ["userUid", "plotKey"])
 data class CropPlotEntity(
-    @PrimaryKey val plotKey: String,
+    val userUid: String,
+    val plotKey: String,
     val tileX: Int,
     val tileY: Int,
     val isTilled: Boolean,
@@ -65,25 +69,28 @@ data class CropPlotEntity(
     val growthProgress: Float
 )
 
-@Entity(tableName = "rpg_placed_objects")
+@Entity(tableName = "rpg_placed_objects", primaryKeys = ["userUid", "objectId"])
 data class PlacedObjectEntity(
-    @PrimaryKey val objectId: String,
+    val userUid: String,
+    val objectId: String,
     val itemId: String,
     val tileX: Int,
     val tileY: Int,
     val rotation: Int
 )
 
-@Entity(tableName = "rpg_quests")
+@Entity(tableName = "rpg_quests", primaryKeys = ["userUid", "questId"])
 data class QuestProgressEntity(
-    @PrimaryKey val questId: String,
+    val userUid: String,
+    val questId: String,
     val progress: Int,
     val claimed: Boolean
 )
 
-@Entity(tableName = "rpg_achievements")
+@Entity(tableName = "rpg_achievements", primaryKeys = ["userUid", "achievementId"])
 data class AchievementEntity(
-    @PrimaryKey val achievementId: String,
+    val userUid: String,
+    val achievementId: String,
     val progress: Int,
     val unlocked: Boolean
 )

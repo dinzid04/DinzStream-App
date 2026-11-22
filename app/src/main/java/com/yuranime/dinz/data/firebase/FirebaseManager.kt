@@ -162,7 +162,10 @@ data class UserProfile(
     val nextLevelTargetExp: Long = 500L,
     val expProgress: Float = 0f,
     val isVerified: Boolean = false,
-    val verifiedColor: String = VERIFIED_BADGE_DEFAULT_HEX
+    val verifiedColor: String = VERIFIED_BADGE_DEFAULT_HEX,
+    val rpgLevel: Int = 0,
+    val rpgCoins: Int = 0,
+    val rpgHouseTier: Int = 1
 ) {
     val expToNextLevel: Long
         get() = (nextLevelTargetExp - exp).coerceAtLeast(0L)
@@ -1795,6 +1798,11 @@ object FirebaseManager {
             ?.takeIf { it.isNotBlank() }
             ?: VERIFIED_BADGE_DEFAULT_HEX
 
+        val rpgSummaryMap = snapshot.get("rpgSummary") as? Map<*, *>
+        val rpgLevel = ((rpgSummaryMap?.get("level") as? Number)?.toInt() ?: 0).coerceAtLeast(0)
+        val rpgCoins = ((rpgSummaryMap?.get("coins") as? Number)?.toInt() ?: 0).coerceAtLeast(0)
+        val rpgHouseTier = ((rpgSummaryMap?.get("houseTier") as? Number)?.toInt() ?: 1).coerceIn(1, 3)
+
         return UserProfile(
             uid = uid,
             name = name,
@@ -1832,7 +1840,10 @@ object FirebaseManager {
             nextLevelTargetExp = nextTarget,
             expProgress = expProgress,
             isVerified = verifiedBool,
-            verifiedColor = verifiedHex
+            verifiedColor = verifiedHex,
+            rpgLevel = rpgLevel,
+            rpgCoins = rpgCoins,
+            rpgHouseTier = rpgHouseTier
         )
     }
 
@@ -3766,5 +3777,104 @@ object FirebaseManager {
             Log.w(TAG, "Gagal mengambil profil peer $uid: ${t.message}")
             null
         }
+    }
+
+    /**
+     * Menyimpan seluruh progres game Willowbrook Cove RPG ke database Firestore milik akun
+     * pengguna yang sedang login (`users/{uid}` dan subkoleksi `users/{uid}/rpg_saves/starter_homestead`).
+     */
+    suspend fun saveRpgStateToCloud(
+        uid: String,
+        saveJson: String,
+        summary: Map<String, Any>,
+        updatedAtMs: Long
+    ): Boolean {
+        if (!isUserLoggedIn() || uid.isBlank() || saveJson.isBlank()) return false
+        var syncedAny = false
+
+        val userDocPayload = mapOf(
+            "uid" to uid,
+            "rpgSaveJson" to saveJson,
+            "rpgSummary" to summary,
+            "rpgUpdatedAt" to updatedAtMs
+        )
+        try {
+            firestore.collection("users")
+                .document(uid)
+                .set(userDocPayload, SetOptions.merge())
+                .await()
+            syncedAny = true
+        } catch (e: Exception) {
+            Log.w(TAG, "Gagal simpan rpgSaveJson pada dokumen users/$uid: ${e.message}")
+        }
+
+        val subDocPayload = HashMap<String, Any>(summary).apply {
+            put("uid", uid)
+            put("saveJson", saveJson)
+            put("updatedAtMs", updatedAtMs)
+        }
+        try {
+            firestore.collection("users")
+                .document(uid)
+                .collection("rpg_saves")
+                .document("starter_homestead")
+                .set(subDocPayload, SetOptions.merge())
+                .await()
+            syncedAny = true
+        } catch (e: Exception) {
+            Log.w(TAG, "Subkoleksi rpg_saves/$uid dilewati: ${e.message}")
+        }
+
+        return syncedAny
+    }
+
+    /**
+     * Memuat progres game Willowbrook Cove RPG terbaru dari database Firestore milik akun login.
+     * Mengecek baik `users/{uid}/rpg_saves/starter_homestead` maupun field `rpgSaveJson` pada `users/{uid}`,
+     * lalu memilih versi dengan timestamp `updatedAtMs` paling baru.
+     */
+    suspend fun loadRpgStateFromCloud(uid: String): Pair<String, Long>? {
+        if (!isUserLoggedIn() || uid.isBlank()) return null
+
+        var bestJson: String? = null
+        var bestTs = 0L
+
+        try {
+            val subSnap = firestore.collection("users")
+                .document(uid)
+                .collection("rpg_saves")
+                .document("starter_homestead")
+                .get()
+                .await()
+            if (subSnap.exists()) {
+                val json = subSnap.getString("saveJson")?.takeIf { it.isNotBlank() }
+                val ts = (subSnap.getLong("updatedAtMs") ?: subSnap.getLong("updatedAt") ?: 0L)
+                if (json != null && ts >= bestTs) {
+                    bestJson = json
+                    bestTs = ts
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Gagal baca subkoleksi rpg_saves untuk $uid: ${e.message}")
+        }
+
+        try {
+            val userSnap = firestore.collection("users")
+                .document(uid)
+                .get()
+                .await()
+            if (userSnap.exists()) {
+                val json = userSnap.getString("rpgSaveJson")?.takeIf { it.isNotBlank() }
+                val ts = userSnap.getLong("rpgUpdatedAt") ?: 0L
+                if (json != null && (bestJson == null || ts > bestTs)) {
+                    bestJson = json
+                    bestTs = ts
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Gagal baca rpgSaveJson pada users/$uid: ${e.message}")
+        }
+
+        return bestJson?.let { it to bestTs }
     }
 }

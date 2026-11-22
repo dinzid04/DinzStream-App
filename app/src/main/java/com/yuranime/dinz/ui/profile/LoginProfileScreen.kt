@@ -329,9 +329,6 @@ fun LoginProfileScreen(
                 isLoggingIn = isLoggingIn,
                 onBackToHomeClick = { onTabSelected(NavTab.HOME) },
                 onSettingsClick = { currentSubScreen = ProfileSubScreen.SETTINGS },
-                onPlayRpgClick = {
-                    context.startActivity(Intent(context, com.yuranime.dinz.rpg.ui.RpgGameActivity::class.java))
-                },
                 onGoogleLoginClick = {
                     isLoggingIn = true
                     try {
@@ -386,7 +383,25 @@ fun LoginProfileScreen(
                     onOpenPointsRewardsClick = { currentSubScreen = ProfileSubScreen.POINTS_REWARDS },
                     onOpenShopClick = { currentSubScreen = ProfileSubScreen.SHOP },
                     onOpenRpgGameClick = {
-                        context.startActivity(Intent(context, com.yuranime.dinz.rpg.ui.RpgGameActivity::class.java))
+                        val activeUid = FirebaseManager.getCurrentUid()?.takeIf { it.isNotBlank() }
+                            ?: userProfile?.uid?.takeIf { it.isNotBlank() }
+                        val playerName = userProfile?.name?.takeIf { it.isNotBlank() }
+                            ?: authDb.getUsername()
+                        if (FirebaseManager.isUserLoggedIn() && !activeUid.isNullOrBlank()) {
+                            context.startActivity(
+                                com.yuranime.dinz.rpg.ui.RpgGameActivity.createIntent(
+                                    context = context,
+                                    userUid = activeUid,
+                                    userName = playerName
+                                )
+                            )
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "Silakan login akun terlebih dahulu untuk bermain Willowbrook Cove RPG.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                     },
                     onOpenTitleSlotClick = { showTitlePickerDialog = true },
                     onOpenLevelProgressClick = { showLevelProgressDialog = true },
@@ -1174,10 +1189,15 @@ private fun UserProfileView(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
             ) {
+                val rpgSubtitle = if ((profile?.rpgLevel ?: 0) > 0) {
+                    "Lv.${profile?.rpgLevel ?: 1} • ${profile?.rpgCoins ?: 0} Koin • Tersimpan di akun $displayName"
+                } else {
+                    "Game pixel-art mancing, bertani & bangun rumah • Akun Login"
+                }
                 CleanEditorialNavRow(
                     icon = Icons.Outlined.SportsEsports,
                     title = "Willowbrook Cove RPG",
-                    subtitle = "Game pixel-art mancing, bertani, tebang pohon & bangun rumah",
+                    subtitle = rpgSubtitle,
                     iconTint = Color(0xFFFF5722),
                     onClick = onOpenRpgGameClick
                 )
@@ -1996,7 +2016,6 @@ private fun LoginView(
     isLoggingIn: Boolean,
     onBackToHomeClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
-    onPlayRpgClick: () -> Unit = {},
     onGoogleLoginClick: () -> Unit,
     onEmailLoginClick: () -> Unit,
     onGuestLoginClick: () -> Unit,
@@ -2149,35 +2168,6 @@ private fun LoginView(
                         )
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF1A1815))
-                    .border(1.dp, Color(0x55FF5722), CircleShape)
-                    .clickable { onPlayRpgClick() },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.SportsEsports,
-                    contentDescription = "Main Willowbrook Cove RPG",
-                    tint = Color(0xFFFF5722),
-                    modifier = Modifier.size(19.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Main Willowbrook Cove RPG",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = SfProFontFamily
-                )
             }
 
             Spacer(modifier = Modifier.height(14.dp))
