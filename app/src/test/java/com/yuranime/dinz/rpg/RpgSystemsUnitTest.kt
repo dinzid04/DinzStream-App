@@ -118,17 +118,17 @@ class RpgSystemsUnitTest {
     }
 
     @Test
-    fun fishingStateMachineReachesBiteAndMinigame() {
+    fun fishingStateMachineReachesBiteMinigameAndCatch() {
         val fishing = FishingSystem()
         fishing.startCasting(120f, 80f, WaterHabitat.POND, "tool_rod_basic", 1, false)
         assertEquals(FishingPhase.CASTING, fishing.phase)
 
         var reachedBite = false
-        repeat(200) {
+        for (step in 0 until 200) {
             fishing.update(0.05f)
             if (fishing.phase == FishingPhase.BITE) {
                 reachedBite = true
-                return@repeat
+                break
             }
         }
         assertTrue("Fishing should reach BITE phase", reachedBite)
@@ -136,6 +136,28 @@ class RpgSystemsUnitTest {
         fishing.onTimingTap()
         assertEquals(FishingPhase.MINIGAME, fishing.phase)
         assertNotNull(fishing.toUiState().targetFish)
+    }
+
+    @Test
+    fun treeChoppingAndBuildingPlacementWork() {
+        val world = HomesteadWorld()
+        val inv = InventorySystem()
+        inv.initStarterKit()
+        val eco = EconomySystem(inv)
+        val building = BuildingSystem(world, inv, eco)
+
+        building.startBuildMode("bench_wood", 10, 12)
+        building.rotatePreview()
+        assertEquals(90, building.rotation)
+        val res = building.confirmPlacement()
+        assertTrue("Bench should place cleanly on open tile", res.success)
+        assertEquals(1, world.placedObjects.size)
+        assertEquals(5, inv.getQuantity("res_wood")) // Starter 10 - 5 wood cost
+
+        val removeRes = building.removeObjectAt(10, 12)
+        assertTrue(removeRes.success)
+        assertEquals(0, world.placedObjects.size)
+        assertEquals(1, inv.getQuantity("bench_wood"))
     }
 
     @Test
