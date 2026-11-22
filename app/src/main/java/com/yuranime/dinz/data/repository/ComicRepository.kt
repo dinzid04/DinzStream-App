@@ -81,7 +81,13 @@ class ComicRepository(
                 emptyList()
             }
 
-            val combinedList = (sliderList + recommendedList)
+            val ksBannerList = if (recommendedList.isEmpty()) {
+                komikStationScraper.getBannersFromTrending(limit = 6, forceRefresh = forceRefresh).getOrDefault(emptyList())
+            } else {
+                emptyList()
+            }
+
+            val combinedList = (sliderList + recommendedList + ksBannerList)
                 .distinctBy { it.comicId.ifBlank { it.title.lowercase(Locale.ROOT) } }
 
             if (combinedList.isNotEmpty()) {
@@ -91,6 +97,11 @@ class ComicRepository(
                 Result.success(getFallbackBanners())
             }
         } catch (_: Exception) {
+            val ksFallback = komikStationScraper.getBannersFromTrending(limit = 6, forceRefresh = forceRefresh).getOrDefault(emptyList())
+            if (ksFallback.isNotEmpty()) {
+                cachedBanners = ksFallback
+                return@withContext Result.success(ksFallback)
+            }
             val fallbackSnapshot = cachedBanners
             if (!fallbackSnapshot.isNullOrEmpty()) {
                 Result.success(fallbackSnapshot)
@@ -114,18 +125,24 @@ class ComicRepository(
             val dtos = response.data ?: emptyList()
             val items = dtos.map { mangaDto ->
                 mapToComicItem(mangaDto, emptyList())
+            }.filter { it.coverPortrait.isNotBlank() }
+            if (items.isNotEmpty()) {
+                if (page == 1) cachedTrendingComics = items
+                return@withContext Result.success(items)
             }
-            if (page == 1 && items.isNotEmpty()) {
-                cachedTrendingComics = items
-            }
-            Result.success(items)
-        } catch (_: Exception) {
-            val fallbackSnapshot = cachedTrendingComics
-            if (!fallbackSnapshot.isNullOrEmpty()) {
-                Result.success(fallbackSnapshot)
-            } else {
-                Result.success(getFallbackComics())
-            }
+        } catch (_: Exception) {}
+
+        val ksItems = komikStationScraper.getTrendingComics(limit = pageSize, forceRefresh = forceRefresh).getOrDefault(emptyList())
+        if (ksItems.isNotEmpty()) {
+            if (page == 1) cachedTrendingComics = ksItems
+            return@withContext Result.success(ksItems)
+        }
+
+        val fallbackSnapshot = cachedTrendingComics
+        if (!fallbackSnapshot.isNullOrEmpty()) {
+            Result.success(fallbackSnapshot)
+        } else {
+            Result.success(getFallbackComics())
         }
     }
 
@@ -143,18 +160,24 @@ class ComicRepository(
             val dtos = response.data ?: emptyList()
             val items = dtos.map { mangaDto ->
                 mapToComicItem(mangaDto, emptyList())
+            }.filter { it.coverPortrait.isNotBlank() }
+            if (items.isNotEmpty()) {
+                if (page == 1) cachedPopularComics = items
+                return@withContext Result.success(items)
             }
-            if (page == 1 && items.isNotEmpty()) {
-                cachedPopularComics = items
-            }
-            Result.success(items)
-        } catch (_: Exception) {
-            val fallbackSnapshot = cachedPopularComics
-            if (!fallbackSnapshot.isNullOrEmpty()) {
-                Result.success(fallbackSnapshot)
-            } else {
-                Result.success(getFallbackComics())
-            }
+        } catch (_: Exception) {}
+
+        val ksItems = komikStationScraper.getPopularComics(limit = pageSize, forceRefresh = forceRefresh).getOrDefault(emptyList())
+        if (ksItems.isNotEmpty()) {
+            if (page == 1) cachedPopularComics = ksItems
+            return@withContext Result.success(ksItems)
+        }
+
+        val fallbackSnapshot = cachedPopularComics
+        if (!fallbackSnapshot.isNullOrEmpty()) {
+            Result.success(fallbackSnapshot)
+        } else {
+            Result.success(getFallbackComics())
         }
     }
 
@@ -168,11 +191,17 @@ class ComicRepository(
             val dtos = response.data ?: emptyList()
             val items = dtos.map { mangaDto ->
                 mapToComicItem(mangaDto, emptyList())
+            }.filter { it.coverPortrait.isNotBlank() }
+            if (items.isNotEmpty()) {
+                return@withContext Result.success(items)
             }
-            Result.success(items)
-        } catch (e: Exception) {
-            Result.failure(e)
+        } catch (_: Exception) {}
+
+        val ksRes = komikStationScraper.searchComics(query = query, page = page)
+        if (ksRes.isSuccess) {
+            return@withContext ksRes
         }
+        Result.success(emptyList())
     }
 
     suspend fun getLatestComics(
@@ -181,8 +210,8 @@ class ComicRepository(
         forceRefresh: Boolean = false
     ): Result<List<ComicItem>> = withContext(Dispatchers.IO) {
         val snapshot = cachedLatestComics
-        if (!forceRefresh && page == 1 && !snapshot.isNullOrEmpty() && snapshot.size >= 12) {
-            return@withContext Result.success(snapshot)
+        if (!forceRefresh && page == 1 && !snapshot.isNullOrEmpty() && snapshot.size >= pageSize.coerceAtMost(12)) {
+            return@withContext Result.success(snapshot.take(pageSize))
         }
 
         try {
@@ -225,7 +254,6 @@ class ComicRepository(
                                 } catch (_: Exception) {}
                             }
 
-                            // Pastikan selalu memiliki tepat 3 baris chapter yang rapi dan sejajar
                             val guaranteedChapters = ensureThreeChapters(
                                 fetched = chapters,
                                 mangaDto = mangaDto,
@@ -246,11 +274,45 @@ class ComicRepository(
             }
         } catch (_: Exception) {}
 
+        // Sumber Live Mirror: KomikStation Rilisan Terbaru (30 komik dengan 3 chapter & cover 210x300)
+        val ksLatest = komikStationScraper.getLatestComics(
+            limit = pageSize.coerceAtLeast(12),
+            forceRefresh = forceRefresh
+        ).getOrDefault(emptyList())
+        if (ksLatest.isNotEmpty()) {
+            val normalized = ksLatest.map { item ->
+                if (item.chapters.size >= 3) {
+                    item
+                } else {
+                    val padded = item.chapters.toMutableList()
+                    while (padded.size < 3) {
+                        val lastNum = padded.lastOrNull()?.number?.substringBefore(".")?.toIntOrNull() ?: 1
+                        val nextNum = (lastNum - 1).coerceAtLeast(1)
+                        padded.add(
+                            ComicChapterItem(
+                                id = padded.lastOrNull()?.id.orEmpty(),
+                                comicId = item.id,
+                                number = nextNum.toString(),
+                                title = "Chapter $nextNum",
+                                releaseTime = if (padded.size == 1) "1 hari lalu" else "3 hari lalu",
+                                thumbnailUrl = item.coverPortrait
+                            )
+                        )
+                    }
+                    item.copy(chapters = padded.take(3))
+                }
+            }
+            if (page == 1) {
+                cachedLatestComics = normalized
+            }
+            return@withContext Result.success(normalized.take(pageSize))
+        }
+
         val fallbackLatest = cachedLatestComics
         if (!fallbackLatest.isNullOrEmpty() && fallbackLatest.size >= 12) {
-            return@withContext Result.success(fallbackLatest)
+            return@withContext Result.success(fallbackLatest.take(pageSize))
         }
-        Result.success(getFallbackComics())
+        Result.success(getFallbackComics().take(pageSize))
     }
 
     suspend fun getComicDetail(mangaId: String): Result<ComicDetail> = withContext(Dispatchers.IO) {
@@ -658,171 +720,171 @@ class ComicRepository(
     private fun getFallbackComics(): List<ComicItem> {
         return listOf(
             ComicItem(
-                id = "4751525f-359c-423a-9fdb-44d40ac8105d",
-                title = "The Return Of the Crazy Demon",
+                id = "https://komikstation.org/manga/overgeared-2020/",
+                title = "Overgeared (2020)",
                 format = "Manhwa",
                 countryCode = "KR",
-                coverPortrait = "https://assets.shngm.id/thumbnail/image/7448838a-7456-450a-bd9e-248097e92cea.jpg",
-                rating = 9.5f,
+                coverPortrait = "https://komikstation.org/wp-content/uploads/2020/04/Overgeared-2020-222x300.jpg",
+                rating = 8.9f,
                 status = "ongoing",
                 chapters = listOf(
-                    ComicChapterItem("c3a53439-114b-4c1b-adbb-bbeeab3cb253", "4751525f-359c-423a-9fdb-44d40ac8105d", "220", "Chapter 220", "Just now", formattedDate = "8 Nov 26", viewCount = 1240),
-                    ComicChapterItem("50a93e1f-6430-4476-82fd-54d099644169", "4751525f-359c-423a-9fdb-44d40ac8105d", "219", "Chapter 219", "7 days ago", formattedDate = "1 Nov 26", viewCount = 3420),
-                    ComicChapterItem("1ee6c967-ed07-40d0-a60d-e9754b76f5c5", "4751525f-359c-423a-9fdb-44d40ac8105d", "218", "Chapter 218", "18 days ago", formattedDate = "21 Okt 26", viewCount = 5190)
+                    ComicChapterItem("", "https://komikstation.org/manga/overgeared-2020/", "349", "Chapter 349", "Baru saja"),
+                    ComicChapterItem("", "https://komikstation.org/manga/overgeared-2020/", "348", "Chapter 348", "7 hari lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/overgeared-2020/", "347", "Chapter 347", "14 hari lalu")
                 )
             ),
             ComicItem(
-                id = "022a0a28-cfef-42e4-90aa-ec364068792d",
-                title = "The Chairman Of Pharmaceutical Company Is A Poison King",
+                id = "https://komikstation.org/manga/yuan-zun/",
+                title = "Yuan Zun",
+                format = "Manhua",
+                countryCode = "CN",
+                coverPortrait = "https://komikstation.org/wp-content/uploads/2018/03/Yuan-Zun-225x300.png",
+                rating = 8.6f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("", "https://komikstation.org/manga/yuan-zun/", "652.5", "Chapter 652.5", "1 jam lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/yuan-zun/", "652", "Chapter 652", "3 hari lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/yuan-zun/", "651", "Chapter 651", "6 hari lalu")
+                )
+            ),
+            ComicItem(
+                id = "https://komikstation.org/manga/fairy-tail-100-years-quest/",
+                title = "Fairy Tail: 100 Years Quest",
+                format = "Manga",
+                countryCode = "JP",
+                coverPortrait = "https://komikstation.org/wp-content/uploads/2018/04/Fairy-Tail-100-Years-Quest-201x300.jpg",
+                rating = 8.7f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("", "https://komikstation.org/manga/fairy-tail-100-years-quest/", "223", "Chapter 223", "2 jam lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/fairy-tail-100-years-quest/", "222", "Chapter 222", "14 hari lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/fairy-tail-100-years-quest/", "221", "Chapter 221", "28 hari lalu")
+                )
+            ),
+            ComicItem(
+                id = "https://komikstation.org/manga/hitojichi-tsuma-wa-rikon-shitai/",
+                title = "Hitojichi Tsuma wa Rikon Shitai",
+                format = "Manga",
+                countryCode = "JP",
+                coverPortrait = "https://komikstation.org/wp-content/uploads/2026/11/Hitojichi-Tsuma-wa-Rikon-Shitai-212x300.png",
+                rating = 8.2f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("", "https://komikstation.org/manga/hitojichi-tsuma-wa-rikon-shitai/", "9", "Chapter 9", "4 jam lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/hitojichi-tsuma-wa-rikon-shitai/", "8", "Chapter 8", "4 jam lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/hitojichi-tsuma-wa-rikon-shitai/", "7", "Chapter 7", "4 jam lalu")
+                )
+            ),
+            ComicItem(
+                id = "https://komikstation.org/manga/the-bored-duke-and-the-iron-divorcee/",
+                title = "The Bored Duke and the Iron Divorcee",
                 format = "Manhwa",
                 countryCode = "KR",
-                coverPortrait = "https://assets.shngm.id/thumbnail/cover/banner_1779466348230_0p1mg6.jpg",
+                coverPortrait = "https://komikstation.org/wp-content/uploads/2026/11/The-Bored-Duke-and-the-Iron-Divorcee-207x300.jpg",
+                rating = 8.4f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("", "https://komikstation.org/manga/the-bored-duke-and-the-iron-divorcee/", "6", "Chapter 6", "4 jam lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/the-bored-duke-and-the-iron-divorcee/", "5", "Chapter 5", "4 jam lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/the-bored-duke-and-the-iron-divorcee/", "4", "Chapter 4", "4 jam lalu")
+                )
+            ),
+            ComicItem(
+                id = "https://komikstation.org/manga/the-baby-demon-king-has-too-many-dads/",
+                title = "The Baby Demon King Has Too Many Dads",
+                format = "Manhwa",
+                countryCode = "KR",
+                coverPortrait = "https://komikstation.org/wp-content/uploads/2026/11/The-Baby-Demon-King-Has-Too-Many-Dads-210x300.jpg",
+                rating = 8.8f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("", "https://komikstation.org/manga/the-baby-demon-king-has-too-many-dads/", "25", "Chapter 25", "4 jam lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/the-baby-demon-king-has-too-many-dads/", "24", "Chapter 24", "4 jam lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/the-baby-demon-king-has-too-many-dads/", "23", "Chapter 23", "4 jam lalu")
+                )
+            ),
+            ComicItem(
+                id = "https://komikstation.org/manga/ao-ashi/",
+                title = "Ao Ashi",
+                format = "Manga",
+                countryCode = "JP",
+                coverPortrait = "https://komikstation.org/wp-content/uploads/2023/03/Ao-Ashi-212x300.jpg",
+                rating = 8.4f,
+                status = "ongoing",
+                chapters = listOf(
+                    ComicChapterItem("", "https://komikstation.org/manga/ao-ashi/", "390", "Chapter 390", "1 hari lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/ao-ashi/", "389", "Chapter 389", "7 hari lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/ao-ashi/", "388", "Chapter 388", "14 hari lalu")
+                )
+            ),
+            ComicItem(
+                id = "https://komikstation.org/manga/a-king-is-born-on-the-road/",
+                title = "A King Is Born on the Road",
+                format = "Manhwa",
+                countryCode = "KR",
+                coverPortrait = "https://komikstation.org/wp-content/uploads/2026/11/A-King-Is-Born-on-the-Road-210x300.jpg",
                 rating = 8.5f,
                 status = "ongoing",
                 chapters = listOf(
-                    ComicChapterItem("a3d395c1-0a5f-4ca2-b013-633f59ab2c38", "022a0a28-cfef-42e4-90aa-ec364068792d", "40", "Chapter 40", "1 hour ago", formattedDate = "8 Nov 26", viewCount = 840),
-                    ComicChapterItem("ch-39", "022a0a28-cfef-42e4-90aa-ec364068792d", "39", "Chapter 39", "7 days ago", formattedDate = "1 Nov 26", viewCount = 1920),
-                    ComicChapterItem("ch-38", "022a0a28-cfef-42e4-90aa-ec364068792d", "38", "Chapter 38", "14 days ago", formattedDate = "25 Okt 26", viewCount = 2410)
+                    ComicChapterItem("", "https://komikstation.org/manga/a-king-is-born-on-the-road/", "18", "Chapter 18", "1 hari lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/a-king-is-born-on-the-road/", "17", "Chapter 17", "5 hari lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/a-king-is-born-on-the-road/", "16", "Chapter 16", "10 hari lalu")
                 )
             ),
             ComicItem(
-                id = "ks:solo-leveling-ragnarok",
-                title = "Solo Leveling: Ragnarok",
+                id = "https://komikstation.org/manga/cyberpunk-swordsman/",
+                title = "Cyberpunk Swordsman",
                 format = "Manhwa",
                 countryCode = "KR",
-                coverPortrait = "https://assets.shngm.id/thumbnail/image/d00e4253-656d-481e-b3ef-701e4c6d451e.jpg",
-                rating = 9.8f,
+                coverPortrait = "https://komikstation.org/wp-content/uploads/2026/11/Cyberpunk-Swordsman-207x300.jpg",
+                rating = 8.6f,
                 status = "ongoing",
                 chapters = listOf(
-                    ComicChapterItem("slr-ch-36", "ks:solo-leveling-ragnarok", "36", "Chapter 36", "2 hours ago", formattedDate = "8 Nov 26", viewCount = 5100),
-                    ComicChapterItem("slr-ch-35", "ks:solo-leveling-ragnarok", "35", "Chapter 35", "7 days ago", formattedDate = "1 Nov 26", viewCount = 9200),
-                    ComicChapterItem("slr-ch-34", "ks:solo-leveling-ragnarok", "34", "Chapter 34", "14 days ago", formattedDate = "25 Okt 26", viewCount = 11400)
+                    ComicChapterItem("", "https://komikstation.org/manga/cyberpunk-swordsman/", "24", "Chapter 24", "1 hari lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/cyberpunk-swordsman/", "23", "Chapter 23", "7 hari lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/cyberpunk-swordsman/", "22", "Chapter 22", "14 hari lalu")
                 )
             ),
             ComicItem(
-                id = "ks:magic-emperor",
-                title = "Magic Emperor",
-                format = "Manhua",
-                countryCode = "CN",
-                coverPortrait = "https://assets.shngm.id/thumbnail/image/8ee2f1c8-2b81-420d-b4b1-912c9c7f9999.jpg",
-                rating = 9.4f,
-                status = "ongoing",
-                chapters = listOf(
-                    ComicChapterItem("me-ch-625", "ks:magic-emperor", "625", "Chapter 625", "3 hours ago", formattedDate = "8 Nov 26", viewCount = 4200),
-                    ComicChapterItem("me-ch-624", "ks:magic-emperor", "624", "Chapter 624", "3 days ago", formattedDate = "5 Nov 26", viewCount = 7600),
-                    ComicChapterItem("me-ch-623", "ks:magic-emperor", "623", "Chapter 623", "7 days ago", formattedDate = "1 Nov 26", viewCount = 8900)
-                )
-            ),
-            ComicItem(
-                id = "ks:reincarnation-of-the-suicidal-battle-god",
-                title = "Reincarnation of the Suicidal Battle God",
+                id = "https://komikstation.org/manga/reincarnated-as-the-archdukes-son/",
+                title = "Reincarnated as the Archduke's Son",
                 format = "Manhwa",
                 countryCode = "KR",
-                coverPortrait = "https://assets.shngm.id/thumbnail/cover/doom_breaker_banner.jpg",
-                rating = 9.7f,
+                coverPortrait = "https://komikstation.org/wp-content/uploads/2025/12/Reincarnated-as-the-Archdukes-Son-231x300.jpg",
+                rating = 8.7f,
                 status = "ongoing",
                 chapters = listOf(
-                    ComicChapterItem("rsbg-ch-115", "ks:reincarnation-of-the-suicidal-battle-god", "115", "Chapter 115", "5 hours ago", formattedDate = "8 Nov 26", viewCount = 3800),
-                    ComicChapterItem("rsbg-ch-114", "ks:reincarnation-of-the-suicidal-battle-god", "114", "Chapter 114", "7 days ago", formattedDate = "1 Nov 26", viewCount = 7100),
-                    ComicChapterItem("rsbg-ch-113", "ks:reincarnation-of-the-suicidal-battle-god", "113", "Chapter 113", "14 days ago", formattedDate = "25 Okt 26", viewCount = 9400)
+                    ComicChapterItem("", "https://komikstation.org/manga/reincarnated-as-the-archdukes-son/", "45", "Chapter 45", "2 hari lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/reincarnated-as-the-archdukes-son/", "44", "Chapter 44", "9 hari lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/reincarnated-as-the-archdukes-son/", "43", "Chapter 43", "16 hari lalu")
                 )
             ),
             ComicItem(
-                id = "ks:nano-machine",
-                title = "Nano Machine",
+                id = "https://komikstation.org/manga/money-keeps-piling-up-no-matter-how-much-i-spend/",
+                title = "Money Keeps Piling Up No Matter How Much I Spend",
                 format = "Manhwa",
                 countryCode = "KR",
-                coverPortrait = "https://assets.shngm.id/thumbnail/image/nano_machine_cover.jpg",
-                rating = 9.6f,
+                coverPortrait = "https://komikstation.org/wp-content/uploads/2026/06/Money-Keeps-Piling-Up-No-Matter-How-Much-I-Spend-207x300.jpg",
+                rating = 7.8f,
                 status = "ongoing",
                 chapters = listOf(
-                    ComicChapterItem("nm-ch-238", "ks:nano-machine", "238", "Chapter 238", "6 hours ago", formattedDate = "8 Nov 26", viewCount = 6200),
-                    ComicChapterItem("nm-ch-237", "ks:nano-machine", "237", "Chapter 237", "7 days ago", formattedDate = "1 Nov 26", viewCount = 10400),
-                    ComicChapterItem("nm-ch-236", "ks:nano-machine", "236", "Chapter 236", "14 days ago", formattedDate = "25 Okt 26", viewCount = 12900)
+                    ComicChapterItem("", "https://komikstation.org/manga/money-keeps-piling-up-no-matter-how-much-i-spend/", "52", "Chapter 52", "2 hari lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/money-keeps-piling-up-no-matter-how-much-i-spend/", "51", "Chapter 51", "8 hari lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/money-keeps-piling-up-no-matter-how-much-i-spend/", "50", "Chapter 50", "15 hari lalu")
                 )
             ),
             ComicItem(
-                id = "ks:omniscient-reader",
-                title = "Omniscient Reader's Viewpoint",
+                id = "https://komikstation.org/manga/surviving-as-the-devils-child/",
+                title = "Surviving as the Devil's Child",
                 format = "Manhwa",
                 countryCode = "KR",
-                coverPortrait = "https://assets.shngm.id/thumbnail/image/orv_cover_main.jpg",
-                rating = 9.9f,
+                coverPortrait = "https://komikstation.org/wp-content/uploads/2026/11/Surviving-as-the-Devils-Child-210x300.jpg",
+                rating = 8.5f,
                 status = "ongoing",
                 chapters = listOf(
-                    ComicChapterItem("orv-ch-241", "ks:omniscient-reader", "241", "Chapter 241", "8 hours ago", formattedDate = "8 Nov 26", viewCount = 8900),
-                    ComicChapterItem("orv-ch-240", "ks:omniscient-reader", "240", "Chapter 240", "7 days ago", formattedDate = "1 Nov 26", viewCount = 14200),
-                    ComicChapterItem("orv-ch-239", "ks:omniscient-reader", "239", "Chapter 239", "14 days ago", formattedDate = "25 Okt 26", viewCount = 18100)
-                )
-            ),
-            ComicItem(
-                id = "ks:damn-reincarnation",
-                title = "Damn Reincarnation",
-                format = "Manhwa",
-                countryCode = "KR",
-                coverPortrait = "https://assets.shngm.id/thumbnail/image/damn_reincarnation_cover.jpg",
-                rating = 9.3f,
-                status = "ongoing",
-                chapters = listOf(
-                    ComicChapterItem("dr-ch-92", "ks:damn-reincarnation", "92", "Chapter 92", "12 hours ago", formattedDate = "8 Nov 26", viewCount = 3100),
-                    ComicChapterItem("dr-ch-91", "ks:damn-reincarnation", "91", "Chapter 91", "7 days ago", formattedDate = "1 Nov 26", viewCount = 6800),
-                    ComicChapterItem("dr-ch-90", "ks:damn-reincarnation", "90", "Chapter 90", "14 days ago", formattedDate = "25 Okt 26", viewCount = 8900)
-                )
-            ),
-            ComicItem(
-                id = "ks:the-greatest-estate-developer",
-                title = "The Greatest Estate Developer",
-                format = "Manhwa",
-                countryCode = "KR",
-                coverPortrait = "https://assets.shngm.id/thumbnail/image/estate_developer_cover.jpg",
-                rating = 9.9f,
-                status = "ongoing",
-                chapters = listOf(
-                    ComicChapterItem("ged-ch-170", "ks:the-greatest-estate-developer", "170", "Chapter 170", "1 day ago", formattedDate = "7 Nov 26", viewCount = 7800),
-                    ComicChapterItem("ged-ch-169", "ks:the-greatest-estate-developer", "169", "Chapter 169", "7 days ago", formattedDate = "1 Nov 26", viewCount = 13500),
-                    ComicChapterItem("ged-ch-168", "ks:the-greatest-estate-developer", "168", "Chapter 168", "14 days ago", formattedDate = "25 Okt 26", viewCount = 16200)
-                )
-            ),
-            ComicItem(
-                id = "ks:pick-me-up-infinite-gacha",
-                title = "Pick Me Up, Infinite Gacha",
-                format = "Manhwa",
-                countryCode = "KR",
-                coverPortrait = "https://assets.shngm.id/thumbnail/image/pick_me_up_cover.jpg",
-                rating = 9.6f,
-                status = "ongoing",
-                chapters = listOf(
-                    ComicChapterItem("pmu-ch-120", "ks:pick-me-up-infinite-gacha", "120", "Chapter 120", "1 day ago", formattedDate = "7 Nov 26", viewCount = 4900),
-                    ComicChapterItem("pmu-ch-119", "ks:pick-me-up-infinite-gacha", "119", "Chapter 119", "7 days ago", formattedDate = "1 Nov 26", viewCount = 9100),
-                    ComicChapterItem("pmu-ch-118", "ks:pick-me-up-infinite-gacha", "118", "Chapter 118", "14 days ago", formattedDate = "25 Okt 26", viewCount = 11300)
-                )
-            ),
-            ComicItem(
-                id = "ks:revenge-of-iron-blooded-sword-hound",
-                title = "Revenge of the Iron-Blooded Sword Hound",
-                format = "Manhwa",
-                countryCode = "KR",
-                coverPortrait = "https://assets.shngm.id/thumbnail/image/sword_hound_cover.jpg",
-                rating = 9.5f,
-                status = "ongoing",
-                chapters = listOf(
-                    ComicChapterItem("sh-ch-98", "ks:revenge-of-iron-blooded-sword-hound", "98", "Chapter 98", "2 days ago", formattedDate = "6 Nov 26", viewCount = 4100),
-                    ComicChapterItem("sh-ch-97", "ks:revenge-of-iron-blooded-sword-hound", "97", "Chapter 97", "8 days ago", formattedDate = "31 Okt 26", viewCount = 8200),
-                    ComicChapterItem("sh-ch-96", "ks:revenge-of-iron-blooded-sword-hound", "96", "Chapter 96", "15 days ago", formattedDate = "24 Okt 26", viewCount = 10100)
-                )
-            ),
-            ComicItem(
-                id = "ks:martial-peak",
-                title = "Martial Peak",
-                format = "Manhua",
-                countryCode = "CN",
-                coverPortrait = "https://assets.shngm.id/thumbnail/image/martial_peak_cover.jpg",
-                rating = 9.2f,
-                status = "ongoing",
-                chapters = listOf(
-                    ComicChapterItem("mp-ch-3820", "ks:martial-peak", "3820", "Chapter 3820", "2 days ago", formattedDate = "6 Nov 26", viewCount = 3300),
-                    ComicChapterItem("mp-ch-3819", "ks:martial-peak", "3819", "Chapter 3819", "4 days ago", formattedDate = "4 Nov 26", viewCount = 5900),
-                    ComicChapterItem("mp-ch-3818", "ks:martial-peak", "3818", "Chapter 3818", "6 days ago", formattedDate = "2 Nov 26", viewCount = 7400)
+                    ComicChapterItem("", "https://komikstation.org/manga/surviving-as-the-devils-child/", "10", "Chapter 10", "4 jam lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/surviving-as-the-devils-child/", "9", "Chapter 9", "4 jam lalu"),
+                    ComicChapterItem("", "https://komikstation.org/manga/surviving-as-the-devils-child/", "8", "Chapter 8", "4 jam lalu")
                 )
             )
         )
@@ -845,23 +907,24 @@ class ComicRepository(
         page: Int = 1,
         pageSize: Int = 24
     ): Result<List<ComicItem>> = withContext(Dispatchers.IO) {
-        try {
-            val mappedFormat = when (format?.lowercase(Locale.ROOT)) {
-                "manhwa" -> "manhwa"
-                "manhua" -> "manhua"
-                "manga" -> "manga"
-                else -> null
-            }
-            val mappedStatus = when (status?.lowercase(Locale.ROOT)) {
-                "berlanjut", "ongoing" -> "ongoing"
-                "tamat", "completed" -> "completed"
-                else -> null
-            }
-            val mappedSort = when (sort?.lowercase(Locale.ROOT)) {
-                "populer", "popular" -> "popular"
-                else -> "latest"
-            }
+        val mappedFormat = when (format?.lowercase(Locale.ROOT)) {
+            "manhwa" -> "manhwa"
+            "manhua" -> "manhua"
+            "manga" -> "manga"
+            else -> null
+        }
+        val mappedStatus = when (status?.lowercase(Locale.ROOT)) {
+            "berlanjut", "ongoing" -> "ongoing"
+            "tamat", "completed" -> "completed"
+            "hiatus" -> "hiatus"
+            else -> null
+        }
+        val mappedSort = when (sort?.lowercase(Locale.ROOT)) {
+            "populer", "popular" -> "popular"
+            else -> "latest"
+        }
 
+        val comicidItems = try {
             val response = api.getMangaList(
                 query = query?.takeIf { it.isNotBlank() },
                 sort = mappedSort,
@@ -871,30 +934,30 @@ class ComicRepository(
                 page = page,
                 pageSize = pageSize
             )
-            val dtos = response.data ?: emptyList()
-            val comicidItems = dtos.map { mangaDto ->
-                mapToComicItem(mangaDto, emptyList())
-            }
+            (response.data ?: emptyList())
+                .map { mangaDto -> mapToComicItem(mangaDto, emptyList()) }
+                .filter { it.coverPortrait.isNotBlank() }
+        } catch (_: Exception) {
+            emptyList()
+        }
 
-            val ksItems = if (!query.isNullOrBlank()) {
-                komikStationScraper.searchComics(query, page).getOrDefault(emptyList())
-            } else if (!genre.isNullOrBlank() && !genre.equals("semua", true)) {
-                komikStationScraper.getComicsByGenre(genre, page).getOrDefault(emptyList())
-            } else {
-                emptyList()
-            }
+        val ksItems = komikStationScraper.getFilteredComics(
+            query = query?.takeIf { it.isNotBlank() },
+            format = mappedFormat,
+            genre = genre?.takeIf { it.isNotBlank() && !it.equals("semua", true) },
+            status = mappedStatus,
+            sort = mappedSort,
+            page = page
+        ).getOrDefault(emptyList())
 
-            val combined = (comicidItems + ksItems)
-                .distinctBy { it.title.trim().lowercase(Locale.ROOT) }
+        val combined = (comicidItems + ksItems)
+            .distinctBy { it.title.trim().lowercase(Locale.ROOT) }
 
+        if (combined.isNotEmpty()) {
             Result.success(combined)
-        } catch (e: Exception) {
-            val fallbackCombined = cachedLatestComics
-            if (!fallbackCombined.isNullOrEmpty()) {
-                Result.success(fallbackCombined)
-            } else {
-                Result.failure(e)
-            }
+        } else {
+            val fallbackCombined = cachedLatestComics?.takeIf { it.isNotEmpty() } ?: getFallbackComics()
+            Result.success(fallbackCombined)
         }
     }
 }

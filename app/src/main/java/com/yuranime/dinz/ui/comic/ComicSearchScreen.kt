@@ -742,24 +742,33 @@ private fun ComicGridItem(
                 indication = ripple(bounded = false, radius = 70.dp, color = Color.White)
             ) { onClick() }
     ) {
-        // Poster Komik Murni (Rasio 3:4, Tanpa Badge Tipe/BARU di atas gambar)
+        // Poster Komik Murni (Rasio 0.70 cocok dengan cover komik 210x300)
+        val effectiveCover = comic.coverPortrait.ifBlank { comic.coverLandscape.orEmpty() }
+        val referer = if (effectiveCover.contains("komikstation", ignoreCase = true) || effectiveCover.contains("klikcdn", ignoreCase = true)) {
+            "https://komikstation.org/"
+        } else {
+            SEARCH_IMAGE_REFERER
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(3f / 4f)
+                .aspectRatio(0.70f)
                 .clip(RoundedCornerShape(8.dp))
                 .background(SearchCardBg)
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(context)
-                    .data(comic.coverPortrait.ifBlank { comic.coverLandscape })
+                    .data(effectiveCover)
                     .crossfade(true)
                     .addHeader("User-Agent", SEARCH_IMAGE_USER_AGENT)
-                    .addHeader("Referer", SEARCH_IMAGE_REFERER)
+                    .addHeader("Referer", referer)
+                    .placeholder(R.drawable.placeholder_yuranime)
+                    .error(R.drawable.placeholder_yuranime)
                     .build(),
                 contentDescription = comic.title,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter
             )
         }
 

@@ -1,14 +1,13 @@
 package com.yuranime.dinz.ui.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,15 +38,15 @@ import com.yuranime.dinz.ui.theme.SfProFontFamily
 
 private const val COMIC_IMAGE_USER_AGENT =
     "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
-private const val COMIC_IMAGE_REFERER = "https://app.shinigami.asia/"
 
-/**
- * Section Komik Terbaru di HomeScreen:
- * - 12 komik terbaru (6 baris ke bawah x 2 kolom berdampingan).
- * - TANPA kotak/card overlay abu-abu (#141418) dan TANPA border di belakang item komik.
- * - Judul dikunci tepat 2 baris (minLines = 2, maxLines = 2) agar bendera dan 3 chapter
- *   di kolom kiri dan kanan 100% sejajar rata horizontal.
- */
+private fun resolveComicReferer(url: String): String {
+    return if (url.contains("komikstation", ignoreCase = true) || url.contains("klikcdn", ignoreCase = true)) {
+        "https://komikstation.org/"
+    } else {
+        "https://app.shinigami.asia/"
+    }
+}
+
 @Composable
 fun ComicLatestSection(
     comics: List<ComicItem>,
@@ -56,7 +56,6 @@ fun ComicLatestSection(
 ) {
     if (comics.isEmpty()) return
 
-    // Ambil 12 komik terbaru dan susun menjadi 6 baris x 2 kolom ke bawah
     val displayComics = comics.take(12)
     val rows = displayComics.chunked(2)
 
@@ -100,11 +99,6 @@ fun ComicLatestSection(
     }
 }
 
-/**
- * Item Komik Bersih Tanpa Kotak/Border Overlay:
- * - Poster vertikal di kiri langsung di atas latar utama (#0B0B0B), tinggi 100% presisi sejajar dengan kolom chapter.
- * - Judul komik 2 baris rata (minLines = 2, maxLines = 2) + bendera negara + 3 chapter sejajar.
- */
 @Composable
 fun ComicGridCard(
     comic: ComicItem,
@@ -115,38 +109,39 @@ fun ComicGridCard(
     val context = LocalContext.current
     val effectiveCover = comic.coverPortrait.ifBlank { comic.coverLandscape.orEmpty() }
 
+    // Tinggi terukur 112.dp x lebar poster 78.dp (rasio 0.70 cocok dengan cover komik 210x300 agar utuh & sejajar chapter)
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(IntrinsicSize.Min)
+            .height(112.dp)
             .clickable(onClick = onComicClick),
         verticalAlignment = Alignment.Top
     ) {
-        // SISI KIRI: Poster Komik Vertikal Murni (Tinggi sinkron & sejajar penuh dengan teks info & chapter)
         Box(
             modifier = Modifier
-                .width(70.dp)
+                .width(78.dp)
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF141418))
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(effectiveCover)
                     .addHeader("User-Agent", COMIC_IMAGE_USER_AGENT)
-                    .addHeader("Referer", COMIC_IMAGE_REFERER)
+                    .addHeader("Referer", resolveComicReferer(effectiveCover))
                     .crossfade(true)
                     .placeholder(R.drawable.placeholder_yuranime)
                     .error(R.drawable.placeholder_yuranime)
                     .build(),
                 contentDescription = comic.title,
                 contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter,
                 modifier = Modifier.fillMaxSize()
             )
         }
 
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(9.dp))
 
-        // SISI KANAN: Judul (2 baris tetap), Bendera Negara, dan 3 Chapter Terbaru Sejajar
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -157,41 +152,34 @@ fun ComicGridCard(
                 Text(
                     text = comic.title,
                     color = Color.White,
-                    fontSize = 12.5.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = SfProFontFamily,
                     minLines = 2,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    lineHeight = 15.sp
+                    lineHeight = 14.5.sp
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Ikon Bendera Negara (China / Jepang / Korea)
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(comic.flagUrl)
-                        .crossfade(false)
-                        .build(),
+                Image(
+                    painter = painterResource(id = comic.flagDrawableRes),
                     contentDescription = comic.format,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(width = 18.dp, height = 12.dp)
-                        .clip(RoundedCornerShape(2.5.dp))
+                        .size(width = 16.dp, height = 11.dp)
+                        .clip(RoundedCornerShape(2.dp))
                 )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // 3 Chapter Terbaru yang Rapat & Sejajar Rata Horizontal
             Column(
-                verticalArrangement = Arrangement.spacedBy(3.5.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 comic.chapters.take(3).forEach { chapter ->
                     val chNum = chapter.number.ifBlank { "1" }
-                    val timeStr = chapter.releaseTime.ifBlank { chapter.releaseDate ?: "Just now" }
+                    val timeStr = chapter.releaseTime.ifBlank { chapter.releaseDate ?: "Baru saja" }
 
                     Row(
                         modifier = Modifier
@@ -221,7 +209,7 @@ fun ComicGridCard(
                             Text(
                                 text = "CH. $chNum",
                                 color = Color.White,
-                                fontSize = 10.5.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = SfProFontFamily,
                                 maxLines = 1,
@@ -233,8 +221,8 @@ fun ComicGridCard(
 
                         Text(
                             text = timeStr,
-                            color = Color(0xFF64748B),
-                            fontSize = 9.5.sp,
+                            color = Color(0xFF94A3B8),
+                            fontSize = 9.sp,
                             fontWeight = FontWeight.Medium,
                             fontFamily = SfProFontFamily,
                             maxLines = 1,

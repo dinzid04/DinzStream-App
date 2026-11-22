@@ -144,12 +144,18 @@ fun ComicGridItem(
             .fillMaxWidth()
             .clickable(onClick = onClick)
     ) {
-        // Poster with Aspect Ratio 2:3 (Tanpa kotak overlay abu-abu di belakangnya)
+        // Poster rasio 0.70 cocok dengan cover komik 210x300
+        val referer = if (effectiveCover.contains("komikstation", ignoreCase = true) || effectiveCover.contains("klikcdn", ignoreCase = true)) {
+            "https://komikstation.org/"
+        } else {
+            "https://app.shinigami.asia/"
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(2f / 3f)
+                .aspectRatio(0.70f)
                 .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF141418))
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
@@ -158,13 +164,14 @@ fun ComicGridItem(
                         "User-Agent",
                         "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
                     )
-                    .addHeader("Referer", "https://app.shinigami.asia/")
+                    .addHeader("Referer", referer)
                     .crossfade(true)
                     .placeholder(R.drawable.placeholder_yuranime)
                     .error(R.drawable.placeholder_yuranime)
                     .build(),
                 contentDescription = comic.title,
                 contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter,
                 modifier = Modifier.fillMaxSize()
             )
 

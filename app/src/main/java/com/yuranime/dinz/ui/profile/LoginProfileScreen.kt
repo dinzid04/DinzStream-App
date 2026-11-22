@@ -1,6 +1,7 @@
 package com.yuranime.dinz.ui.profile
 
 import android.app.Activity
+import android.content.Intent
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -73,6 +74,7 @@ import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.KeyboardDoubleArrowUp
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.SportsEsports
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.WorkspacePremium
@@ -327,6 +329,9 @@ fun LoginProfileScreen(
                 isLoggingIn = isLoggingIn,
                 onBackToHomeClick = { onTabSelected(NavTab.HOME) },
                 onSettingsClick = { currentSubScreen = ProfileSubScreen.SETTINGS },
+                onPlayRpgClick = {
+                    context.startActivity(Intent(context, com.yuranime.dinz.rpg.ui.RpgGameActivity::class.java))
+                },
                 onGoogleLoginClick = {
                     isLoggingIn = true
                     try {
@@ -380,6 +385,9 @@ fun LoginProfileScreen(
                     onOpenLeaderboardClick = { currentSubScreen = ProfileSubScreen.LEADERBOARD },
                     onOpenPointsRewardsClick = { currentSubScreen = ProfileSubScreen.POINTS_REWARDS },
                     onOpenShopClick = { currentSubScreen = ProfileSubScreen.SHOP },
+                    onOpenRpgGameClick = {
+                        context.startActivity(Intent(context, com.yuranime.dinz.rpg.ui.RpgGameActivity::class.java))
+                    },
                     onOpenTitleSlotClick = { showTitlePickerDialog = true },
                     onOpenLevelProgressClick = { showLevelProgressDialog = true },
                     onOpenDownloadsClick = { currentSubScreen = ProfileSubScreen.DOWNLOADS },
@@ -526,6 +534,7 @@ private fun UserProfileView(
     onOpenLeaderboardClick: () -> Unit,
     onOpenPointsRewardsClick: () -> Unit,
     onOpenShopClick: () -> Unit,
+    onOpenRpgGameClick: () -> Unit = {},
     onOpenTitleSlotClick: () -> Unit,
     onOpenLevelProgressClick: () -> Unit = {},
     onOpenDownloadsClick: () -> Unit,
@@ -1165,6 +1174,16 @@ private fun UserProfileView(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
             ) {
+                CleanEditorialNavRow(
+                    icon = Icons.Outlined.SportsEsports,
+                    title = "Willowbrook Cove RPG",
+                    subtitle = "Game pixel-art mancing, bertani, tebang pohon & bangun rumah",
+                    iconTint = Color(0xFFFF5722),
+                    onClick = onOpenRpgGameClick
+                )
+
+                HorizontalDivider(thickness = 0.5.dp, color = Color(0xFF1A1D26))
+
                 CleanEditorialNavRow(
                     icon = Icons.Outlined.Storefront,
                     title = "Shop Kosmetik",
@@ -1977,6 +1996,7 @@ private fun LoginView(
     isLoggingIn: Boolean,
     onBackToHomeClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
+    onPlayRpgClick: () -> Unit = {},
     onGoogleLoginClick: () -> Unit,
     onEmailLoginClick: () -> Unit,
     onGuestLoginClick: () -> Unit,
@@ -2129,6 +2149,35 @@ private fun LoginView(
                         )
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1A1815))
+                    .border(1.dp, Color(0x55FF5722), CircleShape)
+                    .clickable { onPlayRpgClick() },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.SportsEsports,
+                    contentDescription = "Main Willowbrook Cove RPG",
+                    tint = Color(0xFFFF5722),
+                    modifier = Modifier.size(19.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Main Willowbrook Cove RPG",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = SfProFontFamily
+                )
             }
 
             Spacer(modifier = Modifier.height(14.dp))

@@ -15,8 +15,11 @@ reff_ui/
 design/
 *.jpg
 !app/src/main/res/**/*.jpg
+!app/src/main/assets/**/*.jpg
 *.png
 !app/src/main/res/**/*.png
+!app/src/main/assets/**/*.png
+app/src/main/jniLibs/
 *.mp4
 *.webm
 *.mkv

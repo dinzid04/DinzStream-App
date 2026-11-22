@@ -113,6 +113,15 @@ private const val COMIC_IMAGE_USER_AGENT =
     "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
 private const val COMIC_IMAGE_REFERER = "https://app.shinigami.asia/"
 
+private fun resolveComicImageReferer(url: String?): String {
+    val u = url.orEmpty()
+    return if (u.contains("komikstation", ignoreCase = true) || u.contains("klikcdn", ignoreCase = true)) {
+        "https://komikstation.org/"
+    } else {
+        COMIC_IMAGE_REFERER
+    }
+}
+
 private val ComicScreenBg = Color(0xFF0B0B0B)
 private val ComicCardBg = Color(0xFF141418)
 private val ComicRedAccent = Color(0xFFE11D48)
@@ -438,16 +447,18 @@ private fun ComicHeroSlider(
 
             Box(modifier = Modifier.fillMaxSize()) {
                 // Background cover yang diperbesar dengan tampilan jelas (tidak terlalu gelap)
+                val heroBgUrl = banner.backgroundImage.ifBlank { banner.posterImage }
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data(banner.backgroundImage.ifBlank { banner.posterImage })
+                        .data(heroBgUrl)
                         .crossfade(true)
                         .addHeader("User-Agent", COMIC_IMAGE_USER_AGENT)
-                        .addHeader("Referer", COMIC_IMAGE_REFERER)
+                        .addHeader("Referer", resolveComicImageReferer(heroBgUrl))
                         .build(),
                     contentDescription = banner.title,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter
                 )
 
                 // Lapisan overlay scrim transparan elegan: 45%-55% di bagian atas-tengah untuk teks, dan gradasi hitam halus hanya di tepi bawah
@@ -581,11 +592,14 @@ private fun ComicHeroSlider(
                         }
                     }
 
-                    // SISI KANAN (Poster Komik Vertikal 110.dp x 2:3 Nempel 100% Penuh ke Bingkai)
+                    // SISI KANAN (Poster Komik Vertikal 110.dp x 0.70 rasio cover komik)
+                    val heroPosterUrl = banner.posterImage.ifBlank { banner.backgroundImage }
+                    val isTransparentCutout = heroPosterUrl.contains("thumbnail/banner/", ignoreCase = true) &&
+                        heroPosterUrl.endsWith(".png", ignoreCase = true)
                     Box(
                         modifier = Modifier
                             .width(110.dp)
-                            .aspectRatio(2f / 3f)
+                            .aspectRatio(0.70f)
                             .shadow(12.dp, RoundedCornerShape(12.dp), clip = false)
                             .clip(RoundedCornerShape(12.dp))
                             .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
@@ -597,16 +611,17 @@ private fun ComicHeroSlider(
                     ) {
                         AsyncImage(
                             model = ImageRequest.Builder(context)
-                                .data(banner.posterImage.ifBlank { banner.backgroundImage })
+                                .data(heroPosterUrl)
                                 .crossfade(true)
                                 .addHeader("User-Agent", COMIC_IMAGE_USER_AGENT)
-                                .addHeader("Referer", COMIC_IMAGE_REFERER)
+                                .addHeader("Referer", resolveComicImageReferer(heroPosterUrl))
                                 .build(),
                             contentDescription = banner.title,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(RoundedCornerShape(12.dp)),
-                            contentScale = ContentScale.Crop
+                            contentScale = if (isTransparentCutout) ContentScale.Fit else ContentScale.Crop,
+                            alignment = Alignment.TopCenter
                         )
                     }
                 }
@@ -676,7 +691,7 @@ private fun ComicContinueReadingSection(
                     Box(
                         modifier = Modifier
                             .width(56.dp)
-                            .aspectRatio(2f / 3f)
+                            .aspectRatio(0.70f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color.DarkGray)
                     ) {
@@ -685,11 +700,14 @@ private fun ComicContinueReadingSection(
                                 .data(item.coverUrl)
                                 .crossfade(true)
                                 .addHeader("User-Agent", COMIC_IMAGE_USER_AGENT)
-                                .addHeader("Referer", COMIC_IMAGE_REFERER)
+                                .addHeader("Referer", resolveComicImageReferer(item.coverUrl))
+                                .placeholder(R.drawable.placeholder_yuranime)
+                                .error(R.drawable.placeholder_yuranime)
                                 .build(),
                             contentDescription = item.comicTitle,
                             modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Crop,
+                            alignment = Alignment.TopCenter
                         )
                     }
 
@@ -752,24 +770,28 @@ private fun ComicTrendingRow(
                         indication = ripple(bounded = false, radius = 60.dp, color = Color.White)
                     ) { onComicClick(comic.id) }
             ) {
-                // Poster Komik Vertikal (aspectRatio 2:3, shape 8.dp)
+                // Poster Komik Vertikal (rasio 0.70 cocok dengan cover komik 210x300, shape 8.dp)
+                val trendCoverUrl = comic.coverPortrait.ifBlank { comic.coverLandscape.orEmpty() }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(2f / 3f)
+                        .aspectRatio(0.70f)
                         .clip(RoundedCornerShape(8.dp))
                         .background(ComicCardBg)
                 ) {
                     AsyncImage(
                         model = ImageRequest.Builder(context)
-                            .data(comic.coverPortrait.ifBlank { comic.coverLandscape })
+                            .data(trendCoverUrl)
                             .crossfade(true)
                             .addHeader("User-Agent", COMIC_IMAGE_USER_AGENT)
-                            .addHeader("Referer", COMIC_IMAGE_REFERER)
+                            .addHeader("Referer", resolveComicImageReferer(trendCoverUrl))
+                            .placeholder(R.drawable.placeholder_yuranime)
+                            .error(R.drawable.placeholder_yuranime)
                             .build(),
                         contentDescription = comic.title,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
+                        alignment = Alignment.TopCenter
                     )
                 }
 
@@ -886,36 +908,40 @@ private fun ComicLatestCard(
 ) {
     val context = LocalContext.current
 
-    // Tinggi terukur persis 110.dp agar ujung atas poster rata dengan judul dan ujung bawah rata dengan chapter ke-3
+    // Tinggi terukur persis 112.dp dengan poster 78.dp (rasio 0.70 cocok dengan cover komik 210x300 agar utuh & sejajar)
+    val latestCoverUrl = comic.coverPortrait.ifBlank { comic.coverLandscape.orEmpty() }
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(110.dp)
+            .height(112.dp)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(bounded = false, radius = 80.dp, color = Color.White)
             ) { onComicClick() },
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Poster Kiri (width = 76.dp, fillMaxHeight(), shape 8.dp)
+        // Poster Kiri (width = 78.dp, fillMaxHeight(), shape 8.dp)
         Box(
             modifier = Modifier
-                .width(76.dp)
+                .width(78.dp)
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(8.dp))
                 .background(ComicCardBg)
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(context)
-                    .data(comic.coverPortrait.ifBlank { comic.coverLandscape })
+                    .data(latestCoverUrl)
                     .crossfade(true)
                     .addHeader("User-Agent", COMIC_IMAGE_USER_AGENT)
-                    .addHeader("Referer", COMIC_IMAGE_REFERER)
+                    .addHeader("Referer", resolveComicImageReferer(latestCoverUrl))
+                    .placeholder(R.drawable.placeholder_yuranime)
+                    .error(R.drawable.placeholder_yuranime)
                     .build(),
                 contentDescription = comic.title,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter
             )
         }
 
@@ -1099,54 +1125,32 @@ private fun ComicCommunityChatSection(
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
-        // Area Gabungan Header Title + Maskot Anime Tepat di Atas Kotak Putih Cbox
-        Box(
+        // Header bersih tanpa maskot
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(115.dp)
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Teks '| CHATROOM KOMUNITAS' di Kiri Bawah (10.dp tepat di atas bibir Cbox)
-            Row(
+            Box(
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(bottom = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(3.5.dp)
-                        .height(16.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(ComicRedAccent)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "CHATROOM KOMUNITAS",
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SfProFontFamily,
-                    letterSpacing = 0.5.sp
-                )
-            }
-
-            // Gambar Maskot Anime di Kanan Bawah bertumpu pas di bibir kanan atas kotak Cbox
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data("https://yuranime-tg-cdn.gadingkencana04.workers.dev/f/BQACAgUAAyEGAAMBCfs22gADCGr42d6ic3EvHGiMhRTtiSPzfHiSAAJUKgAC6K7IVy6o0OOVHDh6PQQ/comic_mascot_1.png")
-                    .crossfade(true)
-                    .build(),
-                contentDescription = "Maskot Komunitas",
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 12.dp)
-                    .size(115.dp)
-                    .zIndex(2f),
-                contentScale = ContentScale.Fit
+                    .width(3.5.dp)
+                    .height(16.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(ComicRedAccent)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "CHATROOM KOMUNITAS",
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = SfProFontFamily,
+                letterSpacing = 0.5.sp
             )
         }
 
-        // Kotak Cbox WebView Putih Elegan Tepat di Bawah Header & Maskot
+        // Kotak Cbox WebView Putih Tepat di Bawah Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1224,24 +1228,28 @@ private fun ComicAllTimePopularRow(
                             )
                         }
 
-                        // 2. Poster Komik di Tengah (width = 64.dp, 2:3, shape 8.dp)
+                        // 2. Poster Komik di Tengah (width = 66.dp, rasio 0.70, shape 8.dp)
+                        val popCoverUrl = comic.coverPortrait.ifBlank { comic.coverLandscape.orEmpty() }
                         Box(
                             modifier = Modifier
-                                .width(64.dp)
-                                .aspectRatio(2f / 3f)
+                                .width(66.dp)
+                                .aspectRatio(0.70f)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(ComicCardBg)
                         ) {
                             AsyncImage(
                                 model = ImageRequest.Builder(context)
-                                    .data(comic.coverPortrait.ifBlank { comic.coverLandscape })
+                                    .data(popCoverUrl)
                                     .crossfade(true)
                                     .addHeader("User-Agent", COMIC_IMAGE_USER_AGENT)
-                                    .addHeader("Referer", COMIC_IMAGE_REFERER)
+                                    .addHeader("Referer", resolveComicImageReferer(popCoverUrl))
+                                    .placeholder(R.drawable.placeholder_yuranime)
+                                    .error(R.drawable.placeholder_yuranime)
                                     .build(),
                                 contentDescription = comic.title,
                                 modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
+                                contentScale = ContentScale.Crop,
+                                alignment = Alignment.TopCenter
                             )
                         }
 
@@ -1391,7 +1399,7 @@ private fun ComicYangNggakKalahSeruSection(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(2f / 3f)
+                            .aspectRatio(0.70f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(ComicCardBg)
                     ) {
@@ -1400,11 +1408,14 @@ private fun ComicYangNggakKalahSeruSection(
                                 .data(comic.posterUrl)
                                 .crossfade(true)
                                 .addHeader("User-Agent", COMIC_IMAGE_USER_AGENT)
-                                .addHeader("Referer", "https://komikstation.org/")
+                                .addHeader("Referer", resolveComicImageReferer(comic.posterUrl))
+                                .placeholder(R.drawable.placeholder_yuranime)
+                                .error(R.drawable.placeholder_yuranime)
                                 .build(),
                             contentDescription = comic.title,
                             modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Crop,
+                            alignment = Alignment.TopCenter
                         )
 
                         // Ikon Bendera Negara di pojok kiri bawah
@@ -1601,11 +1612,11 @@ private fun ComicSeriesTerbaruSection(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Sisi Kiri: Poster Komik vertikal 64.dp x 2:3
+                    // Sisi Kiri: Poster Komik vertikal 66.dp x 0.70
                     Box(
                         modifier = Modifier
-                            .width(64.dp)
-                            .aspectRatio(2f / 3f)
+                            .width(66.dp)
+                            .aspectRatio(0.70f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(ComicCardBg)
                     ) {
@@ -1614,11 +1625,14 @@ private fun ComicSeriesTerbaruSection(
                                 .data(item.posterUrl)
                                 .crossfade(true)
                                 .addHeader("User-Agent", COMIC_IMAGE_USER_AGENT)
-                                .addHeader("Referer", "https://komikstation.org/")
+                                .addHeader("Referer", resolveComicImageReferer(item.posterUrl))
+                                .placeholder(R.drawable.placeholder_yuranime)
+                                .error(R.drawable.placeholder_yuranime)
                                 .build(),
                             contentDescription = item.title,
                             modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Crop,
+                            alignment = Alignment.TopCenter
                         )
                     }
 
@@ -2062,20 +2076,24 @@ private fun ComicSearchDialog(
                                 Box(
                                     modifier = Modifier
                                         .width(44.dp)
-                                        .aspectRatio(2f / 3f)
+                                        .aspectRatio(0.70f)
                                         .clip(RoundedCornerShape(6.dp))
                                         .background(Color.DarkGray)
                                 ) {
+                                    val searchCoverUrl = comic.coverPortrait.ifBlank { comic.coverLandscape.orEmpty() }
                                     AsyncImage(
                                         model = ImageRequest.Builder(context)
-                                            .data(comic.coverPortrait.ifBlank { comic.coverLandscape })
+                                            .data(searchCoverUrl)
                                             .crossfade(true)
                                             .addHeader("User-Agent", COMIC_IMAGE_USER_AGENT)
-                                            .addHeader("Referer", COMIC_IMAGE_REFERER)
+                                            .addHeader("Referer", resolveComicImageReferer(searchCoverUrl))
+                                            .placeholder(R.drawable.placeholder_yuranime)
+                                            .error(R.drawable.placeholder_yuranime)
                                             .build(),
                                         contentDescription = comic.title,
                                         modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
+                                        contentScale = ContentScale.Crop,
+                                        alignment = Alignment.TopCenter
                                     )
                                 }
 

@@ -2,8 +2,11 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.devtools.ksp")
     id("com.google.gms.google-services")
 }
+
+val natives: Configuration by configurations.creating
 
 android {
     namespace = "com.yuranime.dinz"
@@ -117,6 +120,23 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
+    // Cozy Fishing RPG Engine (LibGDX 1.12.1 + Fragment Host)
+    val gdxVersion = "1.12.1"
+    implementation("androidx.fragment:fragment-ktx:1.8.4")
+    implementation("com.badlogicgames.gdx:gdx:$gdxVersion")
+    implementation("com.badlogicgames.gdx:gdx-backend-android:$gdxVersion")
+    natives("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a")
+    natives("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a")
+    natives("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86")
+    natives("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86_64")
+
+    // Local Persistence (Room + DataStore) for RPG Save System & Settings
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
     // Firebase (Real-Time Auth & Cloud Firestore)
     val firebaseBom = platform("com.google.firebase:firebase-bom:33.5.1")
     implementation(firebaseBom)
@@ -130,7 +150,36 @@ dependencies {
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
+    // Unit Testing
+    testImplementation("junit:junit:4.13.2")
+
     // Debugging / Tooling
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+val copyAndroidNatives by tasks.registering {
+    doFirst {
+        natives.files.forEach { jar ->
+            val outputDir = when {
+                jar.name.endsWith("natives-armeabi-v7a.jar") -> file("src/main/jniLibs/armeabi-v7a")
+                jar.name.endsWith("natives-arm64-v8a.jar") -> file("src/main/jniLibs/arm64-v8a")
+                jar.name.endsWith("natives-x86_64.jar") -> file("src/main/jniLibs/x86_64")
+                jar.name.endsWith("natives-x86.jar") -> file("src/main/jniLibs/x86")
+                else -> null
+            }
+            outputDir?.let { dir ->
+                dir.mkdirs()
+                copy {
+                    from(zipTree(jar))
+                    into(dir)
+                    include("*.so")
+                }
+            }
+        }
+    }
+}
+
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn(copyAndroidNatives)
 }

@@ -56,46 +56,44 @@ class YuranimeApp : Application(), ImageLoaderFactory {
                 val isShngmDomain = host.contains("shngm") ||
                     host.contains("shinigami") ||
                     host.contains("komikid")
+                val isAnimeInDomain = host.contains("animein") || host.contains("nimein")
 
                 val isRemoteCosmeticDomain =
                     com.yuranime.dinz.data.repository.DiscordCosmeticsRepository.isManagedCdnHost(host)
                 val isStickerDomain = host.contains("pstatic.net") || host.contains("sticker.ly")
+                val chromeMobileUa =
+                    "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
 
                 if (isRemoteCosmeticDomain || isStickerDomain) {
                     requestBuilder
                         .removeHeader("Referer")
                         .removeHeader("x-proxy-secret")
-                        .header(
-                            "User-Agent",
-                            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
-                        )
+                        .header("User-Agent", chromeMobileUa)
                 } else if (isWpDomain) {
                     requestBuilder
                         .removeHeader("Referer")
                         .removeHeader("x-proxy-secret")
-                        .header(
-                            "User-Agent",
-                            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
-                        )
+                        .header("User-Agent", chromeMobileUa)
                 } else if (isKomikStationDomain) {
                     requestBuilder
+                        .removeHeader("x-proxy-secret")
                         .header("Referer", "https://komikstation.org/")
-                        .header(
-                            "User-Agent",
-                            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
-                        )
+                        .header("User-Agent", chromeMobileUa)
                 } else if (isShngmDomain) {
                     requestBuilder
+                        .removeHeader("x-proxy-secret")
                         .header("Referer", "https://app.shinigami.asia/")
-                        .header(
-                            "User-Agent",
-                            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
-                        )
-                } else {
+                        .header("User-Agent", chromeMobileUa)
+                } else if (isAnimeInDomain) {
                     requestBuilder
                         .removeHeader("Referer")
                         .removeHeader("x-proxy-secret")
                         .header("User-Agent", "okhttp/4.12.0")
+                } else {
+                    requestBuilder
+                        .removeHeader("Referer")
+                        .removeHeader("x-proxy-secret")
+                        .header("User-Agent", chromeMobileUa)
                 }
 
                 chain.proceed(requestBuilder.build())

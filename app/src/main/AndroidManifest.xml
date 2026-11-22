@@ -30,6 +30,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".rpg.ui.RpgGameActivity"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize"
+            android:theme="@style/Theme.Yuranime" />
+
         <receiver
             android:name=".data.notification.AnimeReleaseReceiver"
             android:exported="false" />
