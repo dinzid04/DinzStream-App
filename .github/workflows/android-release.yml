@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  APP_VERSION: "3.0.1"
+  APP_VERSION: "3.0.2"
 
 jobs:
   build:
@@ -67,19 +67,18 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           tag_name: "v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
-          name: "Yuranime v${{ env.APP_VERSION }} - Fix Crash Loop RPG, Akses Khusus Akun Login & Sinkronisasi Database Cloud (Build #${{ github.run_number }})"
+          name: "Yuranime v${{ env.APP_VERSION }} - Fix TMX CSV Map Parser Willowbrook Cove RPG (Build #${{ github.run_number }})"
           body: |
             ## Yuranime Android App v${{ env.APP_VERSION }} Release
 
             ### Pembaruan Utama v${{ env.APP_VERSION }}:
-            1. **Perbaikan Total Crash & Restart Loop saat Masuk Willowbrook Cove RPG:**
-               - Upgrade LibGDX ke `1.13.5` (dukungan native alignment 16KB ELF `0x4000` & Android 14/15/16).
-               - Mengganti host LibGDX dengan `SafeAndroidFragmentApplication` + `SafeAndroidGraphics` yang bebas deadlock `Process.killProcess()` saat transisi orientasi maupun pause/destroy di Android 14/15/16 Samsung One UI.
-               - Menggunakan static resource ID (`R.id.rpg_game_container`), `super.onCreate(null)`, `configChanges` lengkap, menghapus bentrok `YuranimeTheme` 60Hz `SideEffect` & deprecated `AndroidVisibilityListener`, serta memproteksi seluruh callback GLThread agar tidak pernah keluar-masuk berulang.
-            2. **Khusus Pengguna yang Sudah Login:**
-               - Menghapus akses tamu pada layar login (`LoginView`). Menu **Willowbrook Cove RPG** hanya tampil di halaman Profil akun yang sudah login dan dijaga langsung di `RpgGameActivity`.
-            3. **Database Per-Akun & Sinkronisasi Penuh Firebase Firestore:**
-               - Seluruh tabel Room kini terisolasi per `userUid` (versi DB 2) dan disinkronkan dua arah (save & restore otomatis) ke database Firebase Firestore milik akun pengguna yang sedang login (`users/{uid}` dan `users/{uid}/rpg_saves/starter_homestead`).
+            1. **Perbaikan Error `Gagal memuat aset game: For input string: "4 4"` pada Willowbrook Cove RPG:**
+               - Memperbaiki format CSV `<data encoding="csv">` pada seluruh 8 layer `starter_homestead.tmx` (menambahkan tanda koma penutup di akhir setiap baris sesuai spesifikasi Tiled TMX & `BaseTmxMapLoader.getTileIds()`).
+               - Menerapkan filter tekstur `TextureFilter.Nearest` eksplisit pada `TmxMapLoader.Parameters` agar peta pixel-art tampil tajam.
+               - Menambahkan pengujian langsung `BaseTmxMapLoader.getTileIds()` pada seluruh 8 layer peta di unit test CI.
+            2. **Tetap Menyertakan Seluruh Perbaikan v3.0.1:**
+               - Bebas crash/restart loop (`SafeAndroidFragmentApplication` + `SafeAndroidGraphics` + LibGDX `1.13.5` 16KB ELF).
+               - Akses khusus akun login dan sinkronisasi penuh ke database Firebase Firestore akun login.
           draft: false
           prerelease: false
           make_latest: true

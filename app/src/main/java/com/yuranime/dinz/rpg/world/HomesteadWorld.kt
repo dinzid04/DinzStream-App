@@ -1,5 +1,6 @@
 package com.yuranime.dinz.rpg.world
 
+import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.maps.tiled.TiledMap
 import com.badlogic.gdx.maps.tiled.TiledMapTileLayer
 import com.badlogic.gdx.maps.tiled.TmxMapLoader
@@ -68,7 +69,11 @@ class HomesteadWorld {
     private var weatherTimer: Float = 95f
 
     fun loadMap() {
-        tiledMap = TmxMapLoader().load("rpg/maps/starter_homestead.tmx")
+        val params = TmxMapLoader.Parameters().apply {
+            textureMinFilter = Texture.TextureFilter.Nearest
+            textureMagFilter = Texture.TextureFilter.Nearest
+        }
+        tiledMap = TmxMapLoader().load("rpg/maps/starter_homestead.tmx", params)
         groundLayer = tiledMap.layers.get("ground") as? TiledMapTileLayer
         decorLayer = tiledMap.layers.get("ground_decor") as? TiledMapTileLayer
         waterLayer = tiledMap.layers.get("water") as? TiledMapTileLayer

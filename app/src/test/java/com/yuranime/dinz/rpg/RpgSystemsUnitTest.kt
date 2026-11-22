@@ -2,6 +2,7 @@ package com.yuranime.dinz.rpg
 
 import com.badlogic.gdx.files.FileHandle
 import com.badlogic.gdx.graphics.g2d.TextureAtlas
+import com.badlogic.gdx.maps.tiled.BaseTmxMapLoader
 import com.badlogic.gdx.utils.XmlReader
 import com.yuranime.dinz.rpg.audio.RpgSfx
 import com.yuranime.dinz.rpg.building.BuildingSystem
@@ -313,7 +314,18 @@ class RpgSystemsUnitTest {
         val mapElem = xml.parse(FileHandle(tmxFile))
         assertEquals(30, mapElem.getIntAttribute("width"))
         assertEquals(24, mapElem.getIntAttribute("height"))
-        assertEquals(8, mapElem.getChildrenByName("layer").size)
+        val layerElems = mapElem.getChildrenByName("layer")
+        assertEquals(8, layerElems.size)
+
+        // Verify exact LibGDX BaseTmxMapLoader.getTileIds CSV parser succeeds on every layer
+        for (i in 0 until layerElems.size) {
+            val layer = layerElems.get(i)
+            val ids = BaseTmxMapLoader.getTileIds(layer, 30, 24)
+            assertEquals("Layer ${layer.getAttribute("name")} must have 720 tile IDs", 720, ids.size)
+            for (gid in ids) {
+                assertTrue("Invalid GID $gid in layer ${layer.getAttribute("name")}", gid in 0..64)
+            }
+        }
 
         val tsxElem = xml.parse(FileHandle(tsxFile))
         val imageSource = tsxElem.getChildByName("image").getAttribute("source")
